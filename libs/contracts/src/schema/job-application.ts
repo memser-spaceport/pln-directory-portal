@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { JobSearchStatusWireSchema } from './job-search-status';
 
 export const CreateJobApplicationSchema = z.object({
   coverLetter: z.string().trim().min(1).max(2000),
@@ -26,8 +27,31 @@ export const JobBoardSignUpSchema = z
   .object({
     name: z.string().trim().min(1).max(200),
     email: z.string().trim().email(),
+    /* The address at the company named in `team` — evidence for that claim, so
+       the PL team reviewing the account can see where the person works. Never a
+       second identity: `email` above is the one address the account is created
+       on. Optional independently of `team`, because the company select is
+       optional too and an answer given without one is still an answer. */
+    teamEmail: z.string().trim().email().max(200).optional(),
+    /* Where they are with job hunting. The other half of the board's
+       `isProfileComplete` (`role && jobSearchStatus`) — asking it here is what
+       lets an account created from this form come back from sign-in ready to
+       apply, instead of owing one radio button and paying a whole step for it.
+
+       Imported rather than restated: this list has to match the `JobSearchStatus`
+       Prisma enum, and `admin-member.ts` already keeps two hand-written copies of
+       it. A third would be a third chance to drift. */
+    jobSearchStatus: JobSearchStatusWireSchema.optional(),
     linkedinHandler: z.string().trim().min(1).max(200).optional(),
-    role: z.string().trim().min(1).max(200),
+    /* Optional at sign-up: the form lets someone skip current role and fill it
+       on the profile step before applying. Blank is the same as omitted — a
+       skipped field, not a failed one. */
+    role: z
+      .string()
+      .trim()
+      .max(200)
+      .optional()
+      .transform((value) => (value ? value : undefined)),
     isTeamNew: z.boolean().optional(),
     team: JobBoardSignUpTeamSchema.optional(),
   })

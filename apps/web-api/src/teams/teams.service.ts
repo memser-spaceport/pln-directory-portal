@@ -535,6 +535,7 @@ export class TeamsService {
       'blog',
       'contactMethod',
       'jobReferEmail',
+      'jobReferCcEmails',
       'twitterHandler',
       'linkedinHandler',
       'telegramHandler',
@@ -559,6 +560,9 @@ export class TeamsService {
 
     if (team.jobReferEmail !== undefined) {
       team.jobReferEmail = this.normalizeJobReferEmail(team.jobReferEmail);
+    }
+    if (team.jobReferCcEmails !== undefined) {
+      team.jobReferCcEmails = this.normalizeJobReferCcEmails(team.jobReferCcEmails);
     }
     if (team.blueskyHandler !== undefined) {
       team.blueskyHandler = normalizeBlueskyHandler(team.blueskyHandler) ?? null;
@@ -646,6 +650,25 @@ export class TeamsService {
       throw new BadRequestException('Invalid job refer email');
     }
     return parsed.data;
+  }
+
+  private normalizeJobReferCcEmails(value: string[] | null): string[] {
+    if (value == null) return [];
+    const seen = new Set<string>();
+    const emails: string[] = [];
+    for (const raw of value) {
+      const trimmed = String(raw ?? '')
+        .trim()
+        .toLowerCase();
+      if (!trimmed || seen.has(trimmed)) continue;
+      const parsed = z.string().email().safeParse(trimmed);
+      if (!parsed.success) {
+        throw new BadRequestException('Invalid job refer CC email');
+      }
+      seen.add(parsed.data);
+      emails.push(parsed.data);
+    }
+    return emails;
   }
 
   /**

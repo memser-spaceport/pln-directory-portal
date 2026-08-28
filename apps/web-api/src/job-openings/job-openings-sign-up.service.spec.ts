@@ -59,7 +59,7 @@ describe('JobOpeningsSignUpService', () => {
     );
   });
 
-  it('assigns the Job Aspirant policy after creating the member', async () => {
+  it('assigns the Job Aspirant policy after creating a member with no team', async () => {
     await service.signUp({ name: 'Ada', email: 'ada@example.com', role: 'Engineer' });
 
     expect(prisma.policy.findUnique).toHaveBeenCalledWith({
@@ -79,6 +79,33 @@ describe('JobOpeningsSignUpService', () => {
         policyUid: 'policy-job-aspirant',
       },
     });
+  });
+
+  it('does not assign Job Aspirant or job-board signUpSource when an existing team is selected', async () => {
+    await service.signUp({
+      name: 'Ada',
+      email: 'ada@example.com',
+      role: 'Engineer',
+      team: { uid: 'team-1' },
+    });
+
+    expect(membersService.createMemberAndAttach.mock.calls[0][0].signUpSource).toBeUndefined();
+    expect(prisma.policy.findUnique).not.toHaveBeenCalled();
+    expect(prisma.policyAssignment.upsert).not.toHaveBeenCalled();
+  });
+
+  it('does not assign Job Aspirant or job-board signUpSource when creating a new team', async () => {
+    await service.signUp({
+      name: 'Ada',
+      email: 'ada@example.com',
+      role: 'Engineer',
+      isTeamNew: true,
+      team: { name: 'New Co', website: 'https://new.co' },
+    });
+
+    expect(membersService.createMemberAndAttach.mock.calls[0][0].signUpSource).toBeUndefined();
+    expect(prisma.policy.findUnique).not.toHaveBeenCalled();
+    expect(prisma.policyAssignment.upsert).not.toHaveBeenCalled();
   });
 
   it('throws when the Job Aspirant policy is missing', async () => {
@@ -103,6 +130,93 @@ describe('JobOpeningsSignUpService', () => {
       isTeamNew: false,
       team: { uid: 'team-1' },
     });
+  });
+
+  /* The address is optional, and so is the company it refers to — so it has to
+     survive on its own. It rides in `options` beside `role` rather than in the
+     member payload, which is where `createMemberAndAttach` writes it to the
+     Member row. */
+  it('passes teamEmail through, with or without a team', async () => {
+    await service.signUp({
+      name: 'Ada',
+      email: 'ada@personal.com',
+      role: 'Engineer',
+      teamEmail: 'ada@newco.xyz',
+      team: { uid: 'team-1' },
+    });
+
+    expect(membersService.createMemberAndAttach.mock.calls[0][1]).toMatchObject({
+      teamEmail: 'ada@newco.xyz',
+      team: { uid: 'team-1' },
+    });
+
+    await service.signUp({
+      name: 'Ada',
+      email: 'ada@personal.com',
+      role: 'Engineer',
+      teamEmail: 'ada@newco.xyz',
+    });
+
+    expect(membersService.createMemberAndAttach.mock.calls[1][1]).toMatchObject({
+      teamEmail: 'ada@newco.xyz',
+      team: undefined,
+    });
+  });
+
+  it('leaves teamEmail undefined when it was not given', async () => {
+    await service.signUp({ name: 'Ada', email: 'ada@example.com', role: 'Engineer' });
+
+    expect(membersService.createMemberAndAttach.mock.calls[0][1].teamEmail).toBeUndefined();
+  });
+
+  /* It is an address or it is absent — a half-typed one must not reach the
+     Member row, because the whole point of the field is that a reviewer can
+     act on it. */
+  it('rejects a malformed teamEmail and accepts its absence', () => {
+    const base = { name: 'Ada', email: 'ada@example.com', role: 'Engineer' };
+
+    expect(JobBoardSignUpSchema.safeParse({ ...base, teamEmail: 'not-an-email' }).success).toBe(false);
+    expect(JobBoardSignUpSchema.safeParse({ ...base, teamEmail: '' }).success).toBe(false);
+    expect(JobBoardSignUpSchema.safeParse(base).success).toBe(true);
+  });
+
+  /* Unlike `teamEmail` one block up, this rides in the member payload rather
+     than in `options` — `prepareMemberFromParticipantRequest` already maps and
+     writes it on the create path, so it needs no follow-up update and no new
+     code. Guarding the argument position is the point of this test: moving it
+     to `options` would be silently ignored, since nothing there reads it. */
+  it('passes jobSearchStatus through on the member payload', async () => {
+    await service.signUp({
+      name: 'Ada',
+      email: 'ada@example.com',
+      role: 'Engineer',
+      jobSearchStatus: 'actively-looking',
+    });
+
+    expect(membersService.createMemberAndAttach.mock.calls[0][0]).toMatchObject({
+      jobSearchStatus: 'actively-looking',
+    });
+    expect(membersService.createMemberAndAttach.mock.calls[0][1].jobSearchStatus).toBeUndefined();
+  });
+
+  it('leaves jobSearchStatus undefined when it was not given', async () => {
+    await service.signUp({ name: 'Ada', email: 'ada@example.com', role: 'Engineer' });
+
+    expect(membersService.createMemberAndAttach.mock.calls[0][0].jobSearchStatus).toBeUndefined();
+  });
+
+  /* The three wire values and nothing else. They have to match the
+     `JobSearchStatus` Prisma enum, and the schema is the only thing standing
+     between a typo and a 500 from `toPrismaJobSearchStatus` further in. */
+  it('accepts the three job search statuses and refuses anything else', () => {
+    const base = { name: 'Ada', email: 'ada@example.com', role: 'Engineer' };
+
+    for (const status of ['actively-looking', 'open-to-right-role', 'not-looking']) {
+      expect(JobBoardSignUpSchema.safeParse({ ...base, jobSearchStatus: status }).success).toBe(true);
+    }
+    expect(JobBoardSignUpSchema.safeParse({ ...base, jobSearchStatus: 'ACTIVELY_LOOKING' }).success).toBe(false);
+    expect(JobBoardSignUpSchema.safeParse({ ...base, jobSearchStatus: '' }).success).toBe(false);
+    expect(JobBoardSignUpSchema.safeParse(base).success).toBe(true);
   });
 
   it('creates a new team when isTeamNew is true', async () => {
@@ -137,6 +251,22 @@ describe('JobOpeningsSignUpService', () => {
     await service.signUp({ name: 'Ada', email: 'ada@example.com', role: 'Engineer' });
     expect(Object.keys(membersService)).toEqual(['createMemberAndAttach']);
     expect(prisma).not.toHaveProperty('jobApplication');
+  });
+
+  it('creates a member when role is omitted', async () => {
+    await service.signUp({ name: 'Ada', email: 'ada@example.com' });
+
+    expect(membersService.createMemberAndAttach.mock.calls[0][1].role).toBeUndefined();
+  });
+
+  it('treats a blank role as omitted', () => {
+    const base = { name: 'Ada', email: 'ada@example.com' };
+
+    expect(JobBoardSignUpSchema.parse(base).role).toBeUndefined();
+    expect(JobBoardSignUpSchema.parse({ ...base, role: '' }).role).toBeUndefined();
+    expect(JobBoardSignUpSchema.parse({ ...base, role: '   ' }).role).toBeUndefined();
+    expect(JobBoardSignUpSchema.parse({ ...base, role: 'Engineer' }).role).toBe('Engineer');
+    expect(JobBoardSignUpSchema.safeParse({ ...base, role: 'x'.repeat(201) }).success).toBe(false);
   });
 
   it('requires team.name when isTeamNew is true', () => {

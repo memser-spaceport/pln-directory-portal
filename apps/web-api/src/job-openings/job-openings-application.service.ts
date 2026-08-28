@@ -1,19 +1,18 @@
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { MemberApprovalState, Prisma } from '@prisma/client';
+import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import type { CreateJobApplicationInput } from 'libs/contracts/src/schema/job-application';
 import { PrismaService } from '../shared/prisma.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { noteToHtml } from './job-openings-email-html';
-import { resolveVisibleJobOpening, type ResolvedJobOpening } from './job-openings-resolve';
+import { parseJobReferCcEmails, resolveVisibleJobOpening, type ResolvedJobOpening } from './job-openings-resolve';
 import { isProtocolLabsTeam } from './pin-protocol-labs-team';
+import { jobBoardDetailUrl } from './job-openings-url';
 
 const JOB_BOARD_APPLICATION_TEMPLATE = 'JOB_BOARD_APPLICATION_EMAIL';
+const PROFILE_CARD_SKILLS_LIMIT = 3;
+
+type ApplicantLocation = { city: string | null; country: string; region: string | null } | null;
+type MemberHeadline = { title: string | null; companyName: string | null };
 
 type Applicant = {
   uid: string;
@@ -25,8 +24,7 @@ type Applicant = {
   bio: string | null;
   githubHandler: string | null;
   linkedinHandler: string | null;
-  approvalState: MemberApprovalState | null;
-  location: { city: string | null; country: string; region: string | null } | null;
+  location: ApplicantLocation;
   skills: Array<{ title: string }>;
   experiences: Array<{
     title: string;
@@ -45,7 +43,7 @@ type Applicant = {
     endDate: Date | null;
     project: { name: string } | null;
   }>;
-  teamMemberRoles: Array<{ mainTeam: boolean; team: { name: string } }>;
+  teamMemberRoles: Array<{ mainTeam: boolean; role: string | null; team: { name: string } }>;
 };
 
 @Injectable()
@@ -73,8 +71,7 @@ export class JobOpeningsApplicationService {
     const companyName = this.resolveCompanyName(applicant);
     const profileSnapshot = this.buildProfileSnapshot(applicant, companyName);
     const coverLetterHtml = noteToHtml(input.coverLetter);
-    const primaryExperience = this.primaryExperience(applicant.experiences);
-    const webBase = (process.env.WEB_UI_BASE_URL || '').replace(/\/+$/, '');
+    const jobBoardUrl = jobBoardDetailUrl(jobOpening.uid);
 
     await this.notificationServiceClient.sendNotification({
       isPriority: true,
@@ -87,19 +84,11 @@ export class JobOpeningsApplicationService {
       },
       deliveryPayload: {
         body: {
-          applicantName: applicant.name,
-          applicantFirstName: this.firstName(applicant.name),
-          applicantRole: applicant.role?.trim() ?? '',
-          applicantCompany: primaryExperience?.company.trim() || companyName || '',
-          applicantWorkDuration: primaryExperience ? this.formatExperienceDates(primaryExperience) : '',
-          applicantLocation: this.formatLocation(applicant.location),
-          applicantSkills: applicant.skills.map((skill) => skill.title).filter(Boolean),
+          applicant: this.buildMemberCard(applicant),
           roleTitle: jobOpening.roleTitle,
           teamName: jobOpening.team.name,
           coverLetterHtml,
-          profileUrl: `${webBase}/members/${applicant.uid}`,
-          applyUrl: jobOpening.sourceLink || null,
-          preferencesUrl: `${webBase}/settings/email`,
+          applyUrl: jobBoardUrl,
         },
       },
       entityType: 'JOB_OPENING',
@@ -176,7 +165,6 @@ export class JobOpeningsApplicationService {
         githubHandler: true,
         linkedinHandler: true,
         deletedAt: true,
-        memberApproval: { select: { state: true } },
         location: { select: { city: true, country: true, region: true } },
         skills: { select: { title: true } },
         experiences: {
@@ -202,7 +190,7 @@ export class JobOpeningsApplicationService {
         },
         teamMemberRoles: {
           orderBy: { mainTeam: 'desc' },
-          select: { mainTeam: true, team: { select: { name: true } } },
+          select: { mainTeam: true, role: true, team: { select: { name: true } } },
         },
       },
     });
@@ -220,7 +208,6 @@ export class JobOpeningsApplicationService {
       bio: member.bio,
       githubHandler: member.githubHandler,
       linkedinHandler: member.linkedinHandler,
-      approvalState: member.memberApproval?.state ?? null,
       location: member.location,
       skills: member.skills,
       experiences: member.experiences,
@@ -229,10 +216,24 @@ export class JobOpeningsApplicationService {
     };
   }
 
+  /**
+   * What an application needs, which is no longer an approved account.
+   *
+   * Approval used to gate this: an unapproved member got a 403 and the board
+   * sent them to the team's own posting instead. The review is still real and
+   * still runs, but it no longer holds up applying — it is a fact about the
+   * account rather than a condition on this button. Someone who signs up to
+   * apply for a job can now do the thing they came to do, and the PL team's
+   * review happens alongside it.
+   *
+   * Rejection is not handled here and never was: a rejected member is
+   * soft-deleted, so they do not reach this method at all.
+   *
+   * What survives are the two checks about the *application* rather than the
+   * account — a role and a job-search status, both of which travel to the
+   * hiring team and neither of which anyone else can supply.
+   */
   private assertCanApply(applicant: Applicant) {
-    if (applicant.approvalState !== MemberApprovalState.APPROVED) {
-      throw new ForbiddenException('Account must be approved before applying');
-    }
     if (!applicant.role?.trim()) {
       throw new BadRequestException('Current role is required before applying');
     }
@@ -247,9 +248,13 @@ export class JobOpeningsApplicationService {
       if (!jobReferEmail) {
         throw new BadRequestException('This job is not accepting in-app applications');
       }
+      const toKey = jobReferEmail.toLowerCase();
+      const cc = parseJobReferCcEmails(jobOpening.team.jobReferCcEmails)
+        .filter((email) => email !== toKey)
+        .map((email) => ({ uid: jobOpening.team.uid, name: jobOpening.team.name, email }));
       return {
         to: { uid: jobOpening.team.uid, name: jobOpening.team.name, email: jobReferEmail },
-        cc: [] as Array<{ uid: string; name: string; email: string }>,
+        cc,
       };
     }
 
@@ -292,29 +297,36 @@ export class JobOpeningsApplicationService {
     return { to, cc };
   }
 
-  private firstName(name: string) {
-    return name.trim().split(/\s+/)[0] || name;
+  private resolveHeadline(applicant: Applicant): MemberHeadline {
+    const teamRole = applicant.teamMemberRoles.find((role) => role.mainTeam) ?? applicant.teamMemberRoles[0];
+    if (teamRole) {
+      return { title: teamRole.role ?? applicant.role?.trim() ?? null, companyName: teamRole.team.name };
+    }
+    return { title: applicant.role?.trim() ?? null, companyName: applicant.currentCompany?.trim() || null };
   }
 
-  private primaryExperience(experiences: Applicant['experiences']) {
-    const current = experiences.find((experience) => experience.isCurrent);
-    if (current) return current;
-    return [...experiences].sort((a, b) => b.startDate.getTime() - a.startDate.getTime())[0] ?? null;
+  private formatHeadline(headline: MemberHeadline): string | null {
+    if (headline.title && headline.companyName) return `${headline.title}, ${headline.companyName}`;
+    return headline.title ?? null;
   }
 
-  private formatExperienceDates(experience: Applicant['experiences'][number]) {
-    const start = this.formatMonthYear(experience.startDate);
-    const end = experience.isCurrent || !experience.endDate ? 'Present' : this.formatMonthYear(experience.endDate);
-    return [start, end].filter(Boolean).join(' — ');
+  private formatLocation(location: ApplicantLocation): string | null {
+    if (!location) return null;
+    return [location.city, location.country].filter(Boolean).join(', ') || null;
   }
 
-  private formatMonthYear(date: Date) {
-    return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(date);
-  }
-
-  private formatLocation(location: Applicant['location']) {
-    if (!location) return '';
-    return [location.city, location.country].filter(Boolean).join(', ');
+  // Shape consumed by the `memberCard` partial in the JOB_BOARD_APPLICATION_EMAIL template.
+  private buildMemberCard(applicant: Applicant) {
+    return {
+      name: applicant.name,
+      profileUrl: `${process.env.WEB_UI_BASE_URL}/members/${applicant.uid}`,
+      headline: this.formatHeadline(this.resolveHeadline(applicant)),
+      location: this.formatLocation(applicant.location),
+      skills: applicant.skills
+        .map((skill) => skill.title)
+        .filter(Boolean)
+        .slice(0, PROFILE_CARD_SKILLS_LIMIT),
+    };
   }
 
   private resolveCompanyName(applicant: Applicant): string | null {

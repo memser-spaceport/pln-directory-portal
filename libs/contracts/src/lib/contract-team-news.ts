@@ -16,6 +16,8 @@ import {
   TeamNewsLatestResponseSchema,
   TeamNewsRecentQueryParams,
   TeamNewsRecentResponseSchema,
+  TeamNewsDigestPicksRequestSchema,
+  TeamNewsDigestPicksResponseSchema,
   TeamNewsUpvoteStatusSchema,
   RecordTeamNewsImpressionsRequestSchema,
   RecordTeamNewsImpressionsResponseSchema,
@@ -62,6 +64,15 @@ export const apiTeamNews = contract.router({
       200: TeamNewsRecentResponseSchema,
     },
     summary: 'Recent network news across all teams (for the digest email)',
+  },
+  getTeamNewsDigestPicks: {
+    method: 'POST',
+    path: `${getAPIVersionAsPath('1')}/team-news/digest-picks`,
+    body: TeamNewsDigestPicksRequestSchema,
+    responses: {
+      200: TeamNewsDigestPicksResponseSchema,
+    },
+    summary: 'Per-member For You news picks for the digest email (service auth)',
   },
   getTeamNewsLatest: {
     method: 'GET',

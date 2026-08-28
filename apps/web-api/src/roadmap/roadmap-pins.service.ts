@@ -34,10 +34,16 @@ export class RoadmapPinsService {
     await this.prisma.$transaction(async (tx) => {
       const item = await tx.roadmapItem.findFirst({
         where: { uid, deletedAt: null },
-        select: { uid: true, stage: true },
+        select: { uid: true, stage: true, createdByUid: true },
       });
       if (!item) {
         throw new NotFoundException(`Roadmap item ${uid} not found`);
+      }
+      // The author's rating already reaches the aggregate as `authorImpact`, so a self-boost
+      // would count it twice on top of inflating pinCount. Creation only — unpinItem stays
+      // open so members who self-boosted before this guard can still release those pins.
+      if (item.createdByUid === actorUid) {
+        throw new ForbiddenException('You cannot boost your own item');
       }
       this.roadmapService.assertStageAllowsSignals(item.stage);
 

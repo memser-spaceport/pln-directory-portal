@@ -87,6 +87,8 @@ export const MEMBER_PERMISSIONS = {
   ONBOARDING: 'member.onboarding',
   /** Manage investor-only settings and profile actions */
   INVESTOR_MANAGE: 'member.investor.manage',
+  /** Appear in the directory and public profile without being APPROVED */
+  PROFILE_VISIBLE: 'member.profile.visible',
 } as const;
 
 // ── Forum ───────────────────────────────────────────────────────────────
@@ -267,6 +269,7 @@ export const ALL_PERMISSION_CODES = [
   MEMBER_PERMISSIONS.AFFINITY_READ,
   MEMBER_PERMISSIONS.ONBOARDING,
   MEMBER_PERMISSIONS.INVESTOR_MANAGE,
+  MEMBER_PERMISSIONS.PROFILE_VISIBLE,
 
   // Forum
   FORUM_PERMISSIONS.READ,
@@ -312,7 +315,7 @@ export const ALL_PERMISSION_CODES = [
 
 // ── Policies ─────────────────────────────────────────────────────────────
 
-/** Marker assigned on Job Board sign-up, including unapproved members. */
+/** Assigned on Job Board sign-up, including unapproved members. Grants `member.profile.visible`. */
 export const JOB_ASPIRANT_POLICY_CODE = 'job_aspirant';
 
 // ── Type Exports ─────────────────────────────────────────────────────────

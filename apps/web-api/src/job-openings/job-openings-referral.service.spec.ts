@@ -49,7 +49,7 @@ const jobOpening = {
   sourceLink: 'https://jobs.example/role',
   status: JobOpeningStatus.CONFIRMED,
   teamUid: 'team-1',
-  team: { uid: 'team-1', name: 'Airship', jobReferEmail: null as string | null },
+  team: { uid: 'team-1', name: 'Airship', jobReferEmail: null as string | null, jobReferCcEmails: [] as string[] },
 };
 
 const memberRecipients = [
@@ -72,6 +72,7 @@ describe('JobOpeningsReferralService', () => {
     prisma = buildPrismaMock();
     notificationServiceClient = { sendNotification: jest.fn().mockResolvedValue({}) };
     service = new JobOpeningsReferralService(prisma as unknown as PrismaService, notificationServiceClient as never);
+    process.env.WEB_UI_BASE_URL = 'https://directory.test';
   });
 
   function mockMembers() {
@@ -111,6 +112,13 @@ describe('JobOpeningsReferralService', () => {
           to: [lead.email],
           cc: [leadTwo.email, referrer.email, referred.email],
         },
+        deliveryPayload: {
+          body: expect.objectContaining({
+            applyUrl: 'https://directory.test/jobs?job=job-1',
+            roleTitle: 'Staff Engineer',
+            teamName: 'Airship',
+          }),
+        },
       })
     );
     expect(prisma.jobReferral.create).toHaveBeenCalledWith(
@@ -141,6 +149,28 @@ describe('JobOpeningsReferralService', () => {
     expect(prisma.member.findMany).not.toHaveBeenCalled();
     expect(result.cc).not.toContain(lead.email);
     expect(result.cc).not.toContain(leadTwo.email);
+  });
+
+  it('CCs team job-refer CC emails when they are set', async () => {
+    mockHappyPath({
+      ...jobOpening.team,
+      jobReferEmail: 'jobs@airship.com',
+      jobReferCcEmails: ['hiring@airship.com', ' JOBS@airship.com ', referrer.email, ''],
+    });
+
+    const result = await service.referJob('job-1', referrer.email, referralInput);
+
+    expect(result.to).toBe('jobs@airship.com');
+    expect(result.cc).toEqual(['hiring@airship.com', referrer.email, referred.email]);
+    expect(notificationServiceClient.sendNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipientsInfo: {
+          to: ['jobs@airship.com'],
+          cc: ['hiring@airship.com', referrer.email, referred.email],
+        },
+      })
+    );
+    expect(prisma.member.findMany).not.toHaveBeenCalled();
   });
 
   it('sends to the team job-refer email when recipients are omitted', async () => {

@@ -9,8 +9,20 @@ export type ResolvedJobOpening = {
   sourceLink: string | null;
   status: JobOpeningStatus;
   teamUid: string | null;
-  team: { uid: string; name: string; jobReferEmail: string | null };
+  team: { uid: string; name: string; jobReferEmail: string | null; jobReferCcEmails: string[] };
 };
+
+export function parseJobReferCcEmails(emails: string[] | null | undefined): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const raw of emails ?? []) {
+    const email = raw.trim().toLowerCase();
+    if (!email || seen.has(email)) continue;
+    seen.add(email);
+    result.push(email);
+  }
+  return result;
+}
 
 export async function resolveVisibleJobOpening(prisma: PrismaService, jobUid: string): Promise<ResolvedJobOpening> {
   const jobOpening = await prisma.jobOpening.findUnique({
@@ -21,7 +33,7 @@ export async function resolveVisibleJobOpening(prisma: PrismaService, jobUid: st
       sourceLink: true,
       status: true,
       teamUid: true,
-      team: { select: { uid: true, name: true, jobReferEmail: true } },
+      team: { select: { uid: true, name: true, jobReferEmail: true, jobReferCcEmails: true } },
     },
   });
   if (!jobOpening || !jobOpening.team || HIDDEN_JOB_OPENING_STATUSES.includes(jobOpening.status)) {

@@ -49,6 +49,20 @@ describe('JobOpeningsQueryService.buildWhere', () => {
     expect(where.AND).toContainEqual({ seniority: { in: ['senior'] } });
   });
 
+  it('scopes to one opening when jobUid is set, without clobbering the team-not-null base', () => {
+    const where = buildWhere({ jobUid: 'role-1' });
+
+    expect(where.teamUid).toEqual({ not: null });
+    expect(where.AND).toContainEqual({ uid: 'role-1' });
+  });
+
+  it('composes jobUid with a team scope', () => {
+    const where = buildWhere({ teamUid: 'team-1', jobUid: 'role-1' });
+
+    expect(where.AND).toContainEqual({ teamUid: 'team-1' });
+    expect(where.AND).toContainEqual({ uid: 'role-1' });
+  });
+
   it('survives facet overrides, because the team scope is not a facet', () => {
     const where = service['buildWhere'](JobsListQueryParams.parse({ teamUid: 'team-1', seniority: 'senior' }), {
       dropSeniority: true,

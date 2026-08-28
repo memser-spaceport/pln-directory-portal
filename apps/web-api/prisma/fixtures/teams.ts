@@ -44,6 +44,7 @@ const teamsFactory = Factory.define<Omit<Team, 'id'>>(({ sequence, onCreate }) =
     website: faker.internet.url(),
     contactMethod: faker.helpers.arrayElement([null, faker.internet.url(), faker.internet.email()]),
     jobReferEmail: faker.helpers.arrayElement([null, faker.internet.email()]),
+    jobReferCcEmails: [],
     twitterHandler: faker.name.firstName(),
     officeHours: faker.name.firstName(),
     linkedinHandler: faker.name.firstName(),

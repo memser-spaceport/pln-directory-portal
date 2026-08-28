@@ -34,6 +34,7 @@ import { ParticipantsRequest } from './members.dto';
 import { OpenSearchService } from '../opensearch/opensearch.service';
 import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { assignJobSearchStatusFromInput, omitJobSearchStatus } from './job-search-status';
+import { directoryVisibleMemberWhere } from './member-visibility';
 
 /**
  * Interface for member search match result (used by entity association)
@@ -106,8 +107,7 @@ export class MembersService {
   async findAll(queryOptions: Prisma.MemberFindManyArgs): Promise<{ count: number; members: Member[] }> {
     try {
       const where: Prisma.MemberWhereInput = {
-        ...queryOptions.where,
-        memberApproval: { state: { in: ['APPROVED'] } },
+        AND: [queryOptions.where ?? {}, directoryVisibleMemberWhere()],
       };
 
       const [members, membersCount] = await this.prisma.$transaction([
@@ -147,11 +147,7 @@ export class MembersService {
     loginEmail: string | null
   ): Promise<{ count: number; members: Member[] }> {
     try {
-      const approvalFilter: Prisma.MemberWhereInput = {
-        memberApproval: { state: { in: ['APPROVED'] } },
-      };
-
-      const filters: Prisma.MemberWhereInput[] = [approvalFilter];
+      const filters: Prisma.MemberWhereInput[] = [directoryVisibleMemberWhere()];
 
       if (loginEmail) {
         filters.push({ email: loginEmail });
@@ -2009,10 +2005,7 @@ export class MembersService {
     const limit = Math.min(filters.limit || 20, 100);
     const skip = (page - 1) * limit;
 
-    // Base where clause including only approved members
-    const baseWhere: Prisma.MemberWhereInput = {
-      memberApproval: { state: { in: ['APPROVED'] } },
-    };
+    const baseWhere: Prisma.MemberWhereInput = directoryVisibleMemberWhere();
 
     const whereConditions: Prisma.MemberWhereInput[] = [baseWhere];
 
@@ -2642,23 +2635,28 @@ export class MembersService {
           }
         : undefined;
 
-      // Build member filter for office hours
-      const memberFilter: any = {
-        memberApproval: { state: { in: ['APPROVED'] } },
-        ...(hasOfficeHours && {
-          AND: [
-            {
-              officeHours: {
-                not: null,
-              },
-            },
-            {
-              officeHours: {
-                not: '',
-              },
-            },
-          ],
-        }),
+      const memberFilter: Prisma.MemberWhereInput = {
+        AND: [
+          directoryVisibleMemberWhere(),
+          ...(hasOfficeHours
+            ? [
+                {
+                  AND: [
+                    {
+                      officeHours: {
+                        not: null,
+                      },
+                    },
+                    {
+                      officeHours: {
+                        not: '',
+                      },
+                    },
+                  ],
+                },
+              ]
+            : []),
+        ],
       };
 
       // Get skills matching the query with filtered member count
@@ -2848,23 +2846,28 @@ export class MembersService {
     const skip = (page - 1) * limit;
 
     try {
-      // Build member filter for office hours
-      const memberFilter: any = {
-        memberApproval: { state: { in: ['APPROVED'] } },
-        ...(hasOfficeHours && {
-          AND: [
-            {
-              officeHours: {
-                not: null,
-              },
-            },
-            {
-              officeHours: {
-                not: '',
-              },
-            },
-          ],
-        }),
+      const memberFilter: Prisma.MemberWhereInput = {
+        AND: [
+          directoryVisibleMemberWhere(),
+          ...(hasOfficeHours
+            ? [
+                {
+                  AND: [
+                    {
+                      officeHours: {
+                        not: null,
+                      },
+                    },
+                    {
+                      officeHours: {
+                        not: '',
+                      },
+                    },
+                  ],
+                },
+              ]
+            : []),
+        ],
       };
 
       // Get all unique member UIDs that match each role from different sources
@@ -3795,6 +3798,7 @@ export class MembersService {
     signUpDto: any,
     options: {
       role?: string;
+      teamEmail?: string;
       team?: { uid?: string; name?: string; website?: string } | string;
       isTeamNew?: boolean;
       website?: string | null;
@@ -3805,13 +3809,26 @@ export class MembersService {
     // create a new member with accessLevel=L0 (existing flow)
     const member = await this.createMemberFromSignUpData(signUpDto);
 
-    // in one txn — persist Member.role (if provided) and handle team + role
+    // in one txn — persist Member.role / Member.teamEmail (if provided) and
+    // handle team + role
     await this.prisma.$transaction(async (tx) => {
-      // persist Member.role from request (even if no team is provided)
+      // persist Member.role and Member.teamEmail from request, both of which
+      // stand even if no team is provided. teamEmail lands on Member rather
+      // than on the TeamMemberRole it describes precisely because the company
+      // it refers to is optional: on TeamMemberRole there would be no row to
+      // write it to when someone gives the address but skips the select, and
+      // the answer would be dropped.
+      const memberUpdate: Prisma.MemberUpdateInput = {};
       if (options?.role) {
+        memberUpdate.role = options.role.trim();
+      }
+      if (options?.teamEmail) {
+        memberUpdate.teamEmail = options.teamEmail.trim();
+      }
+      if (Object.keys(memberUpdate).length > 0) {
         await tx.member.update({
           where: { uid: member.uid },
-          data: { role: options.role.trim() },
+          data: memberUpdate,
         });
       }
 

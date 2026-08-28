@@ -79,6 +79,14 @@ const newDataTeamSchema = z.object({
     const trimmed = value.trim();
     return trimmed === '' ? null : trimmed.toLowerCase();
   }, z.string().email().nullable().optional()),
+  jobReferCcEmails: z.preprocess((value) => {
+    if (value == null) return [];
+    if (!Array.isArray(value)) return value;
+    return value
+      .filter((item): item is string => typeof item === 'string')
+      .map((item) => item.trim().toLowerCase())
+      .filter((item) => item.length > 0);
+  }, z.array(z.string().email()).optional()),
   industryTags: z.array(industrTagsMappingSchema).default([]),
   fundingStage: fundingStageMappingSchema.nullable().optional(),
   technologies: z.array(TechnologiesMappingSchema).default([]),

@@ -148,11 +148,26 @@ export class FollowsService {
    * flag onto team / news listings without an N+1 per row.
    */
   async getFollowedTeamUids(memberUid: string): Promise<Set<string>> {
+    const byMember = await this.getFollowedTeamUidsByMembers([memberUid]);
+    return byMember.get(memberUid) ?? new Set();
+  }
+
+  /** Followed team UIDs keyed by member — one query for a digest-sized batch. */
+  async getFollowedTeamUidsByMembers(memberUids: string[]): Promise<Map<string, Set<string>>> {
+    const byMember = new Map<string, Set<string>>();
+    for (const uid of memberUids) {
+      byMember.set(uid, new Set());
+    }
+    if (memberUids.length === 0) return byMember;
+
     const follows = await this.prisma.follow.findMany({
-      where: { memberUid, entityType: FollowEntityType.TEAM },
-      select: { entityUid: true },
+      where: { memberUid: { in: memberUids }, entityType: FollowEntityType.TEAM },
+      select: { memberUid: true, entityUid: true },
     });
-    return new Set(follows.map((f) => f.entityUid));
+    for (const follow of follows) {
+      byMember.get(follow.memberUid)?.add(follow.entityUid);
+    }
+    return byMember;
   }
 
   /** True when the member is part of the team (any active or historical role). */

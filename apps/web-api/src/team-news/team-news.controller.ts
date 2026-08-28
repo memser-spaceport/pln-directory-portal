@@ -21,10 +21,12 @@ import {
   TeamNewsListQueryParams,
   TeamNewsPopularQueryParams,
   TeamNewsRecentQueryParams,
+  TeamNewsDigestPicksRequestSchema,
 } from 'libs/contracts/src/schema/team-news';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { ServiceAuthGuard } from '../guards/service-auth.guard';
 import { MembersService } from '../members/members.service';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
 import { FORUM_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
@@ -90,6 +92,24 @@ export class TeamNewsController {
       return Number.isNaN(d.getTime()) ? undefined : d;
     };
     return this.teamNewsQueryService.getRecentNews({
+      sinceCreatedAt: toDate(sinceCreatedAt),
+      untilCreatedAt: toDate(untilCreatedAt),
+      limit,
+    });
+  }
+
+  @Api(server.route.getTeamNewsDigestPicks)
+  @NoCache()
+  @UseGuards(ServiceAuthGuard)
+  async getTeamNewsDigestPicks(@Body() body: unknown) {
+    const { memberUids, sinceCreatedAt, untilCreatedAt, limit } = this.parse(TeamNewsDigestPicksRequestSchema, body);
+    const toDate = (value?: string): Date | undefined => {
+      if (!value) return undefined;
+      const d = new Date(value);
+      return Number.isNaN(d.getTime()) ? undefined : d;
+    };
+    return this.teamNewsQueryService.getDigestNewsPicks({
+      memberUids,
       sinceCreatedAt: toDate(sinceCreatedAt),
       untilCreatedAt: toDate(untilCreatedAt),
       limit,

@@ -3,8 +3,9 @@ import type { CreateJobReferralInput } from 'libs/contracts/src/schema/job-refer
 import { PrismaService } from '../shared/prisma.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { noteToHtml } from './job-openings-email-html';
-import { resolveVisibleJobOpening } from './job-openings-resolve';
+import { parseJobReferCcEmails, resolveVisibleJobOpening } from './job-openings-resolve';
 import { deriveReferralBlurb } from './job-openings-referral-blurb';
+import { jobBoardDetailUrl } from './job-openings-url';
 
 const JOB_BOARD_REFERRAL_TEMPLATE = 'JOB_BOARD_REFERRAL_EMAIL';
 
@@ -43,14 +44,21 @@ export class JobOpeningsReferralService {
     const recipients = jobReferEmail
       ? [{ email: jobReferEmail, name: jobOpening.team.name }]
       : await this.resolveMemberRecipients(input.recipients);
+    const jobReferCc = jobReferEmail
+      ? parseJobReferCcEmails(jobOpening.team.jobReferCcEmails).map((email) => ({
+          email,
+          name: jobOpening.team.name,
+        }))
+      : [];
     const { to, cc } = this.buildToAndCc(recipients, [
+      ...jobReferCc,
       { email: referrer.email, name: referrer.name },
       { email: referred.email, name: referred.name },
     ]);
     const recipientGreetingName = jobReferEmail ? `${jobOpening.team.name} team` : recipients[0]?.name || 'there';
 
     const note = input.note.trim();
-    const applyUrl = jobOpening.sourceLink || null;
+    const applyUrl = jobBoardDetailUrl(jobOpening.uid);
 
     const [referrerHeadline, referredHeadline] = await Promise.all([
       this.resolveHeadline(referrer.uid),
@@ -132,7 +140,7 @@ export class JobOpeningsReferralService {
       this.resolveHeadline(referred.uid),
     ]);
 
-    const applyUrl = jobOpening.sourceLink || null;
+    const applyUrl = jobBoardDetailUrl(jobOpening.uid);
     const blurb = deriveReferralBlurb(referred.bio);
 
     // A bio's own leading sentence already restates "X is TITLE at COMPANY"
