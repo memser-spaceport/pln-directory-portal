@@ -1,5 +1,9 @@
 import sanitizeHtml from 'sanitize-html';
-import { DESCRIPTION_HTML_MAX_CHARS, sanitizeJobDescriptionHtml } from './job-description-html.util';
+import {
+  DESCRIPTION_HTML_MAX_CHARS,
+  decodeEntityEncodedHtml,
+  sanitizeJobDescriptionHtml,
+} from './job-description-html.util';
 
 jest.mock('sanitize-html', () => jest.fn((html: string) => html));
 
@@ -40,5 +44,21 @@ describe('sanitizeJobDescriptionHtml', () => {
     mockedSanitizeHtml.mockImplementation((html: string) => html);
     sanitizeJobDescriptionHtml(long);
     expect(mockedSanitizeHtml.mock.calls[0][0].length).toBe(DESCRIPTION_HTML_MAX_CHARS);
+  });
+
+  it('decodes a fully entity-encoded body before sanitizing', () => {
+    sanitizeJobDescriptionHtml('&lt;div class=&quot;content-intro&quot;&gt;&lt;p&gt;Hello&lt;/p&gt;&lt;/div&gt;');
+    expect(mockedSanitizeHtml.mock.calls[0][0]).toBe('<div class="content-intro"><p>Hello</p></div>');
+  });
+
+  it('does not decode when the body already has real tags', () => {
+    sanitizeJobDescriptionHtml('<p>use x &lt; 5</p>');
+    expect(mockedSanitizeHtml.mock.calls[0][0]).toBe('<p>use x &lt; 5</p>');
+  });
+});
+
+describe('decodeEntityEncodedHtml', () => {
+  it('unwraps Greenhouse-encoded markup', () => {
+    expect(decodeEntityEncodedHtml('&lt;p&gt;Hi&lt;/p&gt;')).toBe('<p>Hi</p>');
   });
 });
