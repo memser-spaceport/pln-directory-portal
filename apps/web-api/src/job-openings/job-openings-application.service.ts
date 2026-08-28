@@ -4,7 +4,7 @@ import type { CreateJobApplicationInput } from 'libs/contracts/src/schema/job-ap
 import { PrismaService } from '../shared/prisma.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { noteToHtml } from './job-openings-email-html';
-import { resolveVisibleJobOpening, type ResolvedJobOpening } from './job-openings-resolve';
+import { parseJobReferCcEmails, resolveVisibleJobOpening, type ResolvedJobOpening } from './job-openings-resolve';
 import { isProtocolLabsTeam } from './pin-protocol-labs-team';
 import { jobBoardDetailUrl } from './job-openings-url';
 
@@ -248,9 +248,13 @@ export class JobOpeningsApplicationService {
       if (!jobReferEmail) {
         throw new BadRequestException('This job is not accepting in-app applications');
       }
+      const toKey = jobReferEmail.toLowerCase();
+      const cc = parseJobReferCcEmails(jobOpening.team.jobReferCcEmails)
+        .filter((email) => email !== toKey)
+        .map((email) => ({ uid: jobOpening.team.uid, name: jobOpening.team.name, email }));
       return {
         to: { uid: jobOpening.team.uid, name: jobOpening.team.name, email: jobReferEmail },
-        cc: [] as Array<{ uid: string; name: string; email: string }>,
+        cc,
       };
     }
 

@@ -71,7 +71,7 @@ const jobOpening = {
   sourceLink: 'https://jobs.example/role',
   status: JobOpeningStatus.CONFIRMED,
   teamUid: 'team-1',
-  team: { uid: 'team-1', name: 'Airship', jobReferEmail: null as string | null },
+  team: { uid: 'team-1', name: 'Airship', jobReferEmail: null as string | null, jobReferCcEmails: [] as string[] },
 };
 
 const lead = { member: { uid: 'lead-1', name: 'Lead', email: 'lead@airship.com' } };
@@ -242,6 +242,7 @@ describe('JobOpeningsApplicationService', () => {
       uid: PROTOCOL_LABS_TEAM_UID,
       name: 'Protocol Labs',
       jobReferEmail: 'jobs@protocol.ai',
+      jobReferCcEmails: [],
     });
 
     await service.apply('job-1', 'ada@example.com', { coverLetter: 'I would like this role.' });
@@ -271,11 +272,42 @@ describe('JobOpeningsApplicationService', () => {
     );
   });
 
+  it('CCs Protocol Labs job-refer CC emails when they are set', async () => {
+    mockHappyPath({
+      uid: PROTOCOL_LABS_TEAM_UID,
+      name: 'Protocol Labs',
+      jobReferEmail: 'jobs@protocol.ai',
+      jobReferCcEmails: ['hiring@protocol.ai', ' talent@protocol.ai ', 'JOBS@protocol.ai', ''],
+    });
+
+    await service.apply('job-1', 'ada@example.com', { coverLetter: 'I would like this role.' });
+
+    expect(notificationServiceClient.sendNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipientsInfo: {
+          to: ['jobs@protocol.ai'],
+          cc: ['hiring@protocol.ai', 'talent@protocol.ai'],
+          replyTo: 'ada@example.com',
+        },
+      })
+    );
+    expect(prisma.jobApplication.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          toEmail: 'jobs@protocol.ai',
+          ccEmails: ['hiring@protocol.ai', 'talent@protocol.ai'],
+        }),
+      })
+    );
+    expect(prisma.teamMemberRole.findMany).not.toHaveBeenCalled();
+  });
+
   it('rejects a Protocol Labs apply when the job-refer email is missing', async () => {
     mockHappyPath({
       uid: PROTOCOL_LABS_TEAM_UID,
       name: 'Protocol Labs',
       jobReferEmail: null,
+      jobReferCcEmails: [],
     });
 
     await expect(service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' })).rejects.toBeInstanceOf(
@@ -291,6 +323,7 @@ describe('JobOpeningsApplicationService', () => {
       uid: PROTOCOL_LABS_TEAM_UID,
       name: 'Protocol Labs',
       jobReferEmail: '   ',
+      jobReferCcEmails: [],
     });
 
     await expect(service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' })).rejects.toMatchObject({

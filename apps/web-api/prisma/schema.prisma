@@ -31,6 +31,7 @@ model Team {
   website                      String?
   contactMethod                String?
   jobReferEmail                String?
+  jobReferCcEmails             String[]                       @default([])
   twitterHandler               String?
   linkedinHandler              String?
   telegramHandler              String?

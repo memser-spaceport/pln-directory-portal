@@ -34,6 +34,7 @@ import { ParticipantsRequest } from './members.dto';
 import { OpenSearchService } from '../opensearch/opensearch.service';
 import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { assignJobSearchStatusFromInput, omitJobSearchStatus } from './job-search-status';
+import { directoryVisibleMemberWhere } from './member-visibility';
 
 /**
  * Interface for member search match result (used by entity association)
@@ -106,8 +107,7 @@ export class MembersService {
   async findAll(queryOptions: Prisma.MemberFindManyArgs): Promise<{ count: number; members: Member[] }> {
     try {
       const where: Prisma.MemberWhereInput = {
-        ...queryOptions.where,
-        memberApproval: { state: { in: ['APPROVED'] } },
+        AND: [queryOptions.where ?? {}, directoryVisibleMemberWhere()],
       };
 
       const [members, membersCount] = await this.prisma.$transaction([
@@ -147,11 +147,7 @@ export class MembersService {
     loginEmail: string | null
   ): Promise<{ count: number; members: Member[] }> {
     try {
-      const approvalFilter: Prisma.MemberWhereInput = {
-        memberApproval: { state: { in: ['APPROVED'] } },
-      };
-
-      const filters: Prisma.MemberWhereInput[] = [approvalFilter];
+      const filters: Prisma.MemberWhereInput[] = [directoryVisibleMemberWhere()];
 
       if (loginEmail) {
         filters.push({ email: loginEmail });
@@ -2009,10 +2005,7 @@ export class MembersService {
     const limit = Math.min(filters.limit || 20, 100);
     const skip = (page - 1) * limit;
 
-    // Base where clause including only approved members
-    const baseWhere: Prisma.MemberWhereInput = {
-      memberApproval: { state: { in: ['APPROVED'] } },
-    };
+    const baseWhere: Prisma.MemberWhereInput = directoryVisibleMemberWhere();
 
     const whereConditions: Prisma.MemberWhereInput[] = [baseWhere];
 
@@ -2642,23 +2635,28 @@ export class MembersService {
           }
         : undefined;
 
-      // Build member filter for office hours
-      const memberFilter: any = {
-        memberApproval: { state: { in: ['APPROVED'] } },
-        ...(hasOfficeHours && {
-          AND: [
-            {
-              officeHours: {
-                not: null,
-              },
-            },
-            {
-              officeHours: {
-                not: '',
-              },
-            },
-          ],
-        }),
+      const memberFilter: Prisma.MemberWhereInput = {
+        AND: [
+          directoryVisibleMemberWhere(),
+          ...(hasOfficeHours
+            ? [
+                {
+                  AND: [
+                    {
+                      officeHours: {
+                        not: null,
+                      },
+                    },
+                    {
+                      officeHours: {
+                        not: '',
+                      },
+                    },
+                  ],
+                },
+              ]
+            : []),
+        ],
       };
 
       // Get skills matching the query with filtered member count
@@ -2848,23 +2846,28 @@ export class MembersService {
     const skip = (page - 1) * limit;
 
     try {
-      // Build member filter for office hours
-      const memberFilter: any = {
-        memberApproval: { state: { in: ['APPROVED'] } },
-        ...(hasOfficeHours && {
-          AND: [
-            {
-              officeHours: {
-                not: null,
-              },
-            },
-            {
-              officeHours: {
-                not: '',
-              },
-            },
-          ],
-        }),
+      const memberFilter: Prisma.MemberWhereInput = {
+        AND: [
+          directoryVisibleMemberWhere(),
+          ...(hasOfficeHours
+            ? [
+                {
+                  AND: [
+                    {
+                      officeHours: {
+                        not: null,
+                      },
+                    },
+                    {
+                      officeHours: {
+                        not: '',
+                      },
+                    },
+                  ],
+                },
+              ]
+            : []),
+        ],
       };
 
       // Get all unique member UIDs that match each role from different sources

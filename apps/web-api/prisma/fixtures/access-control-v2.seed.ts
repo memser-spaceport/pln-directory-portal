@@ -28,6 +28,7 @@ const permissionSeeds: PermissionSeed[] = [
   { code: 'member.contacts.read', module: 'Directory' },
   { code: 'member.affinity.read', module: 'Members' },
   { code: 'member.onboarding', module: 'Directory' },
+  { code: 'member.profile.visible', module: 'Directory' },
   { code: 'oh.supply.read', module: 'Office Hours' },
   { code: 'oh.supply.write', module: 'Office Hours' },
   { code: 'oh.demand.read', module: 'Office Hours' },
@@ -396,10 +397,10 @@ const policies: PolicySeed[] = [
   {
     code: 'job_aspirant',
     name: 'Job Aspirant / Job Board',
-    description: 'Members who signed up through the Job Board. Marker only — no extra permissions.',
+    description: 'Members who signed up through the Job Board. Directory-visible without requiring approval.',
     role: 'Job Aspirant',
     group: 'Job Board',
-    permissions: [],
+    permissions: ['member.profile.visible'],
   },
 ];
 

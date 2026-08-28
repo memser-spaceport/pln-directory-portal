@@ -3,7 +3,7 @@ import type { CreateJobReferralInput } from 'libs/contracts/src/schema/job-refer
 import { PrismaService } from '../shared/prisma.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { noteToHtml } from './job-openings-email-html';
-import { resolveVisibleJobOpening } from './job-openings-resolve';
+import { parseJobReferCcEmails, resolveVisibleJobOpening } from './job-openings-resolve';
 import { deriveReferralBlurb } from './job-openings-referral-blurb';
 import { jobBoardDetailUrl } from './job-openings-url';
 
@@ -44,7 +44,14 @@ export class JobOpeningsReferralService {
     const recipients = jobReferEmail
       ? [{ email: jobReferEmail, name: jobOpening.team.name }]
       : await this.resolveMemberRecipients(input.recipients);
+    const jobReferCc = jobReferEmail
+      ? parseJobReferCcEmails(jobOpening.team.jobReferCcEmails).map((email) => ({
+          email,
+          name: jobOpening.team.name,
+        }))
+      : [];
     const { to, cc } = this.buildToAndCc(recipients, [
+      ...jobReferCc,
       { email: referrer.email, name: referrer.name },
       { email: referred.email, name: referred.name },
     ]);
