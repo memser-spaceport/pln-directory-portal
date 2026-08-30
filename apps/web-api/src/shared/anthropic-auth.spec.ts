@@ -50,7 +50,8 @@ describe('AnthropicAuth', () => {
 
     expect(global.fetch).toHaveBeenCalledTimes(1);
     const [, init] = (global.fetch as jest.Mock).mock.calls[0];
-    expect(JSON.parse(init.body)).toMatchObject({
+    const requestBody = JSON.parse(init.body);
+    expect(requestBody).toMatchObject({
       grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
       assertion: 'projected-jwt',
       federation_rule_id: 'fdrl_test',
@@ -58,6 +59,8 @@ describe('AnthropicAuth', () => {
       service_account_id: 'svac_test',
       workspace_id: 'wrkspc_test',
     });
+    expect(requestBody).not.toHaveProperty('subject_token');
+    expect(requestBody).not.toHaveProperty('subject_token_type');
   });
 
   it('replaces x-api-key with a WIF bearer token in the AI SDK fetch wrapper', async () => {

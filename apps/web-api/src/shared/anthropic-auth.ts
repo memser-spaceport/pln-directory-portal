@@ -5,8 +5,12 @@ export type AnthropicAuthMode = 'api_key' | 'wif';
 type TokenExchangeResponse = {
   access_token?: string;
   expires_in?: number;
-  error?: string;
+  error?: string | {
+    type?: string;
+    message?: string;
+  };
   error_description?: string;
+  message?: string;
 };
 
 const WIF_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
@@ -106,7 +110,17 @@ export class AnthropicAuth {
 
     const body = (await response.json()) as TokenExchangeResponse;
     if (!response.ok || !body.access_token) {
-      const reason = body.error_description || body.error || `HTTP ${response.status}`;
+      const apiError =
+        typeof body.error === 'string'
+          ? body.error
+          : body.error?.message || body.error?.type;
+
+      const reason =
+        body.error_description ||
+        apiError ||
+        body.message ||
+        `HTTP ${response.status}`;
+
       throw new Error(`Anthropic WIF token exchange failed: ${reason}`);
     }
 
