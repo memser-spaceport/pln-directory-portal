@@ -4,6 +4,7 @@ import { openai } from '@ai-sdk/openai';
 import { google } from '@ai-sdk/google';
 import { anthropic, createAnthropic, AnthropicProvider } from '@ai-sdk/anthropic';
 import { z } from 'zod';
+import { anthropicAuth } from './anthropic-auth';
 
 export type AiProviderType = 'openai' | 'gemini' | 'anthropic';
 
@@ -21,14 +22,26 @@ export class AiProviderService {
   }
 
   /**
-   * Lazily build a Claude client that reads its API key from `CLAUDE_API_KEY`
-   * (with `ANTHROPIC_API_KEY` as a fallback for SDK-default compatibility).
-   * Returns the default exported `anthropic` client when neither is set, so
-   * the SDK produces its usual "missing key" error downstream.
+   * Lazily build the Claude client. `ANTHROPIC_AUTH_MODE=wif` uses the
+   * Kubernetes-projected identity token and short-lived Anthropic bearer
+   * tokens; the default `api_key` mode preserves the current static-key path.
    */
   private getAnthropicClient(): AnthropicProvider {
     if (this.anthropicClient) return this.anthropicClient;
-    const apiKey = process.env.CLAUDE_API_KEY || process.env.ANTHROPIC_API_KEY;
+
+    if (anthropicAuth.mode === 'wif') {
+      this.logger.log('Anthropic authentication mode: WIF');
+      this.anthropicClient = createAnthropic({
+        // @ai-sdk/anthropic@1.x validates that an API key exists before its
+        // fetch hook runs. This value is never sent: createWifFetch removes
+        // x-api-key and injects the short-lived bearer token instead.
+        apiKey: 'wif-managed',
+        fetch: anthropicAuth.createWifFetch(),
+      });
+      return this.anthropicClient;
+    }
+
+    const apiKey = anthropicAuth.getApiKey();
     this.anthropicClient = apiKey ? createAnthropic({ apiKey }) : anthropic;
     return this.anthropicClient;
   }
