@@ -112,3 +112,137 @@ jobs:
           git_hash=$(git rev-parse --short "$GITHUB_SHA")
           ECR_REGISTRY=$(aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --query 'repositories[0].repositoryUri' --output text)
           helm upgrade --install directory-service deployment/chart/ --set image.repository=$ECR_REGISTRY --set image.tag=$git_hash --set nodeSelector.allocationtags=pln-k8s --set ingress.grpname=prod-pln-internal --set ingress.healthcheck_path=/ --set ingress.host=api-directory.plnetwork.io --set service.port=3000 --set ingress.acm_arn=$CERT_ARN --set serviceAccount.create=true --set serviceAccount.name=directory-service-sa --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=arn:aws:iam::013228333448:role/directory-service-prod-irsa -f deployment/chart/${{ env.APP_MODE }}_secret_values.yaml -n pln-prod
+
+      - name: Configure Anthropic WIF
+        env:
+          ANTHROPIC_FEDERATION_RULE_ID: fdrl_01Tb5jBb7JX9wrLBEgQ9iY8S
+          ANTHROPIC_ORGANIZATION_ID: b531a468-02c0-4f3b-8cac-df5dac2a80a2
+          ANTHROPIC_SERVICE_ACCOUNT_ID: svac_013QAyyYNcF6uSN7J17Kuy6T
+          ANTHROPIC_WORKSPACE_ID: wrkspc_01H4CcBz3LGCcSQdbrMe6Lqu
+        run: |
+          set -euo pipefail
+
+          NAMESPACE="pln-prod"
+          DEPLOYMENT="directory-service-app"
+          SERVICE_ACCOUNT="directory-service-sa"
+          SECRET="directory-service-app-secret"
+          TOKEN_DIR="/var/run/secrets/anthropic.com"
+          TOKEN_FILE="${TOKEN_DIR}/token"
+
+          echo "=== Verify Kubernetes service account ==="
+          kubectl get serviceaccount "$SERVICE_ACCOUNT" \
+            -n "$NAMESPACE" >/dev/null
+
+          echo "SERVICE_ACCOUNT=OK"
+
+          echo "=== Remove static Anthropic credentials from live Secret ==="
+
+          for KEY in CLAUDE_API_KEY ANTHROPIC_API_KEY; do
+            if kubectl get secret "$SECRET" -n "$NAMESPACE" \
+              -o "jsonpath={.data.${KEY}}" 2>/dev/null | grep -q .; then
+              kubectl patch secret "$SECRET" \
+                -n "$NAMESPACE" \
+                --type=json \
+                -p="[{\"op\":\"remove\",\"path\":\"/data/${KEY}\"}]"
+              echo "${KEY}=REMOVED"
+            else
+              echo "${KEY}=ABSENT"
+            fi
+          done
+
+          CONTAINER_NAME="$(
+            kubectl get deployment "$DEPLOYMENT" \
+              -n "$NAMESPACE" \
+              -o jsonpath='{.spec.template.spec.containers[0].name}'
+          )"
+
+          echo "container=$CONTAINER_NAME"
+
+          echo "=== Configure projected Anthropic identity token ==="
+
+          cat <<PATCH | kubectl patch deployment "$DEPLOYMENT" \
+            -n "$NAMESPACE" \
+            --type=strategic \
+            --patch-file=/dev/stdin
+          spec:
+            template:
+              spec:
+                serviceAccountName: ${SERVICE_ACCOUNT}
+                volumes:
+                  - name: anthropic-identity-token
+                    projected:
+                      sources:
+                        - serviceAccountToken:
+                            audience: https://api.anthropic.com
+                            expirationSeconds: 600
+                            path: token
+                containers:
+                  - name: ${CONTAINER_NAME}
+                    volumeMounts:
+                      - name: anthropic-identity-token
+                        mountPath: ${TOKEN_DIR}
+                        readOnly: true
+                    env:
+                      - name: ANTHROPIC_AUTH_MODE
+                        value: wif
+                      - name: ANTHROPIC_FEDERATION_RULE_ID
+                        value: "${ANTHROPIC_FEDERATION_RULE_ID}"
+                      - name: ANTHROPIC_ORGANIZATION_ID
+                        value: "${ANTHROPIC_ORGANIZATION_ID}"
+                      - name: ANTHROPIC_SERVICE_ACCOUNT_ID
+                        value: "${ANTHROPIC_SERVICE_ACCOUNT_ID}"
+                      - name: ANTHROPIC_WORKSPACE_ID
+                        value: "${ANTHROPIC_WORKSPACE_ID}"
+                      - name: ANTHROPIC_IDENTITY_TOKEN_FILE
+                        value: "${TOKEN_FILE}"
+          PATCH
+
+          echo "=== Wait for rollout ==="
+          kubectl rollout status deployment/"$DEPLOYMENT" \
+            -n "$NAMESPACE" \
+            --timeout=5m
+
+          POD="$(
+            kubectl get pods -n "$NAMESPACE" \
+              -l app.kubernetes.io/instance=directory-service \
+              --sort-by=.metadata.creationTimestamp \
+              -o jsonpath='{.items[-1:].metadata.name}' 2>/dev/null || true
+          )"
+
+          if [ -z "$POD" ]; then
+            POD="$(
+              kubectl get pods -n "$NAMESPACE" \
+                -o name \
+                | grep 'directory-service-app-' \
+                | tail -1 \
+                | sed 's#pod/##'
+            )"
+          fi
+
+          echo "pod=$POD"
+
+          echo "=== Verify WIF configuration ==="
+
+          kubectl exec -n "$NAMESPACE" "$POD" -- sh -c '
+            test "$ANTHROPIC_AUTH_MODE" = "wif"
+            test -r "$ANTHROPIC_IDENTITY_TOKEN_FILE"
+
+            echo "ANTHROPIC_AUTH_MODE=wif"
+            echo "IDENTITY_TOKEN=READABLE"
+
+            if env | grep -q "^CLAUDE_API_KEY="; then
+              echo "ERROR: CLAUDE_API_KEY is still present"
+              exit 1
+            else
+              echo "CLAUDE_API_KEY=ABSENT"
+            fi
+
+            if env | grep -q "^ANTHROPIC_API_KEY="; then
+              echo "ERROR: ANTHROPIC_API_KEY is still present"
+              exit 1
+            else
+              echo "ANTHROPIC_API_KEY=ABSENT"
+            fi
+          '
+
+          echo "=== Anthropic WIF configured successfully ==="
