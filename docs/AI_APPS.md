@@ -228,7 +228,7 @@ DELETE <AI_APPS_RUNNER_URL>/apps/<appId>
 Header: x-runner-token: <server secret>
 ```
 
-Flow: set status `DELETING` + log `DELETE_STARTED` → call the runner → on success clear hosting fields, set status `DELETED`, log `DELETE_SUCCEEDED`; on failure set status `ERROR` (with `notes`), log `DELETE_FAILED`, and return `502`. The `AiApp` row is **kept** (status flips to `DELETED`) so the audit trail and event history survive. Response is the updated `AiApp` record.
+Flow: set status `DELETING` + log `DELETE_STARTED` → call the runner → on success clear hosting fields, set status `DELETED`, log `DELETE_SUCCEEDED`; on failure restore the app's prior status (with the error in `notes`; `ERROR` only if it was already stuck in `DELETING`), log `DELETE_FAILED`, and return `502`. A runner **404 counts as success** — the app has no deployment to tear down (a draft registered but never deployed, or one already removed on the runner side) — so the record still flips to `DELETED`. The `AiApp` row is **kept** (status flips to `DELETED`) so the audit trail and event history survive. Response is the updated `AiApp` record.
 
 ## Editable metadata & one-pager PRD
 
