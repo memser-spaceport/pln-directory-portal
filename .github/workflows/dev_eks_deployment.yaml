@@ -179,6 +179,131 @@ jobs:
             --timeout 12m \
             --atomic
 
+      - name: Configure Anthropic WIF
+        run: |
+          set -euo pipefail
+
+          NAMESPACE="${{ env.NAMESPACE }}"
+          DEPLOYMENT="${{ env.DEPLOYMENT_NAME }}"
+          SERVICE_ACCOUNT="directory-service-sa"
+          SECRET="directory-service-app-secret"
+          TOKEN_DIR="/var/run/secrets/anthropic.com"
+          TOKEN_FILE="${TOKEN_DIR}/token"
+
+          echo "=== Verify Kubernetes service account ==="
+          kubectl get serviceaccount "$SERVICE_ACCOUNT" \
+            -n "$NAMESPACE" >/dev/null
+
+          echo "SERVICE_ACCOUNT=OK"
+
+          echo "=== Verify WIF configuration from generated Secret ==="
+
+          AUTH_MODE="$(
+            kubectl get secret "$SECRET" \
+              -n "$NAMESPACE" \
+              -o jsonpath='{.data.ANTHROPIC_AUTH_MODE}' \
+              | base64 -d
+          )"
+
+          if [ "$AUTH_MODE" != "wif" ]; then
+            echo "ERROR: ANTHROPIC_AUTH_MODE must be wif"
+            exit 1
+          fi
+
+          echo "ANTHROPIC_AUTH_MODE=wif"
+
+          for KEY in \
+            ANTHROPIC_FEDERATION_RULE_ID \
+            ANTHROPIC_ORGANIZATION_ID \
+            ANTHROPIC_SERVICE_ACCOUNT_ID
+          do
+            if ! kubectl get secret "$SECRET" \
+              -n "$NAMESPACE" \
+              -o "jsonpath={.data.${KEY}}" 2>/dev/null | grep -q .; then
+              echo "ERROR: ${KEY} is missing from $SECRET"
+              exit 1
+            fi
+            echo "${KEY}=PRESENT"
+          done
+
+          echo "=== Remove static Anthropic credentials from live Secret ==="
+
+          for KEY in CLAUDE_API_KEY ANTHROPIC_API_KEY; do
+            if kubectl get secret "$SECRET" -n "$NAMESPACE" \
+              -o "jsonpath={.data.${KEY}}" 2>/dev/null | grep -q .; then
+              kubectl patch secret "$SECRET" \
+                -n "$NAMESPACE" \
+                --type=json \
+                -p="[{\"op\":\"remove\",\"path\":\"/data/${KEY}\"}]"
+              echo "${KEY}=REMOVED"
+            else
+              echo "${KEY}=ABSENT"
+            fi
+          done
+
+          CONTAINER_NAME="$(
+            kubectl get deployment "$DEPLOYMENT" \
+              -n "$NAMESPACE" \
+              -o jsonpath='{.spec.template.spec.containers[0].name}'
+          )"
+
+          cat <<PATCH | kubectl patch deployment "$DEPLOYMENT" \
+            -n "$NAMESPACE" \
+            --type=strategic \
+            --patch-file=/dev/stdin
+          spec:
+            template:
+              spec:
+                serviceAccountName: ${SERVICE_ACCOUNT}
+                volumes:
+                  - name: anthropic-identity-token
+                    projected:
+                      sources:
+                        - serviceAccountToken:
+                            audience: https://api.anthropic.com
+                            expirationSeconds: 600
+                            path: token
+                containers:
+                  - name: ${CONTAINER_NAME}
+                    volumeMounts:
+                      - name: anthropic-identity-token
+                        mountPath: ${TOKEN_DIR}
+                        readOnly: true
+                    env:
+                      - name: ANTHROPIC_IDENTITY_TOKEN_FILE
+                        value: "${TOKEN_FILE}"
+          PATCH
+
+          kubectl rollout status deployment/"$DEPLOYMENT" \
+            -n "$NAMESPACE" \
+            --timeout=5m
+
+          POD="$(
+            kubectl get pods \
+              -n "$NAMESPACE" \
+              -l app.kubernetes.io/instance=${{ env.HELM_RELEASE }} \
+              --sort-by=.metadata.creationTimestamp \
+              -o jsonpath='{.items[-1:].metadata.name}'
+          )"
+
+          echo "pod=$POD"
+
+          kubectl exec -n "$NAMESPACE" "$POD" -- sh -c '
+            test "$ANTHROPIC_AUTH_MODE" = "wif"
+            test -r "$ANTHROPIC_IDENTITY_TOKEN_FILE"
+
+            echo "ANTHROPIC_AUTH_MODE=wif"
+            echo "IDENTITY_TOKEN=READABLE"
+
+            ! env | grep -q "^CLAUDE_API_KEY="
+            ! env | grep -q "^ANTHROPIC_API_KEY="
+
+            echo "CLAUDE_API_KEY=ABSENT"
+            echo "ANTHROPIC_API_KEY=ABSENT"
+          '
+
+          echo "=== Anthropic WIF configured successfully ==="
+
       - name: Verify rollout
         if: always()
         run: |

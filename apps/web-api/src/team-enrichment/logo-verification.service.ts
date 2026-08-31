@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import sharp from 'sharp';
+import { anthropicAuth } from '../shared/anthropic-auth';
 import {
   LogoVerificationInput,
   LogoVerificationResult,
@@ -20,7 +21,6 @@ export class LogoVerificationService {
   private readonly openAiApiKey?: string;
   private readonly openAiModel: string;
 
-  private readonly anthropicApiKey?: string;
   private readonly anthropicModel: string;
 
   constructor() {
@@ -32,7 +32,6 @@ export class LogoVerificationService {
     this.openAiApiKey = process.env.OPENAI_API_KEY;
     this.openAiModel = process.env.OPENAI_LOGO_VERIFICATION_MODEL || 'gpt-4.1-mini';
 
-    this.anthropicApiKey = process.env.ANTHROPIC_API_KEY;
     this.anthropicModel = process.env.ANTHROPIC_LOGO_VERIFICATION_MODEL || 'claude-sonnet-4-5';
   }
 
@@ -172,15 +171,22 @@ export class LogoVerificationService {
   }
 
   private async verifyWithAnthropic(input, buffer, contentType) {
-    if (!this.anthropicApiKey) throw new Error('ANTHROPIC_API_KEY missing');
+    const headers: Record<string, string> = {
+      'anthropic-version': '2023-06-01',
+      'Content-Type': 'application/json',
+    };
+
+    if (anthropicAuth.mode === 'wif') {
+      headers.Authorization = `Bearer ${await anthropicAuth.getWifAccessToken()}`;
+    } else {
+      const apiKey = anthropicAuth.getApiKey();
+      if (!apiKey) throw new Error('CLAUDE_API_KEY/ANTHROPIC_API_KEY missing');
+      headers['x-api-key'] = apiKey;
+    }
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: {
-        'x-api-key': this.anthropicApiKey,
-        'anthropic-version': '2023-06-01',
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         model: this.anthropicModel,
         max_tokens: 500,
