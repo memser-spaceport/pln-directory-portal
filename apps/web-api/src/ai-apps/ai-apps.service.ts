@@ -1068,9 +1068,7 @@ export class AiAppsService {
    * Directory admins see every non-deleted app; everyone else only apps they
    * created. Skips deleted apps so the list matches the dashboard catalog.
    */
-  async listAccessibleFeedback(
-    requesterUid: string
-  ): Promise<Array<WithMember<AiAppFeedback> & { appName: string }>> {
+  async listAccessibleFeedback(requesterUid: string): Promise<Array<WithMember<AiAppFeedback> & { appName: string }>> {
     const isAdmin = await this.isRequesterDirectoryAdmin(requesterUid);
     const apps = await this.prisma.aiApp.findMany({
       where: isAdmin ? { status: { not: 'DELETED' } } : { memberUid: requesterUid, status: { not: 'DELETED' } },
@@ -1806,7 +1804,10 @@ export class AiAppsService {
   /**
    * Deletes the app from the sandbox runner, then marks it `DELETED` and records
    * the delete events. The row is kept (status flips to `DELETED`) so the audit
-   * trail survives. `memberUid` is the member performing the deletion.
+   * trail survives. A runner 404 counts as success — the app has no deployment
+   * to tear down (e.g. a draft registered but never deployed, or one already
+   * removed on the runner side). `memberUid` is the member performing the
+   * deletion.
    */
   async deleteApp(memberUid: string, uid: string): Promise<ApiAiApp<AiApp>> {
     const app = await this.prisma.aiApp.findUnique({ where: { uid } });
@@ -1827,14 +1828,12 @@ export class AiAppsService {
         headers: { 'x-runner-token': AI_APPS_RUNNER_TOKEN },
       });
       this.logRunnerResponse('delete', app.appId, response.status, response.data);
-
-      const updated = await this.prisma.aiApp.update({
-        where: { uid: app.uid },
-        data: { status: 'DELETED', url: null, httpUrl: null, host: null, port: null, notes: null },
-      });
-      await this.recordEvent('DELETE_SUCCEEDED', memberUid, eventContext);
-      return this.toApiApp((await this.withMember([updated]))[0], true);
+      return await this.finalizeDelete(memberUid, app.uid, eventContext);
     } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        this.logRunnerResponse('delete', app.appId, error.response.status, error.response.data);
+        return await this.finalizeDelete(memberUid, app.uid, eventContext);
+      }
       this.logRunnerError('delete', app.appId, error);
       const message = axios.isAxiosError(error)
         ? `Runner error: ${error.response?.status ?? ''} ${JSON.stringify(error.response?.data ?? error.message)}`
@@ -1842,10 +1841,24 @@ export class AiAppsService {
       this.logger.error(`AI App delete failed for ${app.appId}: ${message}`);
       await this.prisma.aiApp.update({
         where: { uid: app.uid },
-        data: { status: 'ERROR', notes: message.slice(0, 2000) },
+        data: { status: app.status === 'DELETING' ? 'ERROR' : app.status, notes: message.slice(0, 2000) },
       });
       await this.recordEvent('DELETE_FAILED', memberUid, { ...eventContext, message: message.slice(0, 2000) });
       throw new BadGatewayException('Failed to delete app on the sandbox runner');
     }
+  }
+
+  /** Marks the row `DELETED` (keeping it for the audit trail) and records the success event. */
+  private async finalizeDelete(
+    memberUid: string,
+    uid: string,
+    eventContext: { appUid: string; appId: string; deploymentId?: string }
+  ): Promise<ApiAiApp<AiApp>> {
+    const updated = await this.prisma.aiApp.update({
+      where: { uid },
+      data: { status: 'DELETED', url: null, httpUrl: null, host: null, port: null, notes: null },
+    });
+    await this.recordEvent('DELETE_SUCCEEDED', memberUid, eventContext);
+    return this.toApiApp((await this.withMember([updated]))[0], true);
   }
 }
