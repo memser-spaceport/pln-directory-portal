@@ -365,6 +365,20 @@ export class AiAppsController {
     return this.aiAppsService.checkAppLive(uid);
   }
 
+  /**
+   * Record a Directory iframe load for tile signals (all-time views + WAU).
+   * Any member with AI Apps access may POST; creator views count.
+   */
+  @NoCache()
+  @Post(':uid/views')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async recordView(@Param('uid') uid: string, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    await this.aiAppsService.recordView(memberUid, uid);
+  }
+
   /** Full event/status history for a single app, newest first. */
   @NoCache()
   @Get(':uid/events')

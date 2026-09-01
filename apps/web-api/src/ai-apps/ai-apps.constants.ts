@@ -25,6 +25,9 @@ export const AI_APP_DEPLOY_TOKEN_PREFIX = 'plndeploy_';
  */
 export const AI_APPS_CONNECT_SESSION_TTL_MS = 10 * 60 * 1000;
 
+/** Rolling window for weekly-active-users on app tiles. */
+export const AI_APPS_WAU_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
 /**
  * Lifetime of the deploy token minted on approval (60 minutes). The agent may
  * deploy repeatedly within this window; after it the member must reconnect.

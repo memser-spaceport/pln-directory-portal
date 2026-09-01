@@ -3464,12 +3464,26 @@ model AiApp {
   /// runtime pod. A bring-your-own database is just a regular runtime secret 
   /// and isn't tracked here.
   database        Json?
+  /// All-time iframe-load count (Directory detail page). Incremented without
+  /// touching `updatedAt`, so a view never reshuffles the dashboard list.
+  viewCount       Int         @default(0)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
   @@unique([memberUid, appId])
   @@index([memberUid])
   @@index([status])
+}
+
+/// One row per member who has loaded an app's iframe. `lastSeenAt` is the
+/// rolling-7-day WAU signal — count distinct members with lastSeenAt in window.
+model AiAppActiveMember {
+  appUid     String
+  memberUid  String
+  lastSeenAt DateTime
+
+  @@id([appUid, memberUid])
+  @@index([appUid, lastSeenAt])
 }
 
 enum AiAppFeedbackStatus {
