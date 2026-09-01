@@ -58,6 +58,7 @@ import {
   AI_APPS_TRACK_MAX_PROPERTIES_BYTES,
   AI_APPS_VERIFY_ATTEMPTS,
   AI_APPS_VERIFY_INTERVAL_MS,
+  AI_APPS_WAU_WINDOW_MS,
   aiAppDetailPath,
   buildAppHost,
   buildAppHttpUrl,
@@ -138,6 +139,7 @@ interface AiAppDatabaseInfo {
 type ApiAiApp<T extends { memberUid: string }> = Omit<WithMember<T>, 'failureStream' | 'database'> & {
   deployment: AiAppDeploymentInfo;
   database: AiAppDatabaseInfo;
+  weeklyActiveUsers: number;
 };
 
 @Injectable()
@@ -393,7 +395,7 @@ export class AiAppsService {
    * serving through a failed rollout; 'none' = never shipped (strict — the
    * only writer of `lastDeployedAt` is markReady).
    */
-  private toApiApp<T extends AiApp>(app: WithMember<T>, isManager: boolean): ApiAiApp<T> {
+  private toApiApp<T extends AiApp>(app: WithMember<T>, isManager: boolean, weeklyActiveUsers = 0): ApiAiApp<T> {
     const { failureStream, database: storedDatabase, ...rest } = app;
     const serving: AiAppServing = app.status === 'READY' ? 'latest' : app.lastDeployedAt ? 'previous' : 'none';
     const deployment: AiAppDeploymentInfo = { serving };
@@ -407,7 +409,57 @@ export class AiAppsService {
     }
     const parsedDatabase = storedDatabase as AiAppDatabaseInfo | null;
     const database: AiAppDatabaseInfo = parsedDatabase?.enabled ? parsedDatabase : { enabled: false };
-    return { ...rest, notes: isManager ? app.notes : null, deployment, database };
+    return {
+      ...rest,
+      notes: isManager ? app.notes : null,
+      deployment,
+      database,
+      viewCount: app.viewCount ?? 0,
+      weeklyActiveUsers,
+    };
+  }
+
+  private wauSince(): Date {
+    return new Date(Date.now() - AI_APPS_WAU_WINDOW_MS);
+  }
+
+  /** Distinct members who loaded an app's iframe within the rolling WAU window. */
+  private async weeklyActiveUsersByApp(appUids: string[]): Promise<Map<string, number>> {
+    if (!appUids.length) {
+      return new Map();
+    }
+    const rows = await this.prisma.aiAppActiveMember.groupBy({
+      by: ['appUid'],
+      where: { appUid: { in: appUids }, lastSeenAt: { gte: this.wauSince() } },
+      _count: { _all: true },
+    });
+    return new Map(rows.map((row) => [row.appUid, row._count._all]));
+  }
+
+  /**
+   * Record a Directory iframe load: increment all-time views without bumping
+   * `updatedAt` (a view must not reshuffle the dashboard list) and stamp the
+   * member as active for WAU.
+   */
+  async recordView(memberUid: string, uid: string): Promise<void> {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid } });
+    if (!app || app.status === 'DELETED') {
+      throw new NotFoundException(`AI App not found: ${uid}`);
+    }
+
+    const updated = await this.prisma.$executeRaw`
+      UPDATE "AiApp" SET "viewCount" = "viewCount" + 1
+      WHERE uid = ${uid} AND status <> 'DELETED'
+    `;
+    if (updated === 0) {
+      throw new NotFoundException(`AI App not found: ${uid}`);
+    }
+
+    await this.prisma.aiAppActiveMember.upsert({
+      where: { appUid_memberUid: { appUid: uid, memberUid } },
+      create: { appUid: uid, memberUid, lastSeenAt: new Date() },
+      update: { lastSeenAt: new Date() },
+    });
   }
 
   /** Dashboard list — all non-deleted apps across PL Infra users, newest first, with owner info. */
@@ -421,8 +473,13 @@ export class AiAppsService {
     // never a per-row query.
     const isAdmin = !!requesterUid && (await this.isRequesterDirectoryAdmin(requesterUid));
     const withMembers = await this.withMember(settled);
+    const wau = await this.weeklyActiveUsersByApp(settled.map((app) => app.uid));
     return withMembers.map((app, index) =>
-      this.toApiApp(app, isAdmin || (!!requesterUid && settled[index].memberUid === requesterUid))
+      this.toApiApp(
+        app,
+        isAdmin || (!!requesterUid && settled[index].memberUid === requesterUid),
+        wau.get(settled[index].uid) ?? 0
+      )
     );
   }
 
@@ -438,11 +495,13 @@ export class AiAppsService {
     }
     app = await this.settleStuckDeploy(app);
     const result = (await this.withMember([app]))[0];
+    const wau = await this.weeklyActiveUsersByApp([app.uid]);
+    const weeklyActiveUsers = wau.get(app.uid) ?? 0;
     if (!requesterUid) {
-      return this.toApiApp(result, false);
+      return this.toApiApp(result, false, weeklyActiveUsers);
     }
     const canManage = await this.isCreatorOrDirectoryAdmin(requesterUid, app);
-    return { ...this.toApiApp(result, canManage), canManage };
+    return { ...this.toApiApp(result, canManage, weeklyActiveUsers), canManage };
   }
 
   /** Updates dashboard metadata only; this never invokes the sandbox runner or starts a deploy. */

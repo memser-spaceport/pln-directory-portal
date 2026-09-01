@@ -26,6 +26,7 @@
     "api:seed-pathfinder-gold": "ts-node --transpile-only apps/web-api/src/scripts/seed-pathfinder-gold.ts",
     "api:backfill-investor-additional-emails": "ts-node apps/web-api/src/scripts/backfill-investor-additional-emails.ts",
     "api:backfill-team-news-source-duplicates": "ts-node --transpile-only apps/web-api/src/scripts/backfill-team-news-source-duplicates.ts",
+    "api:backfill-ai-app-views": "ts-node --transpile-only apps/web-api/src/scripts/backfill-ai-app-views.ts",
     "api:merge-master-profiles": "ts-node --transpile-only apps/web-api/src/scripts/merge-master-profiles.ts",
     "api:export-investor-portfolio-overlaps": "ts-node --transpile-only apps/web-api/src/scripts/export-investor-portfolio-overlaps.ts",
     "api:export-affinity-founders": "ts-node --transpile-only apps/web-api/src/scripts/export-affinity-founders.ts",
