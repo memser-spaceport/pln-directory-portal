@@ -6,7 +6,12 @@ import { isEmails } from '../utils/helper/helper';
 import { AwsService } from '../utils/aws/aws.service';
 import * as path from 'path';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
-import { toSupportEmailHtml, toSupportTelegramText } from './contact-support-html';
+import {
+  clipTelegramText,
+  stripInlineDataImages,
+  toSupportEmailHtml,
+  toSupportTelegramText,
+} from './contact-support-html';
 
 const CONTACT_SUPPORT_SUBJECT = 'New Contact Support Request';
 
@@ -29,12 +34,13 @@ export class ContactSupportService {
 
   async createSupportRequest(request: ContactSupportRequestDto) {
     try {
+      const message = stripInlineDataImages(request.message);
       const result = await this.prisma.contactSupportRequest.create({
         data: {
           topic: request.topic,
           email: request.email,
           name: request.name,
-          message: request.message,
+          message,
           metadata: request.metadata as any,
         },
       });
@@ -45,23 +51,32 @@ export class ContactSupportService {
         }
         this.logger.info(`New contact support request created with topic "${request.topic}" and ref id ${result.uid}`);
 
-        await this.notificationServiceClient.sendTelegramOutboxMessage({
-          channelType: 'SUPPORT',
-          text: [
-            'New support request',
-            `Topic: ${request.topic}`,
-            `Email: ${request.email ?? '-'}`,
-            `Name: ${request.name ?? '-'}`,
-            `Message: ${toSupportTelegramText(request.message ?? '-')}`,
-            this.formatSupportEmails(),
-          ].join('\n'),
-          meta: {
-            email: request.email,
-            name: request.name,
-            supportEmails: this.supportEmails,
-            source: 'contact-support',
-          },
-        });
+        try {
+          await this.notificationServiceClient.sendTelegramOutboxMessage({
+            channelType: 'SUPPORT',
+            text: clipTelegramText(
+              [
+                'New support request',
+                `Topic: ${request.topic}`,
+                `Email: ${request.email ?? '-'}`,
+                `Name: ${request.name ?? '-'}`,
+                `Message: ${toSupportTelegramText(message ?? '-')}`,
+                this.formatSupportEmails(),
+              ].join('\n')
+            ),
+            meta: {
+              email: request.email,
+              name: request.name,
+              supportEmails: this.supportEmails,
+              source: 'contact-support',
+            },
+          });
+        } catch (error) {
+          this.logger.warn(
+            `Failed to send Telegram alert for contact support request ${result.uid}. ` +
+              (error instanceof Error ? error.message : String(error))
+          );
+        }
         return { uid: result.uid };
       } else {
         throw new InternalServerErrorException('Cannot save a contact support request');

@@ -1107,7 +1107,8 @@ export class AiAppsService {
     if (!app) {
       throw new NotFoundException(`AI App not found: ${appUid}`);
     }
-    const sanitized = DOMPurify.sanitize(text);
+    const withoutDataUris = text.replace(/<img\b[^>]*\bsrc=["']data:[^"']+["'][^>]*>/gi, '');
+    const sanitized = DOMPurify.sanitize(withoutDataUris);
     if (isBlankFeedbackHtml(sanitized)) {
       throw new BadRequestException('Feedback text is required');
     }
