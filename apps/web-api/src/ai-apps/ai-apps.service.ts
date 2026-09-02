@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import axios from 'axios';
 import { randomUUID } from 'crypto';
+import DOMPurify from 'isomorphic-dompurify';
 import {
   AiApp,
   AiAppEvent,
@@ -79,6 +80,14 @@ import {
  * subdomain isn't registered yet.
  */
 const GATEWAY_TIMEOUT_STATUSES = [408, 502, 503, 504, 521, 522, 523, 524, 530];
+
+function isBlankFeedbackHtml(html: string): boolean {
+  const stripped = html
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .trim();
+  return stripped.length === 0 && !/<img\b/i.test(html);
+}
 
 /** Non-sensitive database metadata the runner returns once it provisions one. Never a password. */
 interface RunnerDeployDatabaseInfo {
@@ -1030,16 +1039,22 @@ export class AiAppsService {
   }
 
   /**
-   * Stores free-text feedback from a member viewing the app's detail page. Any
-   * member with AI Apps access may submit, and may do so more than once per app.
+   * Stores feedback from a member viewing the app's detail page. Text may be
+   * Quill HTML (headings, links, images). Any member with AI Apps access may
+   * submit, and may do so more than once per app.
    */
   async submitFeedback(memberUid: string, appUid: string, text: string): Promise<WithMember<AiAppFeedback>> {
     const app = await this.prisma.aiApp.findUnique({ where: { uid: appUid } });
     if (!app) {
       throw new NotFoundException(`AI App not found: ${appUid}`);
     }
+    const withoutDataUris = text.replace(/<img\b[^>]*\bsrc=["']data:[^"']+["'][^>]*>/gi, '');
+    const sanitized = DOMPurify.sanitize(withoutDataUris);
+    if (isBlankFeedbackHtml(sanitized)) {
+      throw new BadRequestException('Feedback text is required');
+    }
     const feedback = await this.prisma.aiAppFeedback.create({
-      data: { appUid: app.uid, memberUid, text },
+      data: { appUid: app.uid, memberUid, text: sanitized },
     });
     return (await this.withMember([feedback]))[0];
   }
@@ -1068,9 +1083,7 @@ export class AiAppsService {
    * Directory admins see every non-deleted app; everyone else only apps they
    * created. Skips deleted apps so the list matches the dashboard catalog.
    */
-  async listAccessibleFeedback(
-    requesterUid: string
-  ): Promise<Array<WithMember<AiAppFeedback> & { appName: string }>> {
+  async listAccessibleFeedback(requesterUid: string): Promise<Array<WithMember<AiAppFeedback> & { appName: string }>> {
     const isAdmin = await this.isRequesterDirectoryAdmin(requesterUid);
     const apps = await this.prisma.aiApp.findMany({
       where: isAdmin ? { status: { not: 'DELETED' } } : { memberUid: requesterUid, status: { not: 'DELETED' } },

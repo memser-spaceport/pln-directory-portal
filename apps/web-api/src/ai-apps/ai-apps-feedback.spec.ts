@@ -1,5 +1,5 @@
 /// <reference types="multer" />
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
 
 // axios ships ESM (not in the jest transform allowlist) and the feedback paths
 // under test never call it.
@@ -93,6 +93,39 @@ describe('AiAppsService feedback', () => {
       // The Prisma image relation is flattened to its plain URL.
       expect(result.member).toEqual({ uid: 'member-1', name: 'Ada', image: 'https://…/ada.png' });
       expect(result).not.toHaveProperty('memberUid');
+    });
+
+    it('stores sanitized HTML and strips scripts', async () => {
+      const { service, prisma } = buildService();
+      await service.submitFeedback('member-1', 'app-1', '<p>hi<script>alert(1)</script></p>');
+      const stored = prisma.aiAppFeedback.create.mock.calls[0][0].data.text as string;
+      expect(stored).toContain('hi');
+      expect(stored).not.toMatch(/script/i);
+    });
+
+    it('rejects empty Quill markup', async () => {
+      const { service, prisma } = buildService();
+      await expect(service.submitFeedback('member-1', 'app-1', '<p><br></p>')).rejects.toBeInstanceOf(
+        BadRequestException
+      );
+      expect(prisma.aiAppFeedback.create).not.toHaveBeenCalled();
+    });
+
+    it('accepts image-only feedback', async () => {
+      const { service, prisma } = buildService();
+      await service.submitFeedback('member-1', 'app-1', '<p><img src="https://cdn.example/x.png" alt="shot"></p>');
+      const stored = prisma.aiAppFeedback.create.mock.calls[0][0].data.text as string;
+      expect(stored).toMatch(/img/i);
+      expect(stored).toContain('https://cdn.example/x.png');
+    });
+
+    it('strips inline data-URI images before storing', async () => {
+      const { service, prisma } = buildService();
+      await service.submitFeedback('member-1', 'app-1', '<p>hi</p><p><img src="data:image/png;base64,AAAA"></p>');
+      const stored = prisma.aiAppFeedback.create.mock.calls[0][0].data.text as string;
+      expect(stored).toContain('hi');
+      expect(stored).not.toContain('data:image');
+      expect(stored).not.toContain('AAAA');
     });
   });
 
