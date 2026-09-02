@@ -61,6 +61,7 @@ const referralInput = {
   referredMemberUid: referred.uid,
   recipients: memberRecipients,
   note: 'Please consider Grace for this role.',
+  includeReferredMember: true,
 };
 
 describe('JobOpeningsReferralService', () => {
@@ -111,6 +112,7 @@ describe('JobOpeningsReferralService', () => {
         recipientsInfo: {
           to: [lead.email],
           cc: [leadTwo.email, referrer.email, referred.email],
+          replyTo: `${referrer.email}, ${referred.email}`,
         },
         deliveryPayload: {
           body: expect.objectContaining({
@@ -131,6 +133,52 @@ describe('JobOpeningsReferralService', () => {
     );
   });
 
+  it('skips ccing the referred member and sends them a separate notice when not included', async () => {
+    mockHappyPath();
+
+    const result = await service.referJob('job-1', referrer.email, { ...referralInput, includeReferredMember: false });
+
+    expect(result.cc).toEqual([leadTwo.email, referrer.email]);
+    expect(result.cc).not.toContain(referred.email);
+    expect(notificationServiceClient.sendNotification).toHaveBeenCalledTimes(2);
+    expect(notificationServiceClient.sendNotification).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        templateName: 'JOB_BOARD_REFERRAL_EMAIL',
+        recipientsInfo: {
+          to: [lead.email],
+          cc: [leadTwo.email, referrer.email],
+          replyTo: referrer.email,
+        },
+      })
+    );
+    expect(notificationServiceClient.sendNotification).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        templateName: 'JOB_BOARD_REFERRAL_NOTICE_EMAIL',
+        recipientsInfo: {
+          to: [referred.email],
+          replyTo: referrer.email,
+        },
+        deliveryPayload: {
+          body: expect.objectContaining({
+            referredFirstName: 'Grace',
+            referrerFirstName: 'Ada',
+            roleTitle: 'Staff Engineer',
+            teamName: 'Airship',
+          }),
+        },
+      })
+    );
+    expect(prisma.jobReferral.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          ccEmails: [leadTwo.email, referrer.email],
+        }),
+      })
+    );
+  });
+
   it('sends only to the team job-refer email and ignores body recipients', async () => {
     mockHappyPath({ ...jobOpening.team, jobReferEmail: 'jobs@airship.com' });
 
@@ -143,6 +191,7 @@ describe('JobOpeningsReferralService', () => {
         recipientsInfo: {
           to: ['jobs@airship.com'],
           cc: [referrer.email, referred.email],
+          replyTo: `${referrer.email}, ${referred.email}`,
         },
       })
     );
@@ -167,6 +216,7 @@ describe('JobOpeningsReferralService', () => {
         recipientsInfo: {
           to: ['jobs@airship.com'],
           cc: ['hiring@airship.com', referrer.email, referred.email],
+          replyTo: `${referrer.email}, ${referred.email}`,
         },
       })
     );
@@ -180,6 +230,7 @@ describe('JobOpeningsReferralService', () => {
       referredMemberUid: referred.uid,
       recipients: [],
       note: 'Please consider Grace for this role.',
+      includeReferredMember: true,
     });
 
     expect(result.to).toBe('jobs@airship.com');
@@ -195,6 +246,7 @@ describe('JobOpeningsReferralService', () => {
         referredMemberUid: referred.uid,
         recipients: [],
         note: 'Please consider Grace for this role.',
+        includeReferredMember: true,
       })
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(notificationServiceClient.sendNotification).not.toHaveBeenCalled();
