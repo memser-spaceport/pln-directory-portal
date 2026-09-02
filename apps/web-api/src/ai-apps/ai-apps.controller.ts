@@ -390,8 +390,8 @@ export class AiAppsController {
   }
 
   /**
-   * Submit free-text feedback on an app from its detail page. Any member with
-   * AI Apps access may submit, more than once per app.
+   * Submit feedback on an app from its detail page. Text may be Quill HTML.
+   * Any member with AI Apps access may submit, more than once per app.
    */
   @NoCache()
   @Post(':uid/feedback')

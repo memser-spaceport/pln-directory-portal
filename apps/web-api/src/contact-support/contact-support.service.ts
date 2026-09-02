@@ -6,6 +6,7 @@ import { isEmails } from '../utils/helper/helper';
 import { AwsService } from '../utils/aws/aws.service';
 import * as path from 'path';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
+import { toSupportEmailHtml, toSupportTelegramText } from './contact-support-html';
 
 const CONTACT_SUPPORT_SUBJECT = 'New Contact Support Request';
 
@@ -51,8 +52,8 @@ export class ContactSupportService {
             `Topic: ${request.topic}`,
             `Email: ${request.email ?? '-'}`,
             `Name: ${request.name ?? '-'}`,
-            `Message: ${request.message ?? '-'}`,
-             this.formatSupportEmails(),
+            `Message: ${toSupportTelegramText(request.message ?? '-')}`,
+            this.formatSupportEmails(),
           ].join('\n'),
           meta: {
             email: request.email,
@@ -86,7 +87,7 @@ export class ContactSupportService {
             topic: supportRequest.topic,
             email: supportRequest.email || 'Not provided',
             name: supportRequest.name || 'Not provided',
-            message: supportRequest.message || 'Not provided',
+            message: toSupportEmailHtml(supportRequest.message || 'Not provided'),
             metadata: supportRequest.metadata ? JSON.stringify(supportRequest.metadata, null, 2) : null,
             createdAt: supportRequest.createdAt.toISOString(),
           },
@@ -119,11 +120,6 @@ export class ContactSupportService {
   }
 
   private formatSupportEmails(): string {
-    return `Support emails: ${
-      this.supportEmails.length
-        ? this.supportEmails.join(', ')
-        : '-'
-    }`;
+    return `Support emails: ${this.supportEmails.length ? this.supportEmails.join(', ') : '-'}`;
   }
-
 }
