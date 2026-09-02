@@ -5,11 +5,14 @@
     <p>Dear Team,</p>
     <p>A new contact support request has been submitted. The details are as follows:</p>
     <div style="margin-top: 20px; background-color: #f9f9f9; padding: 15px; border-radius: 5px;">
-      <p><strong>Topic:</strong> {{ topic }}</p>
+      <p><strong>Topic:</strong> {{ topic }}</p >
       <p><strong>Name:</strong> {{ name }}</p>
       <p><strong>Email:</strong> {{ email }}</p>
       <p><strong>Message:</strong></p>
-      <p style="white-space: pre-wrap; background-color: #fff; padding: 10px; border: 1px solid #ddd; border-radius: 3px;">{{ message }}</p>
+      <div style="background-color: #fff; padding: 10px; border: 1px solid #ddd; border-radius: 3px;">
+        <style type="text/css">img { max-width: 100%; height: auto; }</style>
+        {{{ message }}}
+      </div>
       {{#if metadata}}
       <p><strong>Additional Metadata:</strong></p>
       <pre style="background-color: #fff; padding: 10px; border: 1px solid #ddd; border-radius: 3px; overflow-x: auto;">{{ metadata }}</pre>
