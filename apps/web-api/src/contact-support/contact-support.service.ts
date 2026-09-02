@@ -72,10 +72,7 @@ export class ContactSupportService {
             },
           });
         } catch (error) {
-          this.logger.warn(
-            `Failed to send Telegram alert for contact support request ${result.uid}. ` +
-              (error instanceof Error ? error.message : String(error))
-          );
+          this.logger.error(`Failed to send Telegram alert for contact support request ${result.uid}`, error);
         }
         return { uid: result.uid };
       } else {
