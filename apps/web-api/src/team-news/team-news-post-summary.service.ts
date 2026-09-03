@@ -4,7 +4,7 @@ import { AiProviderService } from '../shared/ai-provider.service';
 import { stripHtmlToPlainText } from './team-news-body-html.util';
 
 const PROVIDER_ENV_VAR = 'TEAM_NEWS_POST_AI_PROVIDER';
-const SUMMARY_MAX_CHARS = 280;
+const SUMMARY_MAX_CHARS = 480;
 
 @Injectable()
 export class TeamNewsPostSummaryService {
@@ -19,10 +19,10 @@ export class TeamNewsPostSummaryService {
     try {
       const { text } = await generateText({
         model: this.aiProvider.getResponsesModel(PROVIDER_ENV_VAR, { useSearchGrounding: false }),
-        system: `You write short teasers for a team news feed card. Use only facts present in the body. One or two sentences, no bullet points, no invented details, no quotes.`,
-        prompt: `Headline: ${title}\n\nBody:\n${plain}\n\nWrite a teaser of at most ${SUMMARY_MAX_CHARS} characters.`,
-        temperature: 0.3,
-        maxTokens: 120,
+        system: `You write feed-card summaries for team news. State the main point of the post in one or two complete sentences. Use only facts present in the body. No hype, no bullet points, no invented details, no quotes. Respond only with the summary.`,
+        prompt: `Headline: ${title}\n\nBody:\n${contentHtml}\n\nSummarize the main point in one or two sentences (at most ${SUMMARY_MAX_CHARS} characters).`,
+        temperature: 0.1,
+        maxTokens: 300,
       });
 
       const summary = text.trim().slice(0, SUMMARY_MAX_CHARS);
