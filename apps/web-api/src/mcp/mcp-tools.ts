@@ -1,6 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
-import { ADMIN_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
+import { ADMIN_PERMISSIONS, FORUM_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { MasterProfileService } from '../master-profile/master-profile.service';
 import { relationKindFromHopChain } from '../warm-intros-v2/warm-intros-v2-enrich.util';
 import { WarmIntrosV2Service } from '../warm-intros-v2/warm-intros-v2.service';
@@ -18,7 +18,7 @@ export type McpActorContext = {
 export type McpToolDef = {
   name: string;
   description: string;
-  visibility: 'always' | 'investor_db';
+  visibility: 'always' | 'investor_db' | 'forum';
   inputSchema?: Record<string, z.ZodTypeAny>;
   execute: (ctx: McpActorContext, args?: Record<string, unknown>) => Promise<Record<string, unknown>>;
 };
@@ -366,6 +366,9 @@ function recordArg(value: unknown): Record<string, unknown> | null {
 export function isToolVisible(tool: McpToolDef, permissions: Set<string>): boolean {
   if (tool.visibility === 'always') {
     return true;
+  }
+  if (tool.visibility === 'forum') {
+    return permissions.has(FORUM_PERMISSIONS.READ);
   }
   return permissions.has(INVESTOR_DB_VIEW_PERMISSION) || permissions.has(ADMIN_PERMISSIONS.DIRECTORY_FULL);
 }

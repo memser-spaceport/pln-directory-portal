@@ -17,7 +17,13 @@ import { AnalyticsService } from '../analytics/service/analytics.service';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
 import { MasterProfileService } from '../master-profile/master-profile.service';
 import { WarmIntrosV2Service } from '../warm-intros-v2/warm-intros-v2.service';
+import { MembersService } from '../members/members.service';
+import { TeamsService } from '../teams/teams.service';
+import { ProjectsService } from '../projects/projects.service';
+import { PLEventsService } from '../pl-events/pl-events.service';
+import { SearchService } from '../search/search.service';
 import { trackMcpToolInvocation } from './mcp-analytics';
+import { directoryTools } from './mcp-directory-tools';
 import { McpOAuthService } from './mcp-oauth.service';
 import { toolsForPermissions, WHOAMI_TOOL, warmIntroTools } from './mcp-tools';
 
@@ -30,6 +36,11 @@ export class McpController {
     private readonly accessControl: AccessControlV2Service,
     private readonly masterProfiles: MasterProfileService,
     private readonly warmIntros: WarmIntrosV2Service,
+    private readonly members: MembersService,
+    private readonly teams: TeamsService,
+    private readonly projects: ProjectsService,
+    private readonly plEvents: PLEventsService,
+    private readonly search: SearchService,
     private readonly analytics: AnalyticsService
   ) {}
 
@@ -58,6 +69,7 @@ export class McpController {
     const tools = toolsForPermissions(permissions, [
       WHOAMI_TOOL,
       ...warmIntroTools(this.masterProfiles, this.warmIntros),
+      ...directoryTools(this.members, this.teams, this.projects, this.plEvents, this.search),
     ]);
 
     const server = new McpServer({ name: 'LabOS', version: '1.0.0' });

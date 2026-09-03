@@ -77,6 +77,21 @@ export function buildMcpToolAnalyticsProperties(
       props.connectorProfileUid = stringProp(args.connectorProfileUid);
       props.isClear = args.note === null;
       break;
+    case 'search_members':
+    case 'search_teams':
+    case 'search_projects':
+    case 'search_events':
+    case 'search_forum_threads':
+      props.limit = numberProp(result?.limit) ?? numberProp(args.limit);
+      props.resultCount = countOf(result?.results);
+      break;
+    case 'get_member':
+    case 'get_team':
+    case 'get_project':
+    case 'get_event':
+    case 'get_forum_thread':
+      props.uid = stringProp(args.uid);
+      break;
     default:
       break;
   }
