@@ -23,6 +23,8 @@ import {
   RecordTeamNewsImpressionsResponseSchema,
   TeamNewsCountsRequestSchema,
   TeamNewsCountsResponseSchema,
+  CreateTeamNewsPostRequestSchema,
+  TeamNewsItemSchema,
 } from '../schema/team-news';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
@@ -119,6 +121,21 @@ export const apiTeamNews = contract.router({
       200: TeamNewsByTeamResponseSchema,
     },
     summary: 'List news items for a team, ordered newest first with pagination and search',
+  },
+  createTeamNewsPost: {
+    method: 'POST',
+    path: `${getAPIVersionAsPath('1')}/teams/:teamUid/team-news`,
+    pathParams: z.object({ teamUid: z.string() }),
+    body: CreateTeamNewsPostRequestSchema,
+    responses: {
+      201: TeamNewsItemSchema,
+      409: z.object({
+        message: z.string(),
+        existingTitle: z.string(),
+        existingEventDate: z.string(),
+      }),
+    },
+    summary: 'Post a team news update from the team profile (members and directory admins)',
   },
   upvoteTeamNews: {
     method: 'POST',

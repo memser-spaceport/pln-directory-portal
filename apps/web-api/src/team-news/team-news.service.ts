@@ -1,16 +1,31 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Prisma, PushNotificationCategory } from '@prisma/client';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { NewsEventType, Prisma, PushNotificationCategory, TeamStatus } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { PushNotificationsService } from '../push-notifications/push-notifications.service';
 import { IngestTeamNewsDto, IngestTeamNewsResponse, TeamNewsIngestItem } from './dto/ingest-team-news.dto';
 import type {
   CreateTeamNewsDiscussionRequest,
   CreateTeamNewsDiscussionResponse,
+  CreateTeamNewsPostRequest,
   TeamNewsForumLinkDto,
 } from 'libs/contracts/src/schema/team-news';
 import { computeCanonicalKey } from './utils/canonical-key';
 import { extractDomain, normalizeSourceUrl, urlSearchVariants } from './utils/url-normalize';
 import { isDuplicateNewsStory } from './utils/news-dedup';
+import {
+  isSafeHttpUrl,
+  sanitizeTeamNewsBodyHtml,
+  stripHtmlToPlainText,
+  TEAM_NEWS_BODY_MAX_PLAIN_CHARS,
+} from './team-news-body-html.util';
+import { TeamNewsPostSummaryService } from './team-news-post-summary.service';
 
 type ExistingNewsRow = {
   id: number;
@@ -84,7 +99,11 @@ function storedSourceUrls(item: { sourceUrl?: string | null; sourceUrls?: string
 export class TeamNewsService {
   private readonly logger = new Logger(TeamNewsService.name);
 
-  constructor(private readonly prisma: PrismaService, private readonly pushNotifications: PushNotificationsService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly pushNotifications: PushNotificationsService,
+    private readonly postSummary: TeamNewsPostSummaryService
+  ) {}
 
   async ingestTeamNews(dto: IngestTeamNewsDto): Promise<IngestTeamNewsResponse> {
     const result: IngestTeamNewsResponse = {
@@ -362,9 +381,7 @@ export class TeamNewsService {
     const searchUrls = urlSearchVariants(incomingUrls);
     if (searchUrls.length === 0) return null;
 
-    const normalizedIncoming = new Set(
-      incomingUrls.map((url) => normalizeSourceUrl(url)).filter(Boolean)
-    );
+    const normalizedIncoming = new Set(incomingUrls.map((url) => normalizeSourceUrl(url)).filter(Boolean));
 
     const candidates = await this.prisma.teamNewsItem.findMany({
       where: {
@@ -523,10 +540,7 @@ export class TeamNewsService {
     const semanticExisting =
       sameSourceExisting ??
       nearbyItems.find((candidate) =>
-        isDuplicateNewsStory(
-          { ...item, eventDate },
-          { ...candidate, eventDate: candidate.eventDate }
-        )
+        isDuplicateNewsStory({ ...item, eventDate }, { ...candidate, eventDate: candidate.eventDate })
       );
 
     if (semanticExisting) {
@@ -553,6 +567,112 @@ export class TeamNewsService {
         update: { recentNewsCount },
       });
     }
+  }
+
+  /**
+   * Post a team news item from the team profile. Does not send push notifications
+   * and rejects duplicate URLs for the same team (unlike service ingest, which merges).
+   */
+  async createTeamPostedNews(
+    teamUid: string,
+    body: CreateTeamNewsPostRequest,
+    requestor: {
+      uid: string;
+      isDirectoryAdmin: boolean;
+      teamMemberRoles?: Array<{ teamUid: string }>;
+    }
+  ): Promise<{ uid: string }> {
+    const team = await this.prisma.team.findUnique({
+      where: { uid: teamUid },
+      select: { uid: true, status: true },
+    });
+    if (!team) {
+      throw new NotFoundException(`Team ${teamUid} not found`);
+    }
+
+    const isMember = requestor.teamMemberRoles?.some((role) => role.teamUid === teamUid) ?? false;
+    if (!requestor.isDirectoryAdmin && !isMember) {
+      throw new ForbiddenException('Only team members and directory admins can post team news');
+    }
+
+    if (team.status !== TeamStatus.ACTIVE) {
+      throw new BadRequestException('News cannot be posted for inactive teams');
+    }
+
+    const url = body.url.trim();
+    if (!isSafeHttpUrl(url)) {
+      throw new BadRequestException('Enter the full link, starting with https://');
+    }
+
+    const duplicate = await this.findDuplicateUrlForTeam(teamUid, url);
+    if (duplicate) {
+      throw new ConflictException({
+        message: `Already in team news: "${duplicate.title}" (${duplicate.eventDate.toISOString().slice(0, 10)})`,
+        existingTitle: duplicate.title,
+        existingEventDate: duplicate.eventDate.toISOString(),
+      });
+    }
+
+    const contentHtml = sanitizeTeamNewsBodyHtml(body.body);
+    if (contentHtml) {
+      const plainLength = stripHtmlToPlainText(contentHtml).length;
+      if (plainLength > TEAM_NEWS_BODY_MAX_PLAIN_CHARS) {
+        throw new BadRequestException(`Body must be at most ${TEAM_NEWS_BODY_MAX_PLAIN_CHARS} characters`);
+      }
+    }
+
+    const title = body.title.trim();
+    let summary: string | null = null;
+    if (contentHtml) {
+      summary = await this.postSummary.summarizeBody(contentHtml, title);
+    }
+
+    const eventDate = new Date();
+    const sourceDomain = extractDomain(url);
+    const canonicalKey = computeCanonicalKey(teamUid, url, eventDate);
+
+    const created = await this.prisma.teamNewsItem.create({
+      data: {
+        teamUid,
+        canonicalKey,
+        eventType: NewsEventType.ANNOUNCEMENT,
+        eventDate,
+        title,
+        summary,
+        contentHtml,
+        sourceUrl: url,
+        sourceUrls: [url],
+        sourceDomain,
+        tags: [],
+        postedByMemberUid: requestor.uid,
+        rawPayload: { source: 'team-post' },
+      },
+      select: { uid: true },
+    });
+
+    await this.recomputeRecentNewsCounts(new Set([teamUid]));
+
+    return { uid: created.uid };
+  }
+
+  private async findDuplicateUrlForTeam(
+    teamUid: string,
+    url: string
+  ): Promise<{ title: string; eventDate: Date } | null> {
+    const normalizedIncoming = normalizeSourceUrl(url);
+    const items = await this.prisma.teamNewsItem.findMany({
+      where: { teamUid },
+      select: { title: true, eventDate: true, sourceUrl: true, sourceUrls: true },
+    });
+
+    for (const item of items) {
+      const urls = item.sourceUrls.length > 0 ? item.sourceUrls : [item.sourceUrl];
+      if (urls.some((candidate) => normalizeSourceUrl(candidate) === normalizedIncoming)) {
+        return { title: item.title, eventDate: item.eventDate };
+      }
+    }
+
+    return null;
   }
 
   /**

@@ -31,7 +31,7 @@ model Team {
   website                      String?
   contactMethod                String?
   jobReferEmail                String?
-  jobReferCcEmails             String[]                       @default([])
+  jobReferCcEmails             String[]                      @default([])
   twitterHandler               String?
   linkedinHandler              String?
   telegramHandler              String?
@@ -2408,34 +2408,36 @@ enum NewsDiscoveryOutcome {
 }
 
 model TeamNewsItem {
-  id               Int                 @id @default(autoincrement())
-  uid              String              @unique @default(cuid())
-  teamUid          String
-  team             Team                @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
-  canonicalKey     String              @unique
-  eventType        NewsEventType       @default(OTHER)
-  eventDate        DateTime
-  title            String
-  summary          String?
-  contentHtml      String?
-  sourceUrl        String
-  sourceUrls       String[]            @default([])
-  sourceDomain     String?
-  tags             String[]            @default([])
-  rawPayload       Json?
+  id                Int                 @id @default(autoincrement())
+  uid               String              @unique @default(cuid())
+  teamUid           String
+  team              Team                @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+  canonicalKey      String              @unique
+  eventType         NewsEventType       @default(OTHER)
+  eventDate         DateTime
+  title             String
+  summary           String?
+  contentHtml       String?
+  sourceUrl         String
+  sourceUrls        String[]            @default([])
+  sourceDomain      String?
+  tags              String[]            @default([])
+  rawPayload        Json?
   /// 1 = Top Stories lead, 2–3 = runners-up; null = not featured. Replaced each seed-trending run.
-  editorialRank    Int?
+  editorialRank     Int?
   /// Raw impression count. Incremented once per feed-card impression via
   /// POST /v1/team-news/impressions. Not deduplicated by user, session, or
   /// repeat viewing — unlike upvotes/likes below.
-  viewCount        Int                 @default(0)
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
-  forumLinks       TeamNewsForumLink[]
-  upvotes          TeamNewsUpvote[]
-  feedComments     FeedComment[]
-  feedLikes        FeedNewsLike[]
-  networkOverviews NetworkOverview[]
+  viewCount         Int                 @default(0)
+  /// Set when a team member or admin posts from the team profile; null for enrichment-ingested items.
+  postedByMemberUid String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  forumLinks        TeamNewsForumLink[]
+  upvotes           TeamNewsUpvote[]
+  feedComments      FeedComment[]
+  feedLikes         FeedNewsLike[]
+  networkOverviews  NetworkOverview[]
 
   @@index([teamUid])
   @@index([eventDate])
@@ -2446,6 +2448,7 @@ model TeamNewsItem {
   /// "new news" dot, so it runs on effectively every page load by every user.
   /// Without this it is a sequential scan on the hottest path in the app.
   @@index([createdAt])
+  @@index([postedByMemberUid])
 }
 
 /// Per-member "I'm interested" signal on a team news item. One upvote per

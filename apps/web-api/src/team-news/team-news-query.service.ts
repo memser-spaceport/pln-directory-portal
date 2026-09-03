@@ -722,6 +722,7 @@ export class TeamNewsQueryService {
       tags: string[];
       editorialRank: number | null;
       viewCount: number;
+      postedByMemberUid: string | null;
       createdAt: Date;
       team: {
         uid: string;
@@ -782,6 +783,34 @@ export class TeamNewsQueryService {
       viewerHasUpvoted: upvotes.viewerUpvoted.has(row.uid),
       editorialRank: row.editorialRank ?? null,
       viewCount: row.viewCount,
+      isTeamPosted: row.postedByMemberUid != null,
     };
+  }
+
+  async getTeamNewsItemDto(
+    uid: string,
+    followedTeamUids: Set<string> = new Set(),
+    viewerMemberUid?: string
+  ): Promise<TeamNewsItemDto | null> {
+    const include = {
+      team: {
+        select: {
+          uid: true,
+          name: true,
+          logo: { select: { url: true } },
+          teamFocusAreas: { include: { focusArea: true, ancestorArea: true } },
+        },
+      },
+    } as const;
+
+    const row = await this.prisma.teamNewsItem.findUnique({ where: { uid }, include });
+    if (!row) return null;
+
+    const [discussions, upvotes] = await Promise.all([
+      this.loadDiscussions([uid]),
+      this.loadUpvotes([uid], viewerMemberUid),
+    ]);
+
+    return this.toDto(row, discussions.get(uid), followedTeamUids, upvotes);
   }
 }
