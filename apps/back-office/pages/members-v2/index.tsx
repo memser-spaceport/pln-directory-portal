@@ -14,10 +14,16 @@ import { usePoliciesList } from '../../hooks/access-control/usePoliciesList';
 import { useAuth } from '../../context/auth-context';
 import { MEMBERS_V2_STATE_TAB_ICONS, PoliciesIcon } from '../../components/menu/components/MembersV2Menu/memberStateTabIcons';
 import { useMemberStateCounts } from '../../hooks/members/useAccessLevelCounts';
+import { useSignUpSources } from '../../hooks/members/useSignUpSources';
 import s from './styles.module.scss';
 
-type MemberStateTab = 'PENDING' | 'VERIFIED' | 'APPROVED' | 'REJECTED';
+type MemberStateTab = 'PENDING' | 'VERIFIED' | 'APPROVED' | 'REJECTED' | 'JOB_ASPIRANT';
 type ActiveTab = MemberStateTab | 'POLICIES';
+
+const TAB_IDS: ActiveTab[] = ['PENDING', 'VERIFIED', 'APPROVED', 'REJECTED', 'JOB_ASPIRANT', 'POLICIES'];
+
+/** Must match JOB_ASPIRANT_POLICY_CODE in apps/web-api/src/access-control-v2/access-control-v2.constants.ts */
+const JOB_ASPIRANT_POLICY_CODE = 'job_aspirant';
 
 const MEMBER_STATE_TABS: { id: MemberStateTab; label: string }[] = [
   { id: 'PENDING', label: 'Pending Members (L0)' },
@@ -26,6 +32,7 @@ const MEMBER_STATE_TABS: { id: MemberStateTab; label: string }[] = [
 ];
 
 const REJECTED_TAB: { id: MemberStateTab; label: string } = { id: 'REJECTED', label: 'Rejected Members' };
+const JOB_ASPIRANT_TAB: { id: MemberStateTab; label: string } = { id: 'JOB_ASPIRANT', label: 'Job Aspirants' };
 
 type SelectOption = { label: string; value: string };
 
@@ -72,15 +79,13 @@ const MembersPageV2 = () => {
   const [authToken] = useCookie('plnadmin');
 
   const initialTab = (
-    ['PENDING', 'VERIFIED', 'APPROVED', 'REJECTED', 'POLICIES'].includes(router.query.tab as string)
-      ? router.query.tab
-      : 'PENDING'
+    TAB_IDS.includes(router.query.tab as ActiveTab) ? router.query.tab : 'PENDING'
   ) as ActiveTab;
   const [activeTab, setActiveTab] = useState<ActiveTab>(initialTab);
 
   useEffect(() => {
     const tab = router.query.tab as string | undefined;
-    if (tab && ['PENDING', 'VERIFIED', 'APPROVED', 'REJECTED', 'POLICIES'].includes(tab)) {
+    if (tab && TAB_IDS.includes(tab as ActiveTab)) {
       setActiveTab(tab as ActiveTab);
     }
   }, [router.query.tab]);
@@ -88,6 +93,7 @@ const MembersPageV2 = () => {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [groupFilter, setGroupFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('');
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 20 });
   /** Default: joined (createdAt) desc. Member / Joined headers toggle sort. */
   const [sorting, setSorting] = useState<SortingState>([{ id: 'joined', desc: true }]);
@@ -109,6 +115,7 @@ const MembersPageV2 = () => {
   }, [authLoading, user, isDirectoryAdmin, router]);
 
   const { data: countsData } = useMemberStateCounts({ authToken: authToken ?? '' });
+  const { data: signUpSourcesData } = useSignUpSources({ authToken: authToken ?? undefined });
 
   const tabCounts = useMemo<Record<MemberStateTab, number>>(
     () => ({
@@ -116,8 +123,17 @@ const MembersPageV2 = () => {
       VERIFIED: countsData?.VERIFIED ?? 0,
       APPROVED: countsData?.APPROVED ?? 0,
       REJECTED: countsData?.REJECTED ?? 0,
+      JOB_ASPIRANT: countsData?.JOB_ASPIRANT ?? 0,
     }),
     [countsData]
+  );
+
+  const sourceOptions = useMemo<SelectOption[]>(
+    () => [
+      { label: 'All sources', value: '' },
+      ...(signUpSourcesData ?? []).map((source) => ({ label: source, value: source })),
+    ],
+    [signUpSourcesData]
   );
 
   const apiSort = useMemo(() => {
@@ -134,16 +150,30 @@ const MembersPageV2 = () => {
   const membersListArgs: MembersListQueryParams = useMemo(
     () => ({
       authToken: authToken ?? undefined,
-      memberState: activeTab !== 'POLICIES' ? [activeTab] : ['PENDING'],
+      memberState:
+        activeTab === 'JOB_ASPIRANT' || activeTab === 'POLICIES' ? undefined : [activeTab],
       page: pagination.pageIndex + 1,
       limit: pagination.pageSize,
       search: debouncedSearch || undefined,
       policyGroups: activeTab === 'APPROVED' && groupFilter ? [groupFilter] : undefined,
       policyRoles: activeTab === 'APPROVED' && roleFilter ? [roleFilter] : undefined,
+      policyCodes: activeTab === 'JOB_ASPIRANT' ? [JOB_ASPIRANT_POLICY_CODE] : undefined,
+      excludeJobAspirants: activeTab === 'PENDING' || activeTab === 'VERIFIED',
+      signUpSources: sourceFilter ? [sourceFilter] : undefined,
       sortBy: apiSort.sortBy,
       sortOrder: apiSort.sortOrder,
     }),
-    [authToken, activeTab, pagination.pageIndex, pagination.pageSize, debouncedSearch, groupFilter, roleFilter, apiSort]
+    [
+      authToken,
+      activeTab,
+      pagination.pageIndex,
+      pagination.pageSize,
+      debouncedSearch,
+      groupFilter,
+      roleFilter,
+      sourceFilter,
+      apiSort,
+    ]
   );
 
   const { data: listResponse, isLoading, isError } = useMembersList(membersListArgs, {
@@ -206,6 +236,7 @@ const MembersPageV2 = () => {
     setPagination((p) => ({ ...p, pageIndex: 0 }));
     setGroupFilter('');
     setRoleFilter('');
+    setSourceFilter('');
     setSorting([{ id: 'joined', desc: true }]);
     setPolicySearch('');
     setPolicyRoleFilter('');
@@ -224,6 +255,7 @@ const MembersPageV2 = () => {
   };
 
   const RejectedTabIcon = MEMBERS_V2_STATE_TAB_ICONS[REJECTED_TAB.id];
+  const JobAspirantTabIcon = MEMBERS_V2_STATE_TAB_ICONS[JOB_ASPIRANT_TAB.id];
 
   return (
     <ApprovalLayout>
@@ -267,6 +299,19 @@ const MembersPageV2 = () => {
           </button>
 
           <button
+            className={clsx(s.tab, { [s.tabActive]: activeTab === JOB_ASPIRANT_TAB.id })}
+            onClick={() => handleTabChange(JOB_ASPIRANT_TAB.id)}
+          >
+            <span className={s.tabIcon} aria-hidden>
+              <JobAspirantTabIcon />
+            </span>
+            {JOB_ASPIRANT_TAB.label}
+            <span className={clsx(s.tabCount, { [s.tabCountActive]: activeTab === JOB_ASPIRANT_TAB.id })}>
+              {tabCounts[JOB_ASPIRANT_TAB.id]}
+            </span>
+          </button>
+
+          <button
             className={clsx(s.tab, { [s.tabActive]: activeTab === 'POLICIES' })}
             onClick={() => handleTabChange('POLICIES')}
           >
@@ -305,6 +350,22 @@ const MembersPageV2 = () => {
                 placeholder="Search policies"
                 value={policySearch}
                 onChange={handlePolicySearchChange}
+              />
+            </div>
+          )}
+
+          {activeTab !== 'POLICIES' && (
+            <div className={s.filterDropdown}>
+              <Select<SelectOption>
+                menuPortalTarget={document.body}
+                options={sourceOptions}
+                value={sourceOptions.find((o) => o.value === sourceFilter) ?? sourceOptions[0]}
+                onChange={(val) => {
+                  setSourceFilter(val?.value ?? '');
+                  setPagination((p) => ({ ...p, pageIndex: 0 }));
+                }}
+                isClearable={false}
+                styles={selectStyles}
               />
             </div>
           )}

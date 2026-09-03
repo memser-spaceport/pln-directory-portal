@@ -36,6 +36,15 @@ export const RequestMembersSchema = z.object({
     .transform((val) => val.split(',').map((v) => v.trim()))
     .refine((arr) => arr.length > 0, { message: 'policyRoles must contain at least one value' })
     .optional(),
+  excludeJobAspirants: z
+    .enum(['true', 'false'])
+    .transform((val) => val === 'true')
+    .optional(),
+  signUpSources: z
+    .string()
+    .transform((val) => val.split(',').map((v) => v.trim()))
+    .refine((arr) => arr.length > 0, { message: 'signUpSources must contain at least one value' })
+    .optional(),
   page: z.string().regex(/^\d+$/).transform(Number).optional(),
   limit: z.string().regex(/^\d+$/).transform(Number).optional(),
   /** Server-side filter: name, email, uid (substring), project name */
@@ -143,7 +152,7 @@ export const UpdateMemberSchema = z.object({
     .optional(),
 });
 
-export type MemberStateCounts = Record<MemberState, number>;
+export type MemberStateCounts = Record<MemberState, number> & { JOB_ASPIRANT: number };
 
 export class RequestMembersDto extends createZodDto(RequestMembersSchema) {}
 export class CreateMemberDto extends createZodDto(CreateMemberSchema) {}
