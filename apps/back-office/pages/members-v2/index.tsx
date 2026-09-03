@@ -357,7 +357,7 @@ const MembersPageV2 = () => {
           {activeTab !== 'POLICIES' && (
             <div className={s.filterDropdown}>
               <Select<SelectOption>
-                menuPortalTarget={document.body}
+                menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
                 options={sourceOptions}
                 value={sourceOptions.find((o) => o.value === sourceFilter) ?? sourceOptions[0]}
                 onChange={(val) => {
@@ -374,7 +374,7 @@ const MembersPageV2 = () => {
             <>
               <div className={s.filterDropdown}>
                 <Select<SelectOption>
-                  menuPortalTarget={document.body}
+                  menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
                   options={groupOptions}
                   value={groupOptions.find((o) => o.value === groupFilter) ?? groupOptions[0]}
                   onChange={(val) => {
@@ -387,7 +387,7 @@ const MembersPageV2 = () => {
               </div>
               <div className={s.filterDropdown}>
                 <Select<SelectOption>
-                  menuPortalTarget={document.body}
+                  menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
                   options={roleOptions}
                   value={roleOptions.find((o) => o.value === roleFilter) ?? roleOptions[0]}
                   onChange={(val) => {
@@ -405,7 +405,7 @@ const MembersPageV2 = () => {
             <>
               <div className={s.filterDropdown}>
                 <Select<SelectOption>
-                  menuPortalTarget={document.body}
+                  menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
                   options={policyRoleOptions}
                   value={policyRoleOptions.find((o) => o.value === policyRoleFilter) ?? policyRoleOptions[0]}
                   onChange={(val) => {
@@ -418,7 +418,7 @@ const MembersPageV2 = () => {
               </div>
               <div className={s.filterDropdown}>
                 <Select<SelectOption>
-                  menuPortalTarget={document.body}
+                  menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
                   options={policyGroupOptions}
                   value={policyGroupOptions.find((o) => o.value === policyGroupFilter) ?? policyGroupOptions[0]}
                   onChange={(val) => {
