@@ -65,7 +65,6 @@ export function PolicyViewDialog({ policy, authToken, isOpen, onClose }: Props) 
   const { data: assigneesData } = useMembersList(
     {
       authToken,
-      memberState: ['APPROVED'],
       policyCodes: policy ? [policy.code] : undefined,
       page: dialogPagination.pageIndex + 1,
       limit: dialogPagination.pageSize,

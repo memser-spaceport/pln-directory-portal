@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { JobBoardSignUpInput } from 'libs/contracts/src/schema/job-application';
-import { JOB_ASPIRANT_POLICY_CODE } from '../access-control-v2/access-control-v2.constants';
+import { JOB_ASPIRANT_POLICY_CODE, MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { MembersService } from '../members/members.service';
 import { PrismaService } from '../shared/prisma.service';
 
@@ -12,8 +12,9 @@ export class JobOpeningsSignUpService {
 
   async signUp(input: JobBoardSignUpInput) {
     /* A selected team is a regular network member. Job Aspirant is only for
-       the no-team apply-only path — and `signUpSource: job-board` is the same
-       marker on the login cookie, which omits policies. */
+       the no-team apply-only path. Every Job Board sign-up still gets
+       `signUpSource: job-board` and `member.profile.visible` so the profile is
+       reachable before approval. */
     const hasSelectedTeam = Boolean(input.team?.uid || input.team?.name);
 
     const member = await this.membersService.createMemberAndAttach(
@@ -31,7 +32,7 @@ export class JobOpeningsSignUpService {
            which owns the wire→enum mapping. So it lands in the same insert that
            creates the member, and no new code writes it. */
         jobSearchStatus: input.jobSearchStatus,
-        signUpSource: hasSelectedTeam ? undefined : JOB_BOARD_SIGN_UP_SOURCE,
+        signUpSource: JOB_BOARD_SIGN_UP_SOURCE,
       },
       {
         role: input.role,
@@ -42,7 +43,9 @@ export class JobOpeningsSignUpService {
       }
     );
 
-    if (!hasSelectedTeam) {
+    if (hasSelectedTeam) {
+      await this.assignProfileVisiblePermission(member.uid);
+    } else {
       await this.assignJobAspirantPolicy(member.uid);
     }
     return member;
@@ -68,6 +71,30 @@ export class JobOpeningsSignUpService {
       create: {
         memberUid,
         policyUid: policy.uid,
+      },
+    });
+  }
+
+  private async assignProfileVisiblePermission(memberUid: string) {
+    const permission = await this.prisma.permission.findUnique({
+      where: { code: MEMBER_PERMISSIONS.PROFILE_VISIBLE },
+      select: { uid: true },
+    });
+    if (!permission) {
+      throw new NotFoundException(`Permission not found: ${MEMBER_PERMISSIONS.PROFILE_VISIBLE}`);
+    }
+
+    await this.prisma.memberPermissionV2.upsert({
+      where: {
+        memberUid_permissionUid: {
+          memberUid,
+          permissionUid: permission.uid,
+        },
+      },
+      update: {},
+      create: {
+        memberUid,
+        permissionUid: permission.uid,
       },
     });
   }

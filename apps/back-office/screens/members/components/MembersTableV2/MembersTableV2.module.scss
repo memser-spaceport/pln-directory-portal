@@ -80,11 +80,24 @@
 
 .colJoined {
   flex: 0 0 auto;
-  min-width: 4.75rem;
-  max-width: 5.5rem;
+  min-width: 7.5rem;
+  max-width: 10rem;
   padding-left: 8px;
   padding-right: 8px;
   justify-content: flex-end;
+}
+
+.bodyCell.colJoined {
+  align-items: flex-end;
+}
+
+.joinedCell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .joinedText {
@@ -92,6 +105,21 @@
   font-variant-numeric: tabular-nums;
   color: #6b7280;
   white-space: nowrap;
+}
+
+.sourceTag {
+  display: block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .colRole {

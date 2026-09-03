@@ -93,17 +93,28 @@ export function MembersTableV2({
       header: 'Joined',
       enableSorting: true,
       cell: (info) => {
-        const raw = info.row.original.createdAt;
+        const member = info.row.original;
+        const raw = member.createdAt;
+        const source = member.signUpSource?.trim();
         return (
-          <span
-            className={s.joinedText}
-            title={raw ? new Date(raw).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : undefined}
-          >
-            {formatJoinedDate(raw)}
-          </span>
+          <div className={s.joinedCell}>
+            <span
+              className={s.joinedText}
+              title={
+                raw ? new Date(raw).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : undefined
+              }
+            >
+              {formatJoinedDate(raw)}
+            </span>
+            {source ? (
+              <span className={s.sourceTag} title={source}>
+                {source}
+              </span>
+            ) : null}
+          </div>
         );
       },
-      size: 76,
+      size: 120,
     });
 
     const approvedExtras =

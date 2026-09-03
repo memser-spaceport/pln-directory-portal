@@ -4,7 +4,7 @@ jest.mock('../members/members.service', () => ({
 
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { JobBoardSignUpSchema } from 'libs/contracts/src/schema/job-application';
-import { JOB_ASPIRANT_POLICY_CODE } from '../access-control-v2/access-control-v2.constants';
+import { JOB_ASPIRANT_POLICY_CODE, MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import type { MembersService } from '../members/members.service';
 import type { PrismaService } from '../shared/prisma.service';
 import { JobOpeningsSignUpService } from './job-openings-sign-up.service';
@@ -12,11 +12,15 @@ import { JobOpeningsSignUpService } from './job-openings-sign-up.service';
 type PrismaMock = {
   policy: { findUnique: jest.Mock };
   policyAssignment: { upsert: jest.Mock };
+  permission: { findUnique: jest.Mock };
+  memberPermissionV2: { upsert: jest.Mock };
 };
 
 const buildPrismaMock = (): PrismaMock => ({
   policy: { findUnique: jest.fn().mockResolvedValue({ uid: 'policy-job-aspirant' }) },
   policyAssignment: { upsert: jest.fn().mockResolvedValue({ uid: 'assignment-1' }) },
+  permission: { findUnique: jest.fn().mockResolvedValue({ uid: 'perm-profile-visible' }) },
+  memberPermissionV2: { upsert: jest.fn().mockResolvedValue({ uid: 'member-perm-1' }) },
 });
 
 describe('JobOpeningsSignUpService', () => {
@@ -81,7 +85,7 @@ describe('JobOpeningsSignUpService', () => {
     });
   });
 
-  it('does not assign Job Aspirant or job-board signUpSource when an existing team is selected', async () => {
+  it('does not assign Job Aspirant when an existing team is selected', async () => {
     await service.signUp({
       name: 'Ada',
       email: 'ada@example.com',
@@ -89,12 +93,39 @@ describe('JobOpeningsSignUpService', () => {
       team: { uid: 'team-1' },
     });
 
-    expect(membersService.createMemberAndAttach.mock.calls[0][0].signUpSource).toBeUndefined();
+    expect(membersService.createMemberAndAttach.mock.calls[0][0].signUpSource).toBe('job-board');
     expect(prisma.policy.findUnique).not.toHaveBeenCalled();
     expect(prisma.policyAssignment.upsert).not.toHaveBeenCalled();
   });
 
-  it('does not assign Job Aspirant or job-board signUpSource when creating a new team', async () => {
+  it('grants member.profile.visible when an existing team is selected', async () => {
+    await service.signUp({
+      name: 'Ada',
+      email: 'ada@example.com',
+      role: 'Engineer',
+      team: { uid: 'team-1' },
+    });
+
+    expect(prisma.permission.findUnique).toHaveBeenCalledWith({
+      where: { code: MEMBER_PERMISSIONS.PROFILE_VISIBLE },
+      select: { uid: true },
+    });
+    expect(prisma.memberPermissionV2.upsert).toHaveBeenCalledWith({
+      where: {
+        memberUid_permissionUid: {
+          memberUid: 'member-1',
+          permissionUid: 'perm-profile-visible',
+        },
+      },
+      update: {},
+      create: {
+        memberUid: 'member-1',
+        permissionUid: 'perm-profile-visible',
+      },
+    });
+  });
+
+  it('does not assign Job Aspirant when creating a new team', async () => {
     await service.signUp({
       name: 'Ada',
       email: 'ada@example.com',
@@ -103,9 +134,35 @@ describe('JobOpeningsSignUpService', () => {
       team: { name: 'New Co', website: 'https://new.co' },
     });
 
-    expect(membersService.createMemberAndAttach.mock.calls[0][0].signUpSource).toBeUndefined();
+    expect(membersService.createMemberAndAttach.mock.calls[0][0].signUpSource).toBe('job-board');
     expect(prisma.policy.findUnique).not.toHaveBeenCalled();
     expect(prisma.policyAssignment.upsert).not.toHaveBeenCalled();
+  });
+
+  it('grants member.profile.visible when creating a new team', async () => {
+    await service.signUp({
+      name: 'Ada',
+      email: 'ada@example.com',
+      role: 'Engineer',
+      isTeamNew: true,
+      team: { name: 'New Co', website: 'https://new.co' },
+    });
+
+    expect(prisma.memberPermissionV2.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: {
+          memberUid: 'member-1',
+          permissionUid: 'perm-profile-visible',
+        },
+      })
+    );
+  });
+
+  it('does not grant a direct profile-visible permission on the Job Aspirant path', async () => {
+    await service.signUp({ name: 'Ada', email: 'ada@example.com', role: 'Engineer' });
+
+    expect(prisma.permission.findUnique).not.toHaveBeenCalled();
+    expect(prisma.memberPermissionV2.upsert).not.toHaveBeenCalled();
   });
 
   it('throws when the Job Aspirant policy is missing', async () => {
@@ -116,6 +173,21 @@ describe('JobOpeningsSignUpService', () => {
     );
 
     expect(prisma.policyAssignment.upsert).not.toHaveBeenCalled();
+  });
+
+  it('throws when member.profile.visible is missing on the team path', async () => {
+    prisma.permission.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.signUp({
+        name: 'Ada',
+        email: 'ada@example.com',
+        role: 'Engineer',
+        team: { uid: 'team-1' },
+      })
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(prisma.memberPermissionV2.upsert).not.toHaveBeenCalled();
   });
 
   it('attaches an existing team', async () => {

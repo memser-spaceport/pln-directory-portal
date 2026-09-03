@@ -1,5 +1,15 @@
 import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
-import { directoryVisibleMemberWhere } from './member-visibility';
+import { directoryListedMemberWhere, directoryVisibleMemberWhere } from './member-visibility';
+
+describe('directoryListedMemberWhere', () => {
+  it('includes only APPROVED members', () => {
+    expect(directoryListedMemberWhere()).toEqual({ memberApproval: { state: { in: ['APPROVED'] } } });
+  });
+
+  it('does not include members via member.profile.visible', () => {
+    expect(JSON.stringify(directoryListedMemberWhere())).not.toContain(MEMBER_PERMISSIONS.PROFILE_VISIBLE);
+  });
+});
 
 describe('directoryVisibleMemberWhere', () => {
   const where = directoryVisibleMemberWhere();
