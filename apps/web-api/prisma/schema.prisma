@@ -264,6 +264,7 @@ model Member {
   jobReferralsSent          JobReferral[]           @relation("JobReferralReferrer")
   jobReferralsReceived      JobReferral[]           @relation("JobReferralReferred")
   jobApplications           JobApplication[]
+  jobOpeningInterests       JobOpeningInterest[]
   roadmapItemsCreated       RoadmapItem[]           @relation("roadmapItemCreatedBy")
   roadmapItemsPromoted      RoadmapItem[]           @relation("roadmapItemPromotedBy")
   roadmapItemUpvotes        RoadmapItemUpvote[]     @relation("roadmapItemUpvoter")
@@ -2313,6 +2314,7 @@ model JobOpening {
   updatedAt       DateTime         @updatedAt
   referrals       JobReferral[]
   applications    JobApplication[]
+  interests       JobOpeningInterest[]
 
   @@index([status])
   @@index([companyName])
@@ -2370,6 +2372,20 @@ model JobApplication {
   @@unique([jobOpeningUid, memberUid])
   @@index([memberUid])
   @@index([jobOpeningUid])
+}
+
+model JobOpeningInterest {
+  id            Int        @id @default(autoincrement())
+  uid           String     @unique @default(cuid())
+  jobOpeningUid String
+  jobOpening    JobOpening @relation(fields: [jobOpeningUid], references: [uid], onDelete: Cascade)
+  memberUid     String
+  member        Member     @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  createdAt     DateTime   @default(now())
+
+  @@unique([jobOpeningUid, memberUid])
+  @@index([jobOpeningUid])
+  @@index([memberUid])
 }
 
 model TeamJobEnrichment {

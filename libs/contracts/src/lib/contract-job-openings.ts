@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { initContract } from '@ts-rest/core';
 import {
+  JobOpeningInterestListResponseSchema,
+  JobOpeningInterestStatusSchema,
   JobsFiltersResponseSchema,
   JobsListQueryParams,
   JobsListResponseSchema,
@@ -87,5 +89,33 @@ export const apiJobOpenings = contract.router({
       201: JobReferralResponseSchema,
     },
     summary: 'Refer a Directory member for a job opening',
+  },
+  getMyInterests: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/job-openings/interests`,
+    responses: {
+      200: JobOpeningInterestListResponseSchema,
+    },
+    summary: "List the current member's Job Board interests",
+  },
+  markJobInterest: {
+    method: 'POST',
+    path: `${getAPIVersionAsPath('1')}/job-openings/:uid/interest`,
+    pathParams: z.object({ uid: z.string() }),
+    body: z.object({}).optional(),
+    responses: {
+      200: JobOpeningInterestStatusSchema,
+    },
+    summary: "Mark the current member's interest in a job opening (idempotent)",
+  },
+  removeJobInterest: {
+    method: 'DELETE',
+    path: `${getAPIVersionAsPath('1')}/job-openings/:uid/interest`,
+    pathParams: z.object({ uid: z.string() }),
+    body: z.object({}).optional(),
+    responses: {
+      200: JobOpeningInterestStatusSchema,
+    },
+    summary: "Remove the current member's interest in a job opening (idempotent)",
   },
 });
