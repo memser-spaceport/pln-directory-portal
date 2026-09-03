@@ -62,6 +62,7 @@ function buildService(app: Record<string, any> | null = APP) {
       findMany: jest.fn().mockResolvedValue([]),
       findUnique: jest.fn().mockResolvedValue(null),
     },
+    aiAppActiveMember: { groupBy: jest.fn().mockResolvedValue([]) },
   };
   const aws = { uploadFileToS3: jest.fn().mockResolvedValue(undefined) };
   const pushNotifications = { create: jest.fn().mockResolvedValue({}) };
