@@ -14,7 +14,11 @@ import { MemberCell } from '../MemberCell/MemberCell';
 import { ProjectsCell } from '../ProjectsCell/ProjectsCell';
 import { EditCell } from '../EditCell/EditCell';
 import PaginationControls from '../PaginationControls/PaginationControls';
+import { JobAspirantIcon } from '../../../../components/menu/components/MembersV2Menu/memberStateTabIcons';
 import s from './MembersTableV2.module.scss';
+
+/** Must match JOB_ASPIRANT_POLICY_CODE in apps/web-api/src/access-control-v2/access-control-v2.constants.ts */
+const JOB_ASPIRANT_POLICY_CODE = 'job_aspirant';
 
 interface Props {
   members: Member[];
@@ -44,6 +48,8 @@ function columnLayoutClass(columnId: string) {
       return s.colMember;
     case 'teamProject':
       return s.colTeam;
+    case 'status':
+      return s.colStatus;
     case 'joined':
       return s.colJoined;
     case 'role':
@@ -85,6 +91,22 @@ export function MembersTableV2({
         enableSorting: false,
         cell: (info) => <ProjectsCell member={info.row.original} />,
         size: 280,
+      }),
+      columnHelper.display({
+        id: 'status',
+        header: 'Status',
+        enableSorting: false,
+        cell: (info) => {
+          const isJobAspirant = (info.row.original.policyCodes ?? []).includes(JOB_ASPIRANT_POLICY_CODE);
+          if (!isJobAspirant) return <span>—</span>;
+          return (
+            <span className={s.jobAspirantBadge}>
+              <JobAspirantIcon />
+              Job Aspirant
+            </span>
+          );
+        },
+        size: 148,
       }),
     ];
 

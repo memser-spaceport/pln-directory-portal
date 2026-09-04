@@ -122,6 +122,29 @@
   max-width: 100%;
 }
 
+.colStatus {
+  flex: 0 0 148px;
+  min-width: 128px;
+}
+
+.jobAspirantBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
 .colRole {
   flex: 0 0 168px;
   min-width: 148px;
