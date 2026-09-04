@@ -92,6 +92,7 @@ describe('AiAppsService.recordView', () => {
     });
   });
 
+
   it('throws 404 when the app does not exist', async () => {
     const { service, prisma } = buildService();
     prisma.aiApp.findUnique.mockResolvedValue(null);
