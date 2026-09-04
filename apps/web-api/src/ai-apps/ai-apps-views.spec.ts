@@ -80,6 +80,18 @@ describe('AiAppsService.recordView', () => {
     });
   });
 
+  it('does not increment viewCount for the creator viewing their own app, but still upserts lastSeenAt', async () => {
+    const { service, prisma } = buildService();
+    await service.recordView('creator-1', 'app-1');
+
+    expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    expect(prisma.aiAppActiveMember.upsert).toHaveBeenCalledWith({
+      where: { appUid_memberUid: { appUid: 'app-1', memberUid: 'creator-1' } },
+      create: { appUid: 'app-1', memberUid: 'creator-1', lastSeenAt: expect.any(Date) },
+      update: { lastSeenAt: expect.any(Date) },
+    });
+  });
+
   it('throws 404 when the app does not exist', async () => {
     const { service, prisma } = buildService();
     prisma.aiApp.findUnique.mockResolvedValue(null);
