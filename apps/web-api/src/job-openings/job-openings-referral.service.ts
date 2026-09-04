@@ -202,15 +202,20 @@ export class JobOpeningsReferralService {
     if (referrerHeadline.title) signature += `, ${referrerHeadline.title}`;
     if (referrerHeadline.companyName) signature += ` at ${referrerHeadline.companyName}`;
 
-    // The one line the backend can't draft — how the referrer knows the person isn't in
-    // anybody's record. Phrased to contain "how you know" so a client mirroring this slot
-    // (e.g. the refer modal's own fallback) can detect it's already present and skip adding
-    // a second one.
-    const howYouKnowPrompt = `[Add a line about how you know ${firstName(referred.name)}.]`;
-
+    // How the referrer knows the person is still the one line this can't draft — it is in
+    // nobody's record — but the draft no longer leaves a bracketed slot for it.
+    //
+    // A `[Add a line about how you know <First>.]` paragraph used to sit here. It made the
+    // referrer *delete* text before they could write their own, in a field whose caption
+    // already asks for the same thing in words ("Add how you know <First> — that's the one
+    // thing the draft can't fill in", refer modal). Two asks, and only one of them left
+    // litter in the note if it went unanswered — a referral could be sent with the bracket
+    // still in it, and some were.
+    //
+    // The ask now lives on the client, above the box, where it costs the writer nothing to
+    // ignore. What this returns is a note that is finished as it stands.
     const paragraphs = [
       `Hi ${jobOpening.team.name} team,\nI'd like to refer ${referred.name} for your ${jobOpening.roleTitle} role.`,
-      howYouKnowPrompt,
       aboutParagraph,
       signature,
     ].filter((paragraph) => paragraph.length > 0);
