@@ -62,7 +62,9 @@ export class NotificationConsumer {
    */
   private async getSubscribers(entityType, entityUid) {
     try {
-      return await this.memberSubscriptionService.getSubscriptions({
+      /* Delivery audience, not the public follower list: a member whose approval
+         is still pending asked for these updates and should receive them. */
+      return await this.memberSubscriptionService.getNotifiableSubscribers({
         where: {
           AND: {
             entityType: entityType,
