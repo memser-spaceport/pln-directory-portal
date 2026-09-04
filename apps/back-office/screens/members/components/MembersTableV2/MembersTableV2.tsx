@@ -14,11 +14,15 @@ import { MemberCell } from '../MemberCell/MemberCell';
 import { ProjectsCell } from '../ProjectsCell/ProjectsCell';
 import { EditCell } from '../EditCell/EditCell';
 import PaginationControls from '../PaginationControls/PaginationControls';
-import { JobAspirantIcon } from '../../../../components/menu/components/MembersV2Menu/memberStateTabIcons';
+import { Level0Icon, Level1Icon, Level2Icon, RejectedIcon } from '../icons';
 import s from './MembersTableV2.module.scss';
 
-/** Must match JOB_ASPIRANT_POLICY_CODE in apps/web-api/src/access-control-v2/access-control-v2.constants.ts */
-const JOB_ASPIRANT_POLICY_CODE = 'job_aspirant';
+const MEMBER_STATE_META = {
+  PENDING: { label: 'Pending', icon: <Level0Icon />, className: s.orange },
+  VERIFIED: { label: 'Verified', icon: <Level1Icon />, className: s.blue },
+  APPROVED: { label: 'Approved', icon: <Level2Icon />, className: s.green },
+  REJECTED: { label: 'Rejected', icon: <RejectedIcon />, className: s.red },
+} as const;
 
 interface Props {
   members: Member[];
@@ -97,12 +101,11 @@ export function MembersTableV2({
         header: 'Status',
         enableSorting: false,
         cell: (info) => {
-          const isJobAspirant = (info.row.original.policyCodes ?? []).includes(JOB_ASPIRANT_POLICY_CODE);
-          if (!isJobAspirant) return <span>—</span>;
+          const meta = MEMBER_STATE_META[info.row.original.memberState ?? 'PENDING'] ?? MEMBER_STATE_META.PENDING;
           return (
-            <span className={s.jobAspirantBadge}>
-              <JobAspirantIcon />
-              Job Aspirant
+            <span className={clsx(s.statusBadge, meta.className)}>
+              {meta.icon}
+              {meta.label}
             </span>
           );
         },

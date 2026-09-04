@@ -127,22 +127,34 @@
   min-width: 128px;
 }
 
-.jobAspirantBadge {
+.statusBadge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
-  border-radius: 12px;
-  background: #eff6ff;
-  color: #1d4ed8;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
 
   svg {
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
   }
+}
+
+.orange {
+  color: #d97706;
+}
+
+.blue {
+  color: #1b4dff;
+}
+
+.green {
+  color: #0a9952;
+}
+
+.red {
+  color: #d21a0e;
 }
 
 .colRole {
