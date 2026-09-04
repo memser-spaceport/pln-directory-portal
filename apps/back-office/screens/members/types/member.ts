@@ -22,6 +22,7 @@ export type Member = {
     group?: string | null;
   }[];
   permissions?: { uid: string; code: string; module: string; description?: string | null }[];
+  policyCodes?: string[];
   memberRoles?: { name: string }[];
   demoDayHosts?: string[];
   demoDayAdminScopes?: {

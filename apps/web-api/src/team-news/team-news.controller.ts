@@ -4,6 +4,7 @@ import {
   Controller,
   ForbiddenException,
   Logger,
+  NotFoundException,
   Param,
   Req,
   UseGuards,
@@ -15,6 +16,7 @@ import { apiTeamNews } from 'libs/contracts/src/lib/contract-team-news';
 import {
   CreateTeamNewsDiscussionRequestSchema,
   RecordTeamNewsImpressionsRequestSchema,
+  CreateTeamNewsPostRequestSchema,
   TeamNewsByTeamQueryParams,
   TeamNewsCountsRequestSchema,
   TeamNewsFollowSuggestionsQueryParams,
@@ -153,6 +155,28 @@ export class TeamNewsController {
     const params = TeamNewsByTeamQueryParams.parse(request.query);
     const { followed, memberUid } = await this.resolveViewerContext(request.userEmail);
     return this.teamNewsQueryService.listTeamNewsByTeam(teamUid, params, followed, memberUid);
+  }
+
+  @Api(server.route.createTeamNewsPost)
+  @UseGuards(UserTokenValidation)
+  async createTeamNewsPost(
+    @Param('teamUid') teamUid: string,
+    @Body() body: unknown,
+    @Req() req: Request & { userEmail?: string }
+  ) {
+    const validated = this.parse(CreateTeamNewsPostRequestSchema, body);
+    const member = await this.resolveMember(req);
+    const { uid } = await this.teamNewsService.createTeamPostedNews(teamUid, validated, {
+      uid: member.uid,
+      isDirectoryAdmin: member.isDirectoryAdmin,
+      teamMemberRoles: member.teamMemberRoles,
+    });
+    const { followed, memberUid } = await this.resolveViewerContext(req.userEmail);
+    const item = await this.teamNewsQueryService.getTeamNewsItemDto(uid, followed, memberUid);
+    if (!item) {
+      throw new NotFoundException(`TeamNewsItem ${uid} not found after create`);
+    }
+    return item;
   }
 
   @Api(server.route.upvoteTeamNews)

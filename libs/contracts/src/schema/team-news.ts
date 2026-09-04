@@ -84,6 +84,20 @@ export const TeamNewsItemSchema = z.object({
   // repeat viewing, and includes anonymous visitors. Incremented via
   // POST /v1/team-news/impressions.
   viewCount: z.number().int().min(0),
+  // True when posted from the team profile by a member or directory admin.
+  isTeamPosted: z.boolean(),
+});
+
+export const CreateTeamNewsPostRequestSchema = z.object({
+  title: z.string().trim().min(1).max(150),
+  body: z.string().optional(),
+  url: z.string().trim().min(1),
+});
+
+export const TeamNewsPostConflictSchema = z.object({
+  message: z.string(),
+  existingTitle: z.string(),
+  existingEventDate: z.string(),
 });
 
 export const TeamNewsUpvoteStatusSchema = z.object({
@@ -455,5 +469,6 @@ export type TeamNewsPopularItem = z.infer<typeof TeamNewsPopularItemSchema>;
 export type TeamNewsPopularResponse = z.infer<typeof TeamNewsPopularResponseSchema>;
 export type TeamNewsCountsRequest = z.infer<typeof TeamNewsCountsRequestSchema>;
 export type TeamNewsCountsResponse = z.infer<typeof TeamNewsCountsResponseSchema>;
+export type CreateTeamNewsPostRequest = z.infer<typeof CreateTeamNewsPostRequestSchema>;
 export type SeedTeamNewsTrendingDto = z.infer<typeof SeedTeamNewsTrendingDtoSchema>;
 export type SeedTeamNewsTrendingResponse = z.infer<typeof SeedTeamNewsTrendingResponseSchema>;

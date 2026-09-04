@@ -65,6 +65,11 @@ export const JobRoleSchema = z.object({
   lastUpdated: z.string(),
   postedDate: z.string().nullable(),
   detectionDate: z.string(),
+  // Aggregate "I'm interested" count. Always present (0 when none).
+  interestedCount: z.number().int().min(0),
+  // True when the authenticated caller has marked interest. Always false
+  // for anonymous requests.
+  viewerIsInterested: z.boolean(),
 });
 
 export const JobTeamSchema = z.object({
@@ -109,4 +114,22 @@ export const JobsFiltersResponseSchema = z.object({
   focus: z.array(JobFacetTreeItemSchema),
   location: z.array(JobFacetItemSchema),
   workMode: z.array(JobFacetItemSchema),
+});
+
+export const JobOpeningInterestStatusSchema = z.object({
+  jobUid: z.string(),
+  interestedCount: z.number().int().min(0),
+  viewerIsInterested: z.boolean(),
+});
+
+export type JobOpeningInterestStatus = z.infer<typeof JobOpeningInterestStatusSchema>;
+
+export const JobOpeningInterestSchema = z.object({
+  uid: z.string(),
+  jobUid: z.string(),
+  interestedAt: z.string(),
+});
+
+export const JobOpeningInterestListResponseSchema = z.object({
+  interests: z.array(JobOpeningInterestSchema),
 });

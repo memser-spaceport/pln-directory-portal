@@ -650,42 +650,51 @@ export class SearchService {
         SearchMetrics.empty.inc({ source, section, strict });
       }
 
-      const mapped = hits.map((hit: any) => {
-        const src = hit._source;
-        return {
-          tid: src.tid,
-          cid: src.cid,
-          topicTitle: src.topicTitle,
-          topicSlug: src.topicSlug,
-          topicUrl: src.topicUrl,
-          forumLink: `${process.env.WEB_UI_BASE_URL}/forum/topics/${src.cid}/${src.tid}`,
-          rootPost: {
-            pid: src.rootPost.pid,
-            uidAuthor: src.rootPost.uidAuthor,
-            author: src.rootPost.author,
-            content: src.rootPost.content,
-            timestamp: src.rootPost.timestamp,
-          },
-          replies:
-            src.replies?.map((reply: any) => ({
-              pid: reply.pid,
-              uidAuthor: reply.uidAuthor,
-              author: reply.author,
-              content: reply.content,
-              timestamp: reply.timestamp,
-            })) ?? [],
-          replyCount: src.replyCount ?? 0,
-          lastReplyAt: src.lastReplyAt,
-          score: hit._score,
-        };
-      });
-
-      return mapped;
+      return hits.map((hit: any) => this.mapForumHit(hit));
     } catch (e) {
       SearchMetrics.errors.inc({ source, section: 'all', strict, error_type: classifyError(e) });
       throw e;
     } finally {
       overallEnd();
     }
+  }
+
+  private mapForumHit(hit: any) {
+    const src = hit._source;
+    return {
+      tid: src.tid,
+      cid: src.cid,
+      topicTitle: src.topicTitle,
+      topicSlug: src.topicSlug,
+      topicUrl: src.topicUrl,
+      forumLink: `${process.env.WEB_UI_BASE_URL}/forum/topics/${src.cid}/${src.tid}`,
+      rootPost: {
+        pid: src.rootPost.pid,
+        uidAuthor: src.rootPost.uidAuthor,
+        author: src.rootPost.author,
+        content: src.rootPost.content,
+        timestamp: src.rootPost.timestamp,
+      },
+      replies:
+        src.replies?.map((reply: any) => ({
+          pid: reply.pid,
+          uidAuthor: reply.uidAuthor,
+          author: reply.author,
+          content: reply.content,
+          timestamp: reply.timestamp,
+        })) ?? [],
+      replyCount: src.replyCount ?? 0,
+      lastReplyAt: src.lastReplyAt,
+      score: hit._score,
+    };
+  }
+
+  async getForumThreadByUid(tid: string): Promise<any | null> {
+    const numericTid = Number(tid);
+    const res = await this.openSearchService.searchWithLimit('forum_thread', 1, {
+      query: { term: { tid: Number.isFinite(numericTid) ? numericTid : tid } },
+    });
+    const hit = res?.body?.hits?.hits?.[0];
+    return hit ? this.mapForumHit(hit) : null;
   }
 }

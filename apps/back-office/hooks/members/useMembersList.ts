@@ -10,6 +10,8 @@ export interface MembersListQueryParams {
   policyCodes?: string[];
   policyGroups?: string[];
   policyRoles?: string[];
+  excludeJobAspirants?: boolean;
+  signUpSources?: string[];
   page?: number;
   limit?: number;
   /** Sent as search= (server filters name/email/uid/project name) */
@@ -38,6 +40,12 @@ async function fetcher(params: MembersListQueryParams) {
   }
   if (params.policyRoles?.length) {
     search.set('policyRoles', params.policyRoles.join(','));
+  }
+  if (params.excludeJobAspirants) {
+    search.set('excludeJobAspirants', 'true');
+  }
+  if (params.signUpSources?.length) {
+    search.set('signUpSources', params.signUpSources.join(','));
   }
   if (params.page !== undefined) {
     search.set('page', String(params.page));
@@ -78,6 +86,8 @@ export function useMembersList(
       params.policyCodes,
       params.policyGroups,
       params.policyRoles,
+      params.excludeJobAspirants,
+      params.signUpSources,
       params.page,
       params.limit,
       params.search,

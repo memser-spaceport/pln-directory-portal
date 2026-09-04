@@ -14,6 +14,10 @@ export const CreateJobReferralSchema = z.object({
   referredMemberUid: z.string().min(1),
   recipients: z.array(JobReferralRecipientSchema).max(20).optional().default([]),
   note: z.string().min(1).max(5000),
+  // Whether the referred person is CCed on the referral email. Checked by default in the
+  // modal — this preserves prior behaviour when a caller omits it. When false, they get a
+  // separate notification email instead (see JobOpeningsReferralService.referJob).
+  includeReferredMember: z.boolean().optional().default(true),
 });
 
 export type CreateJobReferralInput = z.infer<typeof CreateJobReferralSchema>;

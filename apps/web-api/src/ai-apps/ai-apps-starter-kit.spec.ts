@@ -68,6 +68,18 @@ describe('AiAppsStarterKitService buildZip', () => {
     expect(readme).toContain('automatically reports basic usage');
   });
 
+  it('teaches apps to report their route and title to the dashboard for subpage deep links', () => {
+    const skill = entries.get('.claude/skills/app-analytics/SKILL.md') as string;
+    expect(skill).toContain("type: 'pln-ai-app:route'");
+    expect(skill).toContain('title: title');
+    expect(skill).toContain('initRouteSync();');
+    for (const path of ['CLAUDE.md', 'AGENTS.md']) {
+      const content = entries.get(path) as string;
+      expect(content).toContain('hard load');
+      expect(content).toContain('document.title');
+    }
+  });
+
   it('tells the agent this data has no member-facing dashboard yet (no overpromising)', () => {
     const skill = entries.get('.claude/skills/app-analytics/SKILL.md') as string;
     expect(skill).toContain('no usage dashboard for their own app today');

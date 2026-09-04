@@ -292,6 +292,11 @@ folder. Before any UI work, load the **pl-design-system** skill
     \`frame-ancestors 'none'\`.
   - The default scaffold sends neither header, so it already embeds fine — this
     only matters once you add \`helmet\`, a CSP, or other security headers.
+- **Deep links and tab title.** The dashboard mirrors your current page in its
+  own URL and browser tab title, and reopens a shared link as the iframe's
+  initial URL. So every route must work on a hard load at its real URL, every
+  page needs a meaningful \`document.title\`, and the \`initRouteSync()\` part of
+  the app-analytics snippet must stay in.
 
 ## Signed-in member context (personalization)
 The app can identify the PLN member using it. Load the **pln-member-context**
@@ -991,7 +996,7 @@ compensate.
   private analyticsSkill(): string {
     return `---
 name: app-analytics
-description: Wire baseline usage analytics (app opened, JS errors, session length) into every deployed AI App — do this during initial setup for every app, not only when asked. Also covers adding custom product-analytics events (button clicks, feature usage) when the member asks for usage tracking or "analytics" in their app. All of it forwards to the Directory PostHog project with server-enforced app attribution, helping the PL team understand usage across AI Apps — there is no dashboard yet for the member to view their own app's events. Never required for a deploy to succeed — a failure here must never block or break the app.
+description: Wire baseline usage analytics (app opened, JS errors, session length) into every deployed AI App — do this during initial setup for every app, not only when asked. Also covers adding custom product-analytics events (button clicks, feature usage) when the member asks for usage tracking or "analytics" in their app. All of it forwards to the Directory PostHog project with server-enforced app attribution, helping the PL team understand usage across AI Apps — there is no dashboard yet for the member to view their own app's events. Also sends the route-sync message the dashboard uses for subpage deep links and the tab title. Never required for a deploy to succeed — a failure here must never block or break the app.
 ---
 
 # App analytics — baseline events (automatic) + custom events (on request)
@@ -1106,7 +1111,32 @@ function initAppAnalytics() {
   });
 }
 
+// ---- Route sync — the AI Apps dashboard mirrors the open page in its URL and tab title (shareable deep links) ----
+function initRouteSync() {
+  if (window.parent === window) return;
+  let lastSent = '';
+  const send = () => {
+    const path = location.pathname + location.search + location.hash;
+    const title = document.title;
+    if (path + '\\n' + title === lastSent) return;
+    lastSent = path + '\\n' + title;
+    window.parent.postMessage({ type: 'pln-ai-app:route', path: path, title: title }, '*');
+  };
+  ['pushState', 'replaceState'].forEach((method) => {
+    const original = history[method].bind(history);
+    history[method] = (...args) => {
+      original(...args);
+      send();
+    };
+  });
+  window.addEventListener('popstate', send); // also fires for hash changes
+  // Frameworks set the title after navigation, so watch <head> for title changes too.
+  new MutationObserver(send).observe(document.head, { subtree: true, childList: true, characterData: true });
+  send();
+}
+
 initAppAnalytics(); // Call this once, unconditionally — not gated on a member request.
+initRouteSync();
 \`\`\`
 
 Custom events reuse the same \`trackEvent\` helper: \`trackEvent('clicked_export', { format: 'csv' })\`.
@@ -1121,6 +1151,14 @@ Custom events reuse the same \`trackEvent\` helper: \`trackEvent('clicked_export
   calls when the member asks for tracking on something specific. Don't
   instrument every button/click by default — that's exactly the noise this
   design avoids.
+- **Route sync is mandatory too.** Keep \`initRouteSync()\` in: the dashboard
+  mirrors the app's current page in its own URL (shareable deep links) and
+  shows \`document.title\` as \`<page title> · <app name>\` in the browser tab.
+  Deep links are opened as the iframe's initial URL, so every route must
+  render on a hard load at its real URL — no in-memory-only routing — and
+  every page needs a meaningful \`document.title\` (Next.js \`metadata\` per
+  route, or a \`<title>\`). Never put secrets or member data in URLs or titles;
+  both are mirrored into the dashboard.
 - **Event names**: snake_case, plain words describing the action (e.g.
   \`clicked_export\`, \`created_item\`). The endpoint prefixes every name with
   \`ai_app_\` server-side — don't add that prefix yourself, and don't rely on

@@ -21,13 +21,18 @@ import { NotificationSettingsService } from '../notification-settings/notificati
 import {
   CreateMemberDto,
   MemberState,
+  MemberStateCounts,
   RequestMembersDto,
   UpdateMemberDto,
 } from '../../../../libs/contracts/src/schema/admin-member';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
 import { MembersHooksService } from '../members/members.hooks.service';
 import { ParticipantsRequest } from './members.dto';
-import { FORUM_PERMISSIONS, MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
+import {
+  FORUM_PERMISSIONS,
+  JOB_ASPIRANT_POLICY_CODE,
+  MEMBER_PERMISSIONS,
+} from '../access-control-v2/access-control-v2.constants';
 import { TeamsService } from '../teams/teams.service';
 import {
   assignJobSearchStatusFromInput,
@@ -1469,7 +1474,19 @@ export class MemberService {
   }
 
   async findMembers(params: RequestMembersDto) {
-    const { page, limit, memberState, policyCodes, policyGroups, policyRoles, search, sortBy, sortOrder } = params;
+    const {
+      page,
+      limit,
+      memberState,
+      policyCodes,
+      policyGroups,
+      policyRoles,
+      excludeJobAspirants,
+      signUpSources,
+      search,
+      sortBy,
+      sortOrder,
+    } = params;
     const where: Prisma.MemberWhereInput = {};
 
     if (memberState?.length) {
@@ -1478,6 +1495,10 @@ export class MemberService {
           in: memberState as MemberApprovalState[],
         },
       };
+    }
+
+    if (signUpSources?.length) {
+      where.signUpSource = { in: signUpSources };
     }
 
     const policyBranches: Prisma.MemberWhereInput[] = [];
@@ -1494,6 +1515,11 @@ export class MemberService {
     if (policyRoles?.length) {
       policyBranches.push({
         policyAssignmentsV2: { some: { policy: { role: { in: policyRoles } } } },
+      });
+    }
+    if (excludeJobAspirants) {
+      policyBranches.push({
+        NOT: { policyAssignmentsV2: { some: { policy: { code: JOB_ASPIRANT_POLICY_CODE } } } },
       });
     }
 
@@ -1699,17 +1725,28 @@ export class MemberService {
     };
   }
 
-  async getMemberStateCounts(): Promise<Record<MemberState, number>> {
-    const counts = await this.prisma.memberApproval.groupBy({
-      by: ['state'],
-      _count: true,
-    });
+  async getMemberStateCounts(): Promise<MemberStateCounts> {
+    const [counts, jobAspirantCount] = await Promise.all([
+      this.prisma.memberApproval.groupBy({
+        by: ['state'],
+        _count: true,
+        where: {
+          member: {
+            NOT: { policyAssignmentsV2: { some: { policy: { code: JOB_ASPIRANT_POLICY_CODE } } } },
+          },
+        },
+      }),
+      this.prisma.member.count({
+        where: { policyAssignmentsV2: { some: { policy: { code: JOB_ASPIRANT_POLICY_CODE } } } },
+      }),
+    ]);
 
-    const result: Record<MemberState, number> = {
+    const result: MemberStateCounts = {
       [MemberState.PENDING]: 0,
       [MemberState.VERIFIED]: 0,
       [MemberState.APPROVED]: 0,
       [MemberState.REJECTED]: 0,
+      JOB_ASPIRANT: jobAspirantCount,
     };
 
     for (const item of counts) {
@@ -1717,6 +1754,19 @@ export class MemberService {
     }
 
     return result;
+  }
+
+  async getSignUpSources(): Promise<string[]> {
+    const rows = await this.prisma.member.findMany({
+      where: { signUpSource: { not: null } },
+      select: { signUpSource: true },
+      distinct: ['signUpSource'],
+    });
+
+    return rows
+      .map((r) => r.signUpSource)
+      .filter((s): s is string => !!s?.trim())
+      .sort();
   }
 
   async updateMemberApprovalState(memberUid: string, memberState: MemberApprovalState): Promise<{ updated: boolean }> {

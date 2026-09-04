@@ -6,6 +6,7 @@ import { JobOpeningsServiceController } from './job-openings-service.controller'
 import { JobOpeningsEnrichmentService } from './job-openings-enrichment.service';
 import { JobOpeningsReferralService } from './job-openings-referral.service';
 import { JobOpeningsApplicationService } from './job-openings-application.service';
+import { JobOpeningsInterestService } from './job-openings-interest.service';
 import { JobOpeningsSignUpService } from './job-openings-sign-up.service';
 import { SharedModule } from '../shared/shared.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -21,6 +22,7 @@ import { MembersModule } from '../members/members.module';
     JobOpeningsReferralService,
     JobOpeningsApplicationService,
     JobOpeningsSignUpService,
+    JobOpeningsInterestService,
   ],
   exports: [JobOpeningsQueryService, JobOpeningsService, JobOpeningsEnrichmentService],
 })

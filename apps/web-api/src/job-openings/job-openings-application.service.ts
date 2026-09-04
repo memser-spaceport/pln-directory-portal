@@ -80,6 +80,7 @@ export class JobOpeningsApplicationService {
       recipientsInfo: {
         to: [to.email],
         cc: cc.map((lead) => lead.email),
+        bcc: process.env.LABOS_EMAIL ? [process.env.LABOS_EMAIL] : [],
         replyTo: applicant.email,
       },
       deliveryPayload: {

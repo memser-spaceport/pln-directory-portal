@@ -87,7 +87,7 @@ export const MEMBER_PERMISSIONS = {
   ONBOARDING: 'member.onboarding',
   /** Manage investor-only settings and profile actions */
   INVESTOR_MANAGE: 'member.investor.manage',
-  /** Appear in the directory and public profile without being APPROVED */
+  /** Public member profile is reachable without being APPROVED. Does not include the member in directory lists. */
   PROFILE_VISIBLE: 'member.profile.visible',
 } as const;
 

@@ -354,9 +354,11 @@ export class PLEventLocationsService {
      */
   async subscribeLocationByUid(uid: string, memberUid: string, action: string = "Default") {
     try {
-      const subscriptions = await this.memberSubscriptionService.getSubscriptions({
+      /* Member-scoped, so it also finds the rows of a member who is not yet
+         approved -- reading this through the approval-filtered public list is
+         what let duplicate subscriptions accumulate. */
+      const subscriptions = await this.memberSubscriptionService.getSubscriptionsForMember(memberUid, {
         where: {
-          memberUid,
           entityUid: uid,
           entityAction: action
         }

@@ -34,7 +34,7 @@ import { ParticipantsRequest } from './members.dto';
 import { OpenSearchService } from '../opensearch/opensearch.service';
 import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { assignJobSearchStatusFromInput, omitJobSearchStatus } from './job-search-status';
-import { directoryVisibleMemberWhere } from './member-visibility';
+import { directoryListedMemberWhere } from './member-visibility';
 
 /**
  * Interface for member search match result (used by entity association)
@@ -107,7 +107,7 @@ export class MembersService {
   async findAll(queryOptions: Prisma.MemberFindManyArgs): Promise<{ count: number; members: Member[] }> {
     try {
       const where: Prisma.MemberWhereInput = {
-        AND: [queryOptions.where ?? {}, directoryVisibleMemberWhere()],
+        AND: [queryOptions.where ?? {}, directoryListedMemberWhere()],
       };
 
       const [members, membersCount] = await this.prisma.$transaction([
@@ -147,7 +147,7 @@ export class MembersService {
     loginEmail: string | null
   ): Promise<{ count: number; members: Member[] }> {
     try {
-      const filters: Prisma.MemberWhereInput[] = [directoryVisibleMemberWhere()];
+      const filters: Prisma.MemberWhereInput[] = [directoryListedMemberWhere()];
 
       if (loginEmail) {
         filters.push({ email: loginEmail });
@@ -2005,7 +2005,7 @@ export class MembersService {
     const limit = Math.min(filters.limit || 20, 100);
     const skip = (page - 1) * limit;
 
-    const baseWhere: Prisma.MemberWhereInput = directoryVisibleMemberWhere();
+    const baseWhere: Prisma.MemberWhereInput = directoryListedMemberWhere();
 
     const whereConditions: Prisma.MemberWhereInput[] = [baseWhere];
 
@@ -2637,7 +2637,7 @@ export class MembersService {
 
       const memberFilter: Prisma.MemberWhereInput = {
         AND: [
-          directoryVisibleMemberWhere(),
+          directoryListedMemberWhere(),
           ...(hasOfficeHours
             ? [
                 {
@@ -2848,7 +2848,7 @@ export class MembersService {
     try {
       const memberFilter: Prisma.MemberWhereInput = {
         AND: [
-          directoryVisibleMemberWhere(),
+          directoryListedMemberWhere(),
           ...(hasOfficeHours
             ? [
                 {

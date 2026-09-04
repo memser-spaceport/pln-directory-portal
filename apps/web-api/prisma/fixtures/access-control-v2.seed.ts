@@ -397,7 +397,7 @@ const policies: PolicySeed[] = [
   {
     code: 'job_aspirant',
     name: 'Job Aspirant / Job Board',
-    description: 'Members who signed up through the Job Board. Directory-visible without requiring approval.',
+    description: 'Members who signed up through the Job Board. Public profile is visible without requiring approval.',
     role: 'Job Aspirant',
     group: 'Job Board',
     permissions: ['member.profile.visible'],

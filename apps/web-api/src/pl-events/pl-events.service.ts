@@ -180,6 +180,99 @@ export class PLEventsService {
     }
   };
 
+  async searchPLEvents(filters: { search?: string; limit?: number }): Promise<{ events: PLEvent[]; limit: number }> {
+    const limit = Math.min(Math.max(filters.limit ?? 20, 1), 50);
+    const where: Prisma.PLEventWhereInput = { isDeleted: false };
+    const term = filters.search?.trim();
+    if (term) {
+      where.OR = [
+        { name: { contains: term, mode: 'insensitive' } },
+        { description: { contains: term, mode: 'insensitive' } },
+        { location: { location: { contains: term, mode: 'insensitive' } } },
+      ];
+    }
+    const events = await this.prisma.pLEvent.findMany({
+      where,
+      take: limit,
+      orderBy: { startDate: 'desc' },
+      select: {
+        uid: true,
+        name: true,
+        slugURL: true,
+        startDate: true,
+        endDate: true,
+        logo: { select: { url: true } },
+        location: { select: { location: true } },
+      },
+    });
+    return { events: events as unknown as PLEvent[], limit };
+  }
+
+  async getPLEventForViewer(uid: string, { isUserLoggedIn }: { isUserLoggedIn: boolean }): Promise<PLEvent> {
+    try {
+      const plEvent = await this.prisma.pLEvent.findFirst({
+        where: { uid, isDeleted: false },
+        include: {
+          logo: { select: { url: true } },
+          banner: { select: { url: true } },
+          location: { select: { location: true, timezone: true } },
+          eventGuests: {
+            select: {
+              uid: true,
+              reason: true,
+              memberUid: true,
+              teamUid: true,
+              topics: true,
+              additionalInfo: true,
+              isHost: true,
+              isSpeaker: true,
+              isSponsor: true,
+              createdAt: true,
+              telegramId: isUserLoggedIn,
+              officeHours: isUserLoggedIn,
+              member: {
+                select: {
+                  image: { select: { url: true } },
+                  name: true,
+                  preferences: true,
+                  telegramHandler: isUserLoggedIn,
+                  officeHours: isUserLoggedIn,
+                  teamMemberRoles: {
+                    select: {
+                      team: {
+                        select: { uid: true, name: true, logo: { select: { url: true } } },
+                      },
+                    },
+                  },
+                  projectContributions: {
+                    select: { project: { select: { name: true, isDeleted: true } } },
+                  },
+                  createdProjects: {
+                    select: { name: true, isDeleted: true },
+                  },
+                },
+              },
+              team: {
+                select: { uid: true, name: true, logo: { select: { url: true } } },
+              },
+            },
+          },
+        },
+      });
+      if (!plEvent) {
+        throw new NotFoundException(`Event not found with uid: ${uid}.`);
+      }
+      this.filterPrivateResources(plEvent, isUserLoggedIn);
+      plEvent.eventGuests = this.eventGuestsService.restrictTelegramBasedOnMemberPreference(
+        plEvent.eventGuests,
+        isUserLoggedIn
+      );
+      return plEvent as PLEvent;
+    } catch (err) {
+      return this.handleErrors(err, uid);
+    }
+  }
+
   /**
    * This method retrieves events associated with a specific member.
    * @param member The member object, including the member UID

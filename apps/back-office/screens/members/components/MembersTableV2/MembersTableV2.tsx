@@ -14,7 +14,15 @@ import { MemberCell } from '../MemberCell/MemberCell';
 import { ProjectsCell } from '../ProjectsCell/ProjectsCell';
 import { EditCell } from '../EditCell/EditCell';
 import PaginationControls from '../PaginationControls/PaginationControls';
+import { Level0Icon, Level1Icon, Level2Icon, RejectedIcon } from '../icons';
 import s from './MembersTableV2.module.scss';
+
+const MEMBER_STATE_META = {
+  PENDING: { label: 'Pending', icon: <Level0Icon />, className: s.orange },
+  VERIFIED: { label: 'Verified', icon: <Level1Icon />, className: s.blue },
+  APPROVED: { label: 'Approved', icon: <Level2Icon />, className: s.green },
+  REJECTED: { label: 'Rejected', icon: <RejectedIcon />, className: s.red },
+} as const;
 
 interface Props {
   members: Member[];
@@ -44,6 +52,8 @@ function columnLayoutClass(columnId: string) {
       return s.colMember;
     case 'teamProject':
       return s.colTeam;
+    case 'status':
+      return s.colStatus;
     case 'joined':
       return s.colJoined;
     case 'role':
@@ -86,6 +96,21 @@ export function MembersTableV2({
         cell: (info) => <ProjectsCell member={info.row.original} />,
         size: 280,
       }),
+      columnHelper.display({
+        id: 'status',
+        header: 'Status',
+        enableSorting: false,
+        cell: (info) => {
+          const meta = MEMBER_STATE_META[info.row.original.memberState ?? 'PENDING'] ?? MEMBER_STATE_META.PENDING;
+          return (
+            <span className={clsx(s.statusBadge, meta.className)}>
+              {meta.icon}
+              {meta.label}
+            </span>
+          );
+        },
+        size: 148,
+      }),
     ];
 
     const joinedColumn = columnHelper.display({
@@ -93,17 +118,28 @@ export function MembersTableV2({
       header: 'Joined',
       enableSorting: true,
       cell: (info) => {
-        const raw = info.row.original.createdAt;
+        const member = info.row.original;
+        const raw = member.createdAt;
+        const source = member.signUpSource?.trim();
         return (
-          <span
-            className={s.joinedText}
-            title={raw ? new Date(raw).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : undefined}
-          >
-            {formatJoinedDate(raw)}
-          </span>
+          <div className={s.joinedCell}>
+            <span
+              className={s.joinedText}
+              title={
+                raw ? new Date(raw).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : undefined
+              }
+            >
+              {formatJoinedDate(raw)}
+            </span>
+            {source ? (
+              <span className={s.sourceTag} title={source}>
+                {source}
+              </span>
+            ) : null}
+          </div>
         );
       },
-      size: 76,
+      size: 120,
     });
 
     const approvedExtras =

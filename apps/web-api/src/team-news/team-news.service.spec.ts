@@ -9,6 +9,7 @@ jest.mock('../push-notifications/push-notifications.service', () => ({
 import type { PrismaService } from '../shared/prisma.service';
 import type { PushNotificationsService } from '../push-notifications/push-notifications.service';
 import { TeamNewsService } from './team-news.service';
+import type { TeamNewsPostSummaryService } from './team-news-post-summary.service';
 
 type PrismaMock = {
   teamNewsItem: { findUnique: jest.Mock };
@@ -21,6 +22,8 @@ const buildPrismaMock = (): PrismaMock => ({
 });
 
 const buildPushMock = () => ({ create: jest.fn().mockResolvedValue(undefined) });
+
+const buildSummaryMock = () => ({ summarizeBody: jest.fn().mockResolvedValue('Summary') });
 
 const makeRow = (overrides: Record<string, unknown> = {}) => ({
   uid: 'link-1',
@@ -41,7 +44,8 @@ describe('TeamNewsService.createForumLink', () => {
     prisma = buildPrismaMock();
     service = new TeamNewsService(
       prisma as unknown as PrismaService,
-      buildPushMock() as unknown as PushNotificationsService
+      buildPushMock() as unknown as PushNotificationsService,
+      buildSummaryMock() as unknown as TeamNewsPostSummaryService
     );
   });
 
@@ -176,7 +180,11 @@ describe('TeamNewsService.ingestTeamNews notifications', () => {
   beforeEach(() => {
     prisma = buildIngestPrismaMock();
     push = buildPushMock();
-    service = new TeamNewsService(prisma as unknown as PrismaService, push as unknown as PushNotificationsService);
+    service = new TeamNewsService(
+      prisma as unknown as PrismaService,
+      push as unknown as PushNotificationsService,
+      buildSummaryMock() as unknown as TeamNewsPostSummaryService
+    );
   });
 
   it('emits ONE run notification summarising all teams in the batch', async () => {
@@ -318,7 +326,8 @@ describe('TeamNewsService.ingestTeamNews multi-source', () => {
     prisma = buildIngestPrismaMock();
     service = new TeamNewsService(
       prisma as unknown as PrismaService,
-      buildPushMock() as unknown as PushNotificationsService
+      buildPushMock() as unknown as PushNotificationsService,
+      buildSummaryMock() as unknown as TeamNewsPostSummaryService
     );
   });
 

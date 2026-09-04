@@ -106,6 +106,44 @@ export class JobOpeningsQueryService {
     };
   }
 
+  // Tolerant on purpose: an anonymous, unknown, or deleted member just means no
+  // interest stamping for this request, never an error on a public list endpoint.
+  private async resolveViewerMemberUid(email?: string): Promise<string | undefined> {
+    if (!email) return undefined;
+    const member = await this.prisma.member.findUnique({
+      where: { email },
+      select: { uid: true, deletedAt: true },
+    });
+    if (!member || member.deletedAt) return undefined;
+    return member.uid;
+  }
+
+  private async loadInterestStamps(
+    jobUids: string[],
+    viewerMemberUid?: string
+  ): Promise<{ counts: Map<string, number>; viewerInterested: Set<string> }> {
+    if (jobUids.length === 0) {
+      return { counts: new Map(), viewerInterested: new Set() };
+    }
+    const [grouped, viewerRows] = await Promise.all([
+      this.prisma.jobOpeningInterest.groupBy({
+        by: ['jobOpeningUid'],
+        where: { jobOpeningUid: { in: jobUids } },
+        _count: { _all: true },
+      }),
+      viewerMemberUid
+        ? this.prisma.jobOpeningInterest.findMany({
+            where: { jobOpeningUid: { in: jobUids }, memberUid: viewerMemberUid },
+            select: { jobOpeningUid: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    return {
+      counts: new Map(grouped.map((g) => [g.jobOpeningUid, g._count._all])),
+      viewerInterested: new Set(viewerRows.map((r) => r.jobOpeningUid)),
+    };
+  }
+
   private async queryPagedTeamGroups(query: JobsListQuery) {
     const page = query.page;
     const limit = query.limit;
@@ -231,7 +269,7 @@ export class JobOpeningsQueryService {
     };
   }
 
-  async listJobOpenings(query: JobsListQuery) {
+  async listJobOpenings(query: JobsListQuery, viewerEmail?: string) {
     const page = query.page;
     const limit = query.limit;
     const where = this.buildWhere(query);
@@ -262,7 +300,7 @@ export class JobOpeningsQueryService {
       };
     }
 
-    const [pageTeams, focusRows] = await Promise.all([
+    const [pageTeams, focusRows, viewerMemberUid] = await Promise.all([
       this.prisma.team.findMany({
         where: { uid: { in: pageTeamUids } },
         select: {
@@ -300,9 +338,13 @@ export class JobOpeningsQueryService {
           ancestorArea: { select: { title: true } },
         },
       }),
+      this.resolveViewerMemberUid(viewerEmail),
     ]);
 
     const teamByUid = new Map(pageTeams.map((team) => [team.uid, team]));
+
+    const allRoleUids = pageTeams.flatMap((team) => team.jobOpenings.map((role) => role.uid));
+    const { counts: interestCounts, viewerInterested } = await this.loadInterestStamps(allRoleUids, viewerMemberUid);
 
     const ancestorByTeam = new Map<string, Map<string, string>>();
     const leafByTeam = new Map<string, Map<string, string>>();
@@ -356,6 +398,8 @@ export class JobOpeningsQueryService {
             lastUpdated: role.updatedAt.toISOString(),
             postedDate: role.postedDate ? role.postedDate.toISOString() : null,
             detectionDate: role.detectionDate.toISOString(),
+            interestedCount: interestCounts.get(role.uid) ?? 0,
+            viewerIsInterested: viewerInterested.has(role.uid),
           })),
         };
       })

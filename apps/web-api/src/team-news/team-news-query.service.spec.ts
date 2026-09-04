@@ -37,6 +37,7 @@ describe('TeamNewsQueryService.listTeamNewsByTeam', () => {
     tags: ['funding'],
     editorialRank: null,
     viewCount: 0,
+    postedByMemberUid: null,
     createdAt: new Date('2026-06-02T00:00:00.000Z'),
     team: {
       uid: 'team-1',
@@ -173,6 +174,7 @@ describe('TeamNewsQueryService — viewCount', () => {
     tags: ['funding'],
     editorialRank: null,
     viewCount: 0,
+    postedByMemberUid: null,
     createdAt: new Date('2026-06-02T00:00:00.000Z'),
     team: {
       uid: 'team-1',

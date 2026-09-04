@@ -207,6 +207,17 @@ export class ProjectsService {
     }
   }
 
+  async searchProjects(filters: { search?: string; limit?: number }) {
+    const limit = Math.min(Math.max(filters.limit ?? 20, 1), 50);
+    const result = await this.getProjects({
+      where: this.buildProjectFilter({ name: filters.search }),
+      take: limit,
+      orderBy: { name: 'asc' },
+      select: { uid: true, name: true, tagline: true },
+    });
+    return { projects: result?.projects ?? [], limit };
+  }
+
   async removeProjectByUid(uid: string, userEmail: string) {
     const member: any = await this.getMemberInfo(userEmail);
     const existingData = await this.getProjectByUid(uid);

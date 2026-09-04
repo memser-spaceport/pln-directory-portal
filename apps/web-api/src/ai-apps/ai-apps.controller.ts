@@ -367,7 +367,8 @@ export class AiAppsController {
 
   /**
    * Record a Directory iframe load for tile signals (all-time views + WAU).
-   * Any member with AI Apps access may POST; creator views count.
+   * Any member with AI Apps access may POST; the creator's own views are
+   * excluded from `viewCount` (still stamped for WAU).
    */
   @NoCache()
   @Post(':uid/views')

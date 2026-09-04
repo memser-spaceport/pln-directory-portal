@@ -63,6 +63,13 @@ export class MemberController {
     return this.memberService.getMemberStateCounts();
   }
 
+  @Get('sign-up-sources')
+  @UseGuards(DemoDayAdminAuthGuard)
+  @NoCache()
+  async getSignUpSources(): Promise<string[]> {
+    return this.memberService.getSignUpSources();
+  }
+
   /**
    * Count of members whose bio carries the AI-generated disclaimer, plus the
    * in-flight/last bio-refresh run. Cheap; poll this while a refresh runs.

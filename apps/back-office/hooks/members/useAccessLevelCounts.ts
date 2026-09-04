@@ -8,6 +8,7 @@ type ResponseCounts = {
   VERIFIED: number;
   APPROVED: number;
   REJECTED: number;
+  JOB_ASPIRANT: number;
 };
 
 async function fetcher(authToken: string) {

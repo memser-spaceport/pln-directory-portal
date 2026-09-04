@@ -448,7 +448,8 @@ export class AiAppsService {
   /**
    * Record a Directory iframe load: increment all-time views without bumping
    * `updatedAt` (a view must not reshuffle the dashboard list) and stamp the
-   * member as active for WAU.
+   * member as active for WAU. The creator's own views don't count toward
+   * `viewCount` (it's meant to signal outside interest), but still stamp WAU.
    */
   async recordView(memberUid: string, uid: string): Promise<void> {
     const app = await this.prisma.aiApp.findUnique({ where: { uid } });
@@ -456,12 +457,14 @@ export class AiAppsService {
       throw new NotFoundException(`AI App not found: ${uid}`);
     }
 
-    const updated = await this.prisma.$executeRaw`
-      UPDATE "AiApp" SET "viewCount" = "viewCount" + 1
-      WHERE uid = ${uid} AND status <> 'DELETED'
-    `;
-    if (updated === 0) {
-      throw new NotFoundException(`AI App not found: ${uid}`);
+    if (memberUid !== app.memberUid) {
+      const updated = await this.prisma.$executeRaw`
+        UPDATE "AiApp" SET "viewCount" = "viewCount" + 1
+        WHERE uid = ${uid} AND status <> 'DELETED'
+      `;
+      if (updated === 0) {
+        throw new NotFoundException(`AI App not found: ${uid}`);
+      }
     }
 
     await this.prisma.aiAppActiveMember.upsert({

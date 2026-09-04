@@ -73,6 +73,82 @@ describe('JobOpeningsQueryService.buildWhere', () => {
   });
 });
 
+describe('JobOpeningsQueryService.loadInterestStamps', () => {
+  const groupBy = jest.fn();
+  const findMany = jest.fn();
+  const service = new JobOpeningsQueryService({
+    jobOpeningInterest: { groupBy, findMany },
+  } as unknown as PrismaService);
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('returns empty maps without querying when there are no job uids', async () => {
+    const result = await service['loadInterestStamps']([]);
+
+    expect(groupBy).not.toHaveBeenCalled();
+    expect(result.counts.size).toBe(0);
+    expect(result.viewerInterested.size).toBe(0);
+  });
+
+  it('builds counts from groupBy and skips the viewer lookup when there is no viewer', async () => {
+    groupBy.mockResolvedValue([{ jobOpeningUid: 'job-1', _count: { _all: 3 } }]);
+
+    const result = await service['loadInterestStamps'](['job-1', 'job-2']);
+
+    expect(groupBy).toHaveBeenCalledWith({
+      by: ['jobOpeningUid'],
+      where: { jobOpeningUid: { in: ['job-1', 'job-2'] } },
+      _count: { _all: true },
+    });
+    expect(findMany).not.toHaveBeenCalled();
+    expect(result.counts.get('job-1')).toBe(3);
+    expect(result.viewerInterested.size).toBe(0);
+  });
+
+  it('marks the viewer-interested set from the viewer-scoped rows', async () => {
+    groupBy.mockResolvedValue([{ jobOpeningUid: 'job-1', _count: { _all: 1 } }]);
+    findMany.mockResolvedValue([{ jobOpeningUid: 'job-1' }]);
+
+    const result = await service['loadInterestStamps'](['job-1'], 'member-1');
+
+    expect(findMany).toHaveBeenCalledWith({
+      where: { jobOpeningUid: { in: ['job-1'] }, memberUid: 'member-1' },
+      select: { jobOpeningUid: true },
+    });
+    expect(result.viewerInterested.has('job-1')).toBe(true);
+  });
+});
+
+describe('JobOpeningsQueryService.resolveViewerMemberUid', () => {
+  const findUnique = jest.fn();
+  const service = new JobOpeningsQueryService({ member: { findUnique } } as unknown as PrismaService);
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('returns undefined when no email is given', async () => {
+    await expect(service['resolveViewerMemberUid'](undefined)).resolves.toBeUndefined();
+    expect(findUnique).not.toHaveBeenCalled();
+  });
+
+  it('returns undefined when the member is missing or deleted', async () => {
+    findUnique.mockResolvedValueOnce(null);
+    await expect(service['resolveViewerMemberUid']('a@b.com')).resolves.toBeUndefined();
+
+    findUnique.mockResolvedValueOnce({ uid: 'member-1', deletedAt: new Date() });
+    await expect(service['resolveViewerMemberUid']('a@b.com')).resolves.toBeUndefined();
+  });
+
+  it('returns the member uid for an active member', async () => {
+    findUnique.mockResolvedValueOnce({ uid: 'member-1', deletedAt: null });
+
+    await expect(service['resolveViewerMemberUid']('a@b.com')).resolves.toBe('member-1');
+  });
+});
+
 describe('JobTeamSchema inAppApplyAvailable', () => {
   const team = {
     uid: 'team-1',

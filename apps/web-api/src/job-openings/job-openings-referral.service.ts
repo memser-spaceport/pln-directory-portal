@@ -8,11 +8,15 @@ import { deriveReferralBlurb } from './job-openings-referral-blurb';
 import { jobBoardDetailUrl } from './job-openings-url';
 
 const JOB_BOARD_REFERRAL_TEMPLATE = 'JOB_BOARD_REFERRAL_EMAIL';
+// Sent only when the referrer didn't CC the referred person on the main referral email above.
+const JOB_BOARD_REFERRAL_NOTICE_TEMPLATE = 'JOB_BOARD_REFERRAL_NOTICE_EMAIL';
 
 type ResolvedRecipient = { email: string; name: string | null };
 type MemberHeadline = { title: string | null; companyName: string | null };
 type MemberLocation = { city: string | null; country: string } | null;
 const PROFILE_CARD_SKILLS_LIMIT = 3;
+
+const firstName = (name: string): string => name.trim().split(/\s+/)[0];
 
 @Injectable()
 export class JobOpeningsReferralService {
@@ -50,16 +54,19 @@ export class JobOpeningsReferralService {
           name: jobOpening.team.name,
         }))
       : [];
+    // Checked by default in the modal, so omitting the field preserves the old
+    // unconditional-cc behaviour. Unchecked, the referred person gets a separate
+    // notice below instead of being cc'd here.
+    const includeReferredMember = input.includeReferredMember !== false;
     const { to, cc } = this.buildToAndCc(recipients, [
       ...jobReferCc,
       { email: referrer.email, name: referrer.name },
-      { email: referred.email, name: referred.name },
+      ...(includeReferredMember ? [{ email: referred.email, name: referred.name }] : []),
     ]);
     const recipientGreetingName = jobReferEmail ? `${jobOpening.team.name} team` : recipients[0]?.name || 'there';
 
     const note = input.note.trim();
     const applyUrl = jobBoardDetailUrl(jobOpening.uid);
-
     const [referrerHeadline, referredHeadline] = await Promise.all([
       this.resolveHeadline(referrer.uid),
       this.resolveHeadline(referred.uid),
@@ -72,6 +79,8 @@ export class JobOpeningsReferralService {
       recipientsInfo: {
         to: [to],
         cc,
+        replyTo: includeReferredMember ? `${referrer.email}, ${referred.email}` : referrer.email,
+        bcc: process.env.LABOS_EMAIL ? [process.env.LABOS_EMAIL] : [],
       },
       deliveryPayload: {
         body: {
@@ -98,6 +107,42 @@ export class JobOpeningsReferralService {
         userName: referred.name,
       },
     });
+
+    if (!includeReferredMember) {
+      await this.notificationServiceClient.sendNotification({
+        isPriority: true,
+        deliveryChannel: 'EMAIL',
+        templateName: JOB_BOARD_REFERRAL_NOTICE_TEMPLATE,
+        recipientsInfo: {
+          to: [referred.email],
+          replyTo: referrer.email,
+        },
+        deliveryPayload: {
+          body: {
+            referredFirstName: firstName(referred.name),
+            referrerFirstName: firstName(referrer.name),
+            referrer: this.buildMemberCard(referrer, referrerHeadline),
+            roleTitle: jobOpening.roleTitle,
+            teamName: jobOpening.team.name,
+            noteHtml: noteToHtml(note),
+            applyUrl,
+          },
+        },
+        entityType: 'JOB_OPENING',
+        actionType: 'REFERRAL_NOTICE',
+        sourceMeta: {
+          activityId: jobOpening.uid,
+          activityType: 'JOB_OPENING',
+          activityUserId: referrer.uid,
+          activityUserName: referrer.name,
+        },
+        targetMeta: {
+          emailId: referred.email,
+          userId: referred.uid,
+          userName: referred.name,
+        },
+      });
+    }
 
     const record = await this.prisma.jobReferral.create({
       data: {
@@ -158,6 +203,18 @@ export class JobOpeningsReferralService {
     if (referrerHeadline.title) signature += `, ${referrerHeadline.title}`;
     if (referrerHeadline.companyName) signature += ` at ${referrerHeadline.companyName}`;
 
+    // How the referrer knows the person is still the one line this can't draft — it is in
+    // nobody's record — but the draft no longer leaves a bracketed slot for it.
+    //
+    // A `[Add a line about how you know <First>.]` paragraph used to sit here. It made the
+    // referrer *delete* text before they could write their own, in a field whose caption
+    // already asks for the same thing in words ("Add how you know <First> — that's the one
+    // thing the draft can't fill in", refer modal). Two asks, and only one of them left
+    // litter in the note if it went unanswered — a referral could be sent with the bracket
+    // still in it, and some were.
+    //
+    // The ask now lives on the client, above the box, where it costs the writer nothing to
+    // ignore. What this returns is a note that is finished as it stands.
     const paragraphs = [
       `Hi ${jobOpening.team.name} team,\nI'd like to refer ${referred.name} for your ${jobOpening.roleTitle} role.`,
       aboutParagraph,
@@ -235,6 +292,10 @@ export class JobOpeningsReferralService {
     return [location.city, location.country].filter(Boolean).join(', ') || null;
   }
 
+  private profileUrl(memberUid: string): string {
+    return `${process.env.WEB_UI_BASE_URL}/members/${memberUid}`;
+  }
+
   // Shape consumed by the `memberCard` partial in the JOB_BOARD_REFERRAL_EMAIL template.
   private buildMemberCard(
     member: { uid: string; name: string | null; location: MemberLocation; skills: { title: string }[] },
@@ -242,7 +303,7 @@ export class JobOpeningsReferralService {
   ) {
     return {
       name: member.name,
-      profileUrl: `${process.env.WEB_UI_BASE_URL}/members/${member.uid}`,
+      profileUrl: this.profileUrl(member.uid),
       headline: this.formatHeadline(headline),
       location: this.formatLocation(member.location),
       skills: member.skills.map((skill) => skill.title).slice(0, PROFILE_CARD_SKILLS_LIMIT),

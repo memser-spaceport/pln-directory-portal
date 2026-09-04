@@ -22,11 +22,16 @@ const hasProfileVisiblePermission: Prisma.MemberWhereInput = {
   ],
 };
 
-/** Approved members, plus anyone with `member.profile.visible` who is not REJECTED. */
+/** Members that appear on directory list/search. Approved only. */
+export function directoryListedMemberWhere(): Prisma.MemberWhereInput {
+  return { memberApproval: { state: { in: ['APPROVED'] } } };
+}
+
+/** Members whose public profile is reachable. Approved, or holding `member.profile.visible` and not REJECTED. */
 export function directoryVisibleMemberWhere(): Prisma.MemberWhereInput {
   return {
     OR: [
-      { memberApproval: { state: { in: ['APPROVED'] } } },
+      directoryListedMemberWhere(),
       {
         AND: [{ NOT: { memberApproval: { state: 'REJECTED' } } }, hasProfileVisiblePermission],
       },
