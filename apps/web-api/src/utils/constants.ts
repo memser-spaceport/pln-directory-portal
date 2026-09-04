@@ -251,16 +251,6 @@ export const HUSKY_SOURCES = {
   ALL: 'all',
 };
 
-export const HUSKY_ACTION_TYPES = {
-  TEAM: 'team',
-  PROJECT: 'project',
-  MEMBER: 'member',
-  FOCUS_AREA: 'focus_area',
-  IRL_EVENT: 'irl_event',
-};
-
-export const HUSKY_MAX_CONTEXT_LENGTH = 500;
-
 export const HUSKY_POSTGRRES_POOL_CONSTANTS = {
   max: 3, // maximum number of clients in the pool
   idleTimeoutMillis: 60000, // increased to 1 minute

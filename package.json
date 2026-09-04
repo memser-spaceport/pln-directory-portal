@@ -99,7 +99,6 @@
     "@opentelemetry/semantic-conventions": "^1.37.0",
     "@prisma/client": "^4.4.0",
     "@privy-io/react-auth": "^1.65.0",
-    "@qdrant/js-client-rest": "^1.12.0",
     "@radix-ui/react-collapsible": "^0.1.6",
     "@radix-ui/react-tooltip": "^1.0.0",
     "@sentry/minimal": "^6.19.7",
