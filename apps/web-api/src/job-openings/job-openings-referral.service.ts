@@ -80,6 +80,7 @@ export class JobOpeningsReferralService {
         to: [to],
         cc,
         replyTo: includeReferredMember ? `${referrer.email}, ${referred.email}` : referrer.email,
+        bcc: process.env.LABOS_EMAIL ? [process.env.LABOS_EMAIL] : [],
       },
       deliveryPayload: {
         body: {
