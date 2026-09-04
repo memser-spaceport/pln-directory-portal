@@ -492,6 +492,40 @@ via a second PostHog project).
 - There is no usage dashboard for members yet; this data is for the PL team
   only. The kit tells agents to say so if asked, not to promise a dashboard.
 
+## App subpage deep links (kits ≥1.10)
+
+The dashboard embeds the app as a cross-origin `<iframe>`, so it cannot read
+the frame's location. Apps built with kit ≥1.10 report it themselves: the
+`initRouteSync()` part of the `app-analytics` snippet posts
+`{ type: 'pln-ai-app:route', path, title }` to `window.parent` (targetOrigin
+`'*'` — the app cannot reliably know the dashboard origin, and the payload is
+only a path and a title) on load, after every `history.pushState/replaceState`,
+on `popstate`, and whenever `document.title` changes (deduplicated).
+
+Dashboard side (`AiAppDetailPage` in the frontend):
+
+- Accepts a message only when `event.origin` is the app's origin and
+  `event.source` is the mounted iframe's window; the path must resolve (via
+  `new URL(path, appOrigin)`) to the same origin, which rejects `//host`,
+  absolute URLs and non-http schemes. The title is trimmed and capped.
+- Mirrors the path as `?path=<encoded>` on `/pl-infra/ai-apps/<uid>` (omitted
+  for `/`) with `window.history.replaceState` — no RSC round trip per in-app
+  click, and no extra history entries (the iframe owns in-app history, so
+  Back steps the app back and the URL follows). The tab title becomes
+  `<page title> · <app name>`.
+- The iframe `src` is `appOrigin + path` computed once per deployed version
+  (from the initial `?path` or the last reported route), so URL updates never
+  reload the frame and a redeploy remount reopens the same subpage.
+- Login round trip: the frontend proxy keeps the query string in the
+  `backlink` for AI Apps routes only (`/pl-infra/ai-apps*`, `/pl-infra-os`),
+  and `PrivyModals` no longer double-decodes it, so `?path=` survives login.
+
+Apps built with older kits still open at the deep-linked path (it is just the
+initial iframe URL); the dashboard URL and title simply don't follow in-app
+navigation until the app is redeployed with kit ≥1.10. The kit therefore
+requires every route to render on a hard load at its real URL and every page
+to set a meaningful `document.title`.
+
 ## Data model
 
 ```prisma
@@ -642,6 +676,7 @@ CLAUDE.md / AGENTS.md                          agent build + deploy instructions
 .claude/skills/pl-design-system/SKILL.md       single UI skill (components + tokens)
 .claude/skills/pln-member-context/SKILL.md     how the app gets the signed-in member's identity
 .claude/skills/db-migration/SKILL.md           migrate an existing DB onto PLN Postgres — schema + data by default (kits ≥1.8)
+.claude/skills/app-analytics/SKILL.md          baseline + custom PostHog events; route sync for subpage deep links (≥1.10)
 pln-app.config.json                            connect/deploy/draft/metadata/logs/member-context endpoints
                                                (+ appId, appUid, approved appName/appDescription,
                                                 database provisioning choice ≥1.6) — NO token
