@@ -59,6 +59,7 @@ export const ALLOWED_CORS_ORIGINS = {
     /admin.plnetwork.io/,
     /plnetwork.io/,
     /protocol.ai/,
+    /\.os\.pl\.xyz$/,
   ],
 };
 
