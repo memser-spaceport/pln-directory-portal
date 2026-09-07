@@ -1,0 +1,248 @@
+name: Deploy to EKS with Helm [Prod V2]
+
+on:
+  push:
+    branches:
+      - main   # Triggers PROD deployment
+jobs:
+  prod-deploy:
+    name: Deploy Helm Chart to EKS prod_v2
+    runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: prod_v2
+      APPNAME: directory-service
+      DOCKER_IMAGE: directory-service
+      ECR_REPOSITORY: pln-directory-service
+      GITHUB_SHA: ${{ github.sha }}
+      CLUSTER_NAME: prod-pln
+      APP_MODE: directory_service
+
+    permissions:
+      id-token: write # Required for OIDC auth to AWS
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::013228333448:role/github-actions-pln-prod
+          aws-region: us-west-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ env.DOCKER_IMAGE }} .
+
+      - name: Tag Docker image
+        run: |
+          git_hash=$(git rev-parse --short "$GITHUB_SHA")
+          ECR_REGISTRY=$(aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --query 'repositories[0].repositoryUri' --output text)
+
+          docker tag ${{ env.DOCKER_IMAGE }}:latest $ECR_REGISTRY:$git_hash
+          docker tag ${{ env.DOCKER_IMAGE }}:latest $ECR_REGISTRY:prod_v2
+
+      - name: Push Docker image to ECR
+        run: |
+          git_hash=$(git rev-parse --short "$GITHUB_SHA")
+          ECR_REGISTRY=$(aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --query 'repositories[0].repositoryUri' --output text)
+          docker push $ECR_REGISTRY:$git_hash
+          docker push $ECR_REGISTRY:prod_v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Checkout infrastructure repository
+        uses: actions/checkout@v4
+        with:
+          repository: 'memser-spaceport/pl-infra-pipeline'
+          ref: 'main'
+          token: ${{ secrets.GIT_TOKEN }}
+          path: './'
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'latest'
+
+      - name: Update kubeconfig for EKS
+        run: |
+          aws eks update-kubeconfig --region us-west-1 --name ${{ env.CLUSTER_NAME }}
+
+      - name: poetry install for comprehend modules
+        run: |
+          poetry install --no-root
+        working-directory: ./deployment/config_gen
+
+      - name: Config generator
+        run: |
+          poetry run python main.py APPNAME=${{ env.APPNAME }} ENVIRONMENT=${{ env.ENVIRONMENT }} APP_MODE=${{ env.APP_MODE }}
+        working-directory: ./deployment/config_gen
+
+      - name: Get Certificate ARN from SSM Parameter Store
+        id: get-secret
+        run: |
+          CERT_ARN=$(aws ssm get-parameter \
+            --name "/pln/acm/config" \
+            --with-decryption \
+            --query "Parameter.Value" \
+            --output text)
+          echo "CERT_ARN=$CERT_ARN" >> "$GITHUB_ENV"
+
+      - name: Deploy using Helm
+        run: |
+          git_hash=$(git rev-parse --short "$GITHUB_SHA")
+          ECR_REGISTRY=$(aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --query 'repositories[0].repositoryUri' --output text)
+          helm upgrade --install directory-service-v2 deployment/chart/ --set image.repository=$ECR_REGISTRY --set image.tag=$git_hash --set nodeSelector.allocationtags=pln-k8s --set ingress.grpname=prod-pln-internal --set ingress.healthcheck_path=/ --set ingress.host=api-directory-v2.os.pl.xyz --set service.port=3000 --set ingress.acm_arn=arn:aws:acm:us-west-1:013228333448:certificate/49bc8ab6-d5e9-40d3-babd-7ecaca8efafa --set serviceAccount.create=true --set serviceAccount.name=directory-service-sa --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=arn:aws:iam::013228333448:role/directory-service-prod-irsa -f deployment/chart/${{ env.APP_MODE }}_secret_values.yaml -n pln-prod
+
+      - name: Configure Anthropic WIF
+        env:
+          ANTHROPIC_FEDERATION_RULE_ID: fdrl_01Tb5jBb7JX9wrLBEgQ9iY8S
+          ANTHROPIC_ORGANIZATION_ID: b531a468-02c0-4f3b-8cac-df5dac2a80a2
+          ANTHROPIC_SERVICE_ACCOUNT_ID: svac_013QAyyYNcF6uSN7J17Kuy6T
+          ANTHROPIC_WORKSPACE_ID: wrkspc_01H4CcBz3LGCcSQdbrMe6Lqu
+        run: |
+          set -euo pipefail
+
+          NAMESPACE="pln-prod"
+          DEPLOYMENT="directory-service-v2-app"
+          SERVICE_ACCOUNT="directory-service-sa"
+          SECRET="directory-service-v2-app-secret"
+          TOKEN_DIR="/var/run/secrets/anthropic.com"
+          TOKEN_FILE="${TOKEN_DIR}/token"
+
+          echo "=== Verify Kubernetes service account ==="
+          kubectl get serviceaccount "$SERVICE_ACCOUNT" \
+            -n "$NAMESPACE" >/dev/null
+
+          echo "SERVICE_ACCOUNT=OK"
+
+          echo "=== Remove static Anthropic credentials from live Secret ==="
+
+          for KEY in CLAUDE_API_KEY ANTHROPIC_API_KEY; do
+            if kubectl get secret "$SECRET" -n "$NAMESPACE" \
+              -o "jsonpath={.data.${KEY}}" 2>/dev/null | grep -q .; then
+              kubectl patch secret "$SECRET" \
+                -n "$NAMESPACE" \
+                --type=json \
+                -p="[{\"op\":\"remove\",\"path\":\"/data/${KEY}\"}]"
+              echo "${KEY}=REMOVED"
+            else
+              echo "${KEY}=ABSENT"
+            fi
+          done
+
+          CONTAINER_NAME="$(
+            kubectl get deployment "$DEPLOYMENT" \
+              -n "$NAMESPACE" \
+              -o jsonpath='{.spec.template.spec.containers[0].name}'
+          )"
+
+          echo "container=$CONTAINER_NAME"
+
+          echo "=== Configure projected Anthropic identity token ==="
+
+          cat <<PATCH | kubectl patch deployment "$DEPLOYMENT" \
+            -n "$NAMESPACE" \
+            --type=strategic \
+            --patch-file=/dev/stdin
+          spec:
+            template:
+              spec:
+                serviceAccountName: ${SERVICE_ACCOUNT}
+                volumes:
+                  - name: anthropic-identity-token
+                    projected:
+                      sources:
+                        - serviceAccountToken:
+                            audience: https://api.anthropic.com
+                            expirationSeconds: 600
+                            path: token
+                containers:
+                  - name: ${CONTAINER_NAME}
+                    volumeMounts:
+                      - name: anthropic-identity-token
+                        mountPath: ${TOKEN_DIR}
+                        readOnly: true
+                    env:
+                      - name: ANTHROPIC_AUTH_MODE
+                        value: wif
+                      - name: ANTHROPIC_FEDERATION_RULE_ID
+                        value: "${ANTHROPIC_FEDERATION_RULE_ID}"
+                      - name: ANTHROPIC_ORGANIZATION_ID
+                        value: "${ANTHROPIC_ORGANIZATION_ID}"
+                      - name: ANTHROPIC_SERVICE_ACCOUNT_ID
+                        value: "${ANTHROPIC_SERVICE_ACCOUNT_ID}"
+                      - name: ANTHROPIC_WORKSPACE_ID
+                        value: "${ANTHROPIC_WORKSPACE_ID}"
+                      - name: ANTHROPIC_IDENTITY_TOKEN_FILE
+                        value: "${TOKEN_FILE}"
+          PATCH
+
+          echo "=== Wait for rollout ==="
+          kubectl rollout status deployment/"$DEPLOYMENT" \
+            -n "$NAMESPACE" \
+            --timeout=5m
+
+          POD="$(
+            kubectl get pods -n "$NAMESPACE" \
+              -l app.kubernetes.io/instance=directory-service-v2 \
+              --sort-by=.metadata.creationTimestamp \
+              -o jsonpath='{.items[-1:].metadata.name}' 2>/dev/null || true
+          )"
+
+          if [ -z "$POD" ]; then
+            POD="$(
+              kubectl get pods -n "$NAMESPACE" \
+                -o name \
+                | grep 'directory-service-v2-app-' \
+                | tail -1 \
+                | sed 's#pod/##'
+            )"
+          fi
+
+          echo "pod=$POD"
+
+          echo "=== Verify WIF configuration ==="
+
+          kubectl exec -n "$NAMESPACE" "$POD" -- sh -c '
+            test "$ANTHROPIC_AUTH_MODE" = "wif"
+            test -r "$ANTHROPIC_IDENTITY_TOKEN_FILE"
+
+            echo "ANTHROPIC_AUTH_MODE=wif"
+            echo "IDENTITY_TOKEN=READABLE"
+
+            if env | grep -q "^CLAUDE_API_KEY="; then
+              echo "ERROR: CLAUDE_API_KEY is still present"
+              exit 1
+            else
+              echo "CLAUDE_API_KEY=ABSENT"
+            fi
+
+            if env | grep -q "^ANTHROPIC_API_KEY="; then
+              echo "ERROR: ANTHROPIC_API_KEY is still present"
+              exit 1
+            else
+              echo "ANTHROPIC_API_KEY=ABSENT"
+            fi
+          '
+
+          echo "=== Anthropic WIF configured successfully ==="
