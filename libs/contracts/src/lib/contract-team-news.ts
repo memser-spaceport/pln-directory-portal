@@ -137,6 +137,15 @@ export const apiTeamNews = contract.router({
     },
     summary: 'Post a team news update from the team profile (members and directory admins)',
   },
+  getTeamNewsItem: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/team-news/:newsItemUid`,
+    pathParams: z.object({ newsItemUid: z.string() }),
+    responses: {
+      200: TeamNewsItemSchema,
+    },
+    summary: 'One team news item by uid, for permalinks and their link previews',
+  },
   upvoteTeamNews: {
     method: 'POST',
     path: `${getAPIVersionAsPath('1')}/team-news/:newsItemUid/upvote`,
