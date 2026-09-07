@@ -1,4 +1,4 @@
-name: Deploy to EKS with Helm [Prod]
+name: Deploy to EKS with Helm [Prod V2]
 
 on:
   push:
@@ -6,10 +6,10 @@ on:
       - main   # Triggers PROD deployment
 jobs:
   prod-deploy:
-    name: Deploy Helm Chart to EKS prod
+    name: Deploy Helm Chart to EKS prod_v2
     runs-on: ubuntu-latest
     env:
-      ENVIRONMENT: prod
+      ENVIRONMENT: prod_v2
       APPNAME: directory-service
       DOCKER_IMAGE: directory-service
       ECR_REPOSITORY: pln-directory-service
@@ -45,14 +45,14 @@ jobs:
           ECR_REGISTRY=$(aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --query 'repositories[0].repositoryUri' --output text)
 
           docker tag ${{ env.DOCKER_IMAGE }}:latest $ECR_REGISTRY:$git_hash
-          docker tag ${{ env.DOCKER_IMAGE }}:latest $ECR_REGISTRY:prod
+          docker tag ${{ env.DOCKER_IMAGE }}:latest $ECR_REGISTRY:prod_v2
 
       - name: Push Docker image to ECR
         run: |
           git_hash=$(git rev-parse --short "$GITHUB_SHA")
           ECR_REGISTRY=$(aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --query 'repositories[0].repositoryUri' --output text)
           docker push $ECR_REGISTRY:$git_hash
-          docker push $ECR_REGISTRY:prod
+          docker push $ECR_REGISTRY:prod_v2
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -111,7 +111,7 @@ jobs:
         run: |
           git_hash=$(git rev-parse --short "$GITHUB_SHA")
           ECR_REGISTRY=$(aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --query 'repositories[0].repositoryUri' --output text)
-          helm upgrade --install directory-service deployment/chart/ --set image.repository=$ECR_REGISTRY --set image.tag=$git_hash --set nodeSelector.allocationtags=pln-k8s --set ingress.grpname=prod-pln-internal --set ingress.healthcheck_path=/ --set ingress.host=api-directory.plnetwork.io --set 'ingress.additionalHosts[0]=api-directory.os.pl.xyz' --set service.port=3000 --set ingress.acm_arn=$CERT_ARN --set 'ingress.additionalAcmArns[0]=arn:aws:acm:us-west-1:013228333448:certificate/49bc8ab6-d5e9-40d3-babd-7ecaca8efafa' --set serviceAccount.create=true --set serviceAccount.name=directory-service-sa --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=arn:aws:iam::013228333448:role/directory-service-prod-irsa -f deployment/chart/${{ env.APP_MODE }}_secret_values.yaml -n pln-prod
+          helm upgrade --install directory-service-v2 deployment/chart/ --set image.repository=$ECR_REGISTRY --set image.tag=$git_hash --set nodeSelector.allocationtags=pln-k8s --set ingress.grpname=prod-pln-internal --set ingress.healthcheck_path=/ --set ingress.host=api-directory-v2.os.pl.xyz --set service.port=3000 --set ingress.acm_arn=arn:aws:acm:us-west-1:013228333448:certificate/49bc8ab6-d5e9-40d3-babd-7ecaca8efafa --set serviceAccount.create=true --set serviceAccount.name=directory-service-v2-sa --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=arn:aws:iam::013228333448:role/directory-service-prod-irsa -f deployment/chart/${{ env.APP_MODE }}_secret_values.yaml -n pln-prod
 
       - name: Configure Anthropic WIF
         env:
@@ -123,9 +123,9 @@ jobs:
           set -euo pipefail
 
           NAMESPACE="pln-prod"
-          DEPLOYMENT="directory-service-app"
+          DEPLOYMENT="directory-service-v2-app"
           SERVICE_ACCOUNT="directory-service-sa"
-          SECRET="directory-service-app-secret"
+          SECRET="directory-service-v2-app-secret"
           TOKEN_DIR="/var/run/secrets/anthropic.com"
           TOKEN_FILE="${TOKEN_DIR}/token"
 
@@ -204,7 +204,7 @@ jobs:
 
           POD="$(
             kubectl get pods -n "$NAMESPACE" \
-              -l app.kubernetes.io/instance=directory-service \
+              -l app.kubernetes.io/instance=directory-service-v2 \
               --sort-by=.metadata.creationTimestamp \
               -o jsonpath='{.items[-1:].metadata.name}' 2>/dev/null || true
           )"
@@ -213,7 +213,7 @@ jobs:
             POD="$(
               kubectl get pods -n "$NAMESPACE" \
                 -o name \
-                | grep 'directory-service-app-' \
+                | grep 'directory-service-v2-app-' \
                 | tail -1 \
                 | sed 's#pod/##'
             )"
