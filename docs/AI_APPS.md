@@ -70,7 +70,7 @@ sequenceDiagram
     Note over AG,API: within the approx 60 min window the agent may redeploy reusing deployToken. On 401 (expired) it reconnects from step 2 to mint a fresh token
 ```
 
-The agent only ever holds a **short-lived deploy token** it obtained through the connect flow — it ships the app ZIP to us and we handle the rest. **AWS credentials and the runner token both stay server-side**: the backend uploads the ZIP to S3 (reusing `AwsService`, the same uploader as member images) and calls the runner. The S3 key is derived as `apps/<appId>/<deploymentId>/app.zip`, and the app is served at `https://<appId>.<AI_APPS_APP_DOMAIN>` (e.g. `<appId>.dev.plnetwork.io` on Dev, `<appId>.prod.plnetwork.io` on Prod).
+The agent only ever holds a **short-lived deploy token** it obtained through the connect flow — it ships the app ZIP to us and we handle the rest. **AWS credentials and the runner token both stay server-side**: the backend uploads the ZIP to S3 (reusing `AwsService`, the same uploader as member images) and calls the runner. The S3 key is derived as `apps/<appId>/<deploymentId>/app.zip`, and the app is served at `https://<appId>.<AI_APPS_APP_DOMAIN>` (`<appId>.os.pl.xyz` on Prod; the value must match the runner's `DEFAULT_DOMAIN_SUFFIX`).
 
 ## Connect flow (deploy auth)
 
@@ -140,7 +140,7 @@ The backend uploads the ZIP to `s3://<AI_APPS_S3_BUCKET>/apps/<appId>/<deploymen
 
 **appId is a global claim:** although `AiApp` rows are unique per `(memberUid, appId)`, the sandbox runner namespaces everything by `appId` alone (helm release `<environment>-<appId>`, the app host, the secret store, the provisioned database) — two members holding the same `appId` would share one physical deployment. Both `POST /v1/ai-apps/deploy` and `POST /v1/ai-apps/draft` therefore `409` when the `appId` is held by **another member's non-`DELETED` app** (`assertAppIdNotClaimedByAnotherMember`); a `DELETED` row releases the claim since its runner deployment is already torn down.
 
-**Deterministic URL:** the sandbox host is always `<appId>.<AI_APPS_APP_DOMAIN>` (env-configurable: `dev.plnetwork.io` on Dev, `prod.plnetwork.io` on Prod), so `url`/`httpUrl`/`host` are computed from `appId` and stored on the record **at deploy start** (status `DEPLOYING`) — the link exists before the runner finishes. For `appId` `test-hello-01` on Prod the URL is `https://test-hello-01.prod.plnetwork.io`.
+**Deterministic URL:** the sandbox host is always `<appId>.<AI_APPS_APP_DOMAIN>` (env-configurable; `os.pl.xyz` on Prod, matching the runner's `DEFAULT_DOMAIN_SUFFIX`), so `url`/`httpUrl`/`host` are computed from `appId` and stored on the record **at deploy start** (status `DEPLOYING`) — the link exists before the runner finishes. For `appId` `test-hello-01` on Prod the URL is `https://test-hello-01.os.pl.xyz`.
 
 **No concurrent deploys:** while a **fresh** (non-stuck) deploy is in flight for an app, every deploy entry point rejects a second one with `409` (`"A deploy is already in progress for this app — wait for it to finish, then try again."`): the agent `POST /v1/ai-apps/deploy` and `POST /v1/ai-apps/draft` (checked before the S3 upload / upsert, so the in-flight deploy's bundle and status are never clobbered), and the member `POST /v1/ai-apps/:uid/deploy`. Once the deploy settles to `READY`/`ERROR` — or ages past the stuck window (see below), which makes it retryable — a new deploy is allowed again. The LabOS UI mirrors this: the detail page shows the in-progress status card (not the deploy panel) and Deployment settings disables its Redeploy button with "A deploy is already in progress for this app" while another deploy runs.
 
@@ -730,7 +730,7 @@ UI work and follows `AGENTS.md` / `CLAUDE.md` for deploy, secrets, and iframe ru
 | `AI_APPS_RUNNER_URL` | `https://sandbox-runner.plnetwork.io` | Sandbox runner base URL |
 | `AI_APPS_RUNNER_TOKEN` | _(empty)_ | **Required** for real deploys; `x-runner-token` to the runner |
 | `AI_APPS_S3_BUCKET` | _(empty)_ | **Required** for real deploys; bucket the runner reads app bundles from (e.g. `sandbox-apps-pln-dev-013228333448`) |
-| `AI_APPS_APP_DOMAIN` | `prod.plnetwork.io` | Base domain deployed apps are served under (app URL = `https://<appId>.<domain>`); set `dev.plnetwork.io` on Dev, `prod.plnetwork.io` on Prod |
+| `AI_APPS_APP_DOMAIN` | `os.pl.xyz` | Base domain deployed apps are served under (app URL = `https://<appId>.<domain>`); must match the runner's `DEFAULT_DOMAIN_SUFFIX` for the environment |
 | `AI_APPS_BASE_URL` | `https://api.plnetwork.io` | Public base URL of this API; the agent-facing endpoint URLs written into the kit (deploy/connect/draft/member context) are derived from it as `<base>/v1/ai-apps/<endpoint>` |
 | `AI_APPS_DEPLOY_ENDPOINT` / `AI_APPS_CONNECT_ENDPOINT` / `AI_APPS_DRAFT_ENDPOINT` / `AI_APPS_ME_ENDPOINT` / `AI_APPS_METADATA_ENDPOINT` / `AI_APPS_BUILD_LOGS_ENDPOINT` / `AI_APPS_RUNTIME_LOGS_ENDPOINT` | _derived from `AI_APPS_BASE_URL`_ | Optional per-endpoint overrides; rarely needed. The metadata and logs endpoints are templates with a literal `{appUid}` placeholder the agent substitutes |
 | `AI_APPS_PRD_S3_BUCKET` | _`AI_APPS_S3_BUCKET`_ | Bucket for uploaded PRD files (`ai-app-prds/<appId>/<uuid>.<ext>`); defaults to the app-bundle bucket so no extra IAM is needed |
