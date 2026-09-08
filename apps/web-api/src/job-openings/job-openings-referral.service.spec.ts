@@ -4,7 +4,7 @@ jest.mock('../notifications/notification-service.client', () => ({
 
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { JobOpeningStatus } from '@prisma/client';
-import { CreateJobReferralSchema } from 'libs/contracts/src/schema/job-referral';
+import { CreateJobReferralSchema, JobReferralDraftQuerySchema } from 'libs/contracts/src/schema/job-referral';
 import type { PrismaService } from '../shared/prisma.service';
 import { JobOpeningsReferralService } from './job-openings-referral.service';
 
@@ -113,6 +113,7 @@ describe('JobOpeningsReferralService', () => {
           to: [lead.email],
           cc: [leadTwo.email, referrer.email, referred.email],
           replyTo: `${referrer.email}, ${referred.email}`,
+          bcc: [],
         },
         deliveryPayload: {
           body: expect.objectContaining({
@@ -149,6 +150,7 @@ describe('JobOpeningsReferralService', () => {
           to: [lead.email],
           cc: [leadTwo.email, referrer.email],
           replyTo: referrer.email,
+          bcc: [],
         },
       })
     );
@@ -192,6 +194,7 @@ describe('JobOpeningsReferralService', () => {
           to: ['jobs@airship.com'],
           cc: [referrer.email, referred.email],
           replyTo: `${referrer.email}, ${referred.email}`,
+          bcc: [],
         },
       })
     );
@@ -217,6 +220,7 @@ describe('JobOpeningsReferralService', () => {
           to: ['jobs@airship.com'],
           cc: ['hiring@airship.com', referrer.email, referred.email],
           replyTo: `${referrer.email}, ${referred.email}`,
+          bcc: [],
         },
       })
     );
@@ -287,5 +291,155 @@ describe('JobOpeningsReferralService', () => {
         note: 'Please consider Grace for this role.',
       }).success
     ).toBe(true);
+  });
+
+  describe('referring someone outside the network (LAB-2509)', () => {
+    const externalPerson = {
+      name: 'Nia Okafor',
+      email: 'nia@outside.example',
+      linkedinUrl: 'nia-okafor',
+    };
+
+    const externalReferralInput = {
+      referredPerson: externalPerson,
+      recipients: memberRecipients,
+      note: 'Please consider Nia for this role.',
+      includeReferredMember: true,
+    };
+
+    it('rejects a body with both referredMemberUid and referredPerson', () => {
+      expect(
+        CreateJobReferralSchema.safeParse({
+          referredMemberUid: referred.uid,
+          referredPerson: externalPerson,
+          note: 'note',
+        }).success
+      ).toBe(false);
+    });
+
+    it('rejects a body with neither referredMemberUid nor referredPerson', () => {
+      expect(CreateJobReferralSchema.safeParse({ note: 'note' }).success).toBe(false);
+    });
+
+    it('requires name, email, and linkedinUrl on referredPerson', () => {
+      expect(
+        CreateJobReferralSchema.safeParse({
+          referredPerson: { name: 'Nia Okafor', email: 'nia@outside.example' },
+          note: 'note',
+        }).success
+      ).toBe(false);
+    });
+
+    it('sends the referral email using the submitted name/email/LinkedIn, without a Member lookup', async () => {
+      mockMembers();
+      prisma.jobOpening.findUnique.mockResolvedValue(jobOpening);
+      prisma.jobReferral.create.mockResolvedValue({ uid: 'ref-2', createdAt: new Date('2026-08-25T12:00:00.000Z') });
+
+      const result = await service.referJob('job-1', referrer.email, externalReferralInput);
+
+      expect(result.cc).toEqual([leadTwo.email, referrer.email, externalPerson.email]);
+      // The referred person is never resolved against Member — referredPerson bypasses that
+      // lookup entirely, so no findUnique call is ever made with the external person's email.
+      expect(prisma.member.findUnique).not.toHaveBeenCalledWith(
+        expect.objectContaining({ where: { email: externalPerson.email } })
+      );
+      expect(notificationServiceClient.sendNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          templateName: 'JOB_BOARD_REFERRAL_EMAIL',
+          deliveryPayload: {
+            body: expect.objectContaining({
+              referred: expect.objectContaining({
+                name: externalPerson.name,
+                profileUrl: 'https://www.linkedin.com/in/nia-okafor',
+                headline: null,
+                location: null,
+                skills: [],
+              }),
+            }),
+          },
+          targetMeta: expect.objectContaining({
+            emailId: externalPerson.email,
+            userId: null,
+            userName: externalPerson.name,
+          }),
+        })
+      );
+      expect(prisma.jobReferral.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            referredMemberUid: null,
+            referredName: externalPerson.name,
+            referredEmail: externalPerson.email,
+            referredLinkedinUrl: 'https://www.linkedin.com/in/nia-okafor',
+          }),
+        })
+      );
+    });
+
+    it('treats a full LinkedIn URL as-is, without re-prefixing it', async () => {
+      mockMembers();
+      prisma.jobOpening.findUnique.mockResolvedValue(jobOpening);
+      prisma.jobReferral.create.mockResolvedValue({ uid: 'ref-3', createdAt: new Date('2026-08-25T12:00:00.000Z') });
+
+      await service.referJob('job-1', referrer.email, {
+        ...externalReferralInput,
+        referredPerson: { ...externalPerson, linkedinUrl: 'https://linkedin.com/in/nia-okafor' },
+      });
+
+      expect(notificationServiceClient.sendNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          deliveryPayload: {
+            body: expect.objectContaining({
+              referred: expect.objectContaining({ profileUrl: 'https://linkedin.com/in/nia-okafor' }),
+            }),
+          },
+        })
+      );
+    });
+
+    it('still treats an email matching an existing member as an outside referral', async () => {
+      mockMembers();
+      prisma.jobOpening.findUnique.mockResolvedValue(jobOpening);
+      prisma.jobReferral.create.mockResolvedValue({ uid: 'ref-4', createdAt: new Date('2026-08-25T12:00:00.000Z') });
+
+      await service.referJob('job-1', referrer.email, {
+        ...externalReferralInput,
+        referredPerson: { ...externalPerson, email: referred.email },
+      });
+
+      expect(prisma.jobReferral.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ referredMemberUid: null, referredEmail: referred.email }),
+        })
+      );
+    });
+
+    it('drafts a note for an outside person from their name alone, with no about-paragraph', async () => {
+      mockMembers();
+      prisma.jobOpening.findUnique.mockResolvedValue(jobOpening);
+
+      const draft = await service.getReferralDraft('job-1', referrer.email, { referredName: externalPerson.name });
+
+      expect(draft.referredName).toBe(externalPerson.name);
+      expect(draft.referredTitle).toBeNull();
+      expect(draft.referredCompany).toBeNull();
+      expect(draft.note).toContain(`I'd like to refer ${externalPerson.name} for your Staff Engineer role.`);
+      // Only the referrer's headline is resolved — there's no Member record to look up a
+      // team role for an outside person.
+      expect(prisma.teamMemberRole.findFirst).toHaveBeenCalledTimes(1);
+      expect(prisma.teamMemberRole.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { memberUid: referrer.uid } })
+      );
+    });
+
+    it('rejects a draft query with both referredMemberUid and referredName', () => {
+      expect(
+        JobReferralDraftQuerySchema.safeParse({ referredMemberUid: referred.uid, referredName: 'Nia Okafor' }).success
+      ).toBe(false);
+    });
+
+    it('rejects a draft query with neither referredMemberUid nor referredName', () => {
+      expect(JobReferralDraftQuerySchema.safeParse({}).success).toBe(false);
+    });
   });
 });

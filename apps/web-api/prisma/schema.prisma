@@ -2336,12 +2336,18 @@ model JobReferral {
   jobOpening        JobOpening @relation(fields: [jobOpeningUid], references: [uid], onDelete: Cascade)
   referrerMemberUid String
   referrer          Member     @relation("JobReferralReferrer", fields: [referrerMemberUid], references: [uid], onDelete: Cascade)
-  referredMemberUid String
-  referred          Member     @relation("JobReferralReferred", fields: [referredMemberUid], references: [uid], onDelete: Cascade)
-  toEmail           String
-  ccEmails          String[]   @default([])
-  note              String
-  createdAt         DateTime   @default(now())
+  // Exactly one of (referredMemberUid) or (referredName + referredEmail + referredLinkedinUrl) is
+  // set, depending on whether the referred person is a Directory member or someone outside the
+  // network — see CreateJobReferralSchema's refine in libs/contracts/src/schema/job-referral.ts.
+  referredMemberUid   String?
+  referred            Member? @relation("JobReferralReferred", fields: [referredMemberUid], references: [uid], onDelete: Cascade)
+  referredName        String?
+  referredEmail       String?
+  referredLinkedinUrl String?
+  toEmail             String
+  ccEmails            String[] @default([])
+  note                String
+  createdAt           DateTime @default(now())
 
   @@index([jobOpeningUid])
   @@index([referrerMemberUid])

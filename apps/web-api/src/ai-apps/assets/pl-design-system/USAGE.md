@@ -67,7 +67,7 @@ Page shapes: see `guidelines.md` and the recipes in `README.md` (list / detail /
 ## Deploy contract reminders
 
 Bind `0.0.0.0`, listen on `$PORT`, serve `GET /health` (200), stay iframe-embeddable
-from `*.plnetwork.io`. For Next.js:
+from the LabOS portal (see the framing rule in `AGENTS.md`). For Next.js:
 
 ```json
 "start": "next start -p ${PORT:-3000} -H 0.0.0.0"

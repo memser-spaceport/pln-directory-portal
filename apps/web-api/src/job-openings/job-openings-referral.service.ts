@@ -3,6 +3,7 @@ import type { CreateJobReferralInput } from 'libs/contracts/src/schema/job-refer
 import { PrismaService } from '../shared/prisma.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { noteToHtml } from './job-openings-email-html';
+import { normalizeExternalLinkedinUrl } from './job-openings-linkedin-url';
 import { parseJobReferCcEmails, resolveVisibleJobOpening } from './job-openings-resolve';
 import { deriveReferralBlurb } from './job-openings-referral-blurb';
 import { jobBoardDetailUrl } from './job-openings-url';
@@ -15,6 +16,18 @@ type ResolvedRecipient = { email: string; name: string | null };
 type MemberHeadline = { title: string | null; companyName: string | null };
 type MemberLocation = { city: string | null; country: string } | null;
 const PROFILE_CARD_SKILLS_LIMIT = 3;
+const EXTERNAL_HEADLINE: MemberHeadline = { title: null, companyName: null };
+
+// The referred person, whether resolved from a Directory member or from the outside-the-network
+// form (LAB-2509). `uid: null` marks the external case — see JobOpeningsReferralService.resolveReferred.
+type ResolvedReferred = {
+  uid: string | null;
+  name: string;
+  email: string;
+  location: MemberLocation;
+  skills: { title: string }[];
+  externalProfileUrl: string | null;
+};
 
 const firstName = (name: string): string => name.trim().split(/\s+/)[0];
 
@@ -28,21 +41,7 @@ export class JobOpeningsReferralService {
   async referJob(jobUid: string, referrerEmail: string | undefined, input: CreateJobReferralInput) {
     const referrer = await this.resolveReferrer(referrerEmail);
     const jobOpening = await resolveVisibleJobOpening(this.prisma, jobUid);
-
-    const referred = await this.prisma.member.findUnique({
-      where: { uid: input.referredMemberUid },
-      select: {
-        uid: true,
-        name: true,
-        email: true,
-        deletedAt: true,
-        location: { select: { city: true, country: true } },
-        skills: { select: { title: true } },
-      },
-    });
-    if (!referred || referred.deletedAt || !referred.email) {
-      throw new BadRequestException('Referred member not found');
-    }
+    const referred = await this.resolveReferred(input);
 
     const jobReferEmail = jobOpening.team.jobReferEmail?.trim() || null;
     const recipients = jobReferEmail
@@ -69,7 +68,7 @@ export class JobOpeningsReferralService {
     const applyUrl = jobBoardDetailUrl(jobOpening.uid);
     const [referrerHeadline, referredHeadline] = await Promise.all([
       this.resolveHeadline(referrer.uid),
-      this.resolveHeadline(referred.uid),
+      referred.uid ? this.resolveHeadline(referred.uid) : Promise.resolve(EXTERNAL_HEADLINE),
     ]);
 
     await this.notificationServiceClient.sendNotification({
@@ -149,6 +148,9 @@ export class JobOpeningsReferralService {
         jobOpeningUid: jobOpening.uid,
         referrerMemberUid: referrer.uid,
         referredMemberUid: referred.uid,
+        referredName: referred.uid ? null : referred.name,
+        referredEmail: referred.uid ? null : referred.email,
+        referredLinkedinUrl: referred.uid ? null : referred.externalProfileUrl,
         toEmail: to,
         ccEmails: cc,
         note,
@@ -168,25 +170,41 @@ export class JobOpeningsReferralService {
   // comes from the referred member's existing Member.bio (see the
   // member-bio-generation skill for how that's generated) — deliberately not
   // an AI call made from here, so opening the modal stays instant and free.
-  async getReferralDraft(jobUid: string, referrerEmail: string | undefined, referredMemberUid: string) {
+  // For an outside-the-network referral there's no bio to draw from, so the
+  // draft falls back to the plain "I'd like to refer <name>..." opener.
+  async getReferralDraft(
+    jobUid: string,
+    referrerEmail: string | undefined,
+    query: { referredMemberUid?: string; referredName?: string }
+  ) {
     const referrer = await this.resolveReferrer(referrerEmail);
     const jobOpening = await resolveVisibleJobOpening(this.prisma, jobUid);
 
-    const referred = await this.prisma.member.findUnique({
-      where: { uid: referredMemberUid },
-      select: { uid: true, name: true, bio: true, deletedAt: true },
-    });
-    if (!referred || referred.deletedAt) {
-      throw new BadRequestException('Referred member not found');
+    let referredUid: string | null = null;
+    let referredName: string;
+    let referredBio: string | null = null;
+    if (query.referredMemberUid) {
+      const referred = await this.prisma.member.findUnique({
+        where: { uid: query.referredMemberUid },
+        select: { uid: true, name: true, bio: true, deletedAt: true },
+      });
+      if (!referred || referred.deletedAt) {
+        throw new BadRequestException('Referred member not found');
+      }
+      referredUid = referred.uid;
+      referredName = referred.name;
+      referredBio = referred.bio;
+    } else {
+      referredName = query.referredName as string;
     }
 
     const [referrerHeadline, referredHeadline] = await Promise.all([
       this.resolveHeadline(referrer.uid),
-      this.resolveHeadline(referred.uid),
+      referredUid ? this.resolveHeadline(referredUid) : Promise.resolve(EXTERNAL_HEADLINE),
     ]);
 
     const applyUrl = jobBoardDetailUrl(jobOpening.uid);
-    const blurb = deriveReferralBlurb(referred.bio);
+    const blurb = deriveReferralBlurb(referredBio);
 
     // A bio's own leading sentence already restates "X is TITLE at COMPANY"
     // (that's how the Husky bio prompt is structured), so composing the same
@@ -194,7 +212,7 @@ export class JobOpeningsReferralService {
     // there's no bio to draw from.
     let aboutParagraph = blurb ?? '';
     if (!aboutParagraph && referredHeadline.title) {
-      aboutParagraph = `${referred.name} is ${referredHeadline.title}`;
+      aboutParagraph = `${referredName} is ${referredHeadline.title}`;
       if (referredHeadline.companyName) aboutParagraph += ` at ${referredHeadline.companyName}`;
       aboutParagraph += '.';
     }
@@ -216,7 +234,7 @@ export class JobOpeningsReferralService {
     // The ask now lives on the client, above the box, where it costs the writer nothing to
     // ignore. What this returns is a note that is finished as it stands.
     const paragraphs = [
-      `Hi ${jobOpening.team.name} team,\nI'd like to refer ${referred.name} for your ${jobOpening.roleTitle} role.`,
+      `Hi ${jobOpening.team.name} team,\nI'd like to refer ${referredName} for your ${jobOpening.roleTitle} role.`,
       aboutParagraph,
       signature,
     ].filter((paragraph) => paragraph.length > 0);
@@ -226,12 +244,56 @@ export class JobOpeningsReferralService {
       referrerName: referrer.name,
       referrerTitle: referrerHeadline.title,
       referrerCompany: referrerHeadline.companyName,
-      referredName: referred.name,
+      referredName,
       referredTitle: referredHeadline.title,
       referredCompany: referredHeadline.companyName,
       roleTitle: jobOpening.roleTitle,
       teamName: jobOpening.team.name,
       applyUrl,
+    };
+  }
+
+  // Resolves the referred person for a POST /referrals call, either from an existing Directory
+  // member (referredMemberUid) or from the "outside the network" form fields (referredPerson).
+  // An email that happens to match an existing member is deliberately NOT resolved to that
+  // member here — LAB-2509 requires it still be treated as an outside referral.
+  private async resolveReferred(input: CreateJobReferralInput): Promise<ResolvedReferred> {
+    if (input.referredMemberUid) {
+      const referred = await this.prisma.member.findUnique({
+        where: { uid: input.referredMemberUid },
+        select: {
+          uid: true,
+          name: true,
+          email: true,
+          deletedAt: true,
+          location: { select: { city: true, country: true } },
+          skills: { select: { title: true } },
+        },
+      });
+      if (!referred || referred.deletedAt || !referred.email) {
+        throw new BadRequestException('Referred member not found');
+      }
+      return {
+        uid: referred.uid,
+        name: referred.name,
+        email: referred.email,
+        location: referred.location,
+        skills: referred.skills,
+        externalProfileUrl: null,
+      };
+    }
+
+    const person = input.referredPerson;
+    if (!person) {
+      throw new BadRequestException('referredMemberUid or referredPerson is required');
+    }
+    return {
+      uid: null,
+      name: person.name,
+      email: person.email,
+      location: null,
+      skills: [],
+      externalProfileUrl: normalizeExternalLinkedinUrl(person.linkedinUrl),
     };
   }
 
@@ -297,13 +359,21 @@ export class JobOpeningsReferralService {
   }
 
   // Shape consumed by the `memberCard` partial in the JOB_BOARD_REFERRAL_EMAIL template.
+  // `uid: null` (an outside-the-network referred person) links to their LinkedIn profile
+  // instead of a Directory profile page.
   private buildMemberCard(
-    member: { uid: string; name: string | null; location: MemberLocation; skills: { title: string }[] },
+    member: {
+      uid: string | null;
+      name: string | null;
+      location: MemberLocation;
+      skills: { title: string }[];
+      externalProfileUrl?: string | null;
+    },
     headline: MemberHeadline
   ) {
     return {
       name: member.name,
-      profileUrl: this.profileUrl(member.uid),
+      profileUrl: member.uid ? this.profileUrl(member.uid) : member.externalProfileUrl ?? null,
       headline: this.formatHeadline(headline),
       location: this.formatLocation(member.location),
       skills: member.skills.map((skill) => skill.title).slice(0, PROFILE_CARD_SKILLS_LIMIT),
