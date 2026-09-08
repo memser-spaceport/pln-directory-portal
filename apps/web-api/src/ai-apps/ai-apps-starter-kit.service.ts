@@ -6,6 +6,7 @@ import {
   AI_APP_TOKEN_HEADER,
   AI_APPS_ANALYTICS_ENDPOINT,
   AI_APPS_APP_DOMAIN,
+  AI_APPS_PORTAL_ORIGIN,
   AI_APPS_APP_SETTINGS_ENDPOINT,
   AI_APPS_BUILD_LOGS_ENDPOINT,
   AI_APPS_CONNECT_ENDPOINT,
@@ -278,17 +279,17 @@ folder. Before any UI work, load the **pl-design-system** skill
   \`USAGE.md\` (including \`@source\` for vendored components). For a
   non-React/plain-HTML app, \`styles/pln-theme.css\` is a minimal fallback — the
   React components are strongly preferred.
-- **Must be iframe-embeddable from \`*.plnetwork.io\`.** The app is shown inside the
-  PL Infra → AI Apps dashboard via an \`<iframe>\` served from a sibling
-  \`*.plnetwork.io\` subdomain. A different subdomain is a *different origin*, so any
-  framing guard that defaults to "same-origin only" will break the embed with
-  \`refused to connect\`. Therefore:
+- **Must be iframe-embeddable from \`${AI_APPS_PORTAL_ORIGIN}\`.** The app is shown inside the
+  PL Infra → AI Apps dashboard via an \`<iframe>\` served from the LabOS portal
+  (\`${AI_APPS_PORTAL_ORIGIN}\`), while the app itself lives on its own
+  \`<appId>.${AI_APPS_APP_DOMAIN}\` origin. Any framing guard that defaults to
+  "same-origin only" will break the embed with \`refused to connect\`. Therefore:
   - **Do NOT send \`X-Frame-Options\`.** It only understands \`DENY\`/\`SAMEORIGIN\` —
     it cannot allow a sibling subdomain, and if present browsers honor it and block
     the frame. (Note: \`helmet()\` sends \`X-Frame-Options: SAMEORIGIN\` by default —
     pass \`frameguard: false\` to turn it off.)
   - If you set a \`Content-Security-Policy\`, its \`frame-ancestors\` MUST include
-    \`'self' https://plnetwork.io https://*.plnetwork.io\`. Never use
+    \`'self' ${AI_APPS_PORTAL_ORIGIN}\`. Never use
     \`frame-ancestors 'none'\`.
   - The default scaffold sends neither header, so it already embeds fine — this
     only matters once you add \`helmet\`, a CSP, or other security headers.
@@ -1365,18 +1366,18 @@ connection string into the LabOS secrets page, same as an API key.
    redeploy involved. Don't re-offer it on later redeploys.
 
 8. **Verify the app is iframe-embeddable** (internal check — do not surface the URL
-   to the member). The dashboard shows it in an \`<iframe>\` from a sibling
-   \`*.plnetwork.io\` subdomain; check the live response headers:
+   to the member). The dashboard shows it in an \`<iframe>\` from the LabOS portal
+   origin \`${AI_APPS_PORTAL_ORIGIN}\`; check the live response headers:
 
    \`\`\`bash
    curl -sSI "https://<appId>.${AI_APPS_APP_DOMAIN}/" | grep -iE 'x-frame-options|content-security-policy'
    \`\`\`
 
    It must pass BOTH:
-   - **No \`X-Frame-Options\` header** (it can't allow a sibling subdomain; if present
+   - **No \`X-Frame-Options\` header** (it can't allow another origin; if present
      it blocks the embed).
    - If a \`Content-Security-Policy\` is present, its \`frame-ancestors\` must include
-     \`https://*.plnetwork.io\` (and must NOT be \`'none'\`).
+     \`${AI_APPS_PORTAL_ORIGIN}\` (and must NOT be \`'none'\`).
 
    If either fails, the embed will show \`refused to connect\`. Fix the app's headers
    (see the framing rule in \`AGENTS.md\`) and redeploy before reporting success.

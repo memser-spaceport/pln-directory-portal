@@ -11,7 +11,7 @@
  */
 
 /** Starter kit version shown in the README, ZIP filename, and LabOS UI. Bump when the kit contents or flow change. */
-export const AI_APPS_STARTER_KIT_VERSION = '1.10';
+export const AI_APPS_STARTER_KIT_VERSION = '1.11';
 
 /** Header the AI agent sends with its short-lived deploy token. */
 export const AI_APP_TOKEN_HEADER = 'x-app-token';
@@ -184,10 +184,10 @@ export const AI_APPS_LOGS_DESC_CACHE_MAX_ENTRIES = 30;
 export const buildAppS3Key = (appId: string, deploymentId: string): string => `apps/${appId}/${deploymentId}/app.zip`;
 
 /**
- * Base domain apps are served under, per environment:
- * dev → dev.plnetwork.io, prod → prod.plnetwork.io.
+ * Base domain apps are served under (app URL = https://<appId>.<domain>).
+ * Set per environment; must match the runner's DEFAULT_DOMAIN_SUFFIX.
  */
-export const AI_APPS_APP_DOMAIN = process.env.AI_APPS_APP_DOMAIN || 'prod.plnetwork.io';
+export const AI_APPS_APP_DOMAIN = process.env.AI_APPS_APP_DOMAIN || 'os.pl.xyz';
 
 /**
  * The sandbox host/URL for an app is deterministic from its appId, so we can
@@ -293,6 +293,18 @@ export const AI_APPS_TRACK_MAX_BATCH_EVENTS = 20;
  * approve a session. Combined with the session uid to build the connect link.
  */
 export const AI_APPS_PORTAL_URL = process.env.AI_APPS_PORTAL_URL;
+
+/**
+ * Origin (scheme + host) of the LabOS portal that iframes deployed apps. The
+ * starter kit quotes it in its framing guidance (`frame-ancestors`).
+ */
+export const AI_APPS_PORTAL_ORIGIN: string = (() => {
+  try {
+    return new URL(AI_APPS_PORTAL_URL ?? '').origin;
+  } catch {
+    return 'https://os.pl.xyz';
+  }
+})();
 
 /** The LabOS connect page URL a member opens to approve an agent's session. */
 export const buildConnectUrl = (sessionUid: string): string =>
