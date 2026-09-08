@@ -238,8 +238,61 @@ function toDateFromNodebb(ts) {
   return ms ? new Date(ms) : null;
 }
 
+/** Documents per member bulk request. Matches BULK_CHUNK in the orphan reaper. */
+const MEMBER_BULK_CHUNK = 1000;
+
+/**
+ * The one definition of "this member's profile is reachable in the directory".
+ *
+ * Mirrors directoryVisibleMemberWhere() in
+ * apps/web-api/src/members/member-visibility.ts — APPROVED, or not REJECTED and
+ * holding `member.profile.visible` (granted by the `job_aspirant` policy on Job
+ * Board sign-up). If you change one, change the other.
+ *
+ * Deliberately NOT the same rule as directoryListedMemberWhere(), which gates the
+ * Members page and stays approved-only. A pending Job Aspirant is searchable and
+ * reachable by direct link, but is not listed in the directory.
+ *
+ * Assumes `"Member" m` and a LEFT JOIN of the latest_approval CTE aliased `la`.
+ *
+ * COALESCE on BOTH branches is load-bearing. `la.state` is NULL for a member with
+ * no MemberApproval row; a bare `la.state = 'APPROVED'` makes the whole expression
+ * NULL rather than FALSE, and `NOT (NULL)` is NULL — so such a member would drop
+ * out of the delete pass's result set instead of being deleted.
+ */
+const DIRECTORY_VISIBLE_MEMBER_SQL = `(
+  COALESCE(la.state, 'PENDING') = 'APPROVED'
+  OR (
+    COALESCE(la.state, 'PENDING') <> 'REJECTED'
+    AND (
+      EXISTS (
+        SELECT 1
+        FROM "PolicyAssignment" vpa
+        JOIN "PolicyPermission" vpp ON vpp."policyUid" = vpa."policyUid"
+        JOIN "Permission" vperm ON vperm.uid = vpp."permissionUid"
+        WHERE vpa."memberUid" = m.uid AND vperm.code = 'member.profile.visible'
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM "MemberPermissionV2" vmp
+        JOIN "Permission" vperm2 ON vperm2.uid = vmp."permissionUid"
+        WHERE vmp."memberUid" = m.uid AND vperm2.code = 'member.profile.visible'
+      )
+    )
+  )
+)`;
+
 // ----- OpenSearch deletions (PG) -----
-async function deleteRejectedMembersFromOpenSearch() {
+/**
+ * Removes every member the directory should not surface.
+ *
+ * The predicate is the literal negation of DIRECTORY_VISIBLE_MEMBER_SQL rather
+ * than a hand-written variant, which is what makes this self-healing: a Job
+ * Aspirant later set to REJECTED, or one whose `job_aspirant` PolicyAssignment is
+ * revoked, stops satisfying the rule and is removed on the next run without
+ * either case being enumerated here.
+ */
+async function deleteNonVisibleMembersFromOpenSearch() {
   const r = await pgClient.query(`
     WITH latest_approval AS (
       SELECT DISTINCT ON (ma."memberUid")
@@ -251,7 +304,7 @@ async function deleteRejectedMembersFromOpenSearch() {
     SELECT m.uid
     FROM "Member" m
     LEFT JOIN latest_approval la ON la."memberUid" = m.uid
-    WHERE COALESCE(la.state, 'PENDING') <> 'APPROVED'
+    WHERE NOT ${DIRECTORY_VISIBLE_MEMBER_SQL}
   `);
 
   const uids = r.rows.map(x => x.uid);
@@ -264,7 +317,7 @@ async function deleteRejectedMembersFromOpenSearch() {
     const failed = resp.body.items.filter(x => (x.delete && x.delete.error) || (x.index && x.index.error));
     console.error('Member deletes failed:', JSON.stringify(failed.slice(0, 10), null, 2));
   } else {
-    console.log(`Deleted ${uids.length} non-approved members`);
+    console.log(`Deleted ${uids.length} non-visible members`);
   }
 }
 async function deleteDeletedProjectsFromOpenSearch() {
@@ -320,7 +373,7 @@ async function indexMembers(lastCheckpoint) {
         ARRAY[]::text[]
       ) AS "directPermissions"
     FROM "Member" m
-      JOIN latest_approval la ON la."memberUid" = m.uid AND la.state = 'APPROVED'
+      LEFT JOIN latest_approval la ON la."memberUid" = m.uid
       LEFT JOIN "Image" i ON m."imageUid" = i.uid
       LEFT JOIN "PolicyAssignment" pa ON pa."memberUid" = m.uid
       LEFT JOIN "Policy" p ON p.uid = pa."policyUid"
@@ -328,20 +381,32 @@ async function indexMembers(lastCheckpoint) {
       LEFT JOIN "Permission" policy_perm ON policy_perm.uid = pp."permissionUid"
       LEFT JOIN "MemberPermissionV2" mpv2 ON mpv2."memberUid" = m.uid
       LEFT JOIN "Permission" direct_perm ON direct_perm.uid = mpv2."permissionUid"
-    WHERE
-      m."createdAt" > $1
-      OR m."updatedAt" > $1
-      OR la."approvalUpdatedAt" > $1
-      OR pa."createdAt" > $1
-      OR pa."updatedAt" > $1
-      OR p."createdAt" > $1
-      OR p."updatedAt" > $1
-      OR policy_perm."createdAt" > $1
-      OR policy_perm."updatedAt" > $1
-      OR mpv2."createdAt" > $1
-      OR mpv2."updatedAt" > $1
-      OR direct_perm."createdAt" > $1
-      OR direct_perm."updatedAt" > $1
+    WHERE ${DIRECTORY_VISIBLE_MEMBER_SQL}
+      -- These parentheses are load-bearing: SQL binds AND tighter than OR, so
+      -- without them the visibility rule above would guard only the first term and
+      -- every rejected/unapproved member whose policy rows happened to change would
+      -- be indexed. It fails open, silently. Do not flatten this block.
+      AND (
+        m."createdAt" > $1
+        OR m."updatedAt" > $1
+        OR la."approvalUpdatedAt" > $1
+        OR pa."createdAt" > $1
+        OR pa."updatedAt" > $1
+        OR p."createdAt" > $1
+        OR p."updatedAt" > $1
+        OR policy_perm."createdAt" > $1
+        OR policy_perm."updatedAt" > $1
+        OR mpv2."createdAt" > $1
+        OR mpv2."updatedAt" > $1
+        OR direct_perm."createdAt" > $1
+        OR direct_perm."updatedAt" > $1
+        -- Self-healing, and the reason no one-off backfill is needed: the
+        -- visible-but-unapproved set (job aspirants) is small and is re-indexed
+        -- unconditionally, so aspirants who signed up before this shipped get
+        -- picked up on the first run. The approved population — the large one —
+        -- stays checkpoint-gated. Do not "optimise" this into the checkpoint.
+        OR COALESCE(la.state, 'PENDING') <> 'APPROVED'
+      )
     GROUP BY
       m.uid,
       m.name,
@@ -355,7 +420,7 @@ async function indexMembers(lastCheckpoint) {
   console.log('Got data from Member table:', r.rows.length);
   if (!r.rows.length) return 0;
 
-  const body = r.rows.flatMap(row => {
+  const toBulkPair = row => {
     const officeHoursUrl = row.officeHours && String(row.officeHours).trim()
       ? String(row.officeHours).trim()
       : null;
@@ -381,15 +446,35 @@ async function indexMembers(lastCheckpoint) {
         name_suggest: { input: generateSuggestInput(row.name) }
       }
     ];
-  });
+  };
 
-  const resp = await osClient.bulk({ body });
+  // Chunked because this query is no longer bounded by the checkpoint: the
+  // visible-but-unapproved set is re-indexed on every run (see the WHERE above),
+  // and these documents carry full bios, so one bulk body over the whole result
+  // would grow with the job-aspirant population. Mirrors the chunking already
+  // used by deleteOrphanTeamsFromOpenSearch().
+  const chunks = Math.ceil(r.rows.length / MEMBER_BULK_CHUNK);
+  let hadErrors = false;
 
-  if (resp.body?.errors) {
-    const failed = resp.body.items.filter(x => x.index && x.index.error);
-    console.error('Member bulk errors:', JSON.stringify(failed.slice(0, 10), null, 2));
-    return 0;
+  for (let i = 0; i < chunks; i++) {
+    const slice = r.rows.slice(i * MEMBER_BULK_CHUNK, (i + 1) * MEMBER_BULK_CHUNK);
+    const resp = await osClient.bulk({ body: slice.flatMap(toBulkPair) });
+
+    if (resp.body?.errors) {
+      hadErrors = true;
+      const failed = (resp.body.items || []).filter(x => x.index && x.index.error);
+      console.error(
+        `Member bulk errors in chunk ${i + 1}/${chunks}:`,
+        JSON.stringify(failed.slice(0, 10), null, 2)
+      );
+    }
   }
+
+  // Returning 0 on any failure is the pre-existing contract, and it is load-bearing:
+  // this count feeds `changedPg`, which gates the checkpoint update. Reporting a
+  // partial success would let the checkpoint advance past documents that never made
+  // it into the index, and nothing would ever retry them.
+  if (hadErrors) return 0;
 
   return r.rows.length;
 }
@@ -705,7 +790,7 @@ export const handler = async () => {
 
   try {
     // PG side
-    await deleteRejectedMembersFromOpenSearch();
+    await deleteNonVisibleMembersFromOpenSearch();
     await deleteDeletedProjectsFromOpenSearch();
     await deleteOrphanTeamsFromOpenSearch();
 

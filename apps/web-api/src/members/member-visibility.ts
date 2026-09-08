@@ -27,7 +27,16 @@ export function directoryListedMemberWhere(): Prisma.MemberWhereInput {
   return { memberApproval: { state: { in: ['APPROVED'] } } };
 }
 
-/** Members whose public profile is reachable. Approved, or holding `member.profile.visible` and not REJECTED. */
+/**
+ * Members whose public profile is reachable. Approved, or holding
+ * `member.profile.visible` and not REJECTED.
+ *
+ * This rule is also hand-written in SQL as `DIRECTORY_VISIBLE_MEMBER_SQL` in
+ * `lambda/lambda-opensearch-sync/index.mjs`, which decides who reaches the
+ * OpenSearch `member` index behind global search. The two must agree — change
+ * one, change the other. (Unifying them behind a Postgres view is the eventual
+ * fix; until then this comment is the only thing linking them.)
+ */
 export function directoryVisibleMemberWhere(): Prisma.MemberWhereInput {
   return {
     OR: [
