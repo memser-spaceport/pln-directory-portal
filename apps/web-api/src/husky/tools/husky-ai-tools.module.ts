@@ -6,8 +6,6 @@ import { TeamsTool } from './teams.tool';
 import { ProjectsTool } from './projects.tool';
 import { FocusAreasTool } from './focus-areas.tool';
 import { AsksTool } from './asks.tool';
-import { NonDirectoryDocsTool } from './non-directory-docs.tool';
-import { QdrantVectorDbService } from '../db/qdrant-vector-db.service';
 import { ForumTool } from './forum.tool';
 import { SearchModule } from '../../search/search.module';
 
@@ -21,8 +19,6 @@ import { SearchModule } from '../../search/search.module';
     ProjectsTool,
     FocusAreasTool,
     AsksTool,
-    NonDirectoryDocsTool,
-    QdrantVectorDbService,
     ForumTool,
   ],
   exports: [HuskyAiToolsService],

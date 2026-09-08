@@ -27,7 +27,7 @@ import {
 } from 'libs/contracts/src/schema/team-news';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
-import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { OptionalUserTokenCheckGuard, UserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { ServiceAuthGuard } from '../guards/service-auth.guard';
 import { MembersService } from '../members/members.service';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
@@ -175,6 +175,18 @@ export class TeamNewsController {
     const item = await this.teamNewsQueryService.getTeamNewsItemDto(uid, followed, memberUid);
     if (!item) {
       throw new NotFoundException(`TeamNewsItem ${uid} not found after create`);
+    }
+    return item;
+  }
+
+  @Api(server.route.getTeamNewsItem)
+  @NoCache()
+  @UseGuards(OptionalUserTokenCheckGuard)
+  async getTeamNewsItem(@Param('newsItemUid') newsItemUid: string, @Req() request: Request & { userEmail?: string }) {
+    const { followed, memberUid } = await this.resolveViewerContext(request.userEmail);
+    const item = await this.teamNewsQueryService.getTeamNewsItemDto(newsItemUid, followed, memberUid);
+    if (!item) {
+      throw new NotFoundException(`TeamNewsItem ${newsItemUid} not found`);
     }
     return item;
   }
