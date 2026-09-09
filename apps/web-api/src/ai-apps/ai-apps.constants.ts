@@ -131,11 +131,23 @@ export const buildRunnerDeploymentsUrl = (): string =>
 export type AiAppLogPhase = 'build' | 'runtime';
 
 /**
+ * Query forwarded to the runner's log endpoints. Without `deploymentId` the
+ * time window is the scope: every deployment of the app that logged inside it
+ * is returned, so a redeploy never hides the previous pods' output.
+ * `deploymentId` narrows the result to one deployment's pods.
+ */
+export type AiAppLogsQuery = { limit?: number; sinceMinutes?: number; nextToken?: string; deploymentId?: string };
+
+/** Shape of a runner deploymentId — the API's ids on `/deploy` and the runner's `deploy-<ts>-<rand>` ids. */
+export const AI_APPS_LOG_DEPLOYMENT_ID_PATTERN = /^[A-Za-z0-9._-]{1,128}$/;
+
+/**
  * Runner endpoint serving an app's CloudWatch logs for one phase
- * (`GET /v1/apps/<appId>/build/logs` or `…/runtime/logs`). Build logs come from
- * the latest successful build deployment, runtime logs from the latest
- * successful runtime deployment; availability is bounded by the CloudWatch
- * retention policy of the environment's log group.
+ * (`GET /v1/apps/<appId>/build/logs` or `…/runtime/logs`). Both span every
+ * deployment that logged inside the requested window unless `deploymentId`
+ * narrows them to one; the response's `latestDeploymentId` names the latest
+ * successful deployment for the phase. Availability is bounded by the
+ * CloudWatch retention policy of the environment's log group.
  */
 export const buildRunnerLogsUrl = (appId: string, phase: AiAppLogPhase): string =>
   `${AI_APPS_RUNNER_URL}/v1/apps/${encodeURIComponent(appId)}/${phase}/logs`;

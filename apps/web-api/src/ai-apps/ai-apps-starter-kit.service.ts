@@ -299,7 +299,9 @@ folder. Before any UI work, load the **pl-design-system** skill
   own URL and browser tab title, and reopens a shared link as the iframe's
   initial URL. So every route must work on a hard load at its real URL, every
   page needs a meaningful \`document.title\`, and the \`initRouteSync()\` part of
-  the app-analytics snippet must stay in.
+  the app-analytics snippet must stay in — as shipped: it reports the pathname
+  only (never the query string or hash) and posts it to the dashboard origin,
+  not to \`'*'\`.
 
 ## Signed-in member context (personalization)
 The app can identify the PLN member using it. Load the **pln-member-context**
@@ -740,13 +742,18 @@ description: Fetch the deployed app's build logs (Docker/Kaniko image build outp
 The PLN sandbox keeps two log streams per app in CloudWatch, and you can fetch
 both through the PLN API:
 
-- **Build logs** — the output of the image build (Docker/Kaniko) from the latest
-  successful build. Read these when a **deploy fails** or the build seems wrong
-  (missing dependency, compile error, bad Dockerfile step).
-- **Runtime logs** — stdout + stderr of the running app pod from the latest
-  successful runtime deployment. Read these when the **deployed app errors,
-  crashes, or misbehaves** (5xx from the app, feature not working, silent
-  failures).
+- **Build logs** — the output of the image build (Docker/Kaniko). Read these
+  when a **deploy fails** or the build seems wrong (missing dependency, compile
+  error, bad Dockerfile step).
+- **Runtime logs** — stdout + stderr of the app's pods. Read these when the
+  **deployed app errors, crashes, or misbehaves** (5xx from the app, feature
+  not working, silent failures), or to check what a scheduled/background job
+  did.
+
+Both streams are scoped by **time window, not by deployment**: every
+deployment of the app that logged inside the window is returned, so a redeploy
+never erases what the previous pods printed. Each event carries the
+\`deploymentId\` it came from.
 
 ## Endpoints
 
@@ -763,6 +770,9 @@ Query parameters (all optional):
 - \`sinceMinutes\` — time window looking back from now (e.g. \`60\` = last hour,
   \`1440\` = last 24 h, \`10080\` = last 7 days).
 - \`nextToken\` — pagination cursor from the previous response.
+- \`deploymentId\` — narrow the window to ONE deployment's pods (e.g. the
+  response's \`latestDeploymentId\` for "only the version running right now").
+  Omit it to see across redeploys.
 
 \`\`\`bash
 # Runtime logs for the last hour
@@ -779,13 +789,31 @@ Response shape (log events are CloudWatch events, oldest first):
 \`\`\`json
 {
   "appId": "my-app",
-  "deploymentId": "deploy-…",
+  "deploymentId": null,
+  "latestDeploymentId": "deploy-…",
   "phase": "runtime",
   "source": "cloudwatch",
   "logGroup": "/eks/…",
-  "events": [ { "timestamp": 1786000000000, "message": "app listening on 3000" } ],
+  "events": [ { "timestamp": 1786000000000, "message": "app listening on 3000", "deploymentId": "deploy-…" } ],
   "nextToken": "…"
 }
+\`\`\`
+
+\`deploymentId\` echoes the filter you applied (\`null\` = all deployments in the
+window); \`latestDeploymentId\` is the latest successful deployment for that
+phase. When the events span several deployments, group them by their
+\`deploymentId\` before reasoning about them — a line printed by the previous
+revision is not a bug in the one you just deployed.
+
+\`\`\`bash
+# "Did last night's scheduled job run?" — a wide window, NO deploymentId, so a
+# redeploy this morning doesn't hide what the previous pods printed.
+curl -sS "<runtimeLogsEndpoint with {appUid} replaced>?limit=500&sinceMinutes=1440" \\
+  -H "${AI_APP_TOKEN_HEADER}: <deployToken>"
+
+# Only the currently running revision
+curl -sS "<runtimeLogsEndpoint with {appUid} replaced>?sinceMinutes=60&deploymentId=<latestDeploymentId>" \\
+  -H "${AI_APP_TOKEN_HEADER}: <deployToken>"
 \`\`\`
 
 ## Pagination — empty pages are normal
@@ -1075,6 +1103,8 @@ plain-HTML app, a \`<script>\` included on every page:
 
 \`\`\`js
 const ANALYTICS_URL = '${AI_APPS_ANALYTICS_ENDPOINT}';
+// The only page allowed to receive the route-sync message (the AI Apps dashboard).
+const DASHBOARD_ORIGIN = '${AI_APPS_PORTAL_ORIGIN}';
 
 function readAuthToken() {
   const match = document.cookie.match(/(?:^|;\\s*)authToken=([^;]*)/);
@@ -1140,11 +1170,18 @@ function initRouteSync() {
   if (window.parent === window) return;
   let lastSent = '';
   const send = () => {
-    const path = location.pathname + location.search + location.hash;
+    // Pathname ONLY — never location.search or location.hash. The dashboard
+    // mirrors this value into its own address bar and tab title, and query
+    // strings / fragments are where OAuth callbacks (?code=…), magic links
+    // and tokens land.
+    const path = location.pathname;
     const title = document.title;
     if (path + '\\n' + title === lastSent) return;
     lastSent = path + '\\n' + title;
-    window.parent.postMessage({ type: 'pln-ai-app:route', path: path, title: title }, '*');
+    // Addressed to the dashboard origin explicitly — a page other than the
+    // dashboard framing the app never receives it (a '*' target would hand
+    // the route to whoever embeds the app).
+    window.parent.postMessage({ type: 'pln-ai-app:route', path: path, title: title }, DASHBOARD_ORIGIN);
   };
   ['pushState', 'replaceState'].forEach((method) => {
     const original = history[method].bind(history);
@@ -1183,6 +1220,14 @@ Custom events reuse the same \`trackEvent\` helper: \`trackEvent('clicked_export
   every page needs a meaningful \`document.title\` (Next.js \`metadata\` per
   route, or a \`<title>\`). Never put secrets or member data in URLs or titles;
   both are mirrored into the dashboard.
+- **Keep the route message path-only and addressed to the dashboard.** The
+  snippet sends \`location.pathname\` (never \`location.search\` or
+  \`location.hash\` — that is where OAuth \`?code=\` callbacks, magic links and
+  tokens land, and the dashboard mirrors the path into its URL and tab title)
+  and posts it to \`${AI_APPS_PORTAL_ORIGIN}\` explicitly, never to \`'*'\` (which
+  would deliver the route to whatever page frames the app). Don't widen either
+  when adapting the snippet. Route state that must survive a shared deep link
+  belongs in the path (\`/reports/42\`), not the query string.
 - **Event names**: snake_case, plain words describing the action (e.g.
   \`clicked_export\`, \`created_item\`). The endpoint prefixes every name with
   \`ai_app_\` server-side — don't add that prefix yourself, and don't rely on
