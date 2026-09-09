@@ -359,7 +359,8 @@ describe('JobOpeningsReferralService', () => {
           },
           targetMeta: expect.objectContaining({
             emailId: externalPerson.email,
-            userId: null,
+            // Not null — see the dedicated test below for why the difference matters.
+            userId: '',
             userName: externalPerson.name,
           }),
         })
@@ -412,6 +413,31 @@ describe('JobOpeningsReferralService', () => {
           data: expect.objectContaining({ referredMemberUid: null, referredEmail: referred.email }),
         })
       );
+    });
+
+    /* The notification service rejects a null `targetMeta.userId`, and rejects it with a
+       400 whose body the client discards — `sendNotification` reports every one as
+       "Notification payload is invalid or malformed", naming no field. So the outside
+       path failed at the last step, after passing every schema in this repo, and the
+       only way back to the cause was reading the diff for fields that are null here and
+       never null for a member.
+
+       Asserted as "a string, whatever it is" rather than `''`, because what the service
+       needs is a string, and pinning the literal would let a future `null` slip back in
+       under a rename. `sendNotification` is a bare jest.fn here — it accepts anything —
+       so nothing else in this file can catch this. */
+    it('sends a string userId for someone with no member record, on both emails', async () => {
+      mockMembers();
+      prisma.jobOpening.findUnique.mockResolvedValue(jobOpening);
+      prisma.jobReferral.create.mockResolvedValue({ uid: 'ref-5', createdAt: new Date('2026-08-25T12:00:00.000Z') });
+
+      await service.referJob('job-1', referrer.email, { ...externalReferralInput, includeReferredMember: false });
+
+      // Both sends: the referral itself, and the separate notice the unticked box triggers.
+      expect(notificationServiceClient.sendNotification).toHaveBeenCalledTimes(2);
+      for (const [payload] of notificationServiceClient.sendNotification.mock.calls) {
+        expect(typeof payload.targetMeta.userId).toBe('string');
+      }
     });
 
     it('drafts a note for an outside person from their name alone, with no about-paragraph', async () => {
