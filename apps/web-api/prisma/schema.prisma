@@ -3492,6 +3492,9 @@ model AiApp {
   /// All-time iframe-load count (Directory detail page). Incremented without
   /// touching `updatedAt`, so a view never reshuffles the dashboard list.
   viewCount       Int         @default(0)
+  /// Slugs from the controlled vocabulary in `ai-apps-tags.ts` (max 5). Set by
+  /// the agent on first upload, editable by the creator/admin afterwards.
+  tags            String[]    @default([])
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 

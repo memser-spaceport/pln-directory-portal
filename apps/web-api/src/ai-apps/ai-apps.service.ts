@@ -523,8 +523,8 @@ export class AiAppsService {
     dto: UpdateAppMetadataDto,
     ownerOnly = false
   ): Promise<ApiAiApp<AiApp>> {
-    if (dto.name === undefined && dto.description === undefined && dto.prd === undefined) {
-      throw new BadRequestException('At least one of name, description, or prd must be provided');
+    if (dto.name === undefined && dto.description === undefined && dto.prd === undefined && dto.tags === undefined) {
+      throw new BadRequestException('At least one of name, description, prd, or tags must be provided');
     }
 
     const app = await this.prisma.aiApp.findUnique({ where: { uid } });
@@ -535,10 +535,11 @@ export class AiAppsService {
       throw new ForbiddenException('The agent may edit only apps owned by its connected member');
     }
 
-    const data: { name?: string; description?: string | null; prd?: string | null } = {};
+    const data: { name?: string; description?: string | null; prd?: string | null; tags?: string[] } = {};
     if (dto.name !== undefined) data.name = dto.name.trim();
     if (dto.description !== undefined) data.description = dto.description?.trim() || null;
     if (dto.prd !== undefined) data.prd = dto.prd?.trim() || null;
+    if (dto.tags !== undefined) data.tags = dto.tags;
 
     const updated = await this.prisma.aiApp.update({ where: { uid }, data });
     return this.toApiApp((await this.withMember([updated]))[0], true);
@@ -1235,6 +1236,17 @@ export class AiAppsService {
    * the deploy to the sandbox runner (keeping AWS creds + the runner token
    * server-side) and stores the result.
    */
+  /**
+   * Upload-time tags only fill an empty list: once the app is tagged (by an
+   * earlier upload or a creator/admin edit) redeploys leave the tags alone.
+   */
+  private tagsForUpload(existing: AiApp | null, uploaded: string[] | undefined): string[] | undefined {
+    if (existing?.tags?.length) {
+      return undefined;
+    }
+    return uploaded ?? [];
+  }
+
   async deploy(
     memberUid: string,
     dto: DeployAppDto,
@@ -1282,6 +1294,7 @@ export class AiAppsService {
         kitVersion: dto.kitVersion ?? null,
         agentClient: agentClient ?? null,
         agentModel: dto.agentModel ?? null,
+        tags: dto.tags ?? [],
         database: dto.database ? { enabled: true, type: dto.database.type } : Prisma.DbNull,
       },
       update: {
@@ -1293,6 +1306,7 @@ export class AiAppsService {
         url,
         httpUrl,
         host,
+        tags: this.tagsForUpload(existing, dto.tags),
         // Upload metadata reflects the LAST upload — cleared when a client
         // that sends nothing (older kit) redeploys, so it never goes stale.
         kitVersion: dto.kitVersion ?? null,
@@ -1384,6 +1398,7 @@ export class AiAppsService {
         kitVersion: dto.kitVersion ?? null,
         agentClient: agentClient ?? null,
         agentModel: dto.agentModel ?? null,
+        tags: dto.tags ?? [],
         database: dto.database ? { enabled: true, type: dto.database.type } : Prisma.DbNull,
       },
       update: {
@@ -1393,6 +1408,7 @@ export class AiAppsService {
         deploymentId: dto.deploymentId,
         s3Key,
         requiredEnvVars: dto.requiredEnvVars,
+        tags: this.tagsForUpload(existing, dto.tags),
         kitVersion: dto.kitVersion ?? null,
         agentClient: agentClient ?? null,
         agentModel: dto.agentModel ?? null,

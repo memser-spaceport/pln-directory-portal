@@ -11,7 +11,7 @@
  */
 
 /** Starter kit version shown in the README, ZIP filename, and LabOS UI. Bump when the kit contents or flow change. */
-export const AI_APPS_STARTER_KIT_VERSION = '1.11';
+export const AI_APPS_STARTER_KIT_VERSION = '1.12';
 
 /** Header the AI agent sends with its short-lived deploy token. */
 export const AI_APP_TOKEN_HEADER = 'x-app-token';
@@ -233,6 +233,9 @@ export const AI_APPS_ME_ENDPOINT = process.env.AI_APPS_ME_ENDPOINT || `${AI_APPS
  */
 export const AI_APPS_METADATA_ENDPOINT =
   process.env.AI_APPS_METADATA_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/agent`;
+
+/** Public (no auth) controlled tag vocabulary, so any kit version can read the live list. */
+export const AI_APPS_TAGS_ENDPOINT = `${AI_APPS_BASE_URL}/v1/ai-apps/tags`;
 
 /**
  * Public URL TEMPLATES of THIS API's agent log endpoints

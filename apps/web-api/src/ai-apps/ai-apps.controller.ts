@@ -44,6 +44,7 @@ import { UpdateFeedbackStatusDto } from './dto/update-feedback-status.dto';
 import { UpdateAppMetadataDto } from './dto/update-app-metadata.dto';
 import { TrackEventDto } from './dto/track-event.dto';
 import { AI_APPS_MAX_PRD_BYTES, AI_APPS_MAX_ZIP_BYTES, AI_APPS_STARTER_KIT_VERSION } from './ai-apps.constants';
+import { AI_APPS_MAX_TAGS_PER_APP, AI_APPS_TAGS } from './ai-apps-tags';
 
 const READ = { anyOf: [AI_APPS_PERMISSIONS.READ, AI_APPS_PERMISSIONS.WRITE] };
 const WRITE = { anyOf: [AI_APPS_PERMISSIONS.WRITE] };
@@ -109,6 +110,16 @@ export class AiAppsController {
    * `deployment.failureReason`/`failureStream`) can be included only on apps
    * the requester manages — everyone else gets `deployment.serving` alone.
    */
+  /**
+   * Controlled tag vocabulary (slug, label, description) + the per-app cap.
+   * Public: read by the LabOS UI and by member agents holding only a deploy
+   * token. Declared before `:uid` so the literal path wins.
+   */
+  @Get('tags')
+  listTags() {
+    return { tags: AI_APPS_TAGS, maxPerApp: AI_APPS_MAX_TAGS_PER_APP };
+  }
+
   @NoCache()
   @Get()
   @UseGuards(UserTokenCheckGuard, RbacGuard)
