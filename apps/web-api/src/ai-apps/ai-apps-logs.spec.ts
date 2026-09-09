@@ -78,12 +78,18 @@ describe('AiAppsService.getAgentLogs', () => {
       limit: 100,
       sinceMinutes: 60,
       nextToken: 'prev-tok',
+      deploymentId: 'deploy-20260909-abc123',
     });
 
     expect(result).toBe(runnerBody);
     const [url, config] = mockedAxios.get.mock.calls[0];
     expect(url).toContain('/v1/apps/demo/build/logs');
-    expect(config?.params).toEqual({ limit: 100, sinceMinutes: 60, nextToken: 'prev-tok' });
+    expect(config?.params).toEqual({
+      limit: 100,
+      sinceMinutes: 60,
+      nextToken: 'prev-tok',
+      deploymentId: 'deploy-20260909-abc123',
+    });
     expect(config?.headers).toHaveProperty('x-runner-token');
   });
 
@@ -122,19 +128,34 @@ describe('AiAppsController log routes wiring', () => {
     const controller = new AiAppsController(service as any, {} as any, {} as any, {} as any);
     const req = { aiAppMemberUid: 'creator-1' };
 
-    await controller.getBuildLogs('app-1', req, '100', '60', 'tok');
+    await controller.getBuildLogs('app-1', req, '100', '60', 'tok', 'deploy-1');
     expect(service.getAgentLogs).toHaveBeenCalledWith('creator-1', 'app-1', 'build', {
       limit: 100,
       sinceMinutes: 60,
       nextToken: 'tok',
+      deploymentId: 'deploy-1',
     });
 
-    await controller.getRuntimeLogs('app-1', req, undefined, undefined, undefined);
+    await controller.getRuntimeLogs('app-1', req, undefined, undefined, undefined, undefined);
     expect(service.getAgentLogs).toHaveBeenLastCalledWith('creator-1', 'app-1', 'runtime', {
       limit: undefined,
       sinceMinutes: undefined,
       nextToken: undefined,
+      deploymentId: undefined,
     });
+  });
+
+  it('400s on a malformed deploymentId before it reaches the runner URL', async () => {
+    const service = { getAgentLogs: jest.fn() };
+    const controller = new AiAppsController(service as any, {} as any, {} as any, {} as any);
+    const req = { aiAppMemberUid: 'creator-1' };
+
+    for (const bad of ['', 'has space', 'a/b', '../x', 'x'.repeat(129)]) {
+      await expect(controller.getRuntimeLogs('app-1', req, undefined, undefined, undefined, bad)).rejects.toThrow(
+        BadRequestException
+      );
+    }
+    expect(service.getAgentLogs).not.toHaveBeenCalled();
   });
 
   it('400s on non-numeric or non-positive limit/sinceMinutes', async () => {
@@ -155,10 +176,10 @@ describe('AiAppsController log routes wiring', () => {
 describe('AiAppsService.getMemberLogsDesc', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it("403s when the requester is neither the creator nor a directory admin", async () => {
-    await expect(
-      buildService().getMemberLogsDesc('someone-else', 'app-1', 'runtime', {})
-    ).rejects.toThrow(ForbiddenException);
+  it('403s when the requester is neither the creator nor a directory admin', async () => {
+    await expect(buildService().getMemberLogsDesc('someone-else', 'app-1', 'runtime', {})).rejects.toThrow(
+      ForbiddenException
+    );
     expect(mockedAxios.get).not.toHaveBeenCalled();
   });
 
@@ -207,6 +228,44 @@ describe('AiAppsService.getMemberLogsDesc', () => {
 
     // All three pages served from one cached walk.
     expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps each event's deploymentId and caches per deploymentId filter", async () => {
+    const service = buildService();
+    mockedAxios.get.mockResolvedValue({
+      status: 200,
+      data: {
+        events: [
+          { timestamp: 1, message: 'from the previous revision', deploymentId: 'deploy-old' },
+          { timestamp: 2, message: 'from the running revision', deploymentId: 'deploy-new' },
+        ],
+      },
+    });
+
+    const all = await service.getMemberLogsDesc('creator-1', 'app-1', 'runtime', { sinceMinutes: 1440 });
+    expect(all.events).toEqual([
+      { timestamp: 2, message: 'from the running revision', deploymentId: 'deploy-new' },
+      { timestamp: 1, message: 'from the previous revision', deploymentId: 'deploy-old' },
+    ]);
+    expect(mockedAxios.get.mock.calls[0][1]?.params).not.toHaveProperty('deploymentId');
+
+    // A narrowed read is a different walk (and cache entry), forwarded to the runner.
+    const narrowed = await service.getMemberLogsDesc('creator-1', 'app-1', 'runtime', {
+      sinceMinutes: 1440,
+      deploymentId: 'deploy-new',
+      limit: 1,
+    });
+    expect(mockedAxios.get).toHaveBeenCalledTimes(2);
+    expect(mockedAxios.get.mock.calls[1][1]?.params).toMatchObject({ deploymentId: 'deploy-new' });
+
+    // The cursor pins the deployment filter like it pins the window: page 2
+    // reads the narrowed walk even when the follow-up request omits the param.
+    const page2 = await service.getMemberLogsDesc('creator-1', 'app-1', 'runtime', {
+      limit: 1,
+      nextToken: narrowed.nextToken,
+    });
+    expect(page2.events.map((e) => e.message)).toEqual(['from the previous revision']);
+    expect(mockedAxios.get).toHaveBeenCalledTimes(2);
   });
 
   it('coalesces concurrent cold reads into one runner walk', async () => {
@@ -366,15 +425,16 @@ describe('AiAppsController member log routes — order param', () => {
   it('routes order=desc to the desc service and defaults to verbatim passthrough', async () => {
     const { service, controller } = buildController();
 
-    await controller.getMemberBuildLogs('app-1', {}, '100', '60', undefined, 'desc');
+    await controller.getMemberBuildLogs('app-1', {}, '100', '60', undefined, 'deploy-9', 'desc');
     expect(service.getMemberLogsDesc).toHaveBeenCalledWith('member-9', 'app-1', 'build', {
       limit: 100,
       sinceMinutes: 60,
       nextToken: undefined,
+      deploymentId: 'deploy-9',
     });
     expect(service.getMemberLogs).not.toHaveBeenCalled();
 
-    await controller.getMemberRuntimeLogs('app-1', {}, undefined, undefined, 'tok', undefined);
+    await controller.getMemberRuntimeLogs('app-1', {}, undefined, undefined, 'tok', undefined, undefined);
     expect(service.getMemberLogs).toHaveBeenCalledWith('member-9', 'app-1', 'runtime', {
       limit: undefined,
       sinceMinutes: undefined,
@@ -385,9 +445,9 @@ describe('AiAppsController member log routes — order param', () => {
   it('400s on an unknown order value', async () => {
     const { service, controller } = buildController();
 
-    await expect(controller.getMemberRuntimeLogs('app-1', {}, undefined, undefined, undefined, 'sideways')).rejects.toThrow(
-      BadRequestException
-    );
+    await expect(
+      controller.getMemberRuntimeLogs('app-1', {}, undefined, undefined, undefined, undefined, 'sideways')
+    ).rejects.toThrow(BadRequestException);
     expect(service.getMemberLogs).not.toHaveBeenCalled();
     expect(service.getMemberLogsDesc).not.toHaveBeenCalled();
   });

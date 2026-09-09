@@ -1,7 +1,7 @@
 import AdmZip from 'adm-zip';
 
 import { AiAppsStarterKitService } from './ai-apps-starter-kit.service';
-import { AI_APPS_STARTER_KIT_VERSION } from './ai-apps.constants';
+import { AI_APPS_PORTAL_ORIGIN, AI_APPS_STARTER_KIT_VERSION } from './ai-apps.constants';
 
 describe('AiAppsStarterKitService buildZip', () => {
   let entries: Map<string, string>;
@@ -77,6 +77,22 @@ describe('AiAppsStarterKitService buildZip', () => {
       const content = entries.get(path) as string;
       expect(content).toContain('hard load');
       expect(content).toContain('document.title');
+    }
+  });
+
+  it('posts the route path-only and to the dashboard origin only (never the query string, never "*")', () => {
+    const skill = entries.get('.claude/skills/app-analytics/SKILL.md') as string;
+    // The query string / hash are where OAuth `?code=` callbacks and tokens
+    // land, and the dashboard mirrors the path into its URL and tab title.
+    expect(skill).toContain('const path = location.pathname;');
+    expect(skill).not.toContain('location.pathname + location.search');
+    // Addressed to LabOS explicitly: a '*' target hands the route to any framer.
+    expect(skill).toContain(`const DASHBOARD_ORIGIN = '${AI_APPS_PORTAL_ORIGIN}';`);
+    expect(skill).toContain('title: title }, DASHBOARD_ORIGIN);');
+    expect(skill).not.toContain("}, '*');");
+    expect(skill).toContain('Keep the route message path-only and addressed to the dashboard');
+    for (const path of ['CLAUDE.md', 'AGENTS.md']) {
+      expect(entries.get(path) as string).toContain('reports the pathname\n  only');
     }
   });
 
@@ -199,6 +215,11 @@ describe('AiAppsStarterKitService buildZip', () => {
     // CloudWatch quirk: an empty events page with a nextToken is NOT "no logs".
     expect(logsSkill).toContain('nextToken');
     expect(logsSkill).toContain('empty first page does NOT mean there are no logs');
+    // Logs span redeploys: the window is the scope, deploymentId is an opt-in narrowing.
+    expect(logsSkill).toContain('time window, not by deployment');
+    expect(logsSkill).toContain('latestDeploymentId');
+    expect(logsSkill).toContain('deploymentId=<latestDeploymentId>');
+    expect(logsSkill).toContain('NO deploymentId');
     // The URL-privacy rule extends to quoted log lines.
     expect(logsSkill).toContain("don't surface the URL");
 
