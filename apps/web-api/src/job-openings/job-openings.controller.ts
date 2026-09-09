@@ -67,8 +67,8 @@ export class JobOpeningsController {
   @UseGuards(UserAuthValidateGuard)
   @NoCache()
   async getReferralDraft(@Req() request: Request & { userEmail?: string }) {
-    const { referredMemberUid } = this.parse(JobReferralDraftQuerySchema, request.query);
-    return this.jobOpeningsReferralService.getReferralDraft(request.params.uid, request.userEmail, referredMemberUid);
+    const query = this.parse(JobReferralDraftQuerySchema, request.query);
+    return this.jobOpeningsReferralService.getReferralDraft(request.params.uid, request.userEmail, query);
   }
 
   @Api(server.route.referJob)
