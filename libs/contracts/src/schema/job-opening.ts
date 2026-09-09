@@ -97,6 +97,18 @@ export const JobsListResponseSchema = z.object({
   totalRoles: z.number().int(),
 });
 
+/**
+ * `GET /v1/job-openings/for-you` — the newsfeed's personalized hiring roll-ups.
+ *
+ * The list response's shape minus its paging fields, which this endpoint has
+ * none of: it answers with one ranked, bounded set for the signed-in member.
+ * Group and role shapes are shared with the board on purpose, so the feed card
+ * renders the same object the board does.
+ */
+export const JobsForYouResponseSchema = z.object({
+  groups: z.array(JobTeamGroupSchema),
+});
+
 export const JobFacetItemSchema = z.object({
   value: z.string(),
   count: z.number().int(),

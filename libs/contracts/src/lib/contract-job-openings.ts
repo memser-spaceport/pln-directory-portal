@@ -4,6 +4,7 @@ import {
   JobOpeningInterestListResponseSchema,
   JobOpeningInterestStatusSchema,
   JobsFiltersResponseSchema,
+  JobsForYouResponseSchema,
   JobsListQueryParams,
   JobsListResponseSchema,
 } from '../schema/job-opening';
@@ -42,6 +43,14 @@ export const apiJobOpenings = contract.router({
       200: JobsFiltersResponseSchema,
     },
     summary: 'Facet counts for the Jobs list',
+  },
+  getForYouJobs: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/job-openings/for-you`,
+    responses: {
+      200: JobsForYouResponseSchema,
+    },
+    summary: "Personalized hiring roll-ups for the signed-in member's For You feed",
   },
   signUp: {
     method: 'POST',

@@ -118,7 +118,9 @@ export class JobOpeningsQueryService {
     return member.uid;
   }
 
-  private async loadInterestStamps(
+  // Public for JobOpeningsForYouService, which builds its own groups but must
+  // stamp interest exactly the way the board does.
+  async loadInterestStamps(
     jobUids: string[],
     viewerMemberUid?: string
   ): Promise<{ counts: Map<string, number>; viewerInterested: Set<string> }> {
