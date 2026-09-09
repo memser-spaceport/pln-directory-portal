@@ -102,7 +102,12 @@ export class JobOpeningsReferralService {
       },
       targetMeta: {
         emailId: referred.email,
-        userId: referred.uid,
+        // Empty string, not null, when the referred person is outside the network: the
+        // notification service rejects a null `userId` outright (a 400 the client
+        // reports only as "Notification payload is invalid or malformed"). `''` is what
+        // the one other member-less sender in this codebase passes — see
+        // AuthService's sign-up notification.
+        userId: referred.uid ?? '',
         userName: referred.name,
       },
     });
@@ -137,7 +142,9 @@ export class JobOpeningsReferralService {
         },
         targetMeta: {
           emailId: referred.email,
-          userId: referred.uid,
+          // As above — this send is the outside-network path's other half, and would
+          // fail the same way.
+          userId: referred.uid ?? '',
           userName: referred.name,
         },
       });
