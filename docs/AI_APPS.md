@@ -96,8 +96,8 @@ The `deployToken` is held in agent memory only and never written into the kit, s
 | PATCH  | `/v1/ai-apps/:uid`               | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.write`   | Edit display metadata (`name`/`description`/`prd`) without redeploying; JSON **or** multipart (`file` = Markdown/HTML PRD, stored in S3) |
 | POST   | `/v1/ai-apps/:uid/prd`           | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.write`   | File-only PRD upload from the LabOS dashboard (multipart `file`, `.md`/`.html`) — no redeploy |
 | PATCH  | `/v1/ai-apps/:uid/agent`         | `AiAppTokenGuard` (`x-app-token`) | — (token = member, **owner only**) | Agent metadata edit: JSON `{ name?, description?, prd? }`; how the starter kit saves approved names/descriptions and one-pager PRDs |
-| GET    | `/v1/ai-apps/:uid/logs/build`    | `AiAppTokenGuard` (`x-app-token`) | — (token = member, **owner only**) | Build logs (Docker/Kaniko image build, latest successful build deployment), proxied from the runner's CloudWatch endpoint; `?limit=`, `?sinceMinutes=`, `?nextToken=` |
-| GET    | `/v1/ai-apps/:uid/logs/runtime`  | `AiAppTokenGuard` (`x-app-token`) | — (token = member, **owner only**) | Runtime logs (running app pod stdout/stderr, latest successful runtime deployment), same query params |
+| GET    | `/v1/ai-apps/:uid/logs/build`    | `AiAppTokenGuard` (`x-app-token`) | — (token = member, **owner only**) | Build logs (Docker/Kaniko image build) proxied from the runner's CloudWatch endpoint — every build inside the window unless `?deploymentId=` narrows it; `?limit=`, `?sinceMinutes=`, `?nextToken=`, `?deploymentId=` |
+| GET    | `/v1/ai-apps/:uid/logs/runtime`  | `AiAppTokenGuard` (`x-app-token`) | — (token = member, **owner only**) | Runtime logs (app pod stdout/stderr) — every deployment inside the window unless `?deploymentId=` narrows it, so a redeploy never hides the previous pods' output; same query params |
 | GET    | `/v1/ai-apps/:uid/build-logs`    | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | Dashboard build logs (member JWT): same runner logs as `/logs/build` for the app's creator OR a directory admin — debug any app from LabOS without a deploy token; same query params |
 | GET    | `/v1/ai-apps/:uid/runtime-logs`  | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | Dashboard runtime logs (member JWT): same runner logs as `/logs/runtime` for the app's creator OR a directory admin; same query params |
 | POST   | `/v1/ai-apps/:uid/feedback`      | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Submit free-text feedback on an app (multiple entries per member allowed) |
@@ -279,11 +279,22 @@ JWT) so failed deploys and runtime errors can be debugged from either place:
 
 - **Build logs** — `GET /v1/ai-apps/:uid/logs/build` → runner
   `GET /v1/apps/<appId>/build/logs`: output of the image build (Kaniko / build
-  preparation), taken from the **latest successful build deployment**.
+  preparation).
 - **Runtime logs** — `GET /v1/ai-apps/:uid/logs/runtime` → runner
-  `GET /v1/apps/<appId>/runtime/logs`: stdout + stderr of the running app pod
-  (plus the auth-check/auth-proxy sidecars), taken from the **latest successful
-  runtime deployment**.
+  `GET /v1/apps/<appId>/runtime/logs`: stdout + stderr of the app pods (plus
+  the auth-check/auth-proxy sidecars).
+
+**The time window is the scope, not the deployment.** The runner filters
+CloudWatch by the `app_id` + `log_phase` pod labels only, so every deployment
+of the app that logged inside `sinceMinutes` is returned and a redeploy never
+erases what the previous pods printed ("did the scheduled job run last night?"
+stays answerable after a morning deploy). Each event carries the
+`deploymentId` label of the pod that wrote it; the envelope's
+`latestDeploymentId` is the latest successful deployment for the phase, and
+`deploymentId` echoes the optional `?deploymentId=` filter (`null` when none)
+that narrows a read to one deployment's pods. Earlier orchestrator versions
+pinned every read to the latest *successful* deployment, which also hid a
+failed build's own output.
 
 Auth is the short-lived deploy token (`AiAppTokenGuard`, `x-app-token`), and —
 like the agent metadata route — the app must be **owned by the connected
@@ -293,8 +304,9 @@ stays server-side; the runner's response envelope is returned verbatim:
 ```bash
 curl -sS "https://api.plnetwork.io/v1/ai-apps/<uid>/logs/runtime?limit=100&sinceMinutes=60" \
   -H "x-app-token: plndeploy_…"
-# → { "appId", "deploymentId", "phase", "source": "cloudwatch", "logGroup",
-#     "events": [{ "timestamp", "message" }, …], "nextToken" }
+# → { "appId", "deploymentId": <filter|null>, "latestDeploymentId", "phase",
+#     "source": "cloudwatch", "logGroup",
+#     "events": [{ "timestamp", "message", "deploymentId", … }, …], "nextToken" }
 ```
 
 **Dashboard variants (member JWT, admin access):** the two agent routes above
@@ -316,7 +328,11 @@ curl -sS "https://api.plnetwork.io/v1/ai-apps/<uid>/runtime-logs?limit=100&since
 
 Query params (all optional, validated as positive integers where numeric):
 `limit` (events per page), `sinceMinutes` (look-back window, e.g. 60 / 1440 /
-10080), `nextToken` (CloudWatch pagination cursor). **CloudWatch may return an
+10080), `nextToken` (CloudWatch pagination cursor), `deploymentId` (narrow to
+one deployment; `[A-Za-z0-9._-]{1,128}`, 400 otherwise). The dashboard's
+`order=desc` view carries the per-event `deploymentId` too and draws an
+"Earlier deployment" marker where consecutive lines change deployment.
+**CloudWatch may return an
 empty `events` page that still carries a `nextToken`** — clients must follow
 the cursor a few pages before concluding a window has no logs (the kit's
 `app-logs` skill teaches the agent this). Availability is bounded by the
@@ -497,10 +513,17 @@ via a second PostHog project).
 The dashboard embeds the app as a cross-origin `<iframe>`, so it cannot read
 the frame's location. Apps built with kit ≥1.10 report it themselves: the
 `initRouteSync()` part of the `app-analytics` snippet posts
-`{ type: 'pln-ai-app:route', path, title }` to `window.parent` (targetOrigin
-`'*'` — the app cannot reliably know the dashboard origin, and the payload is
-only a path and a title) on load, after every `history.pushState/replaceState`,
-on `popstate`, and whenever `document.title` changes (deduplicated).
+`{ type: 'pln-ai-app:route', path, title }` to `window.parent` on load, after
+every `history.pushState/replaceState`, on `popstate`, and whenever
+`document.title` changes (deduplicated). Since kit **1.12** the message is
+**path-only** (`location.pathname` — never the query string or hash, which is
+where OAuth callbacks like `/oauth/gdrive/callback?code=<live code>`, magic
+links and tokens land) and is **addressed to `AI_APPS_PORTAL_ORIGIN`
+explicitly**, so a page other than LabOS framing the app never receives it.
+Kits 1.10–1.11 sent pathname + search + hash with targetOrigin `'*'`; apps
+built from them need a redeploy with a newer kit (or the one-line change to
+their snippet) to stop handing the route to arbitrary framers — the dashboard
+side below already refuses to mirror their query strings.
 
 Dashboard side (`AiAppDetailPage` in the frontend):
 
@@ -508,6 +531,10 @@ Dashboard side (`AiAppDetailPage` in the frontend):
   `event.source` is the mounted iframe's window; the path must resolve (via
   `new URL(path, appOrigin)`) to the same origin, which rejects `//host`,
   absolute URLs and non-http schemes. The title is trimmed and capped.
+- Keeps only the **pathname** of a reported route — the query string and hash
+  are dropped before anything reaches the address bar or tab title, whatever
+  kit the app was built with. A `?path=` deep link someone opens deliberately
+  keeps its query/hash, since that only ever becomes the frame's initial URL.
 - Mirrors the path as `?path=<encoded>` on `/pl-infra/ai-apps/<uid>` (omitted
   for `/`) with `window.history.replaceState` — no RSC round trip per in-app
   click, and no extra history entries (the iframe owns in-app history, so
@@ -676,7 +703,7 @@ CLAUDE.md / AGENTS.md                          agent build + deploy instructions
 .claude/skills/pl-design-system/SKILL.md       single UI skill (components + tokens)
 .claude/skills/pln-member-context/SKILL.md     how the app gets the signed-in member's identity
 .claude/skills/db-migration/SKILL.md           migrate an existing DB onto PLN Postgres — schema + data by default (kits ≥1.8)
-.claude/skills/app-analytics/SKILL.md          baseline + custom PostHog events; route sync for subpage deep links (≥1.10)
+.claude/skills/app-analytics/SKILL.md          baseline + custom PostHog events; route sync for subpage deep links (≥1.10; path-only, addressed to the dashboard origin ≥1.12)
 pln-app.config.json                            connect/deploy/draft/metadata/logs/member-context endpoints
                                                (+ appId, appUid, approved appName/appDescription,
                                                 database provisioning choice ≥1.6) — NO token

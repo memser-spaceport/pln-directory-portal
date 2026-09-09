@@ -43,7 +43,12 @@ import { SubmitFeedbackDto } from './dto/submit-feedback.dto';
 import { UpdateFeedbackStatusDto } from './dto/update-feedback-status.dto';
 import { UpdateAppMetadataDto } from './dto/update-app-metadata.dto';
 import { TrackEventDto } from './dto/track-event.dto';
-import { AI_APPS_MAX_PRD_BYTES, AI_APPS_MAX_ZIP_BYTES, AI_APPS_STARTER_KIT_VERSION } from './ai-apps.constants';
+import {
+  AI_APPS_LOG_DEPLOYMENT_ID_PATTERN,
+  AI_APPS_MAX_PRD_BYTES,
+  AI_APPS_MAX_ZIP_BYTES,
+  AI_APPS_STARTER_KIT_VERSION,
+} from './ai-apps.constants';
 import { AI_APPS_MAX_TAGS_PER_APP, AI_APPS_TAGS } from './ai-apps-tags';
 
 const READ = { anyOf: [AI_APPS_PERMISSIONS.READ, AI_APPS_PERMISSIONS.WRITE] };
@@ -233,7 +238,10 @@ export class AiAppsController {
   /**
    * Build logs for the agent (deploy-token auth, owner-only): the CloudWatch
    * output of the app's image build (Kaniko), proxied from the sandbox runner.
-   * Supports `limit`, `sinceMinutes` (time window), and `nextToken` (pagination).
+   * Supports `limit`, `sinceMinutes` (time window), `nextToken` (pagination)
+   * and `deploymentId` (narrow to one deployment — by default every deployment
+   * that logged inside the window is returned, so a redeploy never hides the
+   * previous pods' output).
    */
   @NoCache()
   @Get(':uid/logs/build')
@@ -243,12 +251,14 @@ export class AiAppsController {
     @Req() req: any,
     @Query('limit') limit?: string,
     @Query('sinceMinutes') sinceMinutes?: string,
-    @Query('nextToken') nextToken?: string
+    @Query('nextToken') nextToken?: string,
+    @Query('deploymentId') deploymentId?: string
   ) {
     return this.aiAppsService.getAgentLogs(req.aiAppMemberUid, uid, 'build', {
       limit: this.parsePositiveInt('limit', limit),
       sinceMinutes: this.parsePositiveInt('sinceMinutes', sinceMinutes),
       nextToken,
+      deploymentId: this.parseDeploymentId(deploymentId),
     });
   }
 
@@ -265,12 +275,14 @@ export class AiAppsController {
     @Req() req: any,
     @Query('limit') limit?: string,
     @Query('sinceMinutes') sinceMinutes?: string,
-    @Query('nextToken') nextToken?: string
+    @Query('nextToken') nextToken?: string,
+    @Query('deploymentId') deploymentId?: string
   ) {
     return this.aiAppsService.getAgentLogs(req.aiAppMemberUid, uid, 'runtime', {
       limit: this.parsePositiveInt('limit', limit),
       sinceMinutes: this.parsePositiveInt('sinceMinutes', sinceMinutes),
       nextToken,
+      deploymentId: this.parseDeploymentId(deploymentId),
     });
   }
 
@@ -294,6 +306,7 @@ export class AiAppsController {
     @Query('limit') limit?: string,
     @Query('sinceMinutes') sinceMinutes?: string,
     @Query('nextToken') nextToken?: string,
+    @Query('deploymentId') deploymentId?: string,
     @Query('order') order?: string
   ) {
     const memberUid = await this.resolveMemberUid(req);
@@ -301,6 +314,7 @@ export class AiAppsController {
       limit: this.parsePositiveInt('limit', limit),
       sinceMinutes: this.parsePositiveInt('sinceMinutes', sinceMinutes),
       nextToken,
+      deploymentId: this.parseDeploymentId(deploymentId),
     };
     return this.parseLogOrder(order) === 'desc'
       ? this.aiAppsService.getMemberLogsDesc(memberUid, uid, 'build', query)
@@ -322,6 +336,7 @@ export class AiAppsController {
     @Query('limit') limit?: string,
     @Query('sinceMinutes') sinceMinutes?: string,
     @Query('nextToken') nextToken?: string,
+    @Query('deploymentId') deploymentId?: string,
     @Query('order') order?: string
   ) {
     const memberUid = await this.resolveMemberUid(req);
@@ -329,6 +344,7 @@ export class AiAppsController {
       limit: this.parsePositiveInt('limit', limit),
       sinceMinutes: this.parsePositiveInt('sinceMinutes', sinceMinutes),
       nextToken,
+      deploymentId: this.parseDeploymentId(deploymentId),
     };
     return this.parseLogOrder(order) === 'desc'
       ? this.aiAppsService.getMemberLogsDesc(memberUid, uid, 'runtime', query)
@@ -551,6 +567,17 @@ export class AiAppsController {
       throw new BadRequestException(`${name} must be a positive integer`);
     }
     return parsed;
+  }
+
+  /** Optional runner deploymentId filter for the log routes — rejected before it reaches the runner URL. */
+  private parseDeploymentId(value?: string): string | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+    if (!AI_APPS_LOG_DEPLOYMENT_ID_PATTERN.test(value)) {
+      throw new BadRequestException('deploymentId must be 1-128 characters of letters, digits, ".", "_" or "-"');
+    }
+    return value;
   }
 
   private async resolveMemberUid(req: any): Promise<string> {
