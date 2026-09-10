@@ -14,6 +14,9 @@ import { JobSearchStatusWireSchema } from './job-search-status';
    Re-exported here because this is where every existing consumer looks for it. */
 export { JobSearchStatusWireSchema };
 
+/* Same move, same reason — see the header of `./ui-flags`. */
+export { UiFlagsSchema, UiFlagsPatchSchema, UI_FLAG_KEY_REGEX, MAX_UI_FLAGS_PER_REQUEST } from './ui-flags';
+
 export const GitHubRepositorySchema = z.object({
   name: z.string(),
   description: z.string(),

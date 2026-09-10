@@ -82,6 +82,8 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(({ sequence, onCreate 
       showTwitter: true,
       showSubscription: true,
     },
+    // One-time callout dismissals; a seeded member has dismissed nothing.
+    uiFlags: {},
     isTierViewer: false,
     linkedInDetails: {},
     accessLevel,

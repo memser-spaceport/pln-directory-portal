@@ -27,6 +27,7 @@ import {
   AutocompleteQueryParams,
   MembersForNodebbRequestDto,
   UpdateMemberInvestorSettingRequestDto,
+  UiFlagsPatchSchema,
 } from 'libs/contracts/src/schema';
 import { apiMembers } from '../../../../libs/contracts/src/lib/contract-member';
 import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
@@ -358,6 +359,50 @@ export class MemberController {
   @NoCache()
   async getPreferences(@Param('uid') uid) {
     return await this.membersService.getPreferences(uid);
+  }
+
+  /**
+   * Reads a member's one-time UI callout dismissals.
+   *
+   * `AuthGuard` already restricts `:uid` to the caller themselves or a
+   * directory admin, so no further ownership check is needed here.
+   *
+   * `@NoCache()` for the same reason `getPreferences` carries it: this is
+   * per-member state that must not be served from a shared cache.
+   *
+   * @param uid - UID of the member whose flags will be fetched
+   * @returns Flat map of callout key to `true`; `{}` when none are set
+   */
+  @Api(server.route.getMemberUiFlags)
+  @UseGuards(AuthGuard)
+  @NoCache()
+  async getUiFlags(@Param('uid') uid) {
+    return await this.membersService.getUiFlags(uid);
+  }
+
+  /**
+   * Merges one-time UI callout dismissals into a member's existing set.
+   *
+   * The body is validated here rather than left to the contract: `@Api` does
+   * not enforce the declared body schema (see `updateOwnRole` above, which
+   * hand-checks its own), so relying on it would make the shape guards
+   * decorative.
+   *
+   * Shape only — there is no key allowlist, so adding a fourth callout stays a
+   * frontend-only change.
+   *
+   * @param uid - UID of the member whose flags will be set
+   * @param body - Flat map of callout key to `true`
+   * @returns The member's full set of flags after the merge
+   */
+  @Api(server.route.setMemberUiFlags)
+  @UseGuards(AuthGuard)
+  async setUiFlags(@Param('uid') uid, @Body() body) {
+    const parsed = UiFlagsPatchSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.issues[0]?.message ?? 'Invalid UI flags payload');
+    }
+    return await this.membersService.setUiFlags(uid, parsed.data);
   }
 
   /**

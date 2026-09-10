@@ -13,6 +13,8 @@ import {
   MembersForNodebbRequestSchema,
   UpdateMemberInvestorSettingRequestSchema,
   MemberInvestorSettingResponseSchema,
+  UiFlagsSchema,
+  UiFlagsPatchSchema,
 } from '../schema';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
@@ -107,6 +109,37 @@ export const apiMembers = contract.router({
       200: PreferenceSchema,
     },
     summary: 'Get member Preferences',
+  },
+  /*
+   * One-time UI callout dismissals.
+   *
+   * A separate surface from `preferences` on purpose. `modifyMemberPreference`
+   * replaces its Json column wholesale (issue #3406), so anything stored there
+   * is erased by the next partial write from the contact or privacy forms —
+   * and `preferences` is exposed in member listings via `select=preferences`,
+   * which these flags should not be.
+   *
+   * Note the plural `members` segment: the preferences pair above is
+   * inconsistent (`PATCH /member/...` vs `GET /members/...`). Do not copy it.
+   */
+  getMemberUiFlags: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/members/:uid/ui-flags`,
+    responses: {
+      200: UiFlagsSchema,
+    },
+    summary: 'Get member one-time UI callout flags',
+  },
+  setMemberUiFlags: {
+    method: 'PATCH',
+    path: `${getAPIVersionAsPath('1')}/members/:uid/ui-flags`,
+    body: UiFlagsPatchSchema,
+    responses: {
+      200: UiFlagsSchema,
+      400: z.object({ message: z.string() }),
+    },
+    pathParams: z.object({ uid: z.string() }),
+    summary: 'Set member one-time UI callout flags (merged, never replaced)',
   },
   modifyMember: {
     method: 'PUT',
