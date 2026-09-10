@@ -434,7 +434,7 @@ describe('TeamNewsQueryService.listGroupedByFocusArea', () => {
     expect(result.allTabExtraItems).toEqual([expect.objectContaining({ uid: 'editorial-untagged', editorialRank: 3 })]);
   });
 
-  it('does not put an untagged non-editorial item on All', async () => {
+  it('puts an untagged non-editorial item on All via allTabExtraItems', async () => {
     teamNewsItemFindMany.mockResolvedValue([
       makeRow({
         uid: 'untagged-ordinary',
@@ -452,7 +452,7 @@ describe('TeamNewsQueryService.listGroupedByFocusArea', () => {
     const result = await service.listGroupedByFocusArea(query);
 
     expect(result.groups).toEqual([]);
-    expect(result.allTabExtraItems).toEqual([]);
+    expect(result.allTabExtraItems).toEqual([expect.objectContaining({ uid: 'untagged-ordinary' })]);
   });
 
   it('keeps a focused editorial pick in its group, not extras', async () => {

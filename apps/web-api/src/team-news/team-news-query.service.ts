@@ -18,10 +18,7 @@ import type {
   TeamNewsDigestPicksResponse,
 } from 'libs/contracts/src/schema/team-news';
 import { buildTeamNewsEventDateWhere } from './team-news-event-date.where';
-import {
-  TEAM_NEWS_ALWAYS_INCLUDE_IN_ALL_TAB_TEAM_UIDS,
-  TEAM_NEWS_EXCLUDED_TEAM_NAMES,
-} from './team-news-public-list.config';
+import { TEAM_NEWS_EXCLUDED_TEAM_NAMES } from './team-news-public-list.config';
 import { TeamNewsSuggestionsService } from './team-news-suggestions.service';
 import { selectForYouNewsItems } from './select-for-you-news-items';
 
@@ -399,7 +396,6 @@ export class TeamNewsQueryService {
     ]);
     const focusByTitle = new Map(focusAreas.map((fa) => [fa.title, fa]));
 
-    const alwaysIncludeInAllTab = new Set<string>(TEAM_NEWS_ALWAYS_INCLUDE_IN_ALL_TAB_TEAM_UIDS);
     const groups = new Map<string, TeamNewsItemDto[]>();
     const allTabExtraItems: TeamNewsItemDto[] = [];
     for (const row of rows) {
@@ -411,10 +407,9 @@ export class TeamNewsQueryService {
         groups.get(title)!.push(dto);
         addedToGroup = true;
       }
-      // Untagged teams are dropped from every tab unless allowlisted (Protocol
-      // Labs) or editorially ranked — Top Stories is computed client-side from
-      // the All-tab corpus, so a pick with no focus area would otherwise vanish.
-      if (!addedToGroup && (alwaysIncludeInAllTab.has(dto.teamUid) || dto.editorialRank != null)) {
+      // The All tab is not a focus-area cut: news from teams outside the
+      // focus-area list (or with none) still belongs there.
+      if (!addedToGroup) {
         allTabExtraItems.push(dto);
       }
     }
