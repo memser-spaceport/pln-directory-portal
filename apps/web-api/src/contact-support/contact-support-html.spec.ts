@@ -1,9 +1,10 @@
 import {
   clipTelegramText,
+  escapeTelegramHtml,
   stripInlineDataImages,
   TELEGRAM_MESSAGE_MAX_LENGTH,
   toSupportEmailHtml,
-  toSupportTelegramText,
+  toSupportTelegramHtml,
 } from './contact-support-html';
 
 describe('toSupportEmailHtml', () => {
@@ -28,24 +29,70 @@ describe('toSupportEmailHtml', () => {
   });
 });
 
-describe('toSupportTelegramText', () => {
-  it('leaves plain text unchanged', () => {
-    expect(toSupportTelegramText('hello <world>')).toBe('hello <world>');
+describe('escapeTelegramHtml', () => {
+  it('escapes the characters Telegram HTML mode treats as markup', () => {
+    expect(escapeTelegramHtml('a < b & c > d')).toBe('a &lt; b &amp; c &gt; d');
+  });
+});
+
+describe('toSupportTelegramHtml', () => {
+  it('escapes plain text so angle brackets do not read as tags', () => {
+    expect(toSupportTelegramHtml('hello <world> & co')).toBe('hello &lt;world&gt; &amp; co');
   });
 
-  it('strips tags and keeps image URLs as their own lines', () => {
-    const text = toSupportTelegramText('<p>See this</p><p><img src="https://cdn.test/shot.png" alt="shot"></p>');
-    expect(text).toContain('See this');
-    expect(text).toContain('https://cdn.test/shot.png');
-    expect(text).not.toMatch(/<[^>]+>/);
+  it('keeps plain-text newlines', () => {
+    expect(toSupportTelegramHtml('line one\nline two')).toBe('line one\nline two');
+  });
+
+  it('turns paragraphs into separate lines and blank paragraphs into a blank line', () => {
+    const text = toSupportTelegramHtml('<p>First sentence.</p><p>Second sentence.</p><p><br></p><p>Third.</p>');
+    expect(text).toBe('First sentence.\nSecond sentence.\n\nThird.');
+  });
+
+  it('keeps links clickable as Telegram anchors', () => {
+    const html =
+      '<p>Url: <a href="https://directoryv2.dev.os.pl.xyz/jobs?dialog=reportBug" rel="noopener noreferrer" target="_blank">https://directoryv2.dev.os.pl.xyz/jobs?dialog=reportBug</a></p>' +
+      '<p><br></p><p><a href="https://example.com/two" target="_blank">url2</a></p>';
+    expect(toSupportTelegramHtml(html)).toBe(
+      'Url: <a href="https://directoryv2.dev.os.pl.xyz/jobs?dialog=reportBug">https://directoryv2.dev.os.pl.xyz/jobs?dialog=reportBug</a>\n\n' +
+        '<a href="https://example.com/two">url2</a>'
+    );
+  });
+
+  it('re-escapes ampersands inside hrefs and text', () => {
+    const text = toSupportTelegramHtml('<p><a href="https://x.test/?a=1&amp;b=2">A &amp; B</a></p>');
+    expect(text).toBe('<a href="https://x.test/?a=1&amp;b=2">A &amp; B</a>');
+  });
+
+  it('drops anchors with unsafe hrefs but keeps their text', () => {
+    expect(toSupportTelegramHtml('<p><a href="javascript:alert(1)">click</a> <a href="about:blank">me</a></p>')).toBe(
+      'click me'
+    );
+  });
+
+  it('maps Quill emphasis onto Telegram tags and drops unsupported tags', () => {
+    const text = toSupportTelegramHtml(
+      '<h2>Bug</h2><p><strong>Bold</strong> and <em>italic</em> <span class="x">plain</span> <u>u</u> <s>s</s></p>'
+    );
+    expect(text).toBe('Bug\n<b>Bold</b> and <i>italic</i> plain <u>u</u> <s>s</s>');
+  });
+
+  it('renders list items as bullet lines', () => {
+    expect(toSupportTelegramHtml('<ul><li>one</li><li>two</li></ul>')).toBe('• one\n• two');
+  });
+
+  it('closes tags left open by malformed input and ignores stray closers', () => {
+    expect(toSupportTelegramHtml('<p><b>bold</p></i>')).toBe('<b>bold</b>');
+  });
+
+  it('keeps image URLs as their own lines', () => {
+    const text = toSupportTelegramHtml('<p>See this</p><p><img src="https://cdn.test/shot.png" alt="shot"></p>');
+    expect(text).toBe('See this\nhttps://cdn.test/shot.png');
   });
 
   it('replaces data-URI images with a placeholder instead of the payload', () => {
-    const text = toSupportTelegramText('<p>Shot</p><p><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA"></p>');
-    expect(text).toContain('Shot');
-    expect(text).toContain('[image]');
-    expect(text).not.toContain('data:image');
-    expect(text).not.toContain('iVBORw0KGgo');
+    const text = toSupportTelegramHtml('<p>Shot</p><p><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA"></p>');
+    expect(text).toBe('Shot\n[image]');
   });
 });
 
@@ -71,5 +118,11 @@ describe('clipTelegramText', () => {
     const clipped = clipTelegramText(text);
     expect(clipped.length).toBe(TELEGRAM_MESSAGE_MAX_LENGTH);
     expect(clipped.endsWith('…')).toBe(true);
+  });
+
+  it('does not cut through a tag and closes tags the cut left open', () => {
+    const clipped = clipTelegramText('<b>bold</b> <a href="https://x.test/long">link text</a>', 26);
+    expect(clipped).toBe('<b>bold</b> …');
+    expect(clipTelegramText('<b>abcdefghij</b>', 8)).toBe('<b>abcd…</b>');
   });
 });
