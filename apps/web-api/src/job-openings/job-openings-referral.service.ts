@@ -6,7 +6,12 @@ import { noteToHtml } from './job-openings-email-html';
 import { normalizeExternalLinkedinUrl } from './job-openings-linkedin-url';
 import { parseJobReferCcEmails, resolveVisibleJobOpening } from './job-openings-resolve';
 import { deriveReferralBlurb } from './job-openings-referral-blurb';
-import { jobBoardDetailUrl } from './job-openings-url';
+import {
+  JOB_REFERRAL_EMAIL_UTM_SOURCE,
+  JOB_REFERRAL_NOTICE_EMAIL_UTM_SOURCE,
+  jobBoardDetailUrl,
+  memberProfileEmailUrl,
+} from './job-openings-url';
 
 const JOB_BOARD_REFERRAL_TEMPLATE = 'JOB_BOARD_REFERRAL_EMAIL';
 // Sent only when the referrer didn't CC the referred person on the main referral email above.
@@ -83,8 +88,16 @@ export class JobOpeningsReferralService {
       },
       deliveryPayload: {
         body: {
-          referrer: this.buildMemberCard(referrer, referrerHeadline),
-          referred: this.buildMemberCard(referred, referredHeadline),
+          referrer: this.buildMemberCard(referrer, referrerHeadline, {
+            source: JOB_REFERRAL_EMAIL_UTM_SOURCE,
+            content: 'referrer',
+            jobUid: jobOpening.uid,
+          }),
+          referred: this.buildMemberCard(referred, referredHeadline, {
+            source: JOB_REFERRAL_EMAIL_UTM_SOURCE,
+            content: 'referred',
+            jobUid: jobOpening.uid,
+          }),
           roleTitle: jobOpening.roleTitle,
           teamName: jobOpening.team.name,
           noteHtml: noteToHtml(note),
@@ -125,7 +138,11 @@ export class JobOpeningsReferralService {
           body: {
             referredFirstName: firstName(referred.name),
             referrerFirstName: firstName(referrer.name),
-            referrer: this.buildMemberCard(referrer, referrerHeadline),
+            referrer: this.buildMemberCard(referrer, referrerHeadline, {
+              source: JOB_REFERRAL_NOTICE_EMAIL_UTM_SOURCE,
+              content: 'referrer',
+              jobUid: jobOpening.uid,
+            }),
             roleTitle: jobOpening.roleTitle,
             teamName: jobOpening.team.name,
             noteHtml: noteToHtml(note),
@@ -361,10 +378,6 @@ export class JobOpeningsReferralService {
     return [location.city, location.country].filter(Boolean).join(', ') || null;
   }
 
-  private profileUrl(memberUid: string): string {
-    return `${process.env.WEB_UI_BASE_URL}/members/${memberUid}`;
-  }
-
   // Shape consumed by the `memberCard` partial in the JOB_BOARD_REFERRAL_EMAIL template.
   // `uid: null` (an outside-the-network referred person) links to their LinkedIn profile
   // instead of a Directory profile page.
@@ -376,11 +389,14 @@ export class JobOpeningsReferralService {
       skills: { title: string }[];
       externalProfileUrl?: string | null;
     },
-    headline: MemberHeadline
+    headline: MemberHeadline,
+    utm: { source: string; content: string; jobUid: string }
   ) {
     return {
       name: member.name,
-      profileUrl: member.uid ? this.profileUrl(member.uid) : member.externalProfileUrl ?? null,
+      // Only our own profile links get the attribution UTMs — an external
+      // LinkedIn URL goes out exactly as submitted.
+      profileUrl: member.uid ? memberProfileEmailUrl(member.uid, utm) : member.externalProfileUrl ?? null,
       headline: this.formatHeadline(headline),
       location: this.formatLocation(member.location),
       skills: member.skills.map((skill) => skill.title).slice(0, PROFILE_CARD_SKILLS_LIMIT),

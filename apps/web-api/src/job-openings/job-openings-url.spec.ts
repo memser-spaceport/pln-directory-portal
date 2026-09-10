@@ -1,4 +1,4 @@
-import { JOB_BOARD_DETAIL_PARAM, jobBoardDetailUrl } from './job-openings-url';
+import { JOB_BOARD_DETAIL_PARAM, jobBoardDetailUrl, memberProfileEmailUrl } from './job-openings-url';
 
 describe('jobBoardDetailUrl', () => {
   const originalWeb = process.env.WEB_UI_BASE_URL;
@@ -30,5 +30,21 @@ describe('jobBoardDetailUrl', () => {
 
     delete process.env.APPLICATION_BASE_URL;
     expect(jobBoardDetailUrl('role-1')).toBe('https://www.plnetwork.io/jobs?job=role-1');
+  });
+});
+
+describe('memberProfileEmailUrl', () => {
+  const originalWeb = process.env.WEB_UI_BASE_URL;
+
+  afterEach(() => {
+    process.env.WEB_UI_BASE_URL = originalWeb;
+  });
+
+  it('carries the UTMs the profile page reads back to attribute the click', () => {
+    process.env.WEB_UI_BASE_URL = 'https://directory.test/';
+
+    expect(memberProfileEmailUrl('member-1', { source: 'job_referral_email', content: 'referred', jobUid: 'job-1' })).toBe(
+      'https://directory.test/members/member-1?utm_source=job_referral_email&utm_medium=email&utm_content=referred&job_uid=job-1'
+    );
   });
 });

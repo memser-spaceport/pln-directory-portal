@@ -6,7 +6,7 @@ import { NotificationServiceClient } from '../notifications/notification-service
 import { noteToHtml } from './job-openings-email-html';
 import { parseJobReferCcEmails, resolveVisibleJobOpening, type ResolvedJobOpening } from './job-openings-resolve';
 import { isProtocolLabsTeam } from './pin-protocol-labs-team';
-import { jobBoardDetailUrl } from './job-openings-url';
+import { JOB_APPLICATION_EMAIL_UTM_SOURCE, jobBoardDetailUrl, memberProfileEmailUrl } from './job-openings-url';
 
 const JOB_BOARD_APPLICATION_TEMPLATE = 'JOB_BOARD_APPLICATION_EMAIL';
 const PROFILE_CARD_SKILLS_LIMIT = 3;
@@ -85,7 +85,7 @@ export class JobOpeningsApplicationService {
       },
       deliveryPayload: {
         body: {
-          applicant: this.buildMemberCard(applicant),
+          applicant: this.buildMemberCard(applicant, jobOpening.uid),
           roleTitle: jobOpening.roleTitle,
           teamName: jobOpening.team.name,
           coverLetterHtml,
@@ -317,10 +317,14 @@ export class JobOpeningsApplicationService {
   }
 
   // Shape consumed by the `memberCard` partial in the JOB_BOARD_APPLICATION_EMAIL template.
-  private buildMemberCard(applicant: Applicant) {
+  private buildMemberCard(applicant: Applicant, jobUid: string) {
     return {
       name: applicant.name,
-      profileUrl: `${process.env.WEB_UI_BASE_URL}/members/${applicant.uid}`,
+      profileUrl: memberProfileEmailUrl(applicant.uid, {
+        source: JOB_APPLICATION_EMAIL_UTM_SOURCE,
+        content: 'applicant',
+        jobUid,
+      }),
       headline: this.formatHeadline(this.resolveHeadline(applicant)),
       location: this.formatLocation(applicant.location),
       skills: applicant.skills
