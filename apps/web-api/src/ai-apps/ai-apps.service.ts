@@ -70,6 +70,8 @@ import {
   buildPrdS3Key,
   buildRunnerDeploymentsUrl,
   buildRunnerLogsUrl,
+  AiAppLogsQuery,
+  AI_APPS_LOG_DEPLOYMENT_ID_PATTERN,
   buildRunnerMetricsUrl,
   buildRunnerSecretsUrl,
   normalizeAiAppEventName,
@@ -150,6 +152,9 @@ type ApiAiApp<T extends { memberUid: string }> = Omit<WithMember<T>, 'failureStr
   database: AiAppDatabaseInfo;
   weeklyActiveUsers: number;
 };
+
+/** One newest-first (`order=desc`) log line as served to the dashboard. */
+type DescLogEvent = { timestamp: number; message: string; deploymentId?: string };
 
 @Injectable()
 export class AiAppsService {
@@ -523,8 +528,8 @@ export class AiAppsService {
     dto: UpdateAppMetadataDto,
     ownerOnly = false
   ): Promise<ApiAiApp<AiApp>> {
-    if (dto.name === undefined && dto.description === undefined && dto.prd === undefined) {
-      throw new BadRequestException('At least one of name, description, or prd must be provided');
+    if (dto.name === undefined && dto.description === undefined && dto.prd === undefined && dto.tags === undefined) {
+      throw new BadRequestException('At least one of name, description, prd, or tags must be provided');
     }
 
     const app = await this.prisma.aiApp.findUnique({ where: { uid } });
@@ -535,10 +540,11 @@ export class AiAppsService {
       throw new ForbiddenException('The agent may edit only apps owned by its connected member');
     }
 
-    const data: { name?: string; description?: string | null; prd?: string | null } = {};
+    const data: { name?: string; description?: string | null; prd?: string | null; tags?: string[] } = {};
     if (dto.name !== undefined) data.name = dto.name.trim();
     if (dto.description !== undefined) data.description = dto.description?.trim() || null;
     if (dto.prd !== undefined) data.prd = dto.prd?.trim() || null;
+    if (dto.tags !== undefined) data.tags = dto.tags;
 
     const updated = await this.prisma.aiApp.update({ where: { uid }, data });
     return this.toApiApp((await this.withMember([updated]))[0], true);
@@ -663,12 +669,7 @@ export class AiAppsService {
    * like the agent metadata route. Delegates the runner proxy to
    * `fetchRunnerLogs`.
    */
-  async getAgentLogs(
-    requesterUid: string,
-    uid: string,
-    phase: AiAppLogPhase,
-    query: { limit?: number; sinceMinutes?: number; nextToken?: string }
-  ): Promise<unknown> {
+  async getAgentLogs(requesterUid: string, uid: string, phase: AiAppLogPhase, query: AiAppLogsQuery): Promise<unknown> {
     const app = await this.prisma.aiApp.findUnique({ where: { uid } });
     if (!app || app.status === 'DELETED') {
       throw new NotFoundException(`AI App not found: ${uid}`);
@@ -689,7 +690,7 @@ export class AiAppsService {
     requesterUid: string,
     uid: string,
     phase: AiAppLogPhase,
-    query: { limit?: number; sinceMinutes?: number; nextToken?: string }
+    query: AiAppLogsQuery
   ): Promise<unknown> {
     const app = await this.prisma.aiApp.findUnique({ where: { uid } });
     if (!app || app.status === 'DELETED') {
@@ -707,17 +708,20 @@ export class AiAppsService {
    * FORWARD from the window start, so the tail is assembled here: walk every
    * runner page server-side keeping the newest AI_APPS_LOGS_DESC_RETAIN lines,
    * then serve descending slices. The opaque nextToken encodes an offset from
-   * the newest line plus the window the walk used, so "load earlier" pages
-   * read a consistent slice of history. Unlike the forward routes, the
-   * response here is allowlisted to `{ events, nextToken }` with numeric
-   * epoch-ms timestamps (the runner has been seen sending strings).
+   * the newest line plus the window and deployment filter the walk used, so
+   * "load earlier" pages read a consistent slice of history. Unlike the forward routes, the
+   * response here is allowlisted to `{ events, nextToken }` — each event
+   * `{ timestamp, message, deploymentId? }` with numeric epoch-ms timestamps
+   * (the runner has been seen sending strings). Like the forward routes, the
+   * window spans every deployment unless `deploymentId` narrows it; the
+   * dashboard uses the per-event deploymentId to mark redeploy boundaries.
    */
   async getMemberLogsDesc(
     requesterUid: string,
     uid: string,
     phase: AiAppLogPhase,
-    query: { limit?: number; sinceMinutes?: number; nextToken?: string }
-  ): Promise<{ events: { timestamp: number; message: string }[]; nextToken?: string }> {
+    query: AiAppLogsQuery
+  ): Promise<{ events: DescLogEvent[]; nextToken?: string }> {
     const app = await this.prisma.aiApp.findUnique({ where: { uid } });
     if (!app || app.status === 'DELETED') {
       throw new NotFoundException(`AI App not found: ${uid}`);
@@ -728,18 +732,20 @@ export class AiAppsService {
 
     const limit = Math.min(Math.max(query.limit ?? AI_APPS_LOGS_DESC_DEFAULT_LIMIT, 1), AI_APPS_LOGS_DESC_MAX_LIMIT);
     const cursor = this.decodeDescCursor(query.nextToken);
-    // A cursor pins the window its first page walked; later pages must read
-    // the same slice of history (and hit the same cache entry).
+    // A cursor pins the window and deployment filter its first page walked;
+    // later pages must read the same slice of history (and hit the same
+    // cache entry).
     let windowMinutes = cursor ? cursor.w : query.sinceMinutes;
+    const deploymentId = cursor ? cursor.d : query.deploymentId;
 
-    let walk = await this.walkRunnerLogsTail(app, phase, windowMinutes);
+    let walk = await this.walkRunnerLogsTail(app, phase, windowMinutes, deploymentId);
     if (!walk.complete && !cursor && query.sinceMinutes !== undefined) {
       // The window is too chatty to walk in one budget. Narrowing keeps the
       // tail — it's the end of any window that reaches "now" — so retry with
       // progressively smaller windows before giving up.
       for (const divisor of AI_APPS_LOGS_DESC_NARROWINGS) {
         windowMinutes = Math.max(1, Math.floor(query.sinceMinutes / divisor));
-        walk = await this.walkRunnerLogsTail(app, phase, windowMinutes);
+        walk = await this.walkRunnerLogsTail(app, phase, windowMinutes, deploymentId);
         if (walk.complete) break;
       }
     }
@@ -758,7 +764,9 @@ export class AiAppsService {
 
     return {
       events,
-      nextToken: hasEarlier ? this.encodeDescCursor({ o: offset + events.length, w: windowMinutes }) : undefined,
+      nextToken: hasEarlier
+        ? this.encodeDescCursor({ o: offset + events.length, w: windowMinutes, d: deploymentId })
+        : undefined,
     };
   }
 
@@ -780,9 +788,10 @@ export class AiAppsService {
   private walkRunnerLogsTail(
     app: Pick<AiApp, 'appId'>,
     phase: AiAppLogPhase,
-    sinceMinutes: number | undefined
-  ): Promise<{ events: { timestamp: number; message: string }[]; complete: boolean }> {
-    const cacheKey = `${app.appId}:${phase}:${sinceMinutes ?? 'all'}`;
+    sinceMinutes: number | undefined,
+    deploymentId: string | undefined
+  ): Promise<{ events: DescLogEvent[]; complete: boolean }> {
+    const cacheKey = `${app.appId}:${phase}:${sinceMinutes ?? 'all'}:${deploymentId ?? 'all'}`;
     const entry = this.logsTailCache.get(cacheKey);
     const now = Date.now();
     if (entry && entry.evictAt <= now) {
@@ -791,7 +800,7 @@ export class AiAppsService {
       if (entry.staleAt <= now) {
         // Revalidation failure only logs — the stale copy stays valid until
         // evictAt, and the read after that pays the cold walk (and its error).
-        this.startLogsTailWalk(app, phase, sinceMinutes, cacheKey).catch((error) => {
+        this.startLogsTailWalk(app, phase, sinceMinutes, deploymentId, cacheKey).catch((error) => {
           this.logger.warn(
             `Background ${phase}-logs revalidation failed for ${app.appId}: ${(error as Error).message}`
           );
@@ -799,7 +808,7 @@ export class AiAppsService {
       }
       return Promise.resolve({ events: entry.events, complete: true });
     }
-    return this.startLogsTailWalk(app, phase, sinceMinutes, cacheKey);
+    return this.startLogsTailWalk(app, phase, sinceMinutes, deploymentId, cacheKey);
   }
 
   /** One walk per key at a time: concurrent identical requests await the same promise. */
@@ -807,11 +816,12 @@ export class AiAppsService {
     app: Pick<AiApp, 'appId'>,
     phase: AiAppLogPhase,
     sinceMinutes: number | undefined,
+    deploymentId: string | undefined,
     cacheKey: string
-  ): Promise<{ events: { timestamp: number; message: string }[]; complete: boolean }> {
+  ): Promise<{ events: DescLogEvent[]; complete: boolean }> {
     const inFlight = this.logsTailWalks.get(cacheKey);
     if (inFlight) return inFlight;
-    const walk = this.runLogsTailWalk(app, phase, sinceMinutes, cacheKey).finally(() => {
+    const walk = this.runLogsTailWalk(app, phase, sinceMinutes, deploymentId, cacheKey).finally(() => {
       this.logsTailWalks.delete(cacheKey);
     });
     this.logsTailWalks.set(cacheKey, walk);
@@ -822,24 +832,30 @@ export class AiAppsService {
     app: Pick<AiApp, 'appId'>,
     phase: AiAppLogPhase,
     sinceMinutes: number | undefined,
+    deploymentId: string | undefined,
     cacheKey: string
-  ): Promise<{ events: { timestamp: number; message: string }[]; complete: boolean }> {
+  ): Promise<{ events: DescLogEvent[]; complete: boolean }> {
     const startedAt = Date.now();
     let token: string | undefined;
-    let buffer: { timestamp: number; message: string }[] = [];
+    let buffer: DescLogEvent[] = [];
 
     for (let call = 0; call < AI_APPS_LOGS_DESC_MAX_RUNNER_CALLS; call++) {
       const body = (await this.fetchRunnerLogs(app, phase, {
         limit: AI_APPS_LOGS_DESC_RUNNER_LIMIT,
         sinceMinutes,
         nextToken: token,
+        deploymentId,
       })) as { events?: unknown; nextToken?: unknown } | null;
 
       const pageEvents = Array.isArray(body?.events) ? body!.events : [];
       for (const raw of pageEvents) {
-        const entry = raw as { timestamp?: unknown; message?: unknown };
+        const entry = raw as { timestamp?: unknown; message?: unknown; deploymentId?: unknown };
         if (typeof entry?.message !== 'string') continue;
-        buffer.push({ timestamp: this.toEpochMs(entry.timestamp), message: entry.message });
+        buffer.push({
+          timestamp: this.toEpochMs(entry.timestamp),
+          message: entry.message,
+          ...(typeof entry.deploymentId === 'string' ? { deploymentId: entry.deploymentId } : {}),
+        });
       }
       // The walk is chronological, so trimming the front keeps the newest.
       if (buffer.length > AI_APPS_LOGS_DESC_RETAIN * 2) {
@@ -878,50 +894,43 @@ export class AiAppsService {
     return 0;
   }
 
-  private encodeDescCursor(cursor: { o: number; w?: number }): string {
+  private encodeDescCursor(cursor: { o: number; w?: number; d?: string }): string {
     return Buffer.from(JSON.stringify(cursor)).toString('base64url');
   }
 
-  private decodeDescCursor(token: string | undefined): { o: number; w?: number } | undefined {
+  private decodeDescCursor(token: string | undefined): { o: number; w?: number; d?: string } | undefined {
     if (token === undefined) return undefined;
     try {
       const parsed = JSON.parse(Buffer.from(token, 'base64url').toString('utf8'));
       const offset = parsed?.o;
       const window = parsed?.w;
+      const deploymentId = parsed?.d;
       if (typeof offset !== 'number' || !Number.isInteger(offset) || offset < 0) throw new Error('bad offset');
       if (window !== undefined && (typeof window !== 'number' || !Number.isInteger(window) || window < 1)) {
         throw new Error('bad window');
       }
-      return { o: offset, w: window };
+      if (deploymentId !== undefined && !AI_APPS_LOG_DEPLOYMENT_ID_PATTERN.test(String(deploymentId))) {
+        throw new Error('bad deploymentId');
+      }
+      return { o: offset, w: window, d: deploymentId };
     } catch {
       throw new BadRequestException('Invalid nextToken for order=desc — use the token from a previous desc response');
     }
   }
 
   /** Per-instance cache of completed tail walks, so scrolling history doesn't re-walk the runner per page. */
-  private readonly logsTailCache = new Map<
-    string,
-    { staleAt: number; evictAt: number; events: { timestamp: number; message: string }[] }
-  >();
+  private readonly logsTailCache = new Map<string, { staleAt: number; evictAt: number; events: DescLogEvent[] }>();
 
   /** In-flight walks by cache key — concurrent identical requests share one runner walk. */
-  private readonly logsTailWalks = new Map<
-    string,
-    Promise<{ events: { timestamp: number; message: string }[]; complete: boolean }>
-  >();
+  private readonly logsTailWalks = new Map<string, Promise<{ events: DescLogEvent[]; complete: boolean }>>();
 
   /** When each app's walks were last invalidated by a deploy — see writeLogsTailCache. */
   private readonly logsTailDroppedAt = new Map<string, number>();
 
-  private writeLogsTailCache(
-    key: string,
-    appId: string,
-    walkStartedAt: number,
-    events: { timestamp: number; message: string }[]
-  ): void {
-    // A walk that began before the app's last deploy captured the PREVIOUS
-    // deployment's stream — never cache it (returning it once is fine; the
-    // next read re-walks fresh).
+  private writeLogsTailCache(key: string, appId: string, walkStartedAt: number, events: DescLogEvent[]): void {
+    // A walk that began before the app's last deploy predates the new pods'
+    // output — never cache it (returning it once is fine; the next read
+    // re-walks fresh and picks the new lines up).
     if ((this.logsTailDroppedAt.get(appId) ?? 0) > walkStartedAt) return;
     if (!this.logsTailCache.has(key) && this.logsTailCache.size >= AI_APPS_LOGS_DESC_CACHE_MAX_ENTRIES) {
       // Maps iterate in insertion order — dropping the first key is a cheap FIFO.
@@ -937,8 +946,9 @@ export class AiAppsService {
   }
 
   /**
-   * A new deploy invalidates every cached walk for the app — serve-stale must
-   * never show the previous deployment's lines to someone watching the new one.
+   * A new deploy invalidates every cached walk for the app, so whoever is
+   * watching sees the new deployment's lines as soon as they land instead of a
+   * stale tail (earlier deployments' lines stay in the window regardless).
    */
   private dropLogsTailCache(appId: string): void {
     this.logsTailDroppedAt.set(appId, Date.now());
@@ -958,12 +968,13 @@ export class AiAppsService {
   private async fetchRunnerLogs(
     app: Pick<AiApp, 'appId'>,
     phase: AiAppLogPhase,
-    query: { limit?: number; sinceMinutes?: number; nextToken?: string }
+    query: AiAppLogsQuery
   ): Promise<unknown> {
     const params: Record<string, string | number> = {};
     if (query.limit !== undefined) params.limit = query.limit;
     if (query.sinceMinutes !== undefined) params.sinceMinutes = query.sinceMinutes;
     if (query.nextToken !== undefined) params.nextToken = query.nextToken;
+    if (query.deploymentId !== undefined) params.deploymentId = query.deploymentId;
 
     try {
       const response = await axios.get(buildRunnerLogsUrl(app.appId, phase), {
@@ -1235,6 +1246,17 @@ export class AiAppsService {
    * the deploy to the sandbox runner (keeping AWS creds + the runner token
    * server-side) and stores the result.
    */
+  /**
+   * Upload-time tags only fill an empty list: once the app is tagged (by an
+   * earlier upload or a creator/admin edit) redeploys leave the tags alone.
+   */
+  private tagsForUpload(existing: AiApp | null, uploaded: string[] | undefined): string[] | undefined {
+    if (existing?.tags?.length) {
+      return undefined;
+    }
+    return uploaded ?? [];
+  }
+
   async deploy(
     memberUid: string,
     dto: DeployAppDto,
@@ -1282,6 +1304,7 @@ export class AiAppsService {
         kitVersion: dto.kitVersion ?? null,
         agentClient: agentClient ?? null,
         agentModel: dto.agentModel ?? null,
+        tags: dto.tags ?? [],
         database: dto.database ? { enabled: true, type: dto.database.type } : Prisma.DbNull,
       },
       update: {
@@ -1293,6 +1316,7 @@ export class AiAppsService {
         url,
         httpUrl,
         host,
+        tags: this.tagsForUpload(existing, dto.tags),
         // Upload metadata reflects the LAST upload — cleared when a client
         // that sends nothing (older kit) redeploys, so it never goes stale.
         kitVersion: dto.kitVersion ?? null,
@@ -1384,6 +1408,7 @@ export class AiAppsService {
         kitVersion: dto.kitVersion ?? null,
         agentClient: agentClient ?? null,
         agentModel: dto.agentModel ?? null,
+        tags: dto.tags ?? [],
         database: dto.database ? { enabled: true, type: dto.database.type } : Prisma.DbNull,
       },
       update: {
@@ -1393,6 +1418,7 @@ export class AiAppsService {
         deploymentId: dto.deploymentId,
         s3Key,
         requiredEnvVars: dto.requiredEnvVars,
+        tags: this.tagsForUpload(existing, dto.tags),
         kitVersion: dto.kitVersion ?? null,
         agentClient: agentClient ?? null,
         agentModel: dto.agentModel ?? null,

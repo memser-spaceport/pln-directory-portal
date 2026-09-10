@@ -9,6 +9,7 @@ import { CreateJobReferralSchema, JobReferralDraftQuerySchema } from 'libs/contr
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserAuthValidateGuard } from '../guards/user-auth-validate.guard';
 import { JobOpeningsApplicationService } from './job-openings-application.service';
+import { JobOpeningsForYouService } from './job-openings-for-you.service';
 import { JobOpeningsInterestService } from './job-openings-interest.service';
 import { JobOpeningsQueryService } from './job-openings-query.service';
 import { JobOpeningsReferralService } from './job-openings-referral.service';
@@ -23,7 +24,8 @@ export class JobOpeningsController {
     private readonly jobOpeningsReferralService: JobOpeningsReferralService,
     private readonly jobOpeningsApplicationService: JobOpeningsApplicationService,
     private readonly jobOpeningsSignUpService: JobOpeningsSignUpService,
-    private readonly jobOpeningsInterestService: JobOpeningsInterestService
+    private readonly jobOpeningsInterestService: JobOpeningsInterestService,
+    private readonly jobOpeningsForYouService: JobOpeningsForYouService
   ) {}
 
   @Api(server.route.getJobs)
@@ -32,6 +34,13 @@ export class JobOpeningsController {
   async getJobs(@Req() request: Request & { userEmail?: string }) {
     const params = JobsListQueryParams.parse(request.query);
     return this.jobOpeningsQueryService.listJobOpenings(params, request.userEmail);
+  }
+
+  @Api(server.route.getForYouJobs)
+  @UseGuards(UserAuthValidateGuard)
+  @NoCache()
+  async getForYouJobs(@Req() request: Request & { userEmail?: string }) {
+    return this.jobOpeningsForYouService.listForYou(request.userEmail);
   }
 
   @Api(server.route.getJobFilters)
@@ -67,8 +76,8 @@ export class JobOpeningsController {
   @UseGuards(UserAuthValidateGuard)
   @NoCache()
   async getReferralDraft(@Req() request: Request & { userEmail?: string }) {
-    const { referredMemberUid } = this.parse(JobReferralDraftQuerySchema, request.query);
-    return this.jobOpeningsReferralService.getReferralDraft(request.params.uid, request.userEmail, referredMemberUid);
+    const query = this.parse(JobReferralDraftQuerySchema, request.query);
+    return this.jobOpeningsReferralService.getReferralDraft(request.params.uid, request.userEmail, query);
   }
 
   @Api(server.route.referJob)

@@ -1,5 +1,37 @@
 import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
+import { AI_APPS_MAX_TAGS_PER_APP, AI_APPS_TAG_SLUGS } from '../ai-apps-tags';
+
+/** Tag slugs from the controlled vocabulary; duplicates collapse, order is kept. */
+export const AiAppTagsSchema = z
+  .array(z.enum(AI_APPS_TAG_SLUGS))
+  .max(AI_APPS_MAX_TAGS_PER_APP)
+  .transform((tags) => Array.from(new Set(tags)));
+
+/**
+ * Multipart delivers `tags` as a string: accept a JSON array (`["a","b"]`) or a
+ * comma-separated list (`a,b`). Empty string = field omitted.
+ */
+export function parseMultipartStringList(value: unknown): unknown {
+  if (typeof value !== 'string') {
+    return value;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  if (trimmed.startsWith('[')) {
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      return trimmed;
+    }
+  }
+  return trimmed
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
 
 /** Database engines the Deployment Orchestrator can provision on request. */
 export const AI_APPS_SUPPORTED_DATABASE_TYPES = ['postgres'] as const;
@@ -52,6 +84,12 @@ export const DeployAppSchema = z.object({
    * TOOL name isn't sent here; it comes from the connect session's clientName.
    */
   agentModel: z.string().trim().min(1).max(100).optional(),
+  /**
+   * Tags from the controlled vocabulary (see `ai-apps-tags.ts`). Applied on the
+   * first upload; on later uploads only when the app has no tags yet, so the
+   * creator's manual edits survive redeploys.
+   */
+  tags: z.preprocess(parseMultipartStringList, AiAppTagsSchema.optional()),
   /**
    * Opt-in database provisioning request, e.g. `{"enabled":true,"type":"postgres"}`.
    * Multipart delivers it as a JSON string; absent entirely when the member

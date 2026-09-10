@@ -1,6 +1,6 @@
 import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
-import { DeployAppSchema } from './deploy-app.dto';
+import { DeployAppSchema, parseMultipartStringList } from './deploy-app.dto';
 
 /** Conventional env-var name: uppercase letters, digits, underscores. */
 export const ENV_VAR_NAME_REGEX = /^[A-Z][A-Z0-9_]*$/;
@@ -19,23 +19,7 @@ export const EnvVarNameSchema = z
  * (`["A","B"]`) or a comma-separated list (`A,B`).
  */
 export const RegisterDraftSchema = DeployAppSchema.extend({
-  requiredEnvVars: z.preprocess((value) => {
-    if (typeof value !== 'string') {
-      return value;
-    }
-    const trimmed = value.trim();
-    if (trimmed.startsWith('[')) {
-      try {
-        return JSON.parse(trimmed);
-      } catch {
-        return trimmed;
-      }
-    }
-    return trimmed
-      .split(',')
-      .map((name) => name.trim())
-      .filter(Boolean);
-  }, z.array(EnvVarNameSchema).min(1).max(50)),
+  requiredEnvVars: z.preprocess(parseMultipartStringList, z.array(EnvVarNameSchema).min(1).max(50)),
 });
 
 export class RegisterDraftDto extends createZodDto(RegisterDraftSchema) {}

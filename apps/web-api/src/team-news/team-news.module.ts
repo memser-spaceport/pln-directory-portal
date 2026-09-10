@@ -34,6 +34,6 @@ import { TeamNewsPostSummaryService } from './team-news-post-summary.service';
     TeamNewsImpressionsService,
     TeamNewsPostSummaryService,
   ],
-  exports: [TeamNewsService, TeamNewsQueryService, TeamNewsEnrichmentService],
+  exports: [TeamNewsService, TeamNewsQueryService, TeamNewsEnrichmentService, TeamNewsSuggestionsService],
 })
 export class TeamNewsModule {}
