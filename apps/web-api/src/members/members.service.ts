@@ -1711,6 +1711,54 @@ export class MembersService {
   }
 
   /**
+   * Reads the member's one-time UI callout flags.
+   *
+   * Returns a flat map of callout key to `true`. An absent key means "not
+   * dismissed" — nothing ever writes `false`.
+   *
+   * @param uid - The UID of the member.
+   * @returns The member's UI flags, or `{}` when none have been set.
+   */
+  async getUiFlags(uid: string): Promise<Record<string, true>> {
+    const member = await this.prisma.member.findUnique({
+      where: { uid },
+      select: { uiFlags: true },
+    });
+    if (!member) {
+      throw new NotFoundException(`Member not found: ${uid}`);
+    }
+    return (member.uiFlags as Record<string, true> | null) ?? {};
+  }
+
+  /**
+   * Merges one-time UI callout flags into the member's existing set.
+   *
+   * Uses Postgres' `jsonb` merge operator in a single statement rather than a
+   * read-modify-write, so two tabs dismissing two different callouts at the
+   * same instant cannot lose one.
+   *
+   * Deliberately does NOT go through `updateMemberByUid`: that resets the whole
+   * members cache, and dismissing a tooltip must not flush it. These flags
+   * appear in no cached members response — they are read only through
+   * `getUiFlags`, whose route is `@NoCache()`.
+   *
+   * @param uid - The UID of the member.
+   * @param flags - Flat map of callout key to `true`; merged, never replacing.
+   * @returns The member's full set of UI flags after the merge.
+   */
+  async setUiFlags(uid: string, flags: Record<string, true>): Promise<Record<string, true>> {
+    const updated = await this.prisma.$executeRaw`
+      UPDATE "Member"
+      SET "uiFlags" = COALESCE("uiFlags", '{}'::jsonb) || ${JSON.stringify(flags)}::jsonb
+      WHERE uid = ${uid}
+    `;
+    if (updated === 0) {
+      throw new NotFoundException(`Member not found: ${uid}`);
+    }
+    return this.getUiFlags(uid);
+  }
+
+  /**
    * Retrieves member preferences along with social media handlers.
    *
    * @param uid - The UID of the member.
