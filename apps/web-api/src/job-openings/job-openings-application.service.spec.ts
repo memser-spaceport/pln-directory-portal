@@ -124,7 +124,8 @@ describe('JobOpeningsApplicationService', () => {
           body: expect.objectContaining({
             applicant: {
               name: 'Ada Lovelace',
-              profileUrl: 'https://directory.test/members/member-1',
+              profileUrl:
+                'https://directory.test/members/member-1?utm_source=job_application_email&utm_medium=email&utm_content=applicant&job_uid=job-1',
               headline: 'Engineer, LabOS',
               location: 'London, UK',
               skills: ['TypeScript'],
@@ -141,6 +142,22 @@ describe('JobOpeningsApplicationService', () => {
     expect(snapshot.currentCompany).toBe('LabOS');
     expect(snapshot.role).toBe('Engineer');
     expect(prisma.jobApplication.count).not.toHaveBeenCalled();
+  });
+
+  it('tags the applicant card so the email click can be attributed', async () => {
+    mockHappyPath();
+
+    await service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' });
+
+    const body = notificationServiceClient.sendNotification.mock.calls[0][0].deliveryPayload.body;
+    expect(body.applicant.profileUrl).toBe(
+      'https://directory.test/members/member-1?utm_source=job_application_email&utm_medium=email&utm_content=applicant&job_uid=job-1'
+    );
+    // The stored snapshot is a record of the application, not a link anyone
+    // clicks — it keeps the plain URL.
+    expect(prisma.jobApplication.create.mock.calls[0][0].data.profileSnapshot.profileUrl).toBe(
+      'https://directory.test/members/member-1'
+    );
   });
 
   /* Approval used to gate this — PENDING, VERIFIED and REJECTED all got a 403

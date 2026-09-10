@@ -134,6 +134,20 @@ describe('JobOpeningsReferralService', () => {
     );
   });
 
+  it('tags both profile cards so the email click can be attributed', async () => {
+    mockHappyPath();
+
+    await service.referJob('job-1', referrer.email, referralInput);
+
+    const body = notificationServiceClient.sendNotification.mock.calls[0][0].deliveryPayload.body;
+    expect(body.referred.profileUrl).toBe(
+      'https://directory.test/members/referred-1?utm_source=job_referral_email&utm_medium=email&utm_content=referred&job_uid=job-1'
+    );
+    // Distinct `utm_content` — the two cards sit in the same email, so without it
+    // a click on the candidate and a click on whoever vouched for them are one number.
+    expect(body.referrer.profileUrl).toContain('utm_content=referrer');
+  });
+
   it('skips ccing the referred member and sends them a separate notice when not included', async () => {
     mockHappyPath();
 
