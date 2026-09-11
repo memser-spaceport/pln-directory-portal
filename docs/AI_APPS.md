@@ -533,19 +533,28 @@ Dashboard side (`AiAppDetailPage` in the frontend):
   absolute URLs and non-http schemes. The title is trimmed and capped.
 - Keeps only the **pathname** of a reported route — the query string and hash
   are dropped before anything reaches the address bar or tab title, whatever
-  kit the app was built with. A `?path=` deep link someone opens deliberately
-  keeps its query/hash, since that only ever becomes the frame's initial URL.
-- Mirrors the path as `?path=<encoded>` on `/pl-infra/ai-apps/<uid>` (omitted
-  for `/`) with `window.history.replaceState` — no RSC round trip per in-app
-  click, and no extra history entries (the iframe owns in-app history, so
-  Back steps the app back and the URL follows). The tab title becomes
-  `<page title> · <app name>`.
+  kit the app was built with. Deep links are pathname-only too: the portal's
+  query string is never forwarded to the app.
+- Mirrors the path as a route segment — `/pl-infra/ai-apps/<uid>/<path>`, or
+  `/pl-infra-os/<path>` for the PL Infra OS alias; the bare route for `/` —
+  with `window.history.replaceState`, keeping the portal's own query string
+  (`?settings=deployment`). No RSC round trip per in-app click, and no extra
+  history entries (the iframe owns in-app history, so Back steps the app back
+  and the URL follows). The tab title becomes `<page title> · <app name>`.
 - The iframe `src` is `appOrigin + path` computed once per deployed version
-  (from the initial `?path` or the last reported route), so URL updates never
+  (from the URL segments or the last reported route), so URL updates never
   reload the frame and a redeploy remount reopens the same subpage.
+- Legacy `?path=<encoded>` links (the pre-segment form) are 308-redirected by
+  the frontend proxy to the segment URL: only the pathname of the value is
+  kept, every other param survives, and a value that is not a same-origin
+  path (or is `/`) lands on the bare app route.
 - Login round trip: the frontend proxy keeps the query string in the
   `backlink` for AI Apps routes only (`/pl-infra/ai-apps*`, `/pl-infra-os`),
-  and `PrivyModals` no longer double-decodes it, so `?path=` survives login.
+  so `?settings=deployment` survives login; `PrivyModals` does not
+  double-decode it.
+- `/pl-infra/ai-apps/<uid>/prd` is the PRD viewer, so an app route literally
+  named `/prd` cannot be deep-linked as a segment on that route (it works on
+  `/pl-infra-os/prd`).
 
 Apps built with older kits still open at the deep-linked path (it is just the
 initial iframe URL); the dashboard URL and title simply don't follow in-app

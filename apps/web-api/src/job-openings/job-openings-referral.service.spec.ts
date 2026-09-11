@@ -372,7 +372,8 @@ describe('JobOpeningsReferralService', () => {
             body: expect.objectContaining({
               referred: expect.objectContaining({
                 name: externalPerson.name,
-                profileUrl: 'https://www.linkedin.com/in/nia-okafor',
+                profileUrl:
+                  'https://www.linkedin.com/in/nia-okafor?utm_source=job_referral_email&utm_medium=email&utm_content=referred&job_uid=job-1',
                 headline: null,
                 location: null,
                 skills: [],
@@ -413,7 +414,9 @@ describe('JobOpeningsReferralService', () => {
         expect.objectContaining({
           deliveryPayload: {
             body: expect.objectContaining({
-              referred: expect.objectContaining({ profileUrl: 'https://linkedin.com/in/nia-okafor' }),
+              referred: expect.objectContaining({
+                profileUrl: expect.stringMatching(/^https:\/\/linkedin\.com\/in\/nia-okafor\?utm_source=/),
+              }),
             }),
           },
         })

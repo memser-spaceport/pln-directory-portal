@@ -1,6 +1,5 @@
 import React from 'react';
 import { FormField } from '../../../../../components/FormField';
-import { FormCheckboxField } from '../../../../../components/FormCheckboxField';
 
 export const ContactDetails = () => {
   return (
@@ -20,11 +19,6 @@ export const ContactDetails = () => {
       <div className="flex gap-4">
         <FormField name="officeHours" label="Office Hours Link" placeholder="Office Hours Link" />
       </div>
-      <FormCheckboxField
-        name="hasInactiveEmail"
-        label="Email is inactive"
-        description="Hides the email from members and excludes this member from job applications and referrals."
-      />
     </div>
   );
 };

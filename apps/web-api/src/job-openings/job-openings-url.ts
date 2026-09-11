@@ -27,17 +27,27 @@ export const JOB_APPLICATION_EMAIL_UTM_SOURCE = 'job_application_email';
  * the send. `content` says whose card the link was on, since the referral
  * email carries both the referrer's and the referred person's.
  */
-export function memberProfileEmailUrl(
-  memberUid: string,
-  utm: { source: string; content: string; jobUid: string }
-): string {
-  const query = new URLSearchParams({
+export function memberProfileEmailUrl(memberUid: string, utm: EmailUtm): string {
+  return `${webUiBase()}/members/${encodeURIComponent(memberUid)}?${emailUtmQuery(utm)}`;
+}
+
+/**
+ * An outside-the-network referred person's LinkedIn URL as it appears in a
+ * refer email, tagged the same way as a Directory profile link.
+ */
+export function externalProfileEmailUrl(url: string, utm: EmailUtm): string {
+  return `${url}${url.includes('?') ? '&' : '?'}${emailUtmQuery(utm)}`;
+}
+
+type EmailUtm = { source: string; content: string; jobUid: string };
+
+function emailUtmQuery(utm: EmailUtm): string {
+  return new URLSearchParams({
     utm_source: utm.source,
     utm_medium: 'email',
     utm_content: utm.content,
     job_uid: utm.jobUid,
-  });
-  return `${webUiBase()}/members/${encodeURIComponent(memberUid)}?${query.toString()}`;
+  }).toString();
 }
 
 function webUiBase(): string {

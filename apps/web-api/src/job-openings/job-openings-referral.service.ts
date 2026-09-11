@@ -9,6 +9,7 @@ import { deriveReferralBlurb } from './job-openings-referral-blurb';
 import {
   JOB_REFERRAL_EMAIL_UTM_SOURCE,
   JOB_REFERRAL_NOTICE_EMAIL_UTM_SOURCE,
+  externalProfileEmailUrl,
   jobBoardDetailUrl,
   memberProfileEmailUrl,
 } from './job-openings-url';
@@ -394,9 +395,11 @@ export class JobOpeningsReferralService {
   ) {
     return {
       name: member.name,
-      // Only our own profile links get the attribution UTMs — an external
-      // LinkedIn URL goes out exactly as submitted.
-      profileUrl: member.uid ? memberProfileEmailUrl(member.uid, utm) : member.externalProfileUrl ?? null,
+      profileUrl: member.uid
+        ? memberProfileEmailUrl(member.uid, utm)
+        : member.externalProfileUrl
+        ? externalProfileEmailUrl(member.externalProfileUrl, utm)
+        : null,
       headline: this.formatHeadline(headline),
       location: this.formatLocation(member.location),
       skills: member.skills.map((skill) => skill.title).slice(0, PROFILE_CARD_SKILLS_LIMIT),
