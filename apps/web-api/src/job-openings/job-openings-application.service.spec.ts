@@ -10,19 +10,26 @@ import { PROTOCOL_LABS_TEAM_UID } from '../team-news/team-news-public-list.confi
 import { JobOpeningsApplicationService } from './job-openings-application.service';
 
 type PrismaMock = {
-  member: { findUnique: jest.Mock };
+  member: { findUnique: jest.Mock; count: jest.Mock };
   jobOpening: { findUnique: jest.Mock };
-  jobApplication: { findUnique: jest.Mock; findMany: jest.Mock; create: jest.Mock; count: jest.Mock };
+  jobApplication: {
+    findUnique: jest.Mock;
+    findMany: jest.Mock;
+    create: jest.Mock;
+    updateMany: jest.Mock;
+    count: jest.Mock;
+  };
   teamMemberRole: { findMany: jest.Mock };
 };
 
 const buildPrismaMock = (): PrismaMock => ({
-  member: { findUnique: jest.fn() },
+  member: { findUnique: jest.fn(), count: jest.fn().mockResolvedValue(1) },
   jobOpening: { findUnique: jest.fn() },
   jobApplication: {
     findUnique: jest.fn(),
     findMany: jest.fn(),
     create: jest.fn(),
+    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     count: jest.fn().mockResolvedValue(8),
   },
   teamMemberRole: { findMany: jest.fn() },
@@ -160,24 +167,151 @@ describe('JobOpeningsApplicationService', () => {
     );
   });
 
-  /* Approval used to gate this — PENDING, VERIFIED and REJECTED all got a 403
-     and no email. The review still runs, but it no longer holds up applying, so
-     the account's approval state is not consulted here at all: it is neither
-     selected nor read. This asserts the application actually goes out for a
-     member the old rule would have refused. */
-  it('sends the application without consulting approval state', async () => {
+  it('sends immediately when the applicant profile is visible and stamps sentAt', async () => {
     mockHappyPath();
 
     await expect(service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' })).resolves.toMatchObject({
       jobUid: 'job-1',
     });
 
+    expect(prisma.member.count).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ uid: 'member-1', OR: expect.any(Array) }) })
+    );
     expect(notificationServiceClient.sendNotification).toHaveBeenCalledTimes(1);
-    expect(prisma.jobApplication.create).toHaveBeenCalledTimes(1);
+    expect(prisma.jobApplication.create.mock.calls[0][0].data.sentAt).toBeInstanceOf(Date);
+  });
 
-    // The gate is gone at the source, not just unenforced: nothing asks the
-    // database for it any more.
-    expect(prisma.member.findUnique.mock.calls[0][0].select).not.toHaveProperty('memberApproval');
+  it('stores the application without emailing when the applicant profile is not visible', async () => {
+    mockHappyPath();
+    prisma.member.count.mockResolvedValue(0);
+
+    await expect(service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' })).resolves.toEqual({
+      uid: 'app-1',
+      jobUid: 'job-1',
+      appliedAt: '2026-08-19T12:00:00.000Z',
+    });
+
+    expect(notificationServiceClient.sendNotification).not.toHaveBeenCalled();
+    expect(prisma.jobApplication.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          memberUid: 'member-1',
+          toEmail: 'lead@airship.com',
+          ccEmails: ['lead2@airship.com'],
+          sentAt: null,
+        }),
+      })
+    );
+  });
+
+  describe('sendPendingApplications', () => {
+    const pendingApplication = { uid: 'app-1', jobOpeningUid: 'job-1', coverLetter: 'Hi there' };
+
+    it('claims the application before emailing so it can never be sent twice', async () => {
+      prisma.jobApplication.findMany.mockResolvedValue([pendingApplication]);
+      prisma.member.findUnique.mockResolvedValue(applicant);
+      prisma.jobOpening.findUnique.mockResolvedValue(jobOpening);
+      prisma.teamMemberRole.findMany.mockResolvedValue([lead]);
+      const order: string[] = [];
+      prisma.jobApplication.updateMany.mockImplementation(async () => {
+        order.push('claim');
+        return { count: 1 };
+      });
+      notificationServiceClient.sendNotification.mockImplementation(async () => {
+        order.push('send');
+        return {};
+      });
+
+      await service.sendPendingApplications('member-1');
+
+      expect(order).toEqual(['claim', 'send']);
+      expect(prisma.jobApplication.updateMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips an application another run already claimed', async () => {
+      prisma.jobApplication.findMany.mockResolvedValue([pendingApplication]);
+      prisma.member.findUnique.mockResolvedValue(applicant);
+      prisma.jobOpening.findUnique.mockResolvedValue(jobOpening);
+      prisma.teamMemberRole.findMany.mockResolvedValue([lead]);
+      prisma.jobApplication.updateMany.mockResolvedValue({ count: 0 });
+
+      await service.sendPendingApplications('member-1');
+
+      expect(notificationServiceClient.sendNotification).not.toHaveBeenCalled();
+    });
+
+    it('keeps the claim when the email fails instead of retrying later', async () => {
+      prisma.jobApplication.findMany.mockResolvedValue([pendingApplication]);
+      prisma.member.findUnique.mockResolvedValue(applicant);
+      prisma.jobOpening.findUnique.mockResolvedValue(jobOpening);
+      prisma.teamMemberRole.findMany.mockResolvedValue([lead]);
+      notificationServiceClient.sendNotification.mockRejectedValue(new Error('timeout'));
+
+      await expect(service.sendPendingApplications('member-1')).resolves.toBeUndefined();
+
+      expect(prisma.jobApplication.updateMany).toHaveBeenCalledTimes(1);
+      expect(prisma.jobApplication.updateMany.mock.calls[0][0].data.sentAt).toBeInstanceOf(Date);
+    });
+
+    it('emails unsent applications once the member profile is visible and stamps sentAt', async () => {
+      prisma.jobApplication.findMany.mockResolvedValue([pendingApplication]);
+      prisma.member.findUnique.mockResolvedValue(applicant);
+      prisma.jobOpening.findUnique.mockResolvedValue(jobOpening);
+      prisma.teamMemberRole.findMany.mockResolvedValue([lead]);
+
+      await service.sendPendingApplications('member-1');
+
+      expect(prisma.jobApplication.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { memberUid: 'member-1', sentAt: null } })
+      );
+      expect(prisma.member.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { uid: 'member-1' } }));
+      expect(notificationServiceClient.sendNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recipientsInfo: expect.objectContaining({ to: ['lead@airship.com'], cc: [], replyTo: 'ada@example.com' }),
+          deliveryPayload: { body: expect.objectContaining({ coverLetterHtml: expect.stringContaining('Hi there') }) },
+        })
+      );
+      expect(prisma.jobApplication.updateMany).toHaveBeenCalledWith({
+        where: { uid: 'app-1', sentAt: null },
+        data: expect.objectContaining({
+          toEmail: 'lead@airship.com',
+          ccEmails: [],
+          sentAt: expect.any(Date),
+          profileSnapshot: expect.objectContaining({ memberUid: 'member-1' }),
+        }),
+      });
+    });
+
+    it('does nothing when there are no unsent applications', async () => {
+      prisma.jobApplication.findMany.mockResolvedValue([]);
+
+      await service.sendPendingApplications('member-1');
+
+      expect(prisma.member.findUnique).not.toHaveBeenCalled();
+      expect(notificationServiceClient.sendNotification).not.toHaveBeenCalled();
+    });
+
+    it('leaves applications unsent while the profile is still not visible', async () => {
+      prisma.jobApplication.findMany.mockResolvedValue([pendingApplication]);
+      prisma.member.findUnique.mockResolvedValue(applicant);
+      prisma.member.count.mockResolvedValue(0);
+
+      await service.sendPendingApplications('member-1');
+
+      expect(notificationServiceClient.sendNotification).not.toHaveBeenCalled();
+      expect(prisma.jobApplication.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('skips a job that is now hidden and keeps the application unsent', async () => {
+      prisma.jobApplication.findMany.mockResolvedValue([pendingApplication]);
+      prisma.member.findUnique.mockResolvedValue(applicant);
+      prisma.jobOpening.findUnique.mockResolvedValue({ ...jobOpening, status: JobOpeningStatus.STALE });
+
+      await expect(service.sendPendingApplications('member-1')).resolves.toBeUndefined();
+
+      expect(notificationServiceClient.sendNotification).not.toHaveBeenCalled();
+      expect(prisma.jobApplication.updateMany).not.toHaveBeenCalled();
+    });
   });
 
   /* The one account state that still cannot apply, and it never went through

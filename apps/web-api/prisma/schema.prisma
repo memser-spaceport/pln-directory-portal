@@ -2380,6 +2380,7 @@ model JobApplication {
   profileSnapshot Json
   toEmail         String
   ccEmails        String[]   @default([])
+  sentAt          DateTime?
   createdAt       DateTime   @default(now())
 
   @@unique([jobOpeningUid, memberUid])

@@ -1,8 +1,11 @@
-import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { Prisma } from '@prisma/client';
 import type { CreateJobApplicationInput } from 'libs/contracts/src/schema/job-application';
 import { PrismaService } from '../shared/prisma.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
+import { directoryVisibleMemberWhere } from '../members/member-visibility';
+import { MEMBER_APPROVED, MemberApprovedPayload } from '../member-approvals/member-approvals.events';
 import { noteToHtml } from './job-openings-email-html';
 import { parseJobReferCcEmails, resolveVisibleJobOpening, type ResolvedJobOpening } from './job-openings-resolve';
 import { isProtocolLabsTeam } from './pin-protocol-labs-team';
@@ -13,6 +16,7 @@ const PROFILE_CARD_SKILLS_LIMIT = 3;
 
 type ApplicantLocation = { city: string | null; country: string; region: string | null } | null;
 type MemberHeadline = { title: string | null; companyName: string | null };
+type Recipient = { uid: string; name: string; email: string };
 
 type Applicant = {
   uid: string;
@@ -48,6 +52,8 @@ type Applicant = {
 
 @Injectable()
 export class JobOpeningsApplicationService {
+  private readonly logger = new Logger(JobOpeningsApplicationService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationServiceClient: NotificationServiceClient
@@ -67,9 +73,107 @@ export class JobOpeningsApplicationService {
     const jobOpening = await resolveVisibleJobOpening(this.prisma, jobUid);
     const { to, cc } = await this.resolveApplicationRecipients(jobOpening);
 
-    const companyName = this.resolveCompanyName(applicant);
-    const profileSnapshot = this.buildProfileSnapshot(applicant, companyName);
-    const coverLetterHtml = noteToHtml(input.coverLetter);
+    // An unapproved member without a visible profile would send leads a link they cannot open,
+    // so the email waits until approval (see sendPendingApplications).
+    const profileVisible = await this.isProfileVisible(applicant.uid);
+    if (profileVisible) {
+      await this.sendApplicationEmail(applicant, jobOpening, to, cc, input.coverLetter);
+    }
+
+    try {
+      const record = await this.prisma.jobApplication.create({
+        data: {
+          jobOpeningUid: jobOpening.uid,
+          memberUid: applicant.uid,
+          coverLetter: input.coverLetter.trim(),
+          profileSnapshot: this.buildProfileSnapshot(applicant),
+          toEmail: to.email,
+          ccEmails: cc.map((lead) => lead.email),
+          sentAt: profileVisible ? new Date() : null,
+        },
+      });
+
+      return {
+        uid: record.uid,
+        jobUid: jobOpening.uid,
+        appliedAt: record.createdAt.toISOString(),
+      };
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('Already applied to this job');
+      }
+      throw error;
+    }
+  }
+
+  @OnEvent(MEMBER_APPROVED)
+  async onMemberApproved(payload: MemberApprovedPayload) {
+    try {
+      await this.sendPendingApplications(payload.memberUid);
+    } catch (error) {
+      this.logger.error(
+        `Pending job applications for member ${payload.memberUid} not sent: ${error?.message ?? error}`
+      );
+    }
+  }
+
+  async sendPendingApplications(memberUid: string) {
+    const pending = await this.prisma.jobApplication.findMany({
+      where: { memberUid, sentAt: null },
+      select: { uid: true, jobOpeningUid: true, coverLetter: true },
+    });
+    if (pending.length === 0) return;
+
+    const applicant = await this.findApplicant({ uid: memberUid });
+    if (!applicant || !(await this.isProfileVisible(memberUid))) return;
+
+    for (const application of pending) {
+      let jobOpening: ResolvedJobOpening;
+      let recipients: { to: Recipient; cc: Recipient[] };
+      try {
+        jobOpening = await resolveVisibleJobOpening(this.prisma, application.jobOpeningUid);
+        recipients = await this.resolveApplicationRecipients(jobOpening);
+      } catch (error) {
+        this.logger.warn(`Pending job application ${application.uid} not sent: ${error?.message ?? error}`);
+        continue;
+      }
+
+      // Claim the row before sending so concurrent approval events cannot both email the leads.
+      // The claim is kept even if the send fails: a lost email beats a duplicate one.
+      const claimed = await this.prisma.jobApplication.updateMany({
+        where: { uid: application.uid, sentAt: null },
+        data: {
+          profileSnapshot: this.buildProfileSnapshot(applicant),
+          toEmail: recipients.to.email,
+          ccEmails: recipients.cc.map((lead) => lead.email),
+          sentAt: new Date(),
+        },
+      });
+      if (claimed.count === 0) continue;
+
+      try {
+        await this.sendApplicationEmail(applicant, jobOpening, recipients.to, recipients.cc, application.coverLetter);
+      } catch (error) {
+        this.logger.error(
+          `Pending job application ${application.uid} marked sent but email failed: ${error?.message ?? error}`
+        );
+      }
+    }
+  }
+
+  private async isProfileVisible(memberUid: string): Promise<boolean> {
+    const count = await this.prisma.member.count({ where: { uid: memberUid, ...directoryVisibleMemberWhere() } });
+    return count > 0;
+  }
+
+  private async sendApplicationEmail(
+    applicant: Applicant,
+    jobOpening: ResolvedJobOpening,
+    to: Recipient,
+    cc: Recipient[],
+    coverLetter: string
+  ) {
+    const coverLetterHtml = noteToHtml(coverLetter);
     const jobBoardUrl = jobBoardDetailUrl(jobOpening.uid);
 
     await this.notificationServiceClient.sendNotification({
@@ -105,30 +209,6 @@ export class JobOpeningsApplicationService {
         userName: to.name,
       },
     });
-
-    try {
-      const record = await this.prisma.jobApplication.create({
-        data: {
-          jobOpeningUid: jobOpening.uid,
-          memberUid: applicant.uid,
-          coverLetter: input.coverLetter.trim(),
-          profileSnapshot,
-          toEmail: to.email,
-          ccEmails: cc.map((lead) => lead.email),
-        },
-      });
-
-      return {
-        uid: record.uid,
-        jobUid: jobOpening.uid,
-        appliedAt: record.createdAt.toISOString(),
-      };
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException('Already applied to this job');
-      }
-      throw error;
-    }
   }
 
   async listMine(applicantEmail: string | undefined) {
@@ -152,8 +232,16 @@ export class JobOpeningsApplicationService {
     if (!email) {
       throw new UnauthorizedException('Authenticated email required');
     }
+    const applicant = await this.findApplicant({ email });
+    if (!applicant) {
+      throw new UnauthorizedException('Member not found');
+    }
+    return applicant;
+  }
+
+  private async findApplicant(where: Prisma.MemberWhereUniqueInput): Promise<Applicant | null> {
     const member = await this.prisma.member.findUnique({
-      where: { email },
+      where,
       select: {
         uid: true,
         name: true,
@@ -195,7 +283,7 @@ export class JobOpeningsApplicationService {
       },
     });
     if (!member || member.deletedAt || !member.email) {
-      throw new UnauthorizedException('Member not found');
+      return null;
     }
 
     return {
@@ -318,13 +406,13 @@ export class JobOpeningsApplicationService {
     return mainTeam?.team.name ?? null;
   }
 
-  private buildProfileSnapshot(applicant: Applicant, companyName: string | null) {
+  private buildProfileSnapshot(applicant: Applicant) {
     return {
       memberUid: applicant.uid,
       name: applicant.name,
       email: applicant.email,
       role: applicant.role?.trim() ?? '',
-      currentCompany: companyName,
+      currentCompany: this.resolveCompanyName(applicant),
       location: applicant.location
         ? {
             city: applicant.location.city ?? undefined,

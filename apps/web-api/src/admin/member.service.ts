@@ -34,6 +34,8 @@ import {
   MEMBER_PERMISSIONS,
 } from '../access-control-v2/access-control-v2.constants';
 import { TeamsService } from '../teams/teams.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { MEMBER_APPROVED } from '../member-approvals/member-approvals.events';
 import {
   assignJobSearchStatusFromInput,
   toPrismaJobSearchStatus,
@@ -54,7 +56,8 @@ export class MemberService {
     private notificationSettingsService: NotificationSettingsService,
     private forestAdminService: ForestAdminService,
     @Inject(forwardRef(() => TeamsService))
-    private teamService: TeamsService
+    private teamService: TeamsService,
+    private eventEmitter: EventEmitter2
   ) {}
 
   private resolveMemberState(approvalState?: MemberApprovalState | null): MemberApprovalState {
@@ -749,6 +752,10 @@ export class MemberService {
         );
       });
 
+      if (this.normalizeMemberStateFromPayload(updatePayload) === MemberApprovalState.APPROVED) {
+        this.eventEmitter.emit(MEMBER_APPROVED, { memberUid });
+      }
+
       return this.findMemberByUid(memberUid);
     }
 
@@ -821,6 +828,7 @@ export class MemberService {
         const memberName = existingMemberBeforeUpdate?.name ?? result?.name;
 
         await this.notificationService.notifyForMemberCreationApproval(memberName, memberUid, memberEmail, false);
+        this.eventEmitter.emit(MEMBER_APPROVED, { memberUid });
       }
     }
 
