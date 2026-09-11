@@ -63,6 +63,7 @@ const newDataMemberSchema = z.object({
   isUserConsent: z.boolean().nullish(),
   isSubscribedToNewsletter: z.boolean().nullish(),
   teamOrProjectURL: z.string().nullish(),
+  hasInactiveEmail: z.boolean().nullish(),
 });
 
 const newDataTeamSchema = z.object({

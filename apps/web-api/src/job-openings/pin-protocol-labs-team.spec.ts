@@ -41,6 +41,18 @@ describe('isInAppApplyAvailable', () => {
     expect(isInAppApplyAvailable({ teamUid: 'other', name: 'Airship' })).toBe(true);
     expect(isInAppApplyAvailable({ teamUid: 'other', name: 'Airship', jobReferEmail: 'jobs@airship.com' })).toBe(true);
   });
+
+  it('is false for any team flagged with inactive lead emails', () => {
+    expect(isInAppApplyAvailable({ teamUid: 'other', name: 'Airship', hasInactiveLeadEmails: true })).toBe(false);
+    expect(
+      isInAppApplyAvailable({
+        teamUid: PROTOCOL_LABS_TEAM_UID,
+        name: 'Protocol Labs',
+        jobReferEmail: 'jobs@protocol.ai',
+        hasInactiveLeadEmails: true,
+      })
+    ).toBe(false);
+  });
 });
 
 describe('pinProtocolLabsThenPage', () => {

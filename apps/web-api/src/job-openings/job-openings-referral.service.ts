@@ -415,7 +415,7 @@ export class JobOpeningsReferralService {
     const members = memberUids.length
       ? await this.prisma.member.findMany({
           where: { uid: { in: memberUids } },
-          select: { uid: true, name: true, email: true, deletedAt: true },
+          select: { uid: true, name: true, email: true, deletedAt: true, hasInactiveEmail: true },
         })
       : [];
     const memberByUid = new Map(members.map((member) => [member.uid, member]));
@@ -423,7 +423,7 @@ export class JobOpeningsReferralService {
     return recipients.map((recipient) => {
       if (recipient.memberUid) {
         const member = memberByUid.get(recipient.memberUid);
-        if (!member || member.deletedAt || !member.email) {
+        if (!member || member.deletedAt || !member.email || member.hasInactiveEmail) {
           throw new BadRequestException(`Recipient member ${recipient.memberUid} not found`);
         }
         return { email: member.email, name: member.name };

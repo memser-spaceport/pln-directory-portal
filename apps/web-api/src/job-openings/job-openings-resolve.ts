@@ -9,7 +9,13 @@ export type ResolvedJobOpening = {
   sourceLink: string | null;
   status: JobOpeningStatus;
   teamUid: string | null;
-  team: { uid: string; name: string; jobReferEmail: string | null; jobReferCcEmails: string[] };
+  team: {
+    uid: string;
+    name: string;
+    jobReferEmail: string | null;
+    jobReferCcEmails: string[];
+    hasInactiveLeadEmails: boolean;
+  };
 };
 
 export function parseJobReferCcEmails(emails: string[] | null | undefined): string[] {
@@ -33,7 +39,9 @@ export async function resolveVisibleJobOpening(prisma: PrismaService, jobUid: st
       sourceLink: true,
       status: true,
       teamUid: true,
-      team: { select: { uid: true, name: true, jobReferEmail: true, jobReferCcEmails: true } },
+      team: {
+        select: { uid: true, name: true, jobReferEmail: true, jobReferCcEmails: true, hasInactiveLeadEmails: true },
+      },
     },
   });
   if (!jobOpening || !jobOpening.team || HIDDEN_JOB_OPENING_STATUSES.includes(jobOpening.status)) {

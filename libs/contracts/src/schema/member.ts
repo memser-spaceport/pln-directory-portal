@@ -75,6 +75,7 @@ export const MemberSchema = z.object({
   isUserConsent: z.boolean().nullish(),
   isSubscribedToNewsletter: z.boolean().nullish(),
   teamOrProjectURL: z.string().nullish(),
+  hasInactiveEmail: z.boolean().nullish(),
 });
 
 export const ResponseMemberSchema = MemberSchema.omit({ id: true, telegramUid: true }).strict();

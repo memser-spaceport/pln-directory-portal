@@ -281,6 +281,14 @@ describe('JobOpeningsReferralService', () => {
     expect(prisma.member.findMany).toHaveBeenCalled();
   });
 
+  it('rejects a recipient member marked with an inactive email', async () => {
+    mockHappyPath({ ...jobOpening.team, jobReferEmail: null });
+    prisma.member.findMany.mockResolvedValue([{ ...lead, hasInactiveEmail: true }, leadTwo]);
+
+    await expect(service.referJob('job-1', referrer.email, referralInput)).rejects.toBeInstanceOf(BadRequestException);
+    expect(notificationServiceClient.sendNotification).not.toHaveBeenCalled();
+  });
+
   it('requires an authenticated email', async () => {
     await expect(service.referJob('job-1', undefined, referralInput)).rejects.toBeInstanceOf(UnauthorizedException);
   });

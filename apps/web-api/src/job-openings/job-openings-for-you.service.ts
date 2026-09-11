@@ -120,6 +120,7 @@ export class JobOpeningsForYouService {
               teamUid: team.uid,
               name: team.name,
               jobReferEmail: team.jobReferEmail,
+              hasInactiveLeadEmails: team.hasInactiveLeadEmails,
             }),
           },
           // The MATCHED count, not the team's whole board: this card lists only
@@ -203,6 +204,7 @@ function loadCandidates(prisma: PrismaService, ownTeamUids: ReadonlySet<string>)
           uid: true,
           name: true,
           jobReferEmail: true,
+          hasInactiveLeadEmails: true,
           logo: { select: { url: true } },
           teamFocusAreas: {
             select: {

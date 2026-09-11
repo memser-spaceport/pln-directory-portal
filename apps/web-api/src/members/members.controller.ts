@@ -54,11 +54,8 @@ import {
   sanitizeMemberContactsForViewer,
   sanitizeMembersContactsForViewer,
 } from './member-contact-sanitizer';
-import {
-  assignJobSearchStatusFromInput,
-  omitJobSearchStatus,
-  presentJobSearchStatusForViewer,
-} from './job-search-status';
+import { assignJobSearchStatusFromInput, presentJobSearchStatusForViewer } from './job-search-status';
+import { presentEmailForViewer } from './inactive-email';
 
 const server = initNestServer(apiMembers);
 type RouteShape = typeof server.routeShapes;
@@ -242,7 +239,7 @@ export class MemberController {
       throw new NotFoundException('Member not found');
     }
 
-    return this.withJobSearchStatusVisibility(
+    return this.withViewerGatedFields(
       sanitizeMemberContactsForViewer(member, isRequestAuthenticated(request as any)),
       request as Request & { userEmail?: string },
       uid
@@ -560,7 +557,7 @@ export class MemberController {
       throw new NotFoundException('Member not found');
     }
 
-    return this.withJobSearchStatusVisibility(
+    return this.withViewerGatedFields(
       sanitizeMemberContactsForViewer(member, isRequestAuthenticated(request as any)),
       request as Request & { userEmail?: string },
       member.uid
@@ -691,17 +688,14 @@ export class MemberController {
     return await this.membersService.getMemberInvestorSetting(uid);
   }
 
-  private async withJobSearchStatusVisibility<T extends Record<string, unknown>>(
+  private async withViewerGatedFields<T extends Record<string, unknown>>(
     member: T,
     request: Request & { userEmail?: string },
     memberUid: string
   ): Promise<T> {
     const email = request.userEmail;
-    if (!email) {
-      return omitJobSearchStatus({ ...member });
-    }
-    const requestor = await this.membersService.findMemberByEmail(email);
-    const canSee = requestor?.uid === memberUid || requestor?.isDirectoryAdmin === true;
-    return presentJobSearchStatusForViewer({ ...member }, canSee);
+    const requestor = email ? await this.membersService.findMemberByEmail(email) : null;
+    const canSee = !!requestor && (requestor.uid === memberUid || requestor.isDirectoryAdmin === true);
+    return presentEmailForViewer(presentJobSearchStatusForViewer({ ...member }, canSee), canSee);
   }
 }

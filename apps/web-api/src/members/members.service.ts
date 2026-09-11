@@ -2543,6 +2543,7 @@ export class MembersService {
       uid: true,
       externalId: true,
       name: true,
+      hasInactiveEmail: true,
       officeHours: true,
       ohStatus: true,
       ohInterest: true,

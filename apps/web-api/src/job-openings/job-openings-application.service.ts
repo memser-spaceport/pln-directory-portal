@@ -217,6 +217,9 @@ export class JobOpeningsApplicationService {
   }
 
   private async resolveApplicationRecipients(jobOpening: ResolvedJobOpening) {
+    if (jobOpening.team.hasInactiveLeadEmails) {
+      throw new BadRequestException('This job is not accepting in-app applications');
+    }
     if (isProtocolLabsTeam({ teamUid: jobOpening.team.uid, name: jobOpening.team.name })) {
       const jobReferEmail = jobOpening.team.jobReferEmail?.trim() || null;
       if (!jobReferEmail) {
@@ -241,7 +244,7 @@ export class JobOpeningsApplicationService {
       where: {
         teamUid,
         teamLead: true,
-        member: { deletedAt: null, email: { not: null } },
+        member: { deletedAt: null, email: { not: null }, hasInactiveEmail: false },
       },
       select: {
         member: { select: { uid: true, name: true, email: true } },

@@ -88,7 +88,7 @@ describe('JobOpeningsApplicationService', () => {
     process.env.WEB_UI_BASE_URL = 'https://directory.test';
   });
 
-  function mockHappyPath(team = jobOpening.team) {
+  function mockHappyPath(team: typeof jobOpening.team & { hasInactiveLeadEmails?: boolean } = jobOpening.team) {
     prisma.member.findUnique.mockResolvedValue(applicant);
     prisma.jobApplication.findUnique.mockResolvedValue(null);
     prisma.jobOpening.findUnique.mockResolvedValue({ ...jobOpening, teamUid: team.uid, team });
@@ -225,6 +225,28 @@ describe('JobOpeningsApplicationService', () => {
     await expect(service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' })).rejects.toBeInstanceOf(
       NotFoundException
     );
+  });
+
+  it('excludes leads marked with an inactive email from the recipients query', async () => {
+    mockHappyPath();
+
+    await service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' });
+
+    expect(prisma.teamMemberRole.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ member: expect.objectContaining({ hasInactiveEmail: false }) }),
+      })
+    );
+  });
+
+  it('returns 400 when the team is flagged with inactive lead emails', async () => {
+    mockHappyPath({ ...jobOpening.team, hasInactiveLeadEmails: true });
+
+    await expect(service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' })).rejects.toBeInstanceOf(
+      BadRequestException
+    );
+    expect(prisma.teamMemberRole.findMany).not.toHaveBeenCalled();
+    expect(notificationServiceClient.sendNotification).not.toHaveBeenCalled();
   });
 
   it('returns 400 when there are no team leads with email', async () => {

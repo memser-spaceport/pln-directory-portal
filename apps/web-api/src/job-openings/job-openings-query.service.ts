@@ -309,6 +309,7 @@ export class JobOpeningsQueryService {
           uid: true,
           name: true,
           jobReferEmail: true,
+          hasInactiveLeadEmails: true,
           logo: { select: { url: true } },
           jobOpenings: {
             where,
@@ -385,6 +386,7 @@ export class JobOpeningsQueryService {
               teamUid: team.uid,
               name: team.name,
               jobReferEmail: team.jobReferEmail,
+              hasInactiveLeadEmails: team.hasInactiveLeadEmails,
             }),
           },
           totalRoles: roleCountByTeamUid.get(group.teamUid) ?? teamRoles.length,

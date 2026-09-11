@@ -235,6 +235,7 @@ export class AdminTeamsService {
         dateFounded: true,
         teamSize: true,
         location: true,
+        hasInactiveLeadEmails: true,
         logo: { select: { url: true } },
       },
     });
