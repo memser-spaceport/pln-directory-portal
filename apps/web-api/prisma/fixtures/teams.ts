@@ -61,6 +61,7 @@ const teamsFactory = Factory.define<Omit<Team, 'id'>>(({ sequence, onCreate }) =
     lastModifiedBy: null,
     investorProfileId: null,
     isFund: faker.datatype.boolean(),
+    hasInactiveLeadEmails: false,
     accessLevel: 'L1',
     accessLevelUpdatedAt: faker.date.past(),
     blueskyHandler: faker.helpers.arrayElement([null, faker.name.firstName()]),
