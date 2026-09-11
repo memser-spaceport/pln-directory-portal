@@ -1,11 +1,13 @@
 import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MemberApprovalState, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { toWireJobSearchStatus } from '../members/job-search-status';
+import { MEMBER_APPROVED } from './member-approvals.events';
 
 @Injectable()
 export class MemberApprovalsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly eventEmitter: EventEmitter2) {}
 
   async list(state?: 'PENDING' | 'APPROVED' | 'VERIFIED' | 'REJECTED') {
     const rows = await this.prisma.memberApproval.findMany({
@@ -175,6 +177,7 @@ export class MemberApprovalsService {
         where: { uid: memberUid, deletedAt: { not: null } },
         data: { deletedAt: null, deletionReason: null },
       });
+      this.eventEmitter.emit(MEMBER_APPROVED, { memberUid });
     }
 
     return this.get(memberUid);
