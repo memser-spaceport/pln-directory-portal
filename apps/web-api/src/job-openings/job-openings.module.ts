@@ -12,17 +12,9 @@ import { JobOpeningsSignUpService } from './job-openings-sign-up.service';
 import { SharedModule } from '../shared/shared.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { MembersModule } from '../members/members.module';
-import { TeamNewsModule } from '../team-news/team-news.module';
 
 @Module({
-  imports: [
-    SharedModule,
-    NotificationsModule,
-    forwardRef(() => MembersModule),
-    // forwardRef: this reaches TeamNewsSuggestionsService for the For You feed's
-    // team signal, and team-news reaches members, which reaches back here.
-    forwardRef(() => TeamNewsModule),
-  ],
+  imports: [SharedModule, NotificationsModule, forwardRef(() => MembersModule)],
   controllers: [JobOpeningsController, JobOpeningsServiceController],
   providers: [
     JobOpeningsQueryService,

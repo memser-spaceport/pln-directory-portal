@@ -182,7 +182,7 @@ describe('JobOpeningsApplicationService', () => {
 
   /* The one account state that still cannot apply, and it never went through
      the approval check: a rejected member is soft-deleted, so `resolveApplicant`
-     refuses them before `assertCanApply` is reached. Worth pinning now that the
+     refuses them before anything else runs. Worth pinning now that the
      approval branch above is gone — otherwise nothing covers it. */
   it('refuses a soft-deleted member without emailing', async () => {
     prisma.member.findUnique.mockResolvedValue({ ...applicant, deletedAt: new Date('2026-01-01') });
@@ -194,29 +194,14 @@ describe('JobOpeningsApplicationService', () => {
     expect(prisma.jobApplication.create).not.toHaveBeenCalled();
   });
 
-  it('rejects missing role or missing status', async () => {
-    prisma.member.findUnique.mockResolvedValue({ ...applicant, role: '  ' });
-    await expect(service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' })).rejects.toBeInstanceOf(
-      BadRequestException
-    );
-
-    prisma.member.findUnique.mockResolvedValue({ ...applicant, jobSearchStatus: null });
-    await expect(service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' })).rejects.toBeInstanceOf(
-      BadRequestException
-    );
-    expect(notificationServiceClient.sendNotification).not.toHaveBeenCalled();
-  });
-
-  it('allows not-looking when a role is set', async () => {
+  it('applies without a role or a job search status', async () => {
     mockHappyPath();
-    prisma.member.findUnique.mockResolvedValue({
-      ...applicant,
-      jobSearchStatus: JobSearchStatus.NOT_LOOKING,
-    });
+    prisma.member.findUnique.mockResolvedValue({ ...applicant, role: '  ', jobSearchStatus: null });
 
     await expect(service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' })).resolves.toMatchObject({
       uid: 'app-1',
     });
+    expect(notificationServiceClient.sendNotification).toHaveBeenCalledTimes(1);
   });
 
   it('returns 409 for a duplicate apply and does not send a second email', async () => {

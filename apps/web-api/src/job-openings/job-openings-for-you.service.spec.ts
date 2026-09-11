@@ -1,6 +1,5 @@
 import { JobTeamGroupSchema } from 'libs/contracts/src/schema/job-opening';
 import type { PrismaService } from '../shared/prisma.service';
-import type { TeamNewsSuggestionsService } from '../team-news/team-news-suggestions.service';
 import { JobOpeningsForYouService } from './job-openings-for-you.service';
 import type { JobOpeningsQueryService } from './job-openings-query.service';
 
@@ -59,15 +58,7 @@ const job = (uid: string, teamUid: string, overrides: Record<string, unknown> = 
 /** The whole board reaches the service through one findMany, so the fixture is
  *  the list of postings in the window and the assertions are about what the
  *  matcher keeps, how it groups it, and in what order. */
-const build = ({
-  memberRow,
-  jobs,
-  forYouTeamUids = [],
-}: {
-  memberRow: MemberRow | null;
-  jobs: ReturnType<typeof job>[];
-  forYouTeamUids?: string[];
-}) => {
+const build = ({ memberRow, jobs }: { memberRow: MemberRow | null; jobs: ReturnType<typeof job>[] }) => {
   const findMany = jest.fn().mockResolvedValue(jobs);
   const prisma = {
     member: { findUnique: jest.fn().mockResolvedValue(memberRow) },
@@ -76,13 +67,9 @@ const build = ({
   const queryService = {
     loadInterestStamps: jest.fn().mockResolvedValue({ counts: new Map(), viewerInterested: new Set() }),
   } as unknown as JobOpeningsQueryService;
-  const getForYouTeamUids = jest.fn().mockResolvedValue(forYouTeamUids);
-  const suggestions = { getForYouTeamUids } as unknown as TeamNewsSuggestionsService;
-
   return {
-    service: new JobOpeningsForYouService(prisma, queryService, suggestions),
+    service: new JobOpeningsForYouService(prisma, queryService),
     findMany,
-    getForYouTeamUids,
   };
 };
 
@@ -100,16 +87,13 @@ describe('JobOpeningsForYouService.listForYou', () => {
     await expect(service.listForYou('me@example.com')).resolves.toEqual({ groups: [] });
   });
 
-  it('keeps a job whose team the news For You already covers', async () => {
+  it('drops a job the member cannot do, however close they are to the team', async () => {
     const { service } = build({
-      memberRow: member(),
-      jobs: [job('r1', 't1'), job('r2', 't2')],
-      forYouTeamUids: ['t1'],
+      memberRow: member({ role: 'Backend Engineer' }),
+      jobs: [job('r1', 't1', { roleTitle: 'Community Manager' })],
     });
 
-    const { groups } = await service.listForYou('me@example.com');
-
-    expect(groups.map((g) => g.team.uid)).toEqual(['t1']);
+    await expect(service.listForYou('me@example.com')).resolves.toEqual({ groups: [] });
   });
 
   it('keeps a job matching the member’s role at a team they have no relationship with', async () => {
@@ -134,21 +118,10 @@ describe('JobOpeningsForYouService.listForYou', () => {
     expect(groups.map((g) => g.team.uid).sort()).toEqual(['t1', 't2']);
   });
 
-  it('drops a job matching on neither signal', async () => {
-    const { service } = build({
-      memberRow: member({ role: 'Backend Engineer' }),
-      jobs: [job('r1', 't1', { roleTitle: 'Community Manager' })],
-    });
-
-    await expect(service.listForYou('me@example.com')).resolves.toEqual({ groups: [] });
-  });
-
-  it('excludes the member’s own teams in the query, so neither signal can bring them back', async () => {
+  it('excludes the member’s own teams in the query, so a matching role cannot come back', async () => {
     const { service, findMany } = build({
       memberRow: member({ teamMemberRoles: [{ teamUid: 'own', role: 'Backend Engineer' }] }),
       jobs: [],
-      // A team the member belongs to is in the news For You set by definition.
-      forYouTeamUids: ['own', 't1'],
     });
 
     await service.listForYou('me@example.com');
@@ -162,20 +135,19 @@ describe('JobOpeningsForYouService.listForYou', () => {
     );
   });
 
-  it('ranks a job matching both signals above one matching only text, and text above team-only', async () => {
+  it('ranks the team with the freshest matched role first', async () => {
+    const older = new Date('2026-09-01T00:00:00.000Z');
     const { service } = build({
       memberRow: member({ role: 'Backend Engineer' }),
       jobs: [
-        job('team-only', 't-team', { roleTitle: 'Community Manager' }),
-        job('text-only', 't-text', { roleTitle: 'Backend Engineer' }),
-        job('both', 't-both', { roleTitle: 'Backend Engineer' }),
+        job('stale', 't-stale', { roleTitle: 'Backend Engineer', postedDate: older }),
+        job('fresh', 't-fresh', { roleTitle: 'Backend Engineer' }),
       ],
-      forYouTeamUids: ['t-team', 't-both'],
     });
 
     const { groups } = await service.listForYou('me@example.com');
 
-    expect(groups.map((g) => g.team.uid)).toEqual(['t-both', 't-text', 't-team']);
+    expect(groups.map((g) => g.team.uid)).toEqual(['t-fresh', 't-stale']);
   });
 
   it('rolls a team’s matched roles into one group, freshest first, and counts only those', async () => {
@@ -197,7 +169,10 @@ describe('JobOpeningsForYouService.listForYou', () => {
   });
 
   it('returns groups the board’s own contract accepts', async () => {
-    const { service } = build({ memberRow: member(), jobs: [job('r1', 't1')], forYouTeamUids: ['t1'] });
+    const { service } = build({
+      memberRow: member({ role: 'Backend Engineer' }),
+      jobs: [job('r1', 't1', { roleTitle: 'Backend Engineer' })],
+    });
 
     const { groups } = await service.listForYou('me@example.com');
 

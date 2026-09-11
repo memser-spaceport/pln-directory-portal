@@ -1,6 +1,6 @@
 /**
- * The text half of the For You job match: does a job's own words overlap what
- * this member does?
+ * The whole of the For You job match: does a job's own words overlap what this
+ * member does?
  *
  * Compared against a job's STRUCTURED fields only — roleTitle, roleCategory,
  * department, seniority. Deliberately NOT the scraped posting body, where a
@@ -10,7 +10,6 @@
  * The consequence, accepted when this was specced: individual skills ("Rust",
  * "Solidity") rarely appear in a role title, so most of what this signal
  * actually catches is the member's current role and past experience titles.
- * The team signal covers the rest.
  */
 
 /**

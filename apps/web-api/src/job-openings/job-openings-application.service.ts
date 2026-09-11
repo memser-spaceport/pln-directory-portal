@@ -55,7 +55,6 @@ export class JobOpeningsApplicationService {
 
   async apply(jobUid: string, applicantEmail: string | undefined, input: CreateJobApplicationInput) {
     const applicant = await this.resolveApplicant(applicantEmail);
-    this.assertCanApply(applicant);
 
     const existing = await this.prisma.jobApplication.findUnique({
       where: { jobOpeningUid_memberUid: { jobOpeningUid: jobUid, memberUid: applicant.uid } },
@@ -215,32 +214,6 @@ export class JobOpeningsApplicationService {
       projectContributions: member.projectContributions,
       teamMemberRoles: member.teamMemberRoles,
     };
-  }
-
-  /**
-   * What an application needs, which is no longer an approved account.
-   *
-   * Approval used to gate this: an unapproved member got a 403 and the board
-   * sent them to the team's own posting instead. The review is still real and
-   * still runs, but it no longer holds up applying — it is a fact about the
-   * account rather than a condition on this button. Someone who signs up to
-   * apply for a job can now do the thing they came to do, and the PL team's
-   * review happens alongside it.
-   *
-   * Rejection is not handled here and never was: a rejected member is
-   * soft-deleted, so they do not reach this method at all.
-   *
-   * What survives are the two checks about the *application* rather than the
-   * account — a role and a job-search status, both of which travel to the
-   * hiring team and neither of which anyone else can supply.
-   */
-  private assertCanApply(applicant: Applicant) {
-    if (!applicant.role?.trim()) {
-      throw new BadRequestException('Current role is required before applying');
-    }
-    if (!applicant.jobSearchStatus) {
-      throw new BadRequestException('Job search status is required before applying');
-    }
   }
 
   private async resolveApplicationRecipients(jobOpening: ResolvedJobOpening) {
