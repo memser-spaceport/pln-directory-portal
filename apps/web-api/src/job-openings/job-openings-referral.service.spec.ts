@@ -134,6 +134,20 @@ describe('JobOpeningsReferralService', () => {
     );
   });
 
+  it('tags both profile cards so the email click can be attributed', async () => {
+    mockHappyPath();
+
+    await service.referJob('job-1', referrer.email, referralInput);
+
+    const body = notificationServiceClient.sendNotification.mock.calls[0][0].deliveryPayload.body;
+    expect(body.referred.profileUrl).toBe(
+      'https://directory.test/members/referred-1?utm_source=job_referral_email&utm_medium=email&utm_content=referred&job_uid=job-1'
+    );
+    // Distinct `utm_content` — the two cards sit in the same email, so without it
+    // a click on the candidate and a click on whoever vouched for them are one number.
+    expect(body.referrer.profileUrl).toContain('utm_content=referrer');
+  });
+
   it('skips ccing the referred member and sends them a separate notice when not included', async () => {
     mockHappyPath();
 
@@ -267,6 +281,14 @@ describe('JobOpeningsReferralService', () => {
     expect(prisma.member.findMany).toHaveBeenCalled();
   });
 
+  it('rejects a recipient member marked with an inactive email', async () => {
+    mockHappyPath({ ...jobOpening.team, jobReferEmail: null });
+    prisma.member.findMany.mockResolvedValue([{ ...lead, hasInactiveEmail: true }, leadTwo]);
+
+    await expect(service.referJob('job-1', referrer.email, referralInput)).rejects.toBeInstanceOf(BadRequestException);
+    expect(notificationServiceClient.sendNotification).not.toHaveBeenCalled();
+  });
+
   it('requires an authenticated email', async () => {
     await expect(service.referJob('job-1', undefined, referralInput)).rejects.toBeInstanceOf(UnauthorizedException);
   });
@@ -350,7 +372,8 @@ describe('JobOpeningsReferralService', () => {
             body: expect.objectContaining({
               referred: expect.objectContaining({
                 name: externalPerson.name,
-                profileUrl: 'https://www.linkedin.com/in/nia-okafor',
+                profileUrl:
+                  'https://www.linkedin.com/in/nia-okafor?utm_source=job_referral_email&utm_medium=email&utm_content=referred&job_uid=job-1',
                 headline: null,
                 location: null,
                 skills: [],
@@ -391,7 +414,9 @@ describe('JobOpeningsReferralService', () => {
         expect.objectContaining({
           deliveryPayload: {
             body: expect.objectContaining({
-              referred: expect.objectContaining({ profileUrl: 'https://linkedin.com/in/nia-okafor' }),
+              referred: expect.objectContaining({
+                profileUrl: expect.stringMatching(/^https:\/\/linkedin\.com\/in\/nia-okafor\?utm_source=/),
+              }),
             }),
           },
         })

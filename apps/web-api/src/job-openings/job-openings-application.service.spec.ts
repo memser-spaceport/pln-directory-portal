@@ -88,7 +88,7 @@ describe('JobOpeningsApplicationService', () => {
     process.env.WEB_UI_BASE_URL = 'https://directory.test';
   });
 
-  function mockHappyPath(team = jobOpening.team) {
+  function mockHappyPath(team: typeof jobOpening.team & { hasInactiveLeadEmails?: boolean } = jobOpening.team) {
     prisma.member.findUnique.mockResolvedValue(applicant);
     prisma.jobApplication.findUnique.mockResolvedValue(null);
     prisma.jobOpening.findUnique.mockResolvedValue({ ...jobOpening, teamUid: team.uid, team });
@@ -124,7 +124,8 @@ describe('JobOpeningsApplicationService', () => {
           body: expect.objectContaining({
             applicant: {
               name: 'Ada Lovelace',
-              profileUrl: 'https://directory.test/members/member-1',
+              profileUrl:
+                'https://directory.test/members/member-1?utm_source=job_application_email&utm_medium=email&utm_content=applicant&job_uid=job-1',
               headline: 'Engineer, LabOS',
               location: 'London, UK',
               skills: ['TypeScript'],
@@ -141,6 +142,22 @@ describe('JobOpeningsApplicationService', () => {
     expect(snapshot.currentCompany).toBe('LabOS');
     expect(snapshot.role).toBe('Engineer');
     expect(prisma.jobApplication.count).not.toHaveBeenCalled();
+  });
+
+  it('tags the applicant card so the email click can be attributed', async () => {
+    mockHappyPath();
+
+    await service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' });
+
+    const body = notificationServiceClient.sendNotification.mock.calls[0][0].deliveryPayload.body;
+    expect(body.applicant.profileUrl).toBe(
+      'https://directory.test/members/member-1?utm_source=job_application_email&utm_medium=email&utm_content=applicant&job_uid=job-1'
+    );
+    // The stored snapshot is a record of the application, not a link anyone
+    // clicks — it keeps the plain URL.
+    expect(prisma.jobApplication.create.mock.calls[0][0].data.profileSnapshot.profileUrl).toBe(
+      'https://directory.test/members/member-1'
+    );
   });
 
   /* Approval used to gate this — PENDING, VERIFIED and REJECTED all got a 403
@@ -165,7 +182,7 @@ describe('JobOpeningsApplicationService', () => {
 
   /* The one account state that still cannot apply, and it never went through
      the approval check: a rejected member is soft-deleted, so `resolveApplicant`
-     refuses them before `assertCanApply` is reached. Worth pinning now that the
+     refuses them before anything else runs. Worth pinning now that the
      approval branch above is gone — otherwise nothing covers it. */
   it('refuses a soft-deleted member without emailing', async () => {
     prisma.member.findUnique.mockResolvedValue({ ...applicant, deletedAt: new Date('2026-01-01') });
@@ -177,29 +194,14 @@ describe('JobOpeningsApplicationService', () => {
     expect(prisma.jobApplication.create).not.toHaveBeenCalled();
   });
 
-  it('rejects missing role or missing status', async () => {
-    prisma.member.findUnique.mockResolvedValue({ ...applicant, role: '  ' });
-    await expect(service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' })).rejects.toBeInstanceOf(
-      BadRequestException
-    );
-
-    prisma.member.findUnique.mockResolvedValue({ ...applicant, jobSearchStatus: null });
-    await expect(service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' })).rejects.toBeInstanceOf(
-      BadRequestException
-    );
-    expect(notificationServiceClient.sendNotification).not.toHaveBeenCalled();
-  });
-
-  it('allows not-looking when a role is set', async () => {
+  it('applies without a role or a job search status', async () => {
     mockHappyPath();
-    prisma.member.findUnique.mockResolvedValue({
-      ...applicant,
-      jobSearchStatus: JobSearchStatus.NOT_LOOKING,
-    });
+    prisma.member.findUnique.mockResolvedValue({ ...applicant, role: '  ', jobSearchStatus: null });
 
     await expect(service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' })).resolves.toMatchObject({
       uid: 'app-1',
     });
+    expect(notificationServiceClient.sendNotification).toHaveBeenCalledTimes(1);
   });
 
   it('returns 409 for a duplicate apply and does not send a second email', async () => {
@@ -223,6 +225,28 @@ describe('JobOpeningsApplicationService', () => {
     await expect(service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' })).rejects.toBeInstanceOf(
       NotFoundException
     );
+  });
+
+  it('excludes leads marked with an inactive email from the recipients query', async () => {
+    mockHappyPath();
+
+    await service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' });
+
+    expect(prisma.teamMemberRole.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ member: expect.objectContaining({ hasInactiveEmail: false }) }),
+      })
+    );
+  });
+
+  it('returns 400 when the team is flagged with inactive lead emails', async () => {
+    mockHappyPath({ ...jobOpening.team, hasInactiveLeadEmails: true });
+
+    await expect(service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' })).rejects.toBeInstanceOf(
+      BadRequestException
+    );
+    expect(prisma.teamMemberRole.findMany).not.toHaveBeenCalled();
+    expect(notificationServiceClient.sendNotification).not.toHaveBeenCalled();
   });
 
   it('returns 400 when there are no team leads with email', async () => {

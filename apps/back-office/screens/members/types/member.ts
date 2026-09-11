@@ -32,6 +32,7 @@ export type Member = {
     config: unknown | null;
   }[];
   memberState?: 'PENDING' | 'VERIFIED' | 'APPROVED' | 'REJECTED';
+  hasInactiveEmail?: boolean;
 };
 
 export type TMemberForm = {
@@ -57,6 +58,7 @@ export type TMemberForm = {
   github: string;
   telegram: string;
   officeHours: string;
+  hasInactiveEmail: boolean;
   investorProfile?: {
     investmentFocus: { label: string; value: string }[];
     typicalCheckSize: number;

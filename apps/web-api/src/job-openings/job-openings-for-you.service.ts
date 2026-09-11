@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
-import { TeamNewsSuggestionsService } from '../team-news/team-news-suggestions.service';
 import { buildJobOpeningDateWhere } from './job-opening-date.where';
 import { hasJobTextMatch, tokenizeJobMatchText } from './job-openings-for-you-match';
 import { HIDDEN_JOB_OPENING_STATUSES, JobOpeningsQueryService } from './job-openings-query.service';
@@ -20,47 +19,27 @@ const FOR_YOU_WINDOW_DAYS = 14;
  */
 const FOR_YOU_GROUP_LIMIT = 10;
 
-/**
- * A skills/role/experience hit outranks a team hit: a job matching what the
- * member does is a better card than a job at a team they happen to follow. A
- * job carrying both outranks either alone, which falls out of adding them.
- */
-const TEXT_SIGNAL_SCORE = 2;
-const TEAM_SIGNAL_SCORE = 1;
-
 type CandidateJob = Awaited<ReturnType<typeof loadCandidates>>[number];
 
-type ScoredRole = {
-  score: number;
+type MatchedRole = {
   displayDate: Date;
   role: CandidateJob;
 };
 
 @Injectable()
 export class JobOpeningsForYouService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly queryService: JobOpeningsQueryService,
-    private readonly suggestionsService: TeamNewsSuggestionsService
-  ) {}
+  constructor(private readonly prisma: PrismaService, private readonly queryService: JobOpeningsQueryService) {}
 
   /**
-   * Jobs matching this member, grouped per team, ranked by match strength.
+   * Jobs matching this member, grouped per team, freshest first.
    *
-   * A job qualifies on either signal:
+   * A job qualifies on one signal only: its own role words overlap the member's
+   * skills, current role, or past experience titles (`hasJobTextMatch`). Whether
+   * the member follows or is suggested the team is deliberately irrelevant —
+   * a role you could not do is not "for you" just because you know the team.
    *
-   * - **team** — its team is one the newsfeed's For You already covers
-   *   (`getForYouTeamUids`: follows ∪ memberships ∪ attribute-matched
-   *   suggestions), so the two surfaces agree about which teams are "yours".
-   *   That suggestion arm only considers teams which published news in the last
-   *   14 days — inherited from the news matcher rather than reinvented, which
-   *   is what "the same matching approach as news" asks for.
-   * - **text** — the job's own role words overlap the member's skills, current
-   *   role, or past experience titles (`hasJobTextMatch`).
-   *
-   * The member's own teams are excluded outright, on either signal: a
-   * personalized card for a role at the company you already work at reads as a
-   * mistake. Their memberships still seed the suggestion arm above.
+   * The member's own teams are excluded outright: a personalized card for a
+   * role at the company you already work at reads as a mistake.
    *
    * Tolerant like the board's own list — an anonymous, unknown, or deleted
    * caller gets an empty set, never an error.
@@ -72,11 +51,7 @@ export class JobOpeningsForYouService {
     }
 
     const ownTeamUids = new Set(member.teamMemberRoles.map((teamRole) => teamRole.teamUid));
-    const [forYouTeamUids, candidates] = await Promise.all([
-      this.suggestionsService.getForYouTeamUids(member.uid),
-      loadCandidates(this.prisma, ownTeamUids),
-    ]);
-    const teamSignalUids = new Set(forYouTeamUids.filter((uid) => !ownTeamUids.has(uid)));
+    const candidates = await loadCandidates(this.prisma, ownTeamUids);
 
     const memberTokens = tokenizeJobMatchText([
       member.role,
@@ -85,7 +60,7 @@ export class JobOpeningsForYouService {
       ...member.experiences.map((experience) => experience.title),
     ]);
 
-    const matchesByTeam = new Map<string, ScoredRole[]>();
+    const matchesByTeam = new Map<string, MatchedRole[]>();
     for (const candidate of candidates) {
       if (!candidate.teamUid || !candidate.team) continue;
       const jobTokens = tokenizeJobMatchText([
@@ -94,46 +69,37 @@ export class JobOpeningsForYouService {
         candidate.department,
         candidate.seniority,
       ]);
-      const score =
-        (hasJobTextMatch(memberTokens, jobTokens) ? TEXT_SIGNAL_SCORE : 0) +
-        (teamSignalUids.has(candidate.teamUid) ? TEAM_SIGNAL_SCORE : 0);
-      if (score === 0) continue;
+      if (!hasJobTextMatch(memberTokens, jobTokens)) continue;
 
-      const scored: ScoredRole = {
-        score,
+      const matched: MatchedRole = {
         displayDate: candidate.postedDate ?? candidate.detectionDate ?? candidate.updatedAt,
         role: candidate,
       };
       const existing = matchesByTeam.get(candidate.teamUid);
-      if (existing) existing.push(scored);
-      else matchesByTeam.set(candidate.teamUid, [scored]);
+      if (existing) existing.push(matched);
+      else matchesByTeam.set(candidate.teamUid, [matched]);
     }
 
-    // Strongest match first, then the freshest team, then name — a stable order
-    // for a member whose matches all score alike.
+    // Freshest match first, then name — a stable order for a member whose
+    // matches all land on the same day.
     const rankedTeams = [...matchesByTeam.values()]
       .map((roles) =>
         [...roles].sort(
-          (a, b) =>
-            b.score - a.score ||
-            b.displayDate.getTime() - a.displayDate.getTime() ||
-            a.role.uid.localeCompare(b.role.uid)
+          (a, b) => b.displayDate.getTime() - a.displayDate.getTime() || a.role.uid.localeCompare(b.role.uid)
         )
       )
       .sort(
         (a, b) =>
-          b[0].score - a[0].score ||
-          b[0].displayDate.getTime() - a[0].displayDate.getTime() ||
-          teamName(a[0]).localeCompare(teamName(b[0]))
+          b[0].displayDate.getTime() - a[0].displayDate.getTime() || teamName(a[0]).localeCompare(teamName(b[0]))
       )
       .slice(0, FOR_YOU_GROUP_LIMIT);
 
-    const roleUids = rankedTeams.flatMap((roles) => roles.map((scored) => scored.role.uid));
+    const roleUids = rankedTeams.flatMap((roles) => roles.map((matched) => matched.role.uid));
     const { counts, viewerInterested } = await this.queryService.loadInterestStamps(roleUids, member.uid);
 
     return {
       groups: rankedTeams.map((roles) => {
-        // Present on every scored role by construction; read off the first.
+        // Present on every matched role by construction; read off the first.
         const team = roles[0].role.team as NonNullable<CandidateJob['team']>;
         const focusAreas = [...new Set(team.teamFocusAreas.map((tfa) => tfa.ancestorArea.title))].sort((a, b) =>
           a.localeCompare(b)
@@ -154,6 +120,7 @@ export class JobOpeningsForYouService {
               teamUid: team.uid,
               name: team.name,
               jobReferEmail: team.jobReferEmail,
+              hasInactiveLeadEmails: team.hasInactiveLeadEmails,
             }),
           },
           // The MATCHED count, not the team's whole board: this card lists only
@@ -197,7 +164,7 @@ export class JobOpeningsForYouService {
   }
 }
 
-const teamName = (scored: ScoredRole): string => scored.role.team?.name ?? '';
+const teamName = (matched: MatchedRole): string => matched.role.team?.name ?? '';
 
 /**
  * Every non-hidden posting in the window, minus the member's own teams.
@@ -237,6 +204,7 @@ function loadCandidates(prisma: PrismaService, ownTeamUids: ReadonlySet<string>)
           uid: true,
           name: true,
           jobReferEmail: true,
+          hasInactiveLeadEmails: true,
           logo: { select: { url: true } },
           teamFocusAreas: {
             select: {

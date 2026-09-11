@@ -39,6 +39,7 @@ export const memberFormSchema = yup.object({
   github: yup.string().defined(),
   telegram: yup.string().defined(),
   officeHours: yup.string().defined(),
+  hasInactiveEmail: yup.boolean().defined(),
   memberStateStatus: yup
     .object({ label: yup.string().required(), value: yup.string().required() })
     .nullable()

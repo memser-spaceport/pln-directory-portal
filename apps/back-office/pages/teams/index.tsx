@@ -32,6 +32,7 @@ type TeamRow = {
   accessLevel: AccessLevel;
   plnFriend: boolean;
   isFund: boolean;
+  hasInactiveLeadEmails: boolean;
   website?: string | null;
   shortDescription?: string | null;
   longDescription?: string | null;
@@ -257,6 +258,7 @@ const TeamsPage: React.FC = () => {
       shortDescription: team.shortDescription ?? '',
       longDescription: team.longDescription ?? '',
       plnFriend: team.plnFriend,
+      hasInactiveLeadEmails: team.hasInactiveLeadEmails,
       // Prefer priority if present; otherwise derive it from tier.
       priority: team.priority ?? tierToPriority(team.tier),
       tier: team.tier,
@@ -327,6 +329,7 @@ const TeamsPage: React.FC = () => {
         shortDescription: editForm.shortDescription ?? '',
         longDescription: editForm.longDescription ?? '',
         plnFriend: !!editForm.plnFriend,
+        hasInactiveLeadEmails: !!editForm.hasInactiveLeadEmails,
         // isFund is intentionally NOT editable on the right panel now
         blueskyHandler: (editForm.blueskyHandler ?? '').toString().trim() || null,
         crunchbaseHandler: (editForm.crunchbaseHandler ?? '').toString().trim() || null,
@@ -562,6 +565,18 @@ const TeamsPage: React.FC = () => {
                           onChange={(e) => onFieldChange('plnFriend', e.target.checked as any)}
                         />
                         <label className={s.checkboxLabel}>PLN friend</label>
+                      </div>
+                    </div>
+
+                    <div className={s.formField}>
+                      <div className={s.checkboxContainer}>
+                        <input
+                          type="checkbox"
+                          className={s.checkbox}
+                          checked={!!editForm.hasInactiveLeadEmails}
+                          onChange={(e) => onFieldChange('hasInactiveLeadEmails', e.target.checked as any)}
+                        />
+                        <label className={s.checkboxLabel}>Inactive lead emails (job board applies externally)</label>
                       </div>
                     </div>
 

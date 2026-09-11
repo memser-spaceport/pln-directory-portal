@@ -27,6 +27,7 @@ import { hashFileName } from '../utils/hashing';
 import { buildMultiRelationMapping, copyObj } from '../utils/helper/helper';
 import { CacheService } from '../utils/cache/cache.service';
 import { MembersHooksService } from './members.hooks.service';
+import { toPreferencePatch } from './member-preferences';
 import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
 import { OfficeHoursService } from '../office-hours/office-hours.service';
 import { TeamsService } from '../teams/teams.service';
@@ -1698,16 +1699,94 @@ export class MembersService {
   }
 
   /**
-   * Updates the member's preferences and resets the cache.
+   * Merges into the member's preferences and resets the cache.
+   *
+   * **Merges**, because this used to assign — and assigning a Prisma `Json`
+   * field replaces it wholesale. Every caller sends only the keys it cares
+   * about, so each one silently deleted what the others had written: dismissing
+   * the forum banner erased a member's contact-visibility settings, and saving
+   * those settings brought every dismissed dialog back. Nothing surfaced it.
+   *
+   * The merge is a single `jsonb ||` statement rather than a read followed by a
+   * write, so two settings pages saved at the same moment cannot lose one
+   * another — the shape of bug this method is fixing should not be reintroduced
+   * in a narrower form.
+   *
+   * Shallow on purpose: the blob is flat, and every writer sets its keys to
+   * explicit values rather than relying on absence, so there is nothing for a
+   * deep merge to do. Note that a key can no longer be *removed* through this
+   * route, only set — no caller does that today.
    *
    * @param id - The UID of the member.
-   * @param preferences - The new preferences data to be updated.
+   * @param preferences - Keys to set; anything absent is left alone.
    * @returns The updated member object.
    */
   async updatePreference(id: string, preferences: any): Promise<Member> {
-    const updatedMember = await this.updateMemberByUid(id, { preferences });
+    const patch = toPreferencePatch(preferences);
+
+    const updated = await this.prisma.$executeRaw`
+      UPDATE "Member"
+      SET "preferences" = COALESCE("preferences", '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb
+      WHERE uid = ${id}
+    `;
+    if (updated === 0) {
+      throw new NotFoundException(`Member not found: ${id}`);
+    }
+
+    /* Reset kept from the previous implementation: these flags are read back in
+       member responses, so a cached copy would serve the pre-save answer. */
     await this.cacheService.reset({ service: 'members' });
-    return updatedMember;
+
+    const member = await this.prisma.member.findUnique({ where: { uid: id } });
+    return member as Member;
+  }
+
+  /**
+   * Reads the member's one-time UI callout flags.
+   *
+   * Returns a flat map of callout key to `true`. An absent key means "not
+   * dismissed" — nothing ever writes `false`.
+   *
+   * @param uid - The UID of the member.
+   * @returns The member's UI flags, or `{}` when none have been set.
+   */
+  async getUiFlags(uid: string): Promise<Record<string, true>> {
+    const member = await this.prisma.member.findUnique({
+      where: { uid },
+      select: { uiFlags: true },
+    });
+    if (!member) {
+      throw new NotFoundException(`Member not found: ${uid}`);
+    }
+    return (member.uiFlags as Record<string, true> | null) ?? {};
+  }
+
+  /**
+   * Merges one-time UI callout flags into the member's existing set.
+   *
+   * Uses Postgres' `jsonb` merge operator in a single statement rather than a
+   * read-modify-write, so two tabs dismissing two different callouts at the
+   * same instant cannot lose one.
+   *
+   * Deliberately does NOT go through `updateMemberByUid`: that resets the whole
+   * members cache, and dismissing a tooltip must not flush it. These flags
+   * appear in no cached members response — they are read only through
+   * `getUiFlags`, whose route is `@NoCache()`.
+   *
+   * @param uid - The UID of the member.
+   * @param flags - Flat map of callout key to `true`; merged, never replacing.
+   * @returns The member's full set of UI flags after the merge.
+   */
+  async setUiFlags(uid: string, flags: Record<string, true>): Promise<Record<string, true>> {
+    const updated = await this.prisma.$executeRaw`
+      UPDATE "Member"
+      SET "uiFlags" = COALESCE("uiFlags", '{}'::jsonb) || ${JSON.stringify(flags)}::jsonb
+      WHERE uid = ${uid}
+    `;
+    if (updated === 0) {
+      throw new NotFoundException(`Member not found: ${uid}`);
+    }
+    return this.getUiFlags(uid);
   }
 
   /**
@@ -2464,6 +2543,7 @@ export class MembersService {
       uid: true,
       externalId: true,
       name: true,
+      hasInactiveEmail: true,
       officeHours: true,
       ohStatus: true,
       ohInterest: true,

@@ -90,6 +90,7 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
           telegramHandler: string;
           officeHours: string;
           githubHandler: string;
+          hasInactiveEmail: boolean;
           memberState?: string;
           roleCodes?: string[];
           policyCodes?: string[];
@@ -126,6 +127,7 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
           telegramHandler: formData.telegram,
           officeHours: formData.officeHours,
           githubHandler: formData.github,
+          hasInactiveEmail: formData.hasInactiveEmail,
         };
 
         // if (formData.investorProfile) {
@@ -240,6 +242,7 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
       github: data.githubHandler ?? '',
       linkedin: data.linkedinHandler ?? '',
       officeHours: data.officeHours ?? '',
+      hasInactiveEmail: data.hasInactiveEmail ?? false,
       telegram: data.telegramHandler ?? '',
       twitter: data.twitterHandler ?? '',
       bluesky: data.blueskyHandler ?? '',

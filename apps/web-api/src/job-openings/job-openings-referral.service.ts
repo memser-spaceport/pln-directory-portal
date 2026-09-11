@@ -6,7 +6,13 @@ import { noteToHtml } from './job-openings-email-html';
 import { normalizeExternalLinkedinUrl } from './job-openings-linkedin-url';
 import { parseJobReferCcEmails, resolveVisibleJobOpening } from './job-openings-resolve';
 import { deriveReferralBlurb } from './job-openings-referral-blurb';
-import { jobBoardDetailUrl } from './job-openings-url';
+import {
+  JOB_REFERRAL_EMAIL_UTM_SOURCE,
+  JOB_REFERRAL_NOTICE_EMAIL_UTM_SOURCE,
+  externalProfileEmailUrl,
+  jobBoardDetailUrl,
+  memberProfileEmailUrl,
+} from './job-openings-url';
 
 const JOB_BOARD_REFERRAL_TEMPLATE = 'JOB_BOARD_REFERRAL_EMAIL';
 // Sent only when the referrer didn't CC the referred person on the main referral email above.
@@ -83,8 +89,16 @@ export class JobOpeningsReferralService {
       },
       deliveryPayload: {
         body: {
-          referrer: this.buildMemberCard(referrer, referrerHeadline),
-          referred: this.buildMemberCard(referred, referredHeadline),
+          referrer: this.buildMemberCard(referrer, referrerHeadline, {
+            source: JOB_REFERRAL_EMAIL_UTM_SOURCE,
+            content: 'referrer',
+            jobUid: jobOpening.uid,
+          }),
+          referred: this.buildMemberCard(referred, referredHeadline, {
+            source: JOB_REFERRAL_EMAIL_UTM_SOURCE,
+            content: 'referred',
+            jobUid: jobOpening.uid,
+          }),
           roleTitle: jobOpening.roleTitle,
           teamName: jobOpening.team.name,
           noteHtml: noteToHtml(note),
@@ -125,7 +139,11 @@ export class JobOpeningsReferralService {
           body: {
             referredFirstName: firstName(referred.name),
             referrerFirstName: firstName(referrer.name),
-            referrer: this.buildMemberCard(referrer, referrerHeadline),
+            referrer: this.buildMemberCard(referrer, referrerHeadline, {
+              source: JOB_REFERRAL_NOTICE_EMAIL_UTM_SOURCE,
+              content: 'referrer',
+              jobUid: jobOpening.uid,
+            }),
             roleTitle: jobOpening.roleTitle,
             teamName: jobOpening.team.name,
             noteHtml: noteToHtml(note),
@@ -361,10 +379,6 @@ export class JobOpeningsReferralService {
     return [location.city, location.country].filter(Boolean).join(', ') || null;
   }
 
-  private profileUrl(memberUid: string): string {
-    return `${process.env.WEB_UI_BASE_URL}/members/${memberUid}`;
-  }
-
   // Shape consumed by the `memberCard` partial in the JOB_BOARD_REFERRAL_EMAIL template.
   // `uid: null` (an outside-the-network referred person) links to their LinkedIn profile
   // instead of a Directory profile page.
@@ -376,11 +390,16 @@ export class JobOpeningsReferralService {
       skills: { title: string }[];
       externalProfileUrl?: string | null;
     },
-    headline: MemberHeadline
+    headline: MemberHeadline,
+    utm: { source: string; content: string; jobUid: string }
   ) {
     return {
       name: member.name,
-      profileUrl: member.uid ? this.profileUrl(member.uid) : member.externalProfileUrl ?? null,
+      profileUrl: member.uid
+        ? memberProfileEmailUrl(member.uid, utm)
+        : member.externalProfileUrl
+        ? externalProfileEmailUrl(member.externalProfileUrl, utm)
+        : null,
       headline: this.formatHeadline(headline),
       location: this.formatLocation(member.location),
       skills: member.skills.map((skill) => skill.title).slice(0, PROFILE_CARD_SKILLS_LIMIT),
@@ -399,7 +418,7 @@ export class JobOpeningsReferralService {
     const members = memberUids.length
       ? await this.prisma.member.findMany({
           where: { uid: { in: memberUids } },
-          select: { uid: true, name: true, email: true, deletedAt: true },
+          select: { uid: true, name: true, email: true, deletedAt: true, hasInactiveEmail: true },
         })
       : [];
     const memberByUid = new Map(members.map((member) => [member.uid, member]));
@@ -407,7 +426,7 @@ export class JobOpeningsReferralService {
     return recipients.map((recipient) => {
       if (recipient.memberUid) {
         const member = memberByUid.get(recipient.memberUid);
-        if (!member || member.deletedAt || !member.email) {
+        if (!member || member.deletedAt || !member.email || member.hasInactiveEmail) {
           throw new BadRequestException(`Recipient member ${recipient.memberUid} not found`);
         }
         return { email: member.email, name: member.name };

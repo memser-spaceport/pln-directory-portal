@@ -3,6 +3,7 @@ import { ProfileImageInput } from '../ProfileImageInput';
 import { FormField } from '../../../../../components/FormField';
 import { FormDateField } from '../../../../../components/FormDateField';
 import { FormAreaField } from '../../../../../components/FormAreaField';
+import { FormCheckboxField } from '../../../../../components/FormCheckboxField';
 
 interface Props {
   existingImageUrl?: string;
@@ -19,6 +20,11 @@ export const ProfileDetails = ({ existingImageUrl }: Props) => {
         <FormField name="email" label="Email" placeholder="Email" isRequired />
         <FormDateField name="joinDate" label="Join Date" />
       </div>
+      <FormCheckboxField
+        name="hasInactiveEmail"
+        label="Email is inactive"
+        description="Hides the email from members and excludes this member from job applications and referrals."
+      />
       <div className="items-startq flex gap-4">
         <FormAreaField name="bio" placeholder="Short description" label="Bio" />
       </div>

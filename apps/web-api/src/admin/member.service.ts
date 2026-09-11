@@ -885,6 +885,7 @@ export class MemberService {
       'plnFriend',
       'openToWork',
       'isVerified',
+      'hasInactiveEmail',
       'signUpSource',
       'signUpMedium',
       'signUpCampaign',

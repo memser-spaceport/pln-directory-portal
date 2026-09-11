@@ -67,6 +67,7 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(({ sequence, onCreate 
     signUpCampaign: faker.company.name(),
     signUpMedium: faker.company.name(),
     isVerified: faker.datatype.boolean(),
+    hasInactiveEmail: false,
     isUserConsent: faker.datatype.boolean(),
     isSubscribedToNewsletter: faker.datatype.boolean(),
     teamOrProjectURL: faker.internet.url(),
@@ -82,6 +83,8 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(({ sequence, onCreate 
       showTwitter: true,
       showSubscription: true,
     },
+    // One-time callout dismissals; a seeded member has dismissed nothing.
+    uiFlags: {},
     isTierViewer: false,
     linkedInDetails: {},
     accessLevel,

@@ -8,9 +8,10 @@ import * as path from 'path';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import {
   clipTelegramText,
+  escapeTelegramHtml,
   stripInlineDataImages,
   toSupportEmailHtml,
-  toSupportTelegramText,
+  toSupportTelegramHtml,
 } from './contact-support-html';
 
 const CONTACT_SUPPORT_SUBJECT = 'New Contact Support Request';
@@ -57,11 +58,11 @@ export class ContactSupportService {
             text: clipTelegramText(
               [
                 'New support request',
-                `Topic: ${request.topic}`,
-                `Email: ${request.email ?? '-'}`,
-                `Name: ${request.name ?? '-'}`,
-                `Message: ${toSupportTelegramText(message ?? '-')}`,
-                this.formatSupportEmails(),
+                `Topic: ${escapeTelegramHtml(request.topic)}`,
+                `Email: ${escapeTelegramHtml(request.email ?? '-')}`,
+                `Name: ${escapeTelegramHtml(request.name ?? '-')}`,
+                `Message: ${toSupportTelegramHtml(message ?? '-')}`,
+                escapeTelegramHtml(this.formatSupportEmails()),
               ].join('\n')
             ),
             meta: {

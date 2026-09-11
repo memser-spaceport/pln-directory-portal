@@ -241,7 +241,7 @@ export const TeamNewsGroupedResponseSchema = z.object({
   windowDays: z.number().int(),
   generatedAt: z.string(),
   groups: z.array(TeamNewsFocusGroupSchema),
-  /** News from allowlisted teams with no focus-area group; home "All" tab only. */
+  /** News from teams with no focus-area group; home "All" tab only. */
   allTabExtraItems: z.array(TeamNewsItemSchema).default([]),
   /** Memberships ∪ follows ∪ Teams-to-follow matches; empty for anonymous. */
   forYouTeamUids: z.array(z.string()).default([]),

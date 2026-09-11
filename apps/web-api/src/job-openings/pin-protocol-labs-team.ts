@@ -7,12 +7,14 @@ export function isProtocolLabsTeam(team: { teamUid: string; name?: string }): bo
   return team.name?.trim().toLowerCase() === PROTOCOL_LABS_TEAM_NAME;
 }
 
-/** In-app Apply is off for Protocol Labs until the team job-refer email is set. */
+/** In-app Apply is off for teams flagged with inactive lead emails, and for Protocol Labs until the team job-refer email is set. */
 export function isInAppApplyAvailable(team: {
   teamUid: string;
   name?: string;
   jobReferEmail?: string | null;
+  hasInactiveLeadEmails?: boolean | null;
 }): boolean {
+  if (team.hasInactiveLeadEmails) return false;
   if (!isProtocolLabsTeam(team)) return true;
   return Boolean(team.jobReferEmail?.trim());
 }

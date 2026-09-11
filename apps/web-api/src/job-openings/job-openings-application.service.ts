@@ -6,7 +6,7 @@ import { NotificationServiceClient } from '../notifications/notification-service
 import { noteToHtml } from './job-openings-email-html';
 import { parseJobReferCcEmails, resolveVisibleJobOpening, type ResolvedJobOpening } from './job-openings-resolve';
 import { isProtocolLabsTeam } from './pin-protocol-labs-team';
-import { jobBoardDetailUrl } from './job-openings-url';
+import { JOB_APPLICATION_EMAIL_UTM_SOURCE, jobBoardDetailUrl, memberProfileEmailUrl } from './job-openings-url';
 
 const JOB_BOARD_APPLICATION_TEMPLATE = 'JOB_BOARD_APPLICATION_EMAIL';
 const PROFILE_CARD_SKILLS_LIMIT = 3;
@@ -55,7 +55,6 @@ export class JobOpeningsApplicationService {
 
   async apply(jobUid: string, applicantEmail: string | undefined, input: CreateJobApplicationInput) {
     const applicant = await this.resolveApplicant(applicantEmail);
-    this.assertCanApply(applicant);
 
     const existing = await this.prisma.jobApplication.findUnique({
       where: { jobOpeningUid_memberUid: { jobOpeningUid: jobUid, memberUid: applicant.uid } },
@@ -85,7 +84,7 @@ export class JobOpeningsApplicationService {
       },
       deliveryPayload: {
         body: {
-          applicant: this.buildMemberCard(applicant),
+          applicant: this.buildMemberCard(applicant, jobOpening.uid),
           roleTitle: jobOpening.roleTitle,
           teamName: jobOpening.team.name,
           coverLetterHtml,
@@ -217,33 +216,10 @@ export class JobOpeningsApplicationService {
     };
   }
 
-  /**
-   * What an application needs, which is no longer an approved account.
-   *
-   * Approval used to gate this: an unapproved member got a 403 and the board
-   * sent them to the team's own posting instead. The review is still real and
-   * still runs, but it no longer holds up applying — it is a fact about the
-   * account rather than a condition on this button. Someone who signs up to
-   * apply for a job can now do the thing they came to do, and the PL team's
-   * review happens alongside it.
-   *
-   * Rejection is not handled here and never was: a rejected member is
-   * soft-deleted, so they do not reach this method at all.
-   *
-   * What survives are the two checks about the *application* rather than the
-   * account — a role and a job-search status, both of which travel to the
-   * hiring team and neither of which anyone else can supply.
-   */
-  private assertCanApply(applicant: Applicant) {
-    if (!applicant.role?.trim()) {
-      throw new BadRequestException('Current role is required before applying');
-    }
-    if (!applicant.jobSearchStatus) {
-      throw new BadRequestException('Job search status is required before applying');
-    }
-  }
-
   private async resolveApplicationRecipients(jobOpening: ResolvedJobOpening) {
+    if (jobOpening.team.hasInactiveLeadEmails) {
+      throw new BadRequestException('This job is not accepting in-app applications');
+    }
     if (isProtocolLabsTeam({ teamUid: jobOpening.team.uid, name: jobOpening.team.name })) {
       const jobReferEmail = jobOpening.team.jobReferEmail?.trim() || null;
       if (!jobReferEmail) {
@@ -268,7 +244,7 @@ export class JobOpeningsApplicationService {
       where: {
         teamUid,
         teamLead: true,
-        member: { deletedAt: null, email: { not: null } },
+        member: { deletedAt: null, email: { not: null }, hasInactiveEmail: false },
       },
       select: {
         member: { select: { uid: true, name: true, email: true } },
@@ -317,10 +293,14 @@ export class JobOpeningsApplicationService {
   }
 
   // Shape consumed by the `memberCard` partial in the JOB_BOARD_APPLICATION_EMAIL template.
-  private buildMemberCard(applicant: Applicant) {
+  private buildMemberCard(applicant: Applicant, jobUid: string) {
     return {
       name: applicant.name,
-      profileUrl: `${process.env.WEB_UI_BASE_URL}/members/${applicant.uid}`,
+      profileUrl: memberProfileEmailUrl(applicant.uid, {
+        source: JOB_APPLICATION_EMAIL_UTM_SOURCE,
+        content: 'applicant',
+        jobUid,
+      }),
       headline: this.formatHeadline(this.resolveHeadline(applicant)),
       location: this.formatLocation(applicant.location),
       skills: applicant.skills

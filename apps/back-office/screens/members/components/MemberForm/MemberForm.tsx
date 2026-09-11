@@ -57,6 +57,7 @@ export const MemberForm = ({
     github: '',
     linkedin: '',
     officeHours: '',
+    hasInactiveEmail: false,
     telegram: '',
     twitter: '',
     bluesky: '',

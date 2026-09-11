@@ -56,6 +56,7 @@ model Team {
   plnFriend                    Boolean                       @default(false)
   isFeatured                   Boolean?                      @default(false)
   isFund                       Boolean                       @default(false)
+  hasInactiveLeadEmails        Boolean                       @default(false)
   airtableRecId                String?                       @unique
   createdAt                    DateTime                      @default(now())
   updatedAt                    DateTime                      @updatedAt
@@ -168,6 +169,7 @@ model Member {
   isFeatured                         Boolean?                          @default(false)
   isTierViewer                       Boolean?                          @default(false)
   isVerified                         Boolean?                          @default(false)
+  hasInactiveEmail                   Boolean                           @default(false)
   signUpSource                       String?
   signUpMedium                       String?
   signUpCampaign                     String?
@@ -185,6 +187,11 @@ model Member {
   memberRoles                        MemberRole[]
   following                          Follow[]                          @relation("MemberFollowing")
   preferences                        Json?
+  /// One-time UI callout dismissals, as a flat map of key -> true.
+  /// Deliberately NOT nested in `preferences`: that column is replaced
+  /// wholesale by every partial PATCH (issue #3406), and it is exposed in
+  /// member listings via `select=preferences`.
+  uiFlags                            Json?
   projectContributions               ProjectContribution[]
   createdProjects                    Project[]
   eventGuests                        PLEventGuest[]

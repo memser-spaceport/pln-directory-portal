@@ -29,6 +29,7 @@ interface MutationParams {
     telegramHandler: string;
     officeHours: string;
     githubHandler: string;
+    hasInactiveEmail?: boolean;
     memberState?: string;
     roleCodes?: string[];
     policyCodes?: string[];
