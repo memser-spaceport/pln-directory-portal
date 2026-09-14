@@ -14,6 +14,7 @@ import Handlebars from 'handlebars';
 import { PrismaService } from '../shared/prisma.service';
 import { v4 as uuidv4 } from 'uuid';
 import { HuskyAiToolsService } from './tools/husky-ai-tools.serivice';
+import { HuskyAuthContext } from './tools/husky-auth-context';
 import { AiProviderService, AiProviderType } from '../shared/ai-provider.service';
 import { z } from 'zod';
 
@@ -68,9 +69,10 @@ export class HuskyAiService {
    *      into the `content` string;
    *   2. sources / follow-up questions / actions, streamed as the remaining fields.
    */
-  async createContextualToolsResponse(chatInfo: HuskyChatInterface, isLoggedIn: boolean) {
+  async createContextualToolsResponse(chatInfo: HuskyChatInterface, isLoggedIn: boolean, userEmail?: string) {
     const { question, threadId, chatId, chatSummary } = chatInfo;
     const currentDate = new Date().toISOString().split('T')[0];
+    const auth = await this.resolveAuthContext(isLoggedIn, userEmail);
 
     // A conversation started elsewhere (e.g. a blog embed) is handed over with its
     // first exchange so the thread keeps that context.
@@ -104,7 +106,7 @@ export class HuskyAiService {
           const { textStream } = streamText({
             model,
             system: HUSKY_CONTEXTUAL_TOOLS_SYSTEM_PROMPT,
-            tools: this.huskyAiToolsService.getTools(isLoggedIn),
+            tools: this.huskyAiToolsService.getTools(auth),
             prompt: `
           ${historyPrompt}
             - question: ${question}
@@ -160,6 +162,28 @@ export class HuskyAiService {
     });
 
     return stream;
+  }
+
+  /**
+   * Resolves the directory member behind the signed-in caller so tools can gate
+   * their own data by this member's actual permissions (Investor DB access,
+   * etc.), not just by whether a session exists. Failure to resolve degrades to
+   * "logged in with no member context" rather than blocking the search.
+   */
+  private async resolveAuthContext(isLoggedIn: boolean, userEmail?: string): Promise<HuskyAuthContext> {
+    if (!isLoggedIn || !userEmail) {
+      return { isLoggedIn: false };
+    }
+    try {
+      const member = await this.prisma.member.findUnique({
+        where: { email: userEmail },
+        select: { uid: true, deletedAt: true },
+      });
+      return { isLoggedIn: true, memberUid: member && !member.deletedAt ? member.uid : undefined };
+    } catch (error) {
+      this.logger.error(`Failed to resolve member for Husky auth context: ${error?.message ?? error}`);
+      return { isLoggedIn: true };
+    }
   }
 
   /**

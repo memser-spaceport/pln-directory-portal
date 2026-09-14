@@ -90,6 +90,8 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
   };
   let aiProvider: { getResponsesModel: jest.Mock };
   let logger: { error: jest.Mock; info: jest.Mock };
+  let prisma: { member: { findUnique: jest.Mock } };
+  let toolsService: { getTools: jest.Mock };
   let service: HuskyAiService;
 
   beforeEach(() => {
@@ -103,14 +105,16 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
     };
     aiProvider = { getResponsesModel: jest.fn().mockReturnValue('model-handle') };
     logger = { error: jest.fn(), info: jest.fn() };
+    prisma = { member: { findUnique: jest.fn().mockResolvedValue(null) } };
+    toolsService = { getTools: jest.fn().mockReturnValue({}) };
     generateTextMock.mockResolvedValue({ text: 'summary text' });
 
     service = new HuskyAiService(
       logger as any,
       cache as any,
       persistent as any,
-      {} as any,
-      { getTools: jest.fn().mockReturnValue({}) } as any,
+      prisma as any,
+      toolsService as any,
       aiProvider as any
     );
   });
@@ -128,22 +132,30 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
     expect(HUSKY_SEARCH_FALLBACK_PROVIDER).toBe('gemini');
     expect(streamTextMock.mock.calls[0][0].model).toBe('model-handle');
     expect(streamObjectMock.mock.calls[0][0].model).toBe('model-handle');
+    expect(toolsService.getTools).toHaveBeenCalledWith({ isLoggedIn: false });
+    expect(prisma.member.findUnique).not.toHaveBeenCalled();
   });
 
   it('streams one valid JSON object even when the answer contains quotes, backslashes and newlines', async () => {
+    prisma.member.findUnique.mockResolvedValue({ uid: 'member-1', deletedAt: null });
     const answer = 'Example Team builds "storage" tools.\nSee C:\\path for details.';
     streamTextMock.mockReturnValue({ textStream: chunks([answer.slice(0, 20), answer.slice(20)]) });
     // Gemini may lead with whitespace and split the JSON arbitrarily across chunks.
     const json = JSON.stringify(STRUCTURED);
     streamObjectMock.mockReturnValue(structuredStream(['\n ', json.slice(0, 15), json.slice(15)]));
 
-    const raw = await readAll(await service.createContextualToolsResponse(chatInfo, true));
+    const raw = await readAll(await service.createContextualToolsResponse(chatInfo, true, 'member@example.com'));
     const parsed = HuskyResponseSchema.parse(JSON.parse(raw));
 
     expect(parsed.content).toBe(answer);
     expect(parsed.followUpQuestions).toEqual(STRUCTURED.followUpQuestions);
     expect(parsed.sources).toEqual(STRUCTURED.sources);
     expect(parsed.actions).toEqual(STRUCTURED.actions);
+    expect(prisma.member.findUnique).toHaveBeenCalledWith({
+      where: { email: 'member@example.com' },
+      select: { uid: true, deletedAt: true },
+    });
+    expect(toolsService.getTools).toHaveBeenCalledWith({ isLoggedIn: true, memberUid: 'member-1' });
 
     await flushBackgroundWork();
     expect(persistent.create).toHaveBeenCalledWith(

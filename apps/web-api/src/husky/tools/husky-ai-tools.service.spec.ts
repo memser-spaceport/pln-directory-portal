@@ -28,6 +28,9 @@ describe('HuskyAiToolsService.getTools', () => {
   const focusAreas = fakeTool(async () => 'focus areas');
   const asks = fakeTool(async () => 'asks');
   const forum = fakeTool(undefined);
+  const investors = fakeTool(async () => 'investors');
+  const jobOpenings = fakeTool(async () => 'job openings');
+  const news = fakeTool(async () => 'news');
 
   const service = new HuskyAiToolsService(
     logger as any,
@@ -37,22 +40,40 @@ describe('HuskyAiToolsService.getTools', () => {
     projects as any,
     focusAreas as any,
     asks as any,
-    forum as any
+    forum as any,
+    investors as any,
+    jobOpenings as any,
+    news as any
   );
 
   beforeEach(() => jest.clearAllMocks());
 
-  it('exposes only database-backed tools and passes the login state where it matters', () => {
-    const tools = service.getTools(true);
+  it('exposes only database-backed tools and passes the auth context where it matters', () => {
+    const auth = { isLoggedIn: true, memberUid: 'member-1' };
+    const tools = service.getTools(auth);
     expect(Object.keys(tools).sort()).toEqual(
-      ['getAsks', 'getFocusAreas', 'getForumPosts', 'getIrlEvents', 'getMembers', 'getProjects', 'getTeams'].sort()
+      [
+        'getAsks',
+        'getFocusAreas',
+        'getForumPosts',
+        'getIrlEvents',
+        'getInvestors',
+        'getJobOpenings',
+        'getMembers',
+        'getProjects',
+        'getTeams',
+        'getTeamNews',
+      ].sort()
     );
     expect(members.getTool).toHaveBeenCalledWith(true);
     expect(forum.getTool).toHaveBeenCalledWith(true);
+    expect(investors.getTool).toHaveBeenCalledWith(auth);
+    expect(news.getTool).toHaveBeenCalledWith(auth);
+    expect(jobOpenings.getTool).toHaveBeenCalledWith();
   });
 
   it('turns a throwing tool into a tool result instead of an exception', async () => {
-    const tools = service.getTools(false);
+    const tools = service.getTools({ isLoggedIn: false });
 
     await expect(run(tools.getTeams, { search: 'Example' }, options)).resolves.toMatch(
       /getTeams tool is currently unavailable/
@@ -62,7 +83,7 @@ describe('HuskyAiToolsService.getTools', () => {
   });
 
   it('leaves tools without an execute function untouched', () => {
-    const tools = service.getTools(false);
+    const tools = service.getTools({ isLoggedIn: false });
     expect(tools.getForumPosts.execute).toBeUndefined();
   });
 });
