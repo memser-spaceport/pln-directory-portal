@@ -10,22 +10,26 @@ import { ForumTool } from './forum.tool';
 import { InvestorsTool } from './investors.tool';
 import { JobOpeningsTool } from './job-openings.tool';
 import { NewsTool } from './news.tool';
+import { DemoDayTool } from './demo-day.tool';
 import { SearchModule } from '../../search/search.module';
 import { RbacModule } from '../../rbac/rbac.module';
 import { AccessControlV2Module } from '../../access-control-v2/access-control-v2.module';
 import { JobOpeningsModule } from '../../job-openings/job-openings.module';
 import { TeamNewsModule } from '../../team-news/team-news.module';
+import { DemoDaysModule } from '../../demo-days/demo-days.module';
 
 @Module({
   imports: [
     SearchModule,
     RbacModule,
     AccessControlV2Module,
-    // These two pull in MembersModule, which in turn imports HuskyModule (for
+    // These pull in MembersModule, which in turn imports HuskyModule (for
     // HuskyRevalidationService) — forwardRef breaks that require-time cycle,
-    // matching how JobOpeningsModule/TeamNewsModule already forwardRef MembersModule.
+    // matching how JobOpeningsModule/TeamNewsModule/DemoDaysModule already
+    // forwardRef MembersModule.
     forwardRef(() => JobOpeningsModule),
     forwardRef(() => TeamNewsModule),
+    forwardRef(() => DemoDaysModule),
   ],
   providers: [
     HuskyAiToolsService,
@@ -39,6 +43,7 @@ import { TeamNewsModule } from '../../team-news/team-news.module';
     InvestorsTool,
     JobOpeningsTool,
     NewsTool,
+    DemoDayTool,
   ],
   exports: [HuskyAiToolsService],
 })

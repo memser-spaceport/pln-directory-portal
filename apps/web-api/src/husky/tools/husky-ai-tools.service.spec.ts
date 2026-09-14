@@ -31,6 +31,7 @@ describe('HuskyAiToolsService.getTools', () => {
   const investors = fakeTool(async () => 'investors');
   const jobOpenings = fakeTool(async () => 'job openings');
   const news = fakeTool(async () => 'news');
+  const demoDay = fakeTool(async () => 'demo day teams');
 
   const service = new HuskyAiToolsService(
     logger as any,
@@ -43,7 +44,8 @@ describe('HuskyAiToolsService.getTools', () => {
     forum as any,
     investors as any,
     jobOpenings as any,
-    news as any
+    news as any,
+    demoDay as any
   );
 
   beforeEach(() => jest.clearAllMocks());
@@ -63,12 +65,14 @@ describe('HuskyAiToolsService.getTools', () => {
         'getProjects',
         'getTeams',
         'getTeamNews',
+        'getDemoDayTeams',
       ].sort()
     );
     expect(members.getTool).toHaveBeenCalledWith(true);
     expect(forum.getTool).toHaveBeenCalledWith(true);
     expect(investors.getTool).toHaveBeenCalledWith(auth);
     expect(news.getTool).toHaveBeenCalledWith(auth);
+    expect(demoDay.getTool).toHaveBeenCalledWith(auth);
     expect(jobOpenings.getTool).toHaveBeenCalledWith();
   });
 

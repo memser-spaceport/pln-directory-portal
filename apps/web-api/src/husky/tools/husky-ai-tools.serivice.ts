@@ -11,6 +11,7 @@ import { ForumTool } from './forum.tool';
 import { InvestorsTool } from './investors.tool';
 import { JobOpeningsTool } from './job-openings.tool';
 import { NewsTool } from './news.tool';
+import { DemoDayTool } from './demo-day.tool';
 import { HuskyAuthContext } from './husky-auth-context';
 
 /**
@@ -30,7 +31,8 @@ export class HuskyAiToolsService implements OnModuleInit {
     private forumTool: ForumTool,
     private investorsTool: InvestorsTool,
     private jobOpeningsTool: JobOpeningsTool,
-    private newsTool: NewsTool
+    private newsTool: NewsTool,
+    private demoDayTool: DemoDayTool
   ) {}
 
   async onModuleInit() {
@@ -50,6 +52,7 @@ export class HuskyAiToolsService implements OnModuleInit {
       getInvestors: this.investorsTool.getTool(auth),
       getJobOpenings: this.jobOpeningsTool.getTool(),
       getTeamNews: this.newsTool.getTool(auth),
+      getDemoDayTeams: this.demoDayTool.getTool(auth),
     };
     return Object.fromEntries(
       Object.entries(tools).map(([name, tool]) => [name, this.withFailureFallback(name, tool)])
