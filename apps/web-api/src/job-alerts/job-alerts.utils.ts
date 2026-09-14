@@ -36,12 +36,12 @@ export const hashFilterState = (canonical: JobAlertFilterState): string => {
       location: canonical.location.map((v) => v.toLowerCase()),
       workMode: canonical.workMode.map((v) => v.toLowerCase()),
     },
-    Object.keys({ q: 0, roleCategory: 0, seniority: 0, focus: 0, location: 0, workMode: 0 }).sort(),
+    Object.keys({ q: 0, roleCategory: 0, seniority: 0, focus: 0, location: 0, workMode: 0 }).sort()
   );
   return createHash('sha256').update(stable).digest('hex');
 };
 
-const SENIORITY_DISPLAY: Record<string, string> = {
+export const SENIORITY_DISPLAY: Record<string, string> = {
   'Junior (L1-L2)': 'Junior',
   'Mid (L3)': 'Mid',
   'Senior (L4)': 'Senior',

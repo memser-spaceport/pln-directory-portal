@@ -4,19 +4,14 @@ import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { RbacGuard } from '../rbac/rbac.guard';
 import { RequirePermissions } from '../rbac/rbac.decorator';
-import { RBAC_PERMISSION_CODES } from '../rbac/rbac.constants';
-import { ADMIN_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
+import { INVESTOR_DB_EDIT_PERMISSIONS, INVESTOR_DB_VIEW_PERMISSIONS } from '../rbac/rbac.constants';
 import { ListMembersQueryDto } from './dto/list-members.query.dto';
 import { AddListMemberDto } from './dto/membership.dto';
 import { InvestorListsQueryService } from './investor-lists-query.service';
 import { InvestorListsService, ListMembershipActor } from './investor-lists.service';
 
-const VIEW_PERMS = {
-  anyOf: [RBAC_PERMISSION_CODES.INVESTOR_DB_VIEW, ADMIN_PERMISSIONS.DIRECTORY_FULL],
-};
-const EDIT_PERMS = {
-  anyOf: [RBAC_PERMISSION_CODES.INVESTOR_DB_EDIT, ADMIN_PERMISSIONS.DIRECTORY_FULL],
-};
+const VIEW_PERMS = { anyOf: INVESTOR_DB_VIEW_PERMISSIONS };
+const EDIT_PERMS = { anyOf: INVESTOR_DB_EDIT_PERMISSIONS };
 
 interface AuthedRequest {
   userEmail?: string;
