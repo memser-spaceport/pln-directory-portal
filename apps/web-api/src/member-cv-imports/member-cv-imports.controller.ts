@@ -53,6 +53,31 @@ export class MemberCvImportsController {
     return this.memberCvImportsService.getLatest(uid, req.userEmail!);
   }
 
+  @Api(server.route.getMemberCvImportFile)
+  @NoCache()
+  @UseGuards(UserTokenValidation)
+  async getFile(
+    @ApiDecorator() { params: { uid } }: RouteShape['getMemberCvImportFile'],
+    @Req() req: { userEmail?: string }
+  ) {
+    return this.memberCvImportsService.getFile(uid, req.userEmail!);
+  }
+
+  /* The link this hands back is for the member's own resting "Your CV" card, so
+     the guard is the same owner check the other routes make. Showing a CV on an
+     application to the *hiring team* reading it is a wider question than this
+     route answers, and is deliberately not answered here. */
+  @Api(server.route.deleteMemberCvImport)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @NoCache()
+  @UseGuards(UserTokenValidation)
+  async remove(
+    @ApiDecorator() { params: { uid } }: RouteShape['deleteMemberCvImport'],
+    @Req() req: { userEmail?: string }
+  ) {
+    await this.memberCvImportsService.remove(uid, req.userEmail!);
+  }
+
   @Api(server.route.applyMemberCvImport)
   @NoCache()
   @UseGuards(UserTokenValidation)

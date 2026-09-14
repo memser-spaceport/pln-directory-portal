@@ -151,6 +151,23 @@ export class AwsService {
     }
   }
 
+  /**
+   * The object's size in bytes, or `undefined` if it cannot be read.
+   *
+   * Swallows the failure on purpose: callers use this for display (a file
+   * card's "182 KB"), so a HEAD that 404s or is denied should cost the caller
+   * that one line, not the whole response.
+   */
+  async getObjectSize(bucket: string, key: string): Promise<number | undefined> {
+    try {
+      const s3 = new AWS.S3(CONFIG);
+      const head = await s3.headObject({ Bucket: bucket, Key: key }).promise();
+      return typeof head.ContentLength === 'number' ? head.ContentLength : undefined;
+    } catch (error) {
+      return undefined;
+    }
+  }
+
   async deleteObjectFromS3(bucketName: string, key: string) {
     if (process.env.ENVIRONMENT === 'development' && (!bucketName || !CONFIG.region)) {
       return;
