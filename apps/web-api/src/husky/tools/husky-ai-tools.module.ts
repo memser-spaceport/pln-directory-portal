@@ -1,4 +1,4 @@
-import { forwardRef, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { HuskyAiToolsService } from './husky-ai-tools.serivice';
 import { IrlEventsTool } from './irl-events.tool';
 import { MembersTool } from './members.tool';
@@ -19,18 +19,7 @@ import { TeamNewsModule } from '../../team-news/team-news.module';
 import { DemoDaysModule } from '../../demo-days/demo-days.module';
 
 @Module({
-  imports: [
-    SearchModule,
-    RbacModule,
-    AccessControlV2Module,
-    // These pull in MembersModule, which in turn imports HuskyModule (for
-    // HuskyRevalidationService) — forwardRef breaks that require-time cycle,
-    // matching how JobOpeningsModule/TeamNewsModule/DemoDaysModule already
-    // forwardRef MembersModule.
-    forwardRef(() => JobOpeningsModule),
-    forwardRef(() => TeamNewsModule),
-    forwardRef(() => DemoDaysModule),
-  ],
+  imports: [SearchModule, RbacModule, AccessControlV2Module, JobOpeningsModule, TeamNewsModule, DemoDaysModule],
   providers: [
     HuskyAiToolsService,
     IrlEventsTool,

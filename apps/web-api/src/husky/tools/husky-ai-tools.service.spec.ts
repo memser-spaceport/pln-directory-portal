@@ -1,5 +1,9 @@
 // `ai` pulls in untranspiled ESM this jest config can't parse; only its types are used here.
 jest.mock('ai', () => ({}));
+// demo-day.tool transitively imports DemoDaysService -> AnalyticsService -> posthog-node,
+// which ships an untranspiled ESM axios build this jest config can't parse. This spec only
+// needs a constructible stand-in for DI wiring, never the real class.
+jest.mock('./demo-day.tool', () => ({ DemoDayTool: jest.fn() }));
 
 import { CoreTool } from 'ai';
 import { HuskyAiToolsService } from './husky-ai-tools.serivice';

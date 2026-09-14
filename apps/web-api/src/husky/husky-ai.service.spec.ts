@@ -10,6 +10,10 @@ jest.mock('ai', () => ({
   streamObject: jest.fn(),
   generateText: jest.fn(),
 }));
+// demo-day.tool transitively imports DemoDaysService -> AnalyticsService -> posthog-node,
+// which ships an untranspiled ESM axios build this jest config can't parse. This spec only
+// needs HuskyAiService's own module graph to load; the tools service itself is a plain mock.
+jest.mock('./tools/demo-day.tool', () => ({ DemoDayTool: jest.fn() }));
 
 import { streamText, streamObject, generateText } from 'ai';
 import { HuskyResponseSchema } from 'libs/contracts/src/schema/husky-chat';
