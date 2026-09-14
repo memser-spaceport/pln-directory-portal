@@ -76,7 +76,7 @@ describe('HuskyAiToolsService.getTools', () => {
     expect(forum.getTool).toHaveBeenCalledWith(true);
     expect(investors.getTool).toHaveBeenCalledWith(auth);
     expect(news.getTool).toHaveBeenCalledWith(auth);
-    expect(demoDay.getTool).toHaveBeenCalledWith(auth);
+    expect(demoDay.getTool).toHaveBeenCalledWith();
     expect(jobOpenings.getTool).toHaveBeenCalledWith();
   });
 

@@ -52,7 +52,7 @@ export class HuskyAiToolsService implements OnModuleInit {
       getInvestors: this.investorsTool.getTool(auth),
       getJobOpenings: this.jobOpeningsTool.getTool(),
       getTeamNews: this.newsTool.getTool(auth),
-      getDemoDayTeams: this.demoDayTool.getTool(auth),
+      getDemoDayTeams: this.demoDayTool.getTool(),
     };
     return Object.fromEntries(
       Object.entries(tools).map(([name, tool]) => [name, this.withFailureFallback(name, tool)])

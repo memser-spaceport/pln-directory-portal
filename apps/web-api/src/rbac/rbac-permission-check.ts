@@ -3,8 +3,10 @@ import { AccessControlV2Service } from '../access-control-v2/services/access-con
 
 /**
  * Legacy v1 permission codes that also (or instead) live as v2 permission codes.
- * Kept alongside RbacGuard's copy of the same table so both the guard pipeline
- * and out-of-pipeline callers (e.g. Husky tools) resolve a permission identically.
+ * The single source of truth for this mapping — both RbacGuard (the guard
+ * pipeline) and out-of-pipeline callers (e.g. Husky tools) call the functions
+ * below rather than keeping their own copy, so a permission resolves
+ * identically everywhere.
  */
 const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
   'founder_guides.view': ['founder_guides.view.all', 'founder_guides.view.plvs', 'founder_guides.view.plcc'],
@@ -22,8 +24,8 @@ function permissionCandidates(permission: string): string[] {
 /**
  * Resolves whether `memberUid` has `permission`, checking the v2 access-control
  * service (including legacy aliases) before falling back to the v1 RBAC service.
- * This mirrors RbacGuard.hasPermission so out-of-pipeline callers (Husky tools,
- * background jobs) apply the exact same rules a guarded route would.
+ * Used by RbacGuard itself, so out-of-pipeline callers (Husky tools, background
+ * jobs) that call this directly apply the exact same rules a guarded route would.
  */
 export async function memberHasPermission(
   rbacService: Pick<RbacService, 'hasPermission'>,

@@ -5,7 +5,6 @@ import { z } from 'zod';
 import { LogService } from '../../shared/log.service';
 import { PrismaService } from '../../shared/prisma.service';
 import { DemoDaysService } from '../../demo-days/demo-days.service';
-import { HuskyAuthContext } from './husky-auth-context';
 
 const DemoDayToolParams = z.object({
   demoDaySearch: z
@@ -18,16 +17,16 @@ const DemoDayToolParams = z.object({
 export class DemoDayTool {
   constructor(private logger: LogService, private prisma: PrismaService, private demoDaysService: DemoDaysService) {}
 
-  getTool(auth: HuskyAuthContext): CoreTool {
+  getTool(): CoreTool {
     return tool({
       description:
         'Look up which teams presented (pitched) at a completed Demo Day and a short description of what they build. Only covers demo days that have already concluded — in-progress or upcoming demo day pitch/fundraising material is confidential and not available through this tool.',
       parameters: DemoDayToolParams,
-      execute: (args) => this.execute(args, auth),
+      execute: (args) => this.execute(args),
     });
   }
 
-  private async execute(args: z.infer<typeof DemoDayToolParams>, auth: HuskyAuthContext) {
+  private async execute(args: z.infer<typeof DemoDayToolParams>) {
     this.logger.info(`Getting demo day teams for args: ${JSON.stringify(args)}`);
 
     const where: Prisma.DemoDayWhereInput = { status: DemoDayStatus.COMPLETED, isDeleted: false };
@@ -53,11 +52,11 @@ export class DemoDayTool {
     // Same roster `GET /v1/demo-days/:id` already returns publicly (even to an
     // anonymous caller) for a COMPLETED demo day — never the confidential
     // pitch decks/videos/financials behind the fundraising-profiles endpoint,
-    // which stays untouched by this tool.
-    const teams = await this.demoDaysService.getParticipatingTeamsForCompletedDemoDay(
-      demoDay.uid,
-      auth.isLoggedIn ? auth.memberUid ?? null : null
-    );
+    // which stays untouched by this tool. The second argument is a viewer
+    // *email*, used only to compute a per-viewer `isFollowing` flag this
+    // tool's text output never reads, so there's nothing to gain by resolving
+    // and passing one — `null` skips that lookup entirely.
+    const teams = await this.demoDaysService.getParticipatingTeamsForCompletedDemoDay(demoDay.uid, null);
 
     if (teams.length === 0) {
       return `No teams are recorded as having presented at "${demoDay.title}".`;
