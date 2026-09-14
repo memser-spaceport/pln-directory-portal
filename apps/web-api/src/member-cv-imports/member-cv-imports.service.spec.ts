@@ -52,6 +52,7 @@ describe('MemberCvImportsService', () => {
   const cvCreate = jest.fn();
   const cvUpdate = jest.fn();
   const cvUpdateMany = jest.fn();
+  const cvDelete = jest.fn();
   const skillFindFirst = jest.fn();
   const skillCreate = jest.fn();
   const locationUpsert = jest.fn();
@@ -65,6 +66,7 @@ describe('MemberCvImportsService', () => {
       create: cvCreate,
       update: cvUpdate,
       updateMany: cvUpdateMany,
+      delete: cvDelete,
     },
     skill: { findFirst: skillFindFirst, create: skillCreate },
     location: { upsert: locationUpsert },
@@ -75,6 +77,8 @@ describe('MemberCvImportsService', () => {
   const awsService = {
     uploadFileToS3: jest.fn().mockResolvedValue({ Location: '' }),
     deleteObjectFromS3: jest.fn().mockResolvedValue(undefined),
+    getPresignedGetUrl: jest.fn().mockResolvedValue('https://s3.example/signed'),
+    getObjectSize: jest.fn().mockResolvedValue(182_000),
   } as unknown as AwsService;
 
   const aiProvider = {
@@ -104,6 +108,7 @@ describe('MemberCvImportsService', () => {
     cvCreate.mockResolvedValue({});
     cvUpdate.mockResolvedValue({});
     cvUpdateMany.mockResolvedValue({ count: 1 });
+    cvDelete.mockResolvedValue({});
     transaction.mockImplementation(async (fn: (tx: typeof prisma) => Promise<unknown>) => fn(prisma));
     service = new MemberCvImportsService(
       prisma,
@@ -441,6 +446,119 @@ describe('MemberCvImportsService', () => {
     it('404s when the member has never uploaded', async () => {
       cvFindUnique.mockResolvedValue(null);
       await expect(service.getLatest('member-1', 'owner@example.com')).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+  describe('getFile', () => {
+    const STORED = {
+      uid: 'import-1',
+      memberUid: 'member-1',
+      originalFilename: 'ada-lovelace.pdf',
+      s3Bucket: 'test-uploads',
+      s3Key: 'cvs/import-1.pdf',
+      createdAt: new Date('2026-08-12T09:30:00.000Z'),
+      status: MemberCvImportStatus.SUCCEEDED,
+    };
+
+    it('404s when the member has never uploaded', async () => {
+      cvFindUnique.mockResolvedValue(null);
+      await expect(service.getFile('member-1', 'owner@example.com')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('hands back a signed link with what the card prints beside it', async () => {
+      cvFindUnique.mockResolvedValue(STORED);
+
+      const result = await service.getFile('member-1', 'owner@example.com');
+
+      expect(awsService.getPresignedGetUrl).toHaveBeenCalledWith('test-uploads', 'cvs/import-1.pdf', 600);
+      expect(result.url).toBe('https://s3.example/signed');
+      expect(result.originalFilename).toBe('ada-lovelace.pdf');
+      expect(result.uploadedAt).toBe('2026-08-12T09:30:00.000Z');
+      expect(result.size).toBe(182_000);
+    });
+
+    /*
+     * The whole reason this route is not gated on the parse. `upload` writes to
+     * S3 before the row exists and before the model runs, so these three are
+     * documents someone uploaded and can still see, replace and remove.
+     */
+    it.each([MemberCvImportStatus.PROCESSING, MemberCvImportStatus.NOTHING_FOUND, MemberCvImportStatus.FAILED])(
+      'serves the file for a %s import',
+      async (status) => {
+        cvFindUnique.mockResolvedValue({ ...STORED, status });
+
+        await expect(service.getFile('member-1', 'owner@example.com')).resolves.toEqual(
+          expect.objectContaining({ url: 'https://s3.example/signed' })
+        );
+      }
+    );
+
+    it('still serves the document when the size cannot be read', async () => {
+      cvFindUnique.mockResolvedValue(STORED);
+      (awsService.getObjectSize as jest.Mock).mockResolvedValue(undefined);
+
+      const result = await service.getFile('member-1', 'owner@example.com');
+
+      expect(result.url).toBe('https://s3.example/signed');
+      expect(result).not.toHaveProperty('size');
+    });
+
+    it('refuses someone else', async () => {
+      (membersService.findMemberByEmail as jest.Mock).mockResolvedValue({
+        uid: 'someone-else',
+        isDirectoryAdmin: false,
+      });
+      await expect(service.getFile('member-1', 'intruder@example.com')).rejects.toBeInstanceOf(ForbiddenException);
+      expect(awsService.getPresignedGetUrl).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('remove', () => {
+    const STORED = {
+      uid: 'import-1',
+      memberUid: 'member-1',
+      originalFilename: 'cv.pdf',
+      s3Bucket: 'test-uploads',
+      s3Key: 'cvs/import-1.pdf',
+      createdAt: new Date(),
+      status: MemberCvImportStatus.SUCCEEDED,
+    };
+
+    it('404s when there is nothing to remove', async () => {
+      cvFindUnique.mockResolvedValue(null);
+      await expect(service.remove('member-1', 'owner@example.com')).rejects.toBeInstanceOf(NotFoundException);
+      expect(cvDelete).not.toHaveBeenCalled();
+    });
+
+    it('deletes the object and the row', async () => {
+      cvFindUnique.mockResolvedValue(STORED);
+
+      await service.remove('member-1', 'owner@example.com');
+
+      expect(awsService.deleteObjectFromS3).toHaveBeenCalledWith('test-uploads', 'cvs/import-1.pdf');
+      expect(cvDelete).toHaveBeenCalledWith({ where: { memberUid: 'member-1' } });
+    });
+
+    /*
+     * The opposite of what `upload` does with a superseded object, on purpose.
+     * Dropping the row here would tell someone their CV was gone while the
+     * bytes sat in the bucket — the one outcome this endpoint must not produce.
+     */
+    it('keeps the row when the object cannot be deleted', async () => {
+      cvFindUnique.mockResolvedValue(STORED);
+      (awsService.deleteObjectFromS3 as jest.Mock).mockRejectedValue(new Error('s3 down'));
+
+      await expect(service.remove('member-1', 'owner@example.com')).rejects.toThrow('s3 down');
+      expect(cvDelete).not.toHaveBeenCalled();
+    });
+
+    it('refuses someone else', async () => {
+      (membersService.findMemberByEmail as jest.Mock).mockResolvedValue({
+        uid: 'someone-else',
+        isDirectoryAdmin: false,
+      });
+      await expect(service.remove('member-1', 'intruder@example.com')).rejects.toBeInstanceOf(ForbiddenException);
+      expect(awsService.deleteObjectFromS3).not.toHaveBeenCalled();
+      expect(cvDelete).not.toHaveBeenCalled();
     });
   });
 });

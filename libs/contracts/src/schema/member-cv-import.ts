@@ -57,6 +57,28 @@ export const MemberCvImportLatestSchema = z.object({
   error: MemberCvImportErrorSchema.optional(),
 });
 
+/**
+ * The stored document itself, as the profile's resting "Your CV" card renders
+ * it: a short-lived link to the bytes, plus what the card prints beside them.
+ *
+ * `size` is read from S3 at serve time rather than stored on the row. The
+ * column does not exist, and adding one would leave every CV uploaded before
+ * the migration without a size — a gap the card would have to render around
+ * forever. `HeadObject` has no such gap and is one call on a route that is
+ * already fetching.
+ *
+ * Optional because that call is allowed to fail without taking the preview with
+ * it: a card that cannot say "182 KB" is a smaller loss than a card that cannot
+ * show the document.
+ */
+export const MemberCvImportFileSchema = z.object({
+  url: z.string(),
+  expiresAt: z.string(),
+  originalFilename: z.string(),
+  uploadedAt: z.string(),
+  size: z.number().int().optional(),
+});
+
 export const ApplyCvExperienceSchema = z.object({
   title: optionalText,
   company: optionalText,

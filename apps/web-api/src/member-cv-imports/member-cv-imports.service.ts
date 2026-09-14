@@ -24,6 +24,7 @@ import { PrismaService } from '../shared/prisma.service';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
 import { MembersService } from '../members/members.service';
 import {
+  CV_FILE_URL_TTL_SECONDS,
   CV_IMPORT_MAX_TEXT_CHARS,
   CV_IMPORT_S3_PREFIX,
   MEMBER_CV_PARSE_AI_PROVIDER_ENV,
@@ -140,6 +141,74 @@ export class MemberCvImportsService {
     return response;
   }
 
+  /**
+   * A short-lived link to the stored document, plus what the resting card
+   * prints beside it.
+   *
+   * **Deliberately not gated on `status === SUCCEEDED`.** `upload` puts the
+   * file in S3 *before* this row exists and before the parse runs, so a CV the
+   * model failed on — or found nothing in — is still a document the member
+   * uploaded. Gating on the parse would leave exactly those people unable to
+   * see, replace or remove the file they chose. The test is that the row has a
+   * file, not that reading it went well.
+   *
+   * `size` comes from S3 rather than the row because there is no size column,
+   * and adding one would leave every CV uploaded before that migration without
+   * a size forever. See `MemberCvImportFileSchema`.
+   */
+  async getFile(memberUid: string, requestorEmail: string) {
+    await this.assertCanManage(memberUid, requestorEmail);
+
+    const row = await this.prisma.memberCvImport.findUnique({ where: { memberUid } });
+    if (!row || !row.s3Bucket || !row.s3Key) {
+      throw new NotFoundException('No CV found for this member');
+    }
+
+    const url = await this.awsService.getPresignedGetUrl(row.s3Bucket, row.s3Key, CV_FILE_URL_TTL_SECONDS);
+    const size = await this.awsService.getObjectSize(row.s3Bucket, row.s3Key);
+
+    return {
+      url,
+      expiresAt: new Date(Date.now() + CV_FILE_URL_TTL_SECONDS * 1000).toISOString(),
+      originalFilename: row.originalFilename,
+      uploadedAt: row.createdAt.toISOString(),
+      ...(size === undefined ? {} : { size }),
+    };
+  }
+
+  /**
+   * Remove the stored CV.
+   *
+   * **The object is deleted before the row, and a failure to delete it stops
+   * the whole thing.** That is the opposite of what `upload` does when it
+   * supersedes a previous file, and the difference is deliberate: there, the
+   * old object is incidental garbage and the member's actual request — store
+   * this new CV — has already succeeded, so a failed cleanup is logged and
+   * swallowed. Here, deleting the bytes *is* the request. Dropping the row
+   * anyway would tell someone their CV was gone while it sat in the bucket,
+   * which is the one outcome this endpoint must not produce. Failing loudly
+   * leaves a consistent state they can retry.
+   *
+   * **The profile fields the document filled are left alone.** `apply` writes
+   * role, skills and experience as ordinary member fields; nothing records that
+   * a document put them there, and by the time someone removes the file they
+   * may have edited them by hand. Removing the document removes the document.
+   */
+  async remove(memberUid: string, requestorEmail: string) {
+    await this.assertCanManage(memberUid, requestorEmail);
+
+    const row = await this.prisma.memberCvImport.findUnique({ where: { memberUid } });
+    if (!row) {
+      throw new NotFoundException('No CV found for this member');
+    }
+
+    if (row.s3Bucket && row.s3Key) {
+      await this.awsService.deleteObjectFromS3(row.s3Bucket, row.s3Key);
+    }
+
+    await this.prisma.memberCvImport.delete({ where: { memberUid } });
+  }
+
   async apply(memberUid: string, body: unknown, requestorEmail: string) {
     await this.assertCanManage(memberUid, requestorEmail);
     const selection = this.parseApplyBody(body);
@@ -168,7 +237,8 @@ export class MemberCvImportsService {
     const skillsAdded: string[] = [];
     let locationApplied = false;
     const experiencesToCreate = selection.experiences.filter(
-      (experience) => experience.title.trim() && experience.company.trim() && YEAR_MONTH_REGEX.test(experience.startDate)
+      (experience) =>
+        experience.title.trim() && experience.company.trim() && YEAR_MONTH_REGEX.test(experience.startDate)
     );
 
     await this.prisma.$transaction(async (tx) => {
