@@ -8,6 +8,13 @@ import { HuskyAuthContext } from './husky-auth-context';
 
 const EVENT_TYPES = ['FUNDING', 'LAUNCH', 'PARTNERSHIP', 'ANNOUNCEMENT', 'MILESTONE', 'OTHER'] as const;
 
+const NewsToolParams = z.object({
+  search: z.string().describe('Search term to look for in the news title, summary, or team name').optional(),
+  eventType: z.enum(EVENT_TYPES).describe('Filter by news event type').optional(),
+  focus: z.string().describe("Filter by the news team's focus area").optional(),
+  windowDays: z.number().describe('How many days back to look for news (default 14, max 365)').optional(),
+});
+
 @Injectable()
 export class NewsTool {
   constructor(private logger: LogService, private teamNewsQueryService: TeamNewsQueryService) {}
@@ -16,20 +23,12 @@ export class NewsTool {
     return tool({
       description:
         'Search "News from the network" — recent team updates such as funding, launches, partnerships, and milestones',
-      parameters: z.object({
-        search: z.string().describe('Search term to look for in the news title, summary, or team name').optional(),
-        eventType: z.enum(EVENT_TYPES).describe('Filter by news event type').optional(),
-        focus: z.string().describe("Filter by the news team's focus area").optional(),
-        windowDays: z.number().describe('How many days back to look for news (default 14, max 365)').optional(),
-      }),
+      parameters: NewsToolParams,
       execute: (args) => this.execute(args, auth),
     });
   }
 
-  private async execute(
-    args: { search?: string; eventType?: string; focus?: string; windowDays?: number },
-    auth: HuskyAuthContext
-  ) {
+  private async execute(args: z.infer<typeof NewsToolParams>, auth: HuskyAuthContext) {
     this.logger.info(`Getting team news for args: ${JSON.stringify(args)}`);
 
     const query = TeamNewsListQueryParams.parse({

@@ -1,21 +1,28 @@
 import { Injectable } from '@nestjs/common';
-import { InvestorProfileType, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { tool, CoreTool } from 'ai';
 import { z } from 'zod';
 import { LogService } from '../../shared/log.service';
 import { PrismaService } from '../../shared/prisma.service';
 import { RbacService } from '../../rbac/rbac.service';
-import { RBAC_PERMISSION_CODES } from '../../rbac/rbac.constants';
+import { INVESTOR_DB_VIEW_PERMISSIONS } from '../../rbac/rbac.constants';
 import { memberHasAnyPermission } from '../../rbac/rbac-permission-check';
 import { AccessControlV2Service } from '../../access-control-v2/services/access-control-v2.service';
-import { ADMIN_PERMISSIONS } from '../../access-control-v2/access-control-v2.constants';
 import { HuskyAuthContext } from './husky-auth-context';
 
-/** Same grant the Investor Lists / warm-intros surface requires (investor-lists.controller.ts). */
-const INVESTOR_VIEW_PERMISSIONS = [RBAC_PERMISSION_CODES.INVESTOR_DB_VIEW, ADMIN_PERMISSIONS.DIRECTORY_FULL] as const;
-
-const MAX_CANDIDATES = 200;
+const MAX_CANDIDATES = 500;
 const MAX_RESULTS = 15;
+
+const InvestorsToolParams = z.object({
+  search: z.string().describe('Free-text match against investment focus areas, or the investor/fund name').optional(),
+  investInStartupStage: z
+    .string()
+    .describe('Filter by a startup stage the investor invests in, e.g. Pre-Seed, Seed, Series A')
+    .optional(),
+  investInFundType: z.string().describe('Filter by a fund type the investor invests through').optional(),
+  minCheckSize: z.number().describe('Minimum typical check size in USD').optional(),
+  type: z.enum(['ANGEL', 'FUND', 'ANGEL_AND_FUND']).describe('Filter by investor profile type').optional(),
+});
 
 @Injectable()
 export class InvestorsTool {
@@ -30,33 +37,12 @@ export class InvestorsTool {
     return tool({
       description:
         'Search the Investor DB for angels and funds by investment focus, startup stage they invest in, fund type, or typical check size. Only returns data when the signed-in user has Investor DB access; unavailable to everyone else.',
-      parameters: z.object({
-        search: z
-          .string()
-          .describe('Free-text match against investment focus areas, or the investor/fund name')
-          .optional(),
-        investInStartupStage: z
-          .string()
-          .describe('Filter by a startup stage the investor invests in, e.g. Pre-Seed, Seed, Series A')
-          .optional(),
-        investInFundType: z.string().describe('Filter by a fund type the investor invests through').optional(),
-        minCheckSize: z.number().describe('Minimum typical check size in USD').optional(),
-        type: z.enum(['ANGEL', 'FUND', 'ANGEL_AND_FUND']).describe('Filter by investor profile type').optional(),
-      }),
+      parameters: InvestorsToolParams,
       execute: (args) => this.execute(args, auth),
     });
   }
 
-  private async execute(
-    args: {
-      search?: string;
-      investInStartupStage?: string;
-      investInFundType?: string;
-      minCheckSize?: number;
-      type?: InvestorProfileType;
-    },
-    auth: HuskyAuthContext
-  ) {
+  private async execute(args: z.infer<typeof InvestorsToolParams>, auth: HuskyAuthContext) {
     if (!auth.memberUid) {
       return 'User is not logged in, so Investor DB data is unavailable.';
     }
@@ -65,7 +51,7 @@ export class InvestorsTool {
       this.rbacService,
       this.accessControlV2Service,
       auth.memberUid,
-      INVESTOR_VIEW_PERMISSIONS
+      INVESTOR_DB_VIEW_PERMISSIONS
     );
     if (!allowed) {
       return 'The signed-in user does not have Investor DB access, so investor data is unavailable.';
@@ -79,12 +65,18 @@ export class InvestorsTool {
     if (args.investInStartupStage) where.investInStartupStages = { has: args.investInStartupStage };
     if (args.investInFundType) where.investInFundTypes = { has: args.investInFundType };
 
+    // `search` matches free text against investment-focus tags (e.g. "neuro tech" against
+    // "Neurotech"), which Prisma cannot express as a case-insensitive substring match over a
+    // string array — so it is applied in-memory below rather than in `where`. The structured
+    // filters above narrow the DB fetch first; a deterministic order keeps this bounded scan
+    // reproducible instead of relying on whatever order Postgres happens to return.
     const profiles = await this.prisma.investorProfile.findMany({
       where,
       include: {
         team: { select: { uid: true, name: true } },
         member: { select: { uid: true, name: true, deletedAt: true } },
       },
+      orderBy: [{ typicalCheckSize: 'desc' }, { id: 'asc' }],
       take: MAX_CANDIDATES,
     });
 
@@ -119,7 +111,7 @@ export class InvestorsTool {
                 Invests in Startup Stages: ${profile.investInStartupStages.join(', ') || 'Not provided'}
                 Invests via Fund Types: ${profile.investInFundTypes.join(', ') || 'Not provided'}
                 Typical Check Size: ${
-                  profile.typicalCheckSize ? `$${profile.typicalCheckSize.toLocaleString()}` : 'Not provided'
+                  profile.typicalCheckSize != null ? `$${profile.typicalCheckSize.toLocaleString()}` : 'Not provided'
                 }
                 Invests via Fund: ${
                   profile.isInvestViaFund === null || profile.isInvestViaFund === undefined

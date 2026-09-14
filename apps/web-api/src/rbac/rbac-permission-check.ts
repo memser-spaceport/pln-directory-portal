@@ -31,15 +31,18 @@ export async function memberHasPermission(
   memberUid: string,
   permission: string
 ): Promise<boolean> {
-  for (const candidate of permissionCandidates(permission)) {
-    try {
-      const check = await accessControlV2Service.hasPermission(memberUid, candidate);
-      if (check.allowed) {
-        return true;
-      }
-    } catch {
-      // Intentionally fall through to the v1 check.
-    }
+  // Candidates are alternatives (any allowed => true), so check them concurrently
+  // rather than paying for each round trip serially before falling back to v1.
+  const v2Results = await Promise.all(
+    permissionCandidates(permission).map((candidate) =>
+      accessControlV2Service.hasPermission(memberUid, candidate).then(
+        (check) => check.allowed,
+        () => false // Intentionally fall through to the v1 check.
+      )
+    )
+  );
+  if (v2Results.some(Boolean)) {
+    return true;
   }
   return rbacService.hasPermission(memberUid, permission);
 }
@@ -51,10 +54,8 @@ export async function memberHasAnyPermission(
   memberUid: string,
   permissions: readonly string[]
 ): Promise<boolean> {
-  for (const permission of permissions) {
-    if (await memberHasPermission(rbacService, accessControlV2Service, memberUid, permission)) {
-      return true;
-    }
-  }
-  return false;
+  const results = await Promise.all(
+    permissions.map((permission) => memberHasPermission(rbacService, accessControlV2Service, memberUid, permission))
+  );
+  return results.some(Boolean);
 }

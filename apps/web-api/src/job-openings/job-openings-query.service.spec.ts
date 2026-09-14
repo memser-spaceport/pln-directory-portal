@@ -1,6 +1,7 @@
 import { JobOpeningStatus } from '@prisma/client';
 import { JobTeamSchema, JobsListQueryParams } from 'libs/contracts/src/schema/job-opening';
 import type { PrismaService } from '../shared/prisma.service';
+import { resolveLiveMemberUidByEmail } from '../shared/resolve-live-member-uid.util';
 import { PROTOCOL_LABS_TEAM_UID } from '../team-news/team-news-public-list.config';
 import { HIDDEN_JOB_OPENING_STATUSES, JobOpeningsQueryService } from './job-openings-query.service';
 import { isInAppApplyAvailable } from './pin-protocol-labs-team';
@@ -121,31 +122,31 @@ describe('JobOpeningsQueryService.loadInterestStamps', () => {
   });
 });
 
-describe('JobOpeningsQueryService.resolveViewerMemberUid', () => {
+describe('resolveLiveMemberUidByEmail', () => {
   const findUnique = jest.fn();
-  const service = new JobOpeningsQueryService({ member: { findUnique } } as unknown as PrismaService);
+  const prisma = { member: { findUnique } } as unknown as PrismaService;
 
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
   it('returns undefined when no email is given', async () => {
-    await expect(service['resolveViewerMemberUid'](undefined)).resolves.toBeUndefined();
+    await expect(resolveLiveMemberUidByEmail(prisma, undefined)).resolves.toBeUndefined();
     expect(findUnique).not.toHaveBeenCalled();
   });
 
   it('returns undefined when the member is missing or deleted', async () => {
     findUnique.mockResolvedValueOnce(null);
-    await expect(service['resolveViewerMemberUid']('a@b.com')).resolves.toBeUndefined();
+    await expect(resolveLiveMemberUidByEmail(prisma, 'a@b.com')).resolves.toBeUndefined();
 
     findUnique.mockResolvedValueOnce({ uid: 'member-1', deletedAt: new Date() });
-    await expect(service['resolveViewerMemberUid']('a@b.com')).resolves.toBeUndefined();
+    await expect(resolveLiveMemberUidByEmail(prisma, 'a@b.com')).resolves.toBeUndefined();
   });
 
   it('returns the member uid for an active member', async () => {
     findUnique.mockResolvedValueOnce({ uid: 'member-1', deletedAt: null });
 
-    await expect(service['resolveViewerMemberUid']('a@b.com')).resolves.toBe('member-1');
+    await expect(resolveLiveMemberUidByEmail(prisma, 'a@b.com')).resolves.toBe('member-1');
   });
 });
 

@@ -12,6 +12,7 @@ import {
 } from '../utils/ai-prompts';
 import Handlebars from 'handlebars';
 import { PrismaService } from '../shared/prisma.service';
+import { resolveLiveMemberUidByEmail } from '../shared/resolve-live-member-uid.util';
 import { v4 as uuidv4 } from 'uuid';
 import { HuskyAiToolsService } from './tools/husky-ai-tools.serivice';
 import { HuskyAuthContext } from './tools/husky-auth-context';
@@ -175,11 +176,8 @@ export class HuskyAiService {
       return { isLoggedIn: false };
     }
     try {
-      const member = await this.prisma.member.findUnique({
-        where: { email: userEmail },
-        select: { uid: true, deletedAt: true },
-      });
-      return { isLoggedIn: true, memberUid: member && !member.deletedAt ? member.uid : undefined };
+      const memberUid = await resolveLiveMemberUidByEmail(this.prisma, userEmail);
+      return { isLoggedIn: true, memberUid };
     } catch (error) {
       this.logger.error(`Failed to resolve member for Husky auth context: ${error?.message ?? error}`);
       return { isLoggedIn: true };
