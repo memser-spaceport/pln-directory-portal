@@ -143,11 +143,19 @@ export class InvestorsTool {
    */
   private async findMatchingUids(search: string): Promise<string[]> {
     const terms = searchTerms(search);
+    // `NULLIF(column, '')` matters for two distinct empty-value cases, both of which would
+    // otherwise make the reverse-direction check (`term LIKE '%' || column || '%'`) collapse to
+    // `term LIKE '%%'` — true for every term, silently matching a row that has nothing to do
+    // with the search:
+    //   - no team/member at all (COALESCE(t.name, m.name) is NULL for an orphaned profile), and
+    //   - a genuinely empty-string tag or name (data can contain one; NULL alone wouldn't catch it).
+    // NULLIF collapses either case to NULL, and NULL propagates through LOWER/`||`/LIKE to NULL,
+    // which SQL treats as false in a WHERE clause — the correct outcome here.
     const termConditions = (column: Prisma.Sql) =>
       Prisma.join(
         terms.map(
           (term) =>
-            Prisma.sql`(LOWER(${column}) LIKE '%' || LOWER(${term}) || '%' OR LOWER(${term}) LIKE '%' || LOWER(${column}) || '%')`
+            Prisma.sql`(LOWER(NULLIF(${column}, '')) LIKE '%' || LOWER(${term}) || '%' OR LOWER(${term}) LIKE '%' || LOWER(NULLIF(${column}, '')) || '%')`
         ),
         ' OR '
       );
@@ -161,7 +169,7 @@ export class InvestorsTool {
         EXISTS (SELECT 1 FROM unnest(ip."investmentFocus") AS focus_item WHERE ${termConditions(
           Prisma.sql`focus_item`
         )})
-        OR ${termConditions(Prisma.sql`COALESCE(t.name, m.name, '')`)}
+        OR ${termConditions(Prisma.sql`COALESCE(t.name, m.name)`)}
     `);
 
     return rows.map((row) => row.uid);
