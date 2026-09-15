@@ -128,6 +128,15 @@ export const JobsFiltersResponseSchema = z.object({
   workMode: z.array(JobFacetItemSchema),
 });
 
+export const JobCrawlIndexItemSchema = z.object({
+  uid: z.string(),
+  updatedAt: z.string(),
+});
+
+export const JobCrawlIndexResponseSchema = z.object({
+  jobs: z.array(JobCrawlIndexItemSchema),
+});
+
 export const JobOpeningInterestStatusSchema = z.object({
   jobUid: z.string(),
   interestedCount: z.number().int().min(0),

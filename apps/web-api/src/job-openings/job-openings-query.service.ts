@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { JobOpeningStatus, Prisma } from '@prisma/client';
-import type { JobsListQuery } from 'libs/contracts/src/schema/job-opening';
+import { JobsListQueryParams, type JobsListQuery } from 'libs/contracts/src/schema/job-opening';
 import { PrismaService } from '../shared/prisma.service';
 import { buildJobOpeningDateWhere } from './job-opening-date.where';
 import { isInAppApplyAvailable, pinProtocolLabsThenPage } from './pin-protocol-labs-team';
@@ -417,6 +417,33 @@ export class JobOpeningsQueryService {
       totalGroups,
       totalRoles,
     };
+  }
+
+  async listCrawlIndex() {
+    const rows = await this.prisma.jobOpening.findMany({
+      where: {
+        status: { notIn: HIDDEN_JOB_OPENING_STATUSES },
+        teamUid: { not: null },
+      },
+      select: { uid: true, updatedAt: true },
+      orderBy: { updatedAt: 'desc' },
+    });
+    return {
+      jobs: rows.map((row) => ({ uid: row.uid, updatedAt: row.updatedAt.toISOString() })),
+    };
+  }
+
+  async getJobOpening(uid: string, viewerEmail?: string) {
+    const result = await this.listJobOpenings(
+      JobsListQueryParams.parse({ jobUid: uid, page: 1, limit: 1 }),
+      viewerEmail
+    );
+    const group = result.groups[0];
+    const role = group?.roles.find((item) => item.uid === uid);
+    if (!group || !role) {
+      throw new NotFoundException('Job opening not found');
+    }
+    return { ...group, roles: [role], totalRoles: 1 };
   }
 
   async findNewMatchesSince(query: JobsListQuery, sinceTs: Date | null) {
