@@ -9,10 +9,15 @@ import { INVESTOR_DB_VIEW_PERMISSIONS } from '../../rbac/rbac.constants';
 import { memberHasAnyPermission } from '../../rbac/rbac-permission-check';
 import { AccessControlV2Service } from '../../access-control-v2/services/access-control-v2.service';
 import { HuskyAuthContext } from './husky-auth-context';
-import { fuzzyMatches } from './fuzzy-match.util';
+import { searchTerms } from './fuzzy-match.util';
 
-const MAX_CANDIDATES = 500;
 const MAX_RESULTS = 15;
+// A small buffer above MAX_RESULTS, not a ranking cutoff: the real filtering (structured
+// `where` filters, and — when `search` is set — the raw-SQL uid pre-filter below) is fully
+// DB-pushed and correct at any table size. This only needs to absorb the one remaining
+// in-memory step, dropping soft-deleted/orphaned profiles, which is rare enough that a handful
+// of extra rows is always enough.
+const RESULT_FETCH_LIMIT = 50;
 
 const InvestorsToolParams = z.object({
   search: z.string().describe('Free-text match against investment focus areas, or the investor/fund name').optional(),
@@ -66,11 +71,15 @@ export class InvestorsTool {
     if (args.investInStartupStage) where.investInStartupStages = { has: args.investInStartupStage };
     if (args.investInFundType) where.investInFundTypes = { has: args.investInFundType };
 
-    // `search` matches free text against investment-focus tags (e.g. "neuro tech" against
-    // "Neurotech"), which Prisma cannot express as a case-insensitive substring match over a
-    // string array — so it is applied in-memory below rather than in `where`. The structured
-    // filters above narrow the DB fetch first; a deterministic order keeps this bounded scan
-    // reproducible instead of relying on whatever order Postgres happens to return.
+    const search = args.search?.trim();
+    if (search) {
+      const matchingUids = await this.findMatchingUids(search);
+      if (matchingUids.length === 0) {
+        return 'No investors found matching the search criteria.';
+      }
+      where.uid = { in: matchingUids };
+    }
+
     const profiles = await this.prisma.investorProfile.findMany({
       where,
       include: {
@@ -78,16 +87,13 @@ export class InvestorsTool {
         member: { select: { uid: true, name: true, deletedAt: true } },
       },
       orderBy: [{ typicalCheckSize: 'desc' }, { id: 'asc' }],
-      take: MAX_CANDIDATES,
+      take: RESULT_FETCH_LIMIT,
     });
 
-    const search = args.search?.trim();
     const visible = profiles.filter((profile) => {
       if (profile.member?.deletedAt) return false;
       if (!profile.team && !profile.member) return false;
-      if (!search) return true;
-      const name = profile.team?.name ?? profile.member?.name ?? '';
-      return fuzzyMatches(name, search) || profile.investmentFocus.some((f) => fuzzyMatches(f, search));
+      return true;
     });
 
     if (visible.length === 0) {
@@ -121,5 +127,43 @@ export class InvestorsTool {
                 }`;
       })
       .join('\n\n');
+  }
+
+  /**
+   * `investmentFocus` is a `String[]` — Prisma's array filters are `has`/`hasSome`/`hasEvery`/
+   * exact equality only, with no case-insensitive substring operator over individual elements —
+   * so free-text matching against it (and against team/member name) has to be raw SQL rather
+   * than a Prisma `where`. Matches bidirectionally per term (search-in-tag AND tag-in-search) so
+   * a model-normalized single word ("neurotechnology") still matches terser stored tags
+   * ("neuro"/"tech"/"neuro tech"), and a compound tag ("DeepTech") still matches a spaced-out
+   * search ("deep tech") via one of its words — see `searchTerms`. Doing the match here, in SQL,
+   * rather than in memory over a capped candidate fetch (the previous approach) means it scales
+   * correctly to any table size: nothing gets silently excluded by a fetch limit ahead of the
+   * filter, because the filter *is* the fetch.
+   */
+  private async findMatchingUids(search: string): Promise<string[]> {
+    const terms = searchTerms(search);
+    const termConditions = (column: Prisma.Sql) =>
+      Prisma.join(
+        terms.map(
+          (term) =>
+            Prisma.sql`(LOWER(${column}) LIKE '%' || LOWER(${term}) || '%' OR LOWER(${term}) LIKE '%' || LOWER(${column}) || '%')`
+        ),
+        ' OR '
+      );
+
+    const rows = await this.prisma.$queryRaw<{ uid: string }[]>(Prisma.sql`
+      SELECT DISTINCT ip.uid
+      FROM "InvestorProfile" ip
+      LEFT JOIN "Team" t ON t."investorProfileId" = ip.uid
+      LEFT JOIN "Member" m ON m."investorProfileId" = ip.uid
+      WHERE
+        EXISTS (SELECT 1 FROM unnest(ip."investmentFocus") AS focus_item WHERE ${termConditions(
+          Prisma.sql`focus_item`
+        )})
+        OR ${termConditions(Prisma.sql`COALESCE(t.name, m.name, '')`)}
+    `);
+
+    return rows.map((row) => row.uid);
   }
 }

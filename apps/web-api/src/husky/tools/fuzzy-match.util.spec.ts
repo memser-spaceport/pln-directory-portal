@@ -1,4 +1,4 @@
-import { fuzzyMatches, longestWord, resolveFocusAreaTitles } from './fuzzy-match.util';
+import { fuzzyMatches, longestWord, resolveFocusAreaTitles, searchTerms } from './fuzzy-match.util';
 
 describe('fuzzyMatches', () => {
   it('matches a model-normalized single word against a terser multi-word tag', () => {
@@ -26,6 +26,20 @@ describe('longestWord', () => {
 
   it('returns undefined for a single word', () => {
     expect(longestWord('rust')).toBeUndefined();
+  });
+});
+
+describe('searchTerms', () => {
+  it('includes the raw search string, since a single compound word has nothing to split on', () => {
+    expect(searchTerms('neurotechnology')).toEqual(['neurotechnology']);
+  });
+
+  it('adds each word of a multi-word search as its own term', () => {
+    expect(searchTerms('deep tech')).toEqual(expect.arrayContaining(['deep tech', 'deep', 'tech']));
+  });
+
+  it('de-duplicates when the whole string and its tokenization coincide', () => {
+    expect(searchTerms('neuro')).toEqual(['neuro']);
   });
 });
 

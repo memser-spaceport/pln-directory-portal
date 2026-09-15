@@ -1,6 +1,10 @@
 // `ai` pulls in untranspiled ESM this jest config can't parse; `tool()` just needs to hand
 // back its config object so `getTool()` yields something with a callable `execute`.
 jest.mock('ai', () => ({ tool: (config: any) => config }));
+jest.mock('../../rbac/rbac-permission-check', () => ({ memberHasAnyPermission: jest.fn() }));
+
+import { InvestorsTool } from './investors.tool';
+import { memberHasAnyPermission } from '../../rbac/rbac-permission-check';
 
 describe('InvestorsTool', () => {
   const logger = { error: jest.fn(), info: jest.fn() };
@@ -23,42 +27,88 @@ describe('InvestorsTool', () => {
     };
   }
 
-  jest.mock('../../rbac/rbac-permission-check', () => ({ memberHasAnyPermission: jest.fn() }));
-
-  async function run(investorProfiles: unknown[], search?: string) {
-    jest.resetModules();
-    jest.doMock('ai', () => ({ tool: (config: any) => config }));
-    jest.doMock('../../rbac/rbac-permission-check', () => ({
-      memberHasAnyPermission: jest.fn().mockResolvedValue(true),
-    }));
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { InvestorsTool: FreshInvestorsTool } = require('./investors.tool');
-    const prisma = { investorProfile: { findMany: jest.fn().mockResolvedValue(investorProfiles) } } as any;
-    const tool = new FreshInvestorsTool(logger as any, prisma, rbacService, accessControlV2Service);
-    const coreTool = tool.getTool(auth);
-    return coreTool.execute({ search }, { toolCallId: 'call-1', messages: [] });
+  function setup() {
+    const queryRaw = jest.fn();
+    const findMany = jest.fn();
+    const prisma = { investorProfile: { findMany }, $queryRaw: queryRaw } as any;
+    const tool = new InvestorsTool(logger as any, prisma, rbacService, accessControlV2Service);
+    return { tool, queryRaw, findMany };
   }
 
-  it('matches a model-normalized search term against a terser stored focus tag', async () => {
-    // The stored tag is "neuro tech" (space-separated), but a model asked about "neuro tech"
-    // naturally tends to generate the canonical single-word term instead of echoing the tag.
-    const result = await run([profile()], 'neurotechnology');
-    expect(result).toContain('Vova');
-    expect(result).not.toMatch(/No investors found/);
+  function execute(tool: InvestorsTool, args: Record<string, unknown>) {
+    const coreTool = tool.getTool(auth);
+    if (!coreTool.execute) {
+      throw new Error('tool has no execute');
+    }
+    return coreTool.execute(args, { toolCallId: 'call-1', messages: [] });
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (memberHasAnyPermission as jest.Mock).mockResolvedValue(true);
   });
 
-  it('still matches when the model echoes the tag verbatim', async () => {
-    const result = await run([profile()], 'neuro tech');
+  it('resolves matching uids via raw SQL, then fetches only those profiles', async () => {
+    // Matching now happens entirely in the DB (investmentFocus is a String[], which Prisma
+    // can't push a case-insensitive substring match into `where` for), not by fetching a capped
+    // candidate window and filtering in memory. So the tool must: query for matching uids first,
+    // then scope the real fetch to exactly those.
+    const { tool, queryRaw, findMany } = setup();
+    queryRaw.mockResolvedValue([{ uid: 'ip-1' }]);
+    findMany.mockResolvedValue([profile()]);
+
+    const result = await execute(tool, { search: 'neurotechnology' });
+
+    expect(queryRaw).toHaveBeenCalledTimes(1);
+    expect(findMany).toHaveBeenCalledTimes(1);
+    expect(findMany.mock.calls[0][0].where.uid).toEqual({ in: ['ip-1'] });
     expect(result).toContain('Vova');
   });
 
-  it('matches a compound stored tag against a spaced-out search term', async () => {
-    const result = await run([profile({ investmentFocus: ['DeepTech'] })], 'deep tech');
-    expect(result).toContain('Vova');
-  });
+  it('returns "no investors found" without querying profiles when nothing matches', async () => {
+    const { tool, queryRaw, findMany } = setup();
+    queryRaw.mockResolvedValue([]);
 
-  it('does not match on an unrelated search term', async () => {
-    const result = await run([profile()], 'climate');
+    const result = await execute(tool, { search: 'climate' });
+
     expect(result).toMatch(/No investors found/);
+    expect(findMany).not.toHaveBeenCalled();
+  });
+
+  it('skips the raw-SQL match entirely when there is no search term', async () => {
+    const { tool, queryRaw, findMany } = setup();
+    findMany.mockResolvedValue([profile()]);
+
+    await execute(tool, { type: 'ANGEL', minCheckSize: 10000 });
+
+    expect(queryRaw).not.toHaveBeenCalled();
+    expect(findMany.mock.calls[0][0].where.uid).toBeUndefined();
+  });
+
+  it('uses a small, fixed fetch limit regardless of which filters are set', async () => {
+    // Correctness now comes entirely from `where` (structured filters, DB-pushed) and the raw-SQL
+    // uid pre-filter above (also DB-pushed) — both scale to any table size on their own. This
+    // limit only needs to absorb the in-memory soft-delete/orphan-profile drop below, so it never
+    // needs to grow with the table.
+    const { tool, findMany } = setup();
+    findMany.mockResolvedValue([profile()]);
+
+    await execute(tool, { type: 'ANGEL', minCheckSize: 10000 });
+
+    expect(findMany.mock.calls[0][0].take).toBe(50);
+  });
+
+  it('drops soft-deleted or orphaned profiles after the fetch', async () => {
+    const { tool, findMany } = setup();
+    findMany.mockResolvedValue([
+      profile({ uid: 'deleted', member: { uid: 'm', name: 'Gone', deletedAt: new Date() } }),
+      profile({ uid: 'orphan', team: null, member: null }),
+      profile({ uid: 'visible' }),
+    ]);
+
+    const result = await execute(tool, {});
+
+    expect(result).toContain('Vova');
+    expect((result as string).match(/Investor:/g)).toHaveLength(1);
   });
 });

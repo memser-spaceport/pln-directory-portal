@@ -31,6 +31,18 @@ export function fuzzyMatches(value: string, search: string): boolean {
 }
 
 /**
+ * Terms to check a stored value against for a fuzzy match: the raw search string itself, plus
+ * whatever it tokenizes into. A single compound word like "neurotechnology" tokenizes to just
+ * itself — nothing to split on — but matching still works because the whole term already
+ * contains the terser stored tag ("neuro") as a substring. A multi-word search like "deep tech"
+ * additionally yields "deep" and "tech", so a compound stored tag ("DeepTech", with no gap for
+ * the two-word phrase to land in) can still match via one of its words.
+ */
+export function searchTerms(search: string): string[] {
+  return Array.from(new Set([search.toLowerCase(), ...tokenize(search)]));
+}
+
+/**
  * A single-substring `contains` match against a title/name won't match a multi-word phrase
  * like "senior rust engineer roles" against a title like "Senior Backend Engineer, Rust" — the
  * words are there, just not contiguous in that order. Tool descriptions ask the model for one
