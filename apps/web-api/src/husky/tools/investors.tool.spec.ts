@@ -98,6 +98,22 @@ describe('InvestorsTool', () => {
     expect(findMany.mock.calls[0][0].take).toBe(50);
   });
 
+  it('guards the raw-SQL match against empty/NULL columns matching every search term', async () => {
+    // `LOWER(term) LIKE '%' || LOWER(column) || '%'` collapses to `term LIKE '%%'` (true for
+    // ANY term) when `column` is an empty string — which happens both for an orphaned profile's
+    // `COALESCE(t.name, m.name)` (NULL) and for a genuinely empty-string tag or name. Verified
+    // live against Postgres that this makes such rows match every search; NULLIF(column, '') is
+    // the fix (collapses '' to NULL too, and NULL correctly propagates to "no match"). This test
+    // guards the SQL text itself since a mocked $queryRaw can't exercise real NULL semantics.
+    const { tool, queryRaw } = setup();
+    queryRaw.mockResolvedValue([]);
+
+    await execute(tool, { search: 'neurotechnology' });
+
+    const sqlFragment = queryRaw.mock.calls[0][0];
+    expect(sqlFragment.sql).toContain('NULLIF(');
+  });
+
   it('drops soft-deleted or orphaned profiles after the fetch', async () => {
     const { tool, findMany } = setup();
     findMany.mockResolvedValue([
