@@ -8,6 +8,11 @@ import { ProjectsTool } from './projects.tool';
 import { FocusAreasTool } from './focus-areas.tool';
 import { AsksTool } from './asks.tool';
 import { ForumTool } from './forum.tool';
+import { InvestorsTool } from './investors.tool';
+import { JobOpeningsTool } from './job-openings.tool';
+import { NewsTool } from './news.tool';
+import { DemoDayTool } from './demo-day.tool';
+import { HuskyAuthContext } from './husky-auth-context';
 
 /**
  * Directory database tools exposed to the Husky search model. Every tool reads
@@ -23,14 +28,19 @@ export class HuskyAiToolsService implements OnModuleInit {
     private projectsTool: ProjectsTool,
     private focusAreasTool: FocusAreasTool,
     private asksTool: AsksTool,
-    private forumTool: ForumTool
+    private forumTool: ForumTool,
+    private investorsTool: InvestorsTool,
+    private jobOpeningsTool: JobOpeningsTool,
+    private newsTool: NewsTool,
+    private demoDayTool: DemoDayTool
   ) {}
 
   async onModuleInit() {
     await this.irlEventsTool.initialize();
   }
 
-  public getTools(isLoggedIn: boolean): Record<string, CoreTool> {
+  public getTools(auth: HuskyAuthContext): Record<string, CoreTool> {
+    const { isLoggedIn } = auth;
     const tools: Record<string, CoreTool> = {
       getIrlEvents: this.irlEventsTool.getTool(),
       getMembers: this.membersTool.getTool(isLoggedIn),
@@ -39,8 +49,14 @@ export class HuskyAiToolsService implements OnModuleInit {
       getFocusAreas: this.focusAreasTool.getTool(),
       getAsks: this.asksTool.getTool(),
       getForumPosts: this.forumTool.getTool(isLoggedIn),
+      getInvestors: this.investorsTool.getTool(auth),
+      getJobOpenings: this.jobOpeningsTool.getTool(),
+      getTeamNews: this.newsTool.getTool(auth),
+      getDemoDayTeams: this.demoDayTool.getTool(),
     };
-    return Object.fromEntries(Object.entries(tools).map(([name, tool]) => [name, this.withFailureFallback(name, tool)]));
+    return Object.fromEntries(
+      Object.entries(tools).map(([name, tool]) => [name, this.withFailureFallback(name, tool)])
+    );
   }
 
   /**

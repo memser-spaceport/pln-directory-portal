@@ -1,22 +1,25 @@
 import { Module } from '@nestjs/common';
 import { HuskyService } from './husky.service';
-import { HuskyChatsController } from './husky-chats.controller';
 import { RedisCacheDbService } from './db/redis-cache-db.service';
 import { MongoPersistantDbService } from './db/mongo-persistant-db.service';
-import { HuskyAiService } from './husky-ai.service';
-import { HuskyThreadsController } from './husky-threads.controller';
 import { PrismaService } from '../shared/prisma.service';
 import { HuskyRevalidationService } from './husky-revalidation.service';
-import { HuskyAiToolsModule } from './tools/husky-ai-tools.module';
 import { HuskyGenerationService } from './husky-generation.service';
 import { HuskyGenerationController } from './husky-generation.controller';
 import { MemberBioRefreshService } from './member-bio-refresh.service';
 import { MemberScrapingDogService } from './member-scrapingdog.service';
+
+/**
+ * Narrow, widely-depended-on Husky services (member bio/enrichment helpers,
+ * cache/revalidation hooks). Deliberately has no dependency on the AI-search
+ * tool-calling stack — see husky-search.module.ts for that and why it's split
+ * out — so the ~10 unrelated modules that import HuskyModule directly (no
+ * forwardRef needed) can keep doing so safely.
+ */
 @Module({
-  controllers: [HuskyChatsController, HuskyThreadsController, HuskyGenerationController],
+  controllers: [HuskyGenerationController],
   providers: [
     HuskyService,
-    HuskyAiService,
     RedisCacheDbService,
     MongoPersistantDbService,
     PrismaService,
@@ -25,10 +28,8 @@ import { MemberScrapingDogService } from './member-scrapingdog.service';
     MemberBioRefreshService,
     MemberScrapingDogService,
   ],
-  imports: [HuskyAiToolsModule],
   exports: [
     HuskyService,
-    HuskyAiService,
     RedisCacheDbService,
     MongoPersistantDbService,
     HuskyRevalidationService,

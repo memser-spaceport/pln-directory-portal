@@ -12,7 +12,7 @@ export class HuskyChatsController {
   @UseGuards(UserTokenCheckGuard)
   @Post('v1/husky/chat/contextual-tools')
   async huskyChatAssistantTools(@Body() body: HuskyChatDto, @Res() res: Response, @Req() req) {
-    const stream = await this.huskyAiService.createContextualToolsResponse({ ...body }, !!req.userEmail);
+    const stream = await this.huskyAiService.createContextualToolsResponse({ ...body }, !!req.userEmail, req.userEmail);
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Transfer-Encoding', 'chunked');
     try {

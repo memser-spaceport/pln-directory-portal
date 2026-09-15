@@ -7,10 +7,19 @@ import { ProjectsTool } from './projects.tool';
 import { FocusAreasTool } from './focus-areas.tool';
 import { AsksTool } from './asks.tool';
 import { ForumTool } from './forum.tool';
+import { InvestorsTool } from './investors.tool';
+import { JobOpeningsTool } from './job-openings.tool';
+import { NewsTool } from './news.tool';
+import { DemoDayTool } from './demo-day.tool';
 import { SearchModule } from '../../search/search.module';
+import { RbacModule } from '../../rbac/rbac.module';
+import { AccessControlV2Module } from '../../access-control-v2/access-control-v2.module';
+import { JobOpeningsModule } from '../../job-openings/job-openings.module';
+import { TeamNewsModule } from '../../team-news/team-news.module';
+import { DemoDaysModule } from '../../demo-days/demo-days.module';
 
 @Module({
-  imports: [SearchModule],
+  imports: [SearchModule, RbacModule, AccessControlV2Module, JobOpeningsModule, TeamNewsModule, DemoDaysModule],
   providers: [
     HuskyAiToolsService,
     IrlEventsTool,
@@ -20,6 +29,10 @@ import { SearchModule } from '../../search/search.module';
     FocusAreasTool,
     AsksTool,
     ForumTool,
+    InvestorsTool,
+    JobOpeningsTool,
+    NewsTool,
+    DemoDayTool,
   ],
   exports: [HuskyAiToolsService],
 })

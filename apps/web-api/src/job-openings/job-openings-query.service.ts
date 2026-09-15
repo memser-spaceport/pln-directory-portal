@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { JobOpeningStatus, Prisma } from '@prisma/client';
 import type { JobsListQuery } from 'libs/contracts/src/schema/job-opening';
 import { PrismaService } from '../shared/prisma.service';
+import { resolveLiveMemberUidByEmail } from '../shared/resolve-live-member-uid.util';
 import { buildJobOpeningDateWhere } from './job-opening-date.where';
 import { isInAppApplyAvailable, pinProtocolLabsThenPage } from './pin-protocol-labs-team';
 
@@ -104,18 +105,6 @@ export class JobOpeningsQueryService {
       teamUid: { not: null },
       ...(and.length > 0 ? { AND: and } : {}),
     };
-  }
-
-  // Tolerant on purpose: an anonymous, unknown, or deleted member just means no
-  // interest stamping for this request, never an error on a public list endpoint.
-  private async resolveViewerMemberUid(email?: string): Promise<string | undefined> {
-    if (!email) return undefined;
-    const member = await this.prisma.member.findUnique({
-      where: { email },
-      select: { uid: true, deletedAt: true },
-    });
-    if (!member || member.deletedAt) return undefined;
-    return member.uid;
   }
 
   // Public for JobOpeningsForYouService, which builds its own groups but must
@@ -341,7 +330,7 @@ export class JobOpeningsQueryService {
           ancestorArea: { select: { title: true } },
         },
       }),
-      this.resolveViewerMemberUid(viewerEmail),
+      resolveLiveMemberUidByEmail(this.prisma, viewerEmail),
     ]);
 
     const teamByUid = new Map(pageTeams.map((team) => [team.uid, team]));

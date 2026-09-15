@@ -3,15 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { RBAC_PERMISSIONS_KEY, RequiredPermissions } from './rbac.decorator';
 import { RbacService } from './rbac.service';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
-
-const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
-  'founder_guides.view': ['founder_guides.view.all', 'founder_guides.view.plvs', 'founder_guides.view.plcc'],
-  'founder_guides.create': ['founder_guides.create'],
-  'deals.view': ['deals.read'],
-  'demo_day.report_link.view': ['demoday.report_link.read'],
-  'membership.source.read': ['team.membership_source.read'],
-  'team.membership_source.read': ['membership.source.read'],
-};
+import { memberHasPermission } from './rbac-permission-check';
 
 @Injectable()
 export class RbacGuard implements CanActivate {
@@ -21,25 +13,8 @@ export class RbacGuard implements CanActivate {
     private readonly accessControlV2Service: AccessControlV2Service
   ) {}
 
-  private getPermissionCandidates(permission: string): string[] {
-    return Array.from(new Set([permission, ...(LEGACY_PERMISSION_ALIASES[permission] ?? [])]));
-  }
-
-  private async hasPermission(memberUid: string, permission: string): Promise<boolean> {
-    const candidates = this.getPermissionCandidates(permission);
-
-    for (const candidate of candidates) {
-      try {
-        const check = await this.accessControlV2Service.hasPermission(memberUid, candidate);
-        if (check.allowed) {
-          return true;
-        }
-      } catch {
-        // Intentionally fall through to v1 check.
-      }
-    }
-
-    return this.rbacService.hasPermission(memberUid, permission);
+  private hasPermission(memberUid: string, permission: string): Promise<boolean> {
+    return memberHasPermission(this.rbacService, this.accessControlV2Service, memberUid, permission);
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {

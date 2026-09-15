@@ -32,7 +32,7 @@ import { NotificationServiceClient } from '../notifications/notification-service
 import { MemberApprovalsService } from '../member-approvals/member-approvals.service';
 import { FollowsService } from '../follows/follows.service';
 
-type ParticipatingTeam = {
+export type ParticipatingTeam = {
   uid: string;
   name: string;
   shortDescription: string | null;
@@ -2031,7 +2031,10 @@ export class DemoDaysService {
     });
   }
 
-  private async getParticipatingTeamsForCompletedDemoDay(
+  // Public for Husky's demo-day tool, which needs the same completed-demo-day
+  // roster `getDemoDayAccess` already exposes publicly (even to anonymous
+  // callers) rather than re-deriving the PUBLISHED/founder-participant filter.
+  async getParticipatingTeamsForCompletedDemoDay(
     demoDayUid: string,
     memberEmail: string | null
   ): Promise<ParticipatingTeam[]> {

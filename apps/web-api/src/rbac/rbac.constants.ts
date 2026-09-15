@@ -1,3 +1,5 @@
+import { ADMIN_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
+
 export const RBAC_ROLE_CODES = {
   DIRECTORY_ADMIN: 'DIRECTORY_ADMIN',
   PL_VS_FOUNDER: 'PL_VS_FOUNDER',
@@ -20,6 +22,21 @@ export const RBAC_PERMISSION_CODES = {
   MCP_CONNECT: 'mcp.connect',
   PLAA_ACCESS: 'plaa.access',
 } as const;
+
+/**
+ * Permissions that grant read/write access to the Investor DB — the single
+ * source of truth for investor-lists.controller.ts's `@RequirePermissions`
+ * gates and for any out-of-pipeline caller (e.g. Husky's investors tool) that
+ * needs to check the same access without going through a guarded route.
+ */
+export const INVESTOR_DB_VIEW_PERMISSIONS = [
+  RBAC_PERMISSION_CODES.INVESTOR_DB_VIEW,
+  ADMIN_PERMISSIONS.DIRECTORY_FULL,
+] as const;
+export const INVESTOR_DB_EDIT_PERMISSIONS = [
+  RBAC_PERMISSION_CODES.INVESTOR_DB_EDIT,
+  ADMIN_PERMISSIONS.DIRECTORY_FULL,
+] as const;
 
 export const RBAC_SCOPES = {
   PLVS: 'PLVS',
