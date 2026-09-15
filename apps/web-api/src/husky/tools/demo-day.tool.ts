@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { LogService } from '../../shared/log.service';
 import { PrismaService } from '../../shared/prisma.service';
 import { DemoDaysService } from '../../demo-days/demo-days.service';
+import { longestWord } from './fuzzy-match.util';
 
 const DemoDayToolParams = z.object({
   demoDaySearch: z
@@ -29,19 +30,35 @@ export class DemoDayTool {
   private async execute(args: z.infer<typeof DemoDayToolParams>) {
     this.logger.info(`Getting demo day teams for args: ${JSON.stringify(args)}`);
 
-    const where: Prisma.DemoDayWhereInput = { status: DemoDayStatus.COMPLETED, isDeleted: false };
-    if (args.demoDaySearch) {
-      where.OR = [
-        { title: { contains: args.demoDaySearch, mode: 'insensitive' } },
-        { host: { contains: args.demoDaySearch, mode: 'insensitive' } },
-      ];
-    }
+    const baseWhere: Prisma.DemoDayWhereInput = { status: DemoDayStatus.COMPLETED, isDeleted: false };
 
-    const demoDay = await this.prisma.demoDay.findFirst({
-      where,
-      orderBy: { endDate: 'desc' },
-      select: { uid: true, title: true, host: true, endDate: true },
-    });
+    const findBySearch = (search: string) =>
+      this.prisma.demoDay.findFirst({
+        where: {
+          ...baseWhere,
+          OR: [
+            { title: { contains: search, mode: 'insensitive' } },
+            { host: { contains: search, mode: 'insensitive' } },
+          ],
+        },
+        orderBy: { endDate: 'desc' },
+        select: { uid: true, title: true, host: true, endDate: true },
+      });
+
+    let demoDay = args.demoDaySearch
+      ? await findBySearch(args.demoDaySearch)
+      : await this.prisma.demoDay.findFirst({
+          where: baseWhere,
+          orderBy: { endDate: 'desc' },
+          select: { uid: true, title: true, host: true, endDate: true },
+        });
+
+    if (!demoDay && args.demoDaySearch) {
+      const fallbackSearch = longestWord(args.demoDaySearch);
+      if (fallbackSearch) {
+        demoDay = await findBySearch(fallbackSearch);
+      }
+    }
 
     if (!demoDay) {
       return args.demoDaySearch

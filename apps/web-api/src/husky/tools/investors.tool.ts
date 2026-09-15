@@ -9,6 +9,7 @@ import { INVESTOR_DB_VIEW_PERMISSIONS } from '../../rbac/rbac.constants';
 import { memberHasAnyPermission } from '../../rbac/rbac-permission-check';
 import { AccessControlV2Service } from '../../access-control-v2/services/access-control-v2.service';
 import { HuskyAuthContext } from './husky-auth-context';
+import { fuzzyMatches } from './fuzzy-match.util';
 
 const MAX_CANDIDATES = 500;
 const MAX_RESULTS = 15;
@@ -80,15 +81,13 @@ export class InvestorsTool {
       take: MAX_CANDIDATES,
     });
 
-    const search = args.search?.toLowerCase();
+    const search = args.search?.trim();
     const visible = profiles.filter((profile) => {
       if (profile.member?.deletedAt) return false;
       if (!profile.team && !profile.member) return false;
       if (!search) return true;
       const name = profile.team?.name ?? profile.member?.name ?? '';
-      return (
-        name.toLowerCase().includes(search) || profile.investmentFocus.some((f) => f.toLowerCase().includes(search))
-      );
+      return fuzzyMatches(name, search) || profile.investmentFocus.some((f) => fuzzyMatches(f, search));
     });
 
     if (visible.length === 0) {

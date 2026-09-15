@@ -3,8 +3,10 @@ import { tool, CoreTool } from 'ai';
 import { z } from 'zod';
 import { TeamNewsListQueryParams } from 'libs/contracts/src/schema/team-news';
 import { LogService } from '../../shared/log.service';
+import { PrismaService } from '../../shared/prisma.service';
 import { TeamNewsQueryService } from '../../team-news/team-news-query.service';
 import { HuskyAuthContext } from './husky-auth-context';
+import { longestWord, resolveFocusAreaTitles } from './fuzzy-match.util';
 
 const EVENT_TYPES = ['FUNDING', 'LAUNCH', 'PARTNERSHIP', 'ANNOUNCEMENT', 'MILESTONE', 'OTHER'] as const;
 
@@ -17,7 +19,11 @@ const NewsToolParams = z.object({
 
 @Injectable()
 export class NewsTool {
-  constructor(private logger: LogService, private teamNewsQueryService: TeamNewsQueryService) {}
+  constructor(
+    private logger: LogService,
+    private prisma: PrismaService,
+    private teamNewsQueryService: TeamNewsQueryService
+  ) {}
 
   getTool(auth: HuskyAuthContext): CoreTool {
     return tool({
@@ -31,15 +37,29 @@ export class NewsTool {
   private async execute(args: z.infer<typeof NewsToolParams>, auth: HuskyAuthContext) {
     this.logger.info(`Getting team news for args: ${JSON.stringify(args)}`);
 
-    const query = TeamNewsListQueryParams.parse({
-      q: args.search,
+    const baseArgs = {
       eventType: args.eventType ? [args.eventType] : undefined,
-      focus: args.focus ? [args.focus] : undefined,
+      focus: args.focus ? await resolveFocusAreaTitles(this.prisma, args.focus) : undefined,
       windowDays: args.windowDays,
       limit: 15,
-    });
+    };
 
-    const { items } = await this.teamNewsQueryService.listTeamNews(query, new Set(), auth.memberUid);
+    let { items } = await this.teamNewsQueryService.listTeamNews(
+      TeamNewsListQueryParams.parse({ ...baseArgs, q: args.search }),
+      new Set(),
+      auth.memberUid
+    );
+
+    if (items.length === 0 && args.search) {
+      const fallbackSearch = longestWord(args.search);
+      if (fallbackSearch) {
+        ({ items } = await this.teamNewsQueryService.listTeamNews(
+          TeamNewsListQueryParams.parse({ ...baseArgs, q: fallbackSearch }),
+          new Set(),
+          auth.memberUid
+        ));
+      }
+    }
 
     if (items.length === 0) {
       return 'No network news found matching the search criteria.';
