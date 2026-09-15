@@ -3,8 +3,10 @@ import { tool, CoreTool } from 'ai';
 import { z } from 'zod';
 import { JobsListQueryParams } from 'libs/contracts/src/schema/job-opening';
 import { LogService } from '../../shared/log.service';
+import { PrismaService } from '../../shared/prisma.service';
 import { JobOpeningsQueryService } from '../../job-openings/job-openings-query.service';
 import { SENIORITY_DISPLAY } from '../../job-alerts/job-alerts.utils';
+import { longestWord, resolveFocusAreaTitles } from './fuzzy-match.util';
 
 // `JobOpening.seniority` is filtered by exact match, and is stored with an L-level suffix
 // (e.g. "Senior (L4)") that a model has no way to guess from the question alone — without
@@ -21,21 +23,6 @@ for (const [canonical, short] of Object.entries(SENIORITY_DISPLAY)) {
 function resolveSeniority(input?: string): string[] | undefined {
   if (!input) return undefined;
   return SENIORITY_ALIASES.get(input.trim().toLowerCase()) ?? [input];
-}
-
-/**
- * `search` is a single-substring `contains` match against role title/team name (see
- * job-openings-query.service.ts's buildWhere), so a multi-word phrase like "senior rust
- * engineer roles" won't match a title like "Senior Backend Engineer, Rust" — the words are
- * there, just not contiguous in that order. The tool description asks the model for one
- * keyword, but models don't always comply; this falls back to the single longest word in
- * the phrase (a reasonable proxy for "the distinctive term") when the literal phrase alone
- * matched nothing.
- */
-function longestWord(phrase: string): string | undefined {
-  const words = phrase.split(/\s+/).filter(Boolean);
-  if (words.length <= 1) return undefined;
-  return words.reduce((longest, word) => (word.length > longest.length ? word : longest));
 }
 
 const JobOpeningsToolParams = z.object({
@@ -61,7 +48,11 @@ const JobOpeningsToolParams = z.object({
 
 @Injectable()
 export class JobOpeningsTool {
-  constructor(private logger: LogService, private jobOpeningsQueryService: JobOpeningsQueryService) {}
+  constructor(
+    private logger: LogService,
+    private prisma: PrismaService,
+    private jobOpeningsQueryService: JobOpeningsQueryService
+  ) {}
 
   getTool(): CoreTool {
     return tool({
@@ -79,7 +70,7 @@ export class JobOpeningsTool {
       roleCategory: args.roleCategory ? [args.roleCategory] : undefined,
       location: args.location ? [args.location] : undefined,
       workMode: args.workMode ? [args.workMode] : undefined,
-      focus: args.focus ? [args.focus] : undefined,
+      focus: args.focus ? await resolveFocusAreaTitles(this.prisma, args.focus) : undefined,
       limit: 10,
     };
 
