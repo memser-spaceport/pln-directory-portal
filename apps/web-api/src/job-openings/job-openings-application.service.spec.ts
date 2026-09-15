@@ -125,6 +125,7 @@ describe('JobOpeningsApplicationService', () => {
         recipientsInfo: {
           to: ['lead@airship.com'],
           cc: ['lead2@airship.com'],
+          bcc: [],
           replyTo: 'ada@example.com',
         },
         deliveryPayload: {
@@ -139,7 +140,7 @@ describe('JobOpeningsApplicationService', () => {
             },
             roleTitle: 'Staff Engineer',
             teamName: 'Airship',
-            applyUrl: 'https://directory.test/jobs?job=job-1',
+            applyUrl: 'https://directory.test/jobs/openings/job-1',
           }),
         },
       })
@@ -410,6 +411,7 @@ describe('JobOpeningsApplicationService', () => {
         recipientsInfo: {
           to: ['jobs@protocol.ai'],
           cc: [],
+          bcc: [],
           replyTo: 'ada@example.com',
         },
         targetMeta: {
@@ -445,6 +447,7 @@ describe('JobOpeningsApplicationService', () => {
         recipientsInfo: {
           to: ['jobs@protocol.ai'],
           cc: ['hiring@protocol.ai', 'talent@protocol.ai'],
+          bcc: [],
           replyTo: 'ada@example.com',
         },
       })
@@ -501,6 +504,7 @@ describe('JobOpeningsApplicationService', () => {
         recipientsInfo: {
           to: ['lead@airship.com'],
           cc: ['lead2@airship.com'],
+          bcc: [],
           replyTo: 'ada@example.com',
         },
       })

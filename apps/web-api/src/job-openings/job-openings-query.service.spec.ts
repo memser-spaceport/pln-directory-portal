@@ -179,3 +179,24 @@ describe('JobTeamSchema inAppApplyAvailable', () => {
     expect(isInAppApplyAvailable({ teamUid: team.uid, name: team.name, jobReferEmail: null })).toBe(true);
   });
 });
+
+describe('JobOpeningsQueryService.listCrawlIndex', () => {
+  it('returns uid and updatedAt for visible openings', async () => {
+    const findMany = jest.fn().mockResolvedValue([{ uid: 'j1', updatedAt: new Date('2026-01-01T00:00:00.000Z') }]);
+    const service = new JobOpeningsQueryService({ jobOpening: { findMany } } as unknown as PrismaService);
+
+    await expect(service.listCrawlIndex()).resolves.toEqual({
+      jobs: [{ uid: 'j1', updatedAt: '2026-01-01T00:00:00.000Z' }],
+    });
+
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          status: { notIn: HIDDEN_JOB_OPENING_STATUSES },
+          teamUid: { not: null },
+        },
+        select: { uid: true, updatedAt: true },
+      })
+    );
+  });
+});

@@ -1,12 +1,14 @@
 import { z } from 'zod';
 import { initContract } from '@ts-rest/core';
 import {
+  JobCrawlIndexResponseSchema,
   JobOpeningInterestListResponseSchema,
   JobOpeningInterestStatusSchema,
   JobsFiltersResponseSchema,
   JobsForYouResponseSchema,
   JobsListQueryParams,
   JobsListResponseSchema,
+  JobTeamGroupSchema,
 } from '../schema/job-opening';
 import {
   CreateJobApplicationSchema,
@@ -43,6 +45,14 @@ export const apiJobOpenings = contract.router({
       200: JobsFiltersResponseSchema,
     },
     summary: 'Facet counts for the Jobs list',
+  },
+  getCrawlIndex: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/job-openings/crawl-index`,
+    responses: {
+      200: JobCrawlIndexResponseSchema,
+    },
+    summary: 'Flat uid/updatedAt list of visible job openings for sitemaps',
   },
   getForYouJobs: {
     method: 'GET',
@@ -126,5 +136,14 @@ export const apiJobOpenings = contract.router({
       200: JobOpeningInterestStatusSchema,
     },
     summary: "Remove the current member's interest in a job opening (idempotent)",
+  },
+  getJob: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/job-openings/:uid`,
+    pathParams: z.object({ uid: z.string() }),
+    responses: {
+      200: JobTeamGroupSchema,
+    },
+    summary: 'One visible job opening with its hiring team',
   },
 });

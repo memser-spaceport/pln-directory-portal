@@ -117,7 +117,7 @@ describe('JobOpeningsReferralService', () => {
         },
         deliveryPayload: {
           body: expect.objectContaining({
-            applyUrl: 'https://directory.test/jobs?job=job-1',
+            applyUrl: 'https://directory.test/jobs/openings/job-1',
             roleTitle: 'Staff Engineer',
             teamName: 'Airship',
           }),

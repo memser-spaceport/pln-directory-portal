@@ -50,6 +50,12 @@ export class JobOpeningsController {
     return this.jobOpeningsQueryService.getFilters(params);
   }
 
+  @Api(server.route.getCrawlIndex)
+  @NoCache()
+  async getCrawlIndex() {
+    return this.jobOpeningsQueryService.listCrawlIndex();
+  }
+
   @Api(server.route.signUp)
   @NoCache()
   async signUp(@Req() request: Request) {
@@ -93,6 +99,13 @@ export class JobOpeningsController {
   @NoCache()
   async getMyInterests(@Req() request: Request & { userEmail?: string }) {
     return this.jobOpeningsInterestService.listMine(request.userEmail);
+  }
+
+  @Api(server.route.getJob)
+  @UseGuards(UserAuthValidateGuard)
+  @NoCache()
+  async getJob(@Req() request: Request & { userEmail?: string }) {
+    return this.jobOpeningsQueryService.getJobOpening(request.params.uid, request.userEmail);
   }
 
   @Api(server.route.markJobInterest)

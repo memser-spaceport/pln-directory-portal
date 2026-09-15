@@ -20,7 +20,10 @@ const BATCH_SIZE = 50;
 const EMAIL_CONCURRENCY = 5;
 
 const buildAppUrl = (pathname: string) => {
-  const base = process.env.WEB_UI_BASE_URL || process.env.APPLICATION_BASE_URL || 'https://www.plnetwork.io';
+  const base = process.env.WEB_UI_BASE_URL || process.env.APPLICATION_BASE_URL;
+  if (!base) {
+    throw new Error('WEB_UI_BASE_URL or APPLICATION_BASE_URL must be set');
+  }
   return `${base.replace(/\/$/, '')}${pathname}`;
 };
 
