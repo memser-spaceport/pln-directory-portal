@@ -774,7 +774,7 @@ export class PLEventGuestsService {
     if (filteredEventsUid?.length > 0) {
       return events
         .filter((event) => filteredEventsUid?.includes(event.uid))
-        .filter((event) => event.type !== 'INVITE_ONLY' || attendedEventUids.has(event?.uid));
+        .filter((event) => event.type !== 'INVITE_ONLY' || attendedEventUids.has(event.uid));
     }
     return events.filter((event) => event.type !== 'INVITE_ONLY' || attendedEventUids.has(event.uid));
   }
