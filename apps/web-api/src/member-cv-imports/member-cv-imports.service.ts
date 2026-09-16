@@ -157,7 +157,12 @@ export class MemberCvImportsService {
 
     const member = await this.prisma.member.findUnique({
       where: { uid: memberUid },
-      include: { skills: { select: { uid: true, title: true } } },
+      select: {
+        role: true,
+        locationUid: true,
+        customSkills: true,
+        skills: { select: { uid: true, title: true } },
+      },
     });
     if (!member) {
       throw new NotFoundException('Member not found');
@@ -172,15 +177,25 @@ export class MemberCvImportsService {
     );
 
     await this.prisma.$transaction(async (tx) => {
-      const skillConnect = await this.unionSkills(tx, member.skills, selection.skills);
-      skillsAdded.push(...skillConnect.addedTitles);
+      const skillUnion = await this.unionSkills(
+        tx,
+        member.skills ?? [],
+        member.customSkills ?? [],
+        selection.skills ?? []
+      );
+      skillsAdded.push(...skillUnion.addedTitles, ...skillUnion.customSkillsToAdd);
 
       const memberUpdate: Prisma.MemberUpdateInput = {};
       if (shouldFillRole) {
         memberUpdate.role = selection.role.trim();
       }
-      if (skillConnect.connect.length > 0) {
-        memberUpdate.skills = { connect: skillConnect.connect };
+      if (skillUnion.connect.length > 0) {
+        memberUpdate.skills = { connect: skillUnion.connect };
+      }
+      if (skillUnion.customSkillsToAdd.length > 0) {
+        memberUpdate.customSkills = {
+          set: [...(member.customSkills ?? []), ...skillUnion.customSkillsToAdd],
+        };
       }
       if (shouldFillLocation) {
         const locationUid = await this.resolveLocationUid(tx, selection.location.trim());
@@ -315,46 +330,45 @@ export class MemberCvImportsService {
 
   private async unionSkills(
     tx: Prisma.TransactionClient,
-    existing: Array<{ uid: string; title: string }>,
-    titles: string[]
-  ): Promise<{ connect: Array<{ uid: string }>; addedTitles: string[] }> {
+    existing: Array<{ uid: string; title: string }> = [],
+    existingCustomSkills: string[] = [],
+    titles: string[] = []
+  ): Promise<{ connect: Array<{ uid: string }>; addedTitles: string[]; customSkillsToAdd: string[] }> {
     const existingUids = new Set(existing.map((skill) => skill.uid));
     const connect: Array<{ uid: string }> = [];
     const addedTitles: string[] = [];
+    const customSkillsToAdd: string[] = [];
     const seen = new Set<string>();
+    const haveTitlesLower = new Set([
+      ...existing.map((skill) => skill.title.toLowerCase()),
+      ...existingCustomSkills.map((skill) => skill.toLowerCase()),
+    ]);
 
     for (const raw of titles) {
       const title = raw.trim();
       if (!title) continue;
       const key = title.toLowerCase();
-      if (seen.has(key)) continue;
+      if (seen.has(key) || haveTitlesLower.has(key)) continue;
       seen.add(key);
 
-      let skill = await tx.skill.findFirst({
+      const skill = await tx.skill.findFirst({
         where: { title: { equals: title, mode: 'insensitive' } },
         select: { uid: true, title: true },
       });
-      if (!skill) {
-        try {
-          skill = await tx.skill.create({ data: { title }, select: { uid: true, title: true } });
-        } catch (error) {
-          if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-            skill = await tx.skill.findFirst({
-              where: { title: { equals: title, mode: 'insensitive' } },
-              select: { uid: true, title: true },
-            });
-          } else {
-            throw error;
-          }
+      if (skill) {
+        if (!existingUids.has(skill.uid)) {
+          existingUids.add(skill.uid);
+          connect.push({ uid: skill.uid });
+          addedTitles.push(skill.title);
+          haveTitlesLower.add(skill.title.toLowerCase());
         }
+      } else {
+        customSkillsToAdd.push(title);
+        haveTitlesLower.add(key);
       }
-      if (!skill || existingUids.has(skill.uid)) continue;
-      existingUids.add(skill.uid);
-      connect.push({ uid: skill.uid });
-      addedTitles.push(skill.title);
     }
 
-    return { connect, addedTitles };
+    return { connect, addedTitles, customSkillsToAdd };
   }
 
   private async resolveLocationUid(tx: Prisma.TransactionClient, location: string): Promise<string | null> {

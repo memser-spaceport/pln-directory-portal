@@ -159,6 +159,7 @@ model Member {
   ohStatus                           String?
   ohInterest                         String[]                          @default([])
   ohHelpWith                         String[]                          @default([])
+  customSkills                       String[]                          @default([])
   moreDetails                        String?
   bio                                String?
   plnFriend                          Boolean?                          @default(false)
