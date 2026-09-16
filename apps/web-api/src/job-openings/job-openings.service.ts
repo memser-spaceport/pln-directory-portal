@@ -2,10 +2,20 @@ import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../shared/prisma.service';
-import { JobOpeningStatus, Prisma } from '@prisma/client';
+import { JobOpeningManagedBy, JobOpeningStatus, Prisma } from '@prisma/client';
 import { JobOpeningIngestItem, IngestJobOpeningsResponse } from './dto/ingest-job-openings.dto';
 import { JOB_INGEST_COMPLETED, JobIngestCompletedPayload } from '../job-alerts/job-alerts.events';
 import { sanitizeJobDescriptionHtml } from './job-description-html.util';
+import { HIDDEN_JOB_OPENING_STATUSES } from './job-openings-query.service';
+
+type SkipReason = 'owned-by-integration' | 'owned-by-manual';
+
+type UpsertOutcome = { outcome: 'created' | 'updated' } | { outcome: 'skipped'; reason: SkipReason };
+
+/** A row is visible on the board when its status is outside the hidden set. */
+function isVisibleStatus(status: JobOpeningStatus | null | undefined): boolean {
+  return status != null && !HIDDEN_JOB_OPENING_STATUSES.includes(status);
+}
 
 @Injectable()
 export class JobOpeningsService {
@@ -21,8 +31,10 @@ export class JobOpeningsService {
       received: items.length,
       created: 0,
       updated: 0,
+      skipped: 0,
       failed: 0,
       errors: [],
+      skippedReasons: [],
     };
 
     if (items.length === 0) {
@@ -31,18 +43,17 @@ export class JobOpeningsService {
 
     for (const item of items) {
       try {
-        await this.upsertJobOpening(item);
-        // Count as created or updated based on whether it existed
-        const existing = await this.prisma.jobOpening.findUnique({
-          where: { dedupKey: item.dedupKey },
-          select: { id: true, createdAt: true },
-        });
-
-        // If created within last second, consider it newly created
-        if (existing && existing.createdAt > new Date(Date.now() - 5000)) {
-          result.created++;
+        if (item.managedBy !== undefined && item.managedBy !== JobOpeningManagedBy.ENRICHMENT) {
+          throw new Error(
+            `managedBy must be ${JobOpeningManagedBy.ENRICHMENT} on this endpoint, got ${item.managedBy}`
+          );
+        }
+        const upserted = await this.upsertJobOpening(item);
+        if (upserted.outcome === 'skipped') {
+          result.skipped++;
+          result.skippedReasons.push(`${upserted.reason}: ${item.dedupKey}`);
         } else {
-          result.updated++;
+          result[upserted.outcome]++;
         }
       } catch (error) {
         this.logger.error(
@@ -99,19 +110,51 @@ export class JobOpeningsService {
     return new Date();
   }
 
-  private async upsertJobOpening(item: JobOpeningIngestItem): Promise<void> {
+  /**
+   * Stamp rule for `publishedAt`: set when a row is created visible, and when an
+   * update takes it from hidden to visible. `undefined` means "leave as is".
+   */
+  private resolvePublishedAt(
+    existing: { status: JobOpeningStatus } | null,
+    resolvedStatus: JobOpeningStatus,
+    now: Date
+  ): Date | null | undefined {
+    if (!existing) {
+      return isVisibleStatus(resolvedStatus) ? now : null;
+    }
+    if (!isVisibleStatus(existing.status) && isVisibleStatus(resolvedStatus)) {
+      return now;
+    }
+    return undefined;
+  }
+
+  private async upsertJobOpening(item: JobOpeningIngestItem): Promise<UpsertOutcome> {
+    const existing = await this.prisma.jobOpening.findUnique({
+      where: { dedupKey: item.dedupKey },
+      select: { status: true, closedAt: true, managedBy: true, publishedAt: true },
+    });
+
+    if (existing?.managedBy && existing.managedBy !== JobOpeningManagedBy.ENRICHMENT) {
+      return {
+        outcome: 'skipped',
+        reason: existing.managedBy === JobOpeningManagedBy.INTEGRATION ? 'owned-by-integration' : 'owned-by-manual',
+      };
+    }
+
     const mappedStatus = this.mapStatus(item.status);
     const status = mappedStatus ?? JobOpeningStatus.NEW;
     const location = this.resolveIngestLocations(item);
-    const existing = await this.prisma.jobOpening.findUnique({
-      where: { dedupKey: item.dedupKey },
-      select: { closedAt: true },
-    });
     const closedAt = this.resolveClosedAt(item, status, existing);
     const descriptionHtml = sanitizeJobDescriptionHtml(item.descriptionHtml);
+    const now = new Date();
+    // An unknown incoming status keeps the stored one on update, so it is never a transition.
+    const resolvedStatus = existing ? mappedStatus ?? existing.status : status;
+    const publishedAt = this.resolvePublishedAt(existing, resolvedStatus, now);
 
     const data: Prisma.JobOpeningUncheckedCreateInput = {
       status,
+      managedBy: JobOpeningManagedBy.ENRICHMENT,
+      publishedAt: publishedAt ?? null,
       companyName: item.companyName,
       signalType: item.signalType,
       roleTitle: item.roleTitle,
@@ -154,14 +197,25 @@ export class JobOpeningsService {
         location: data.location,
         lastSeenLive: data.lastSeenLive,
         detectionDate: data.detectionDate,
+        ...(existing?.managedBy == null ? { managedBy: JobOpeningManagedBy.ENRICHMENT } : {}),
+        ...(publishedAt !== undefined ? { publishedAt } : {}),
         ...(mappedStatus ? { status: mappedStatus } : {}),
+        ...(item.roleTitle !== undefined ? { roleTitle: data.roleTitle } : {}),
+        ...(item.roleCategory !== undefined ? { roleCategory: data.roleCategory } : {}),
+        ...(item.seniority !== undefined ? { seniority: data.seniority } : {}),
+        ...(item.department !== undefined ? { department: data.department } : {}),
+        ...(item.postedDate !== undefined ? { postedDate: data.postedDate } : {}),
+        ...(item.teamUid !== undefined ? { teamUid: data.teamUid } : {}),
+        ...(item.sourceType !== undefined ? { sourceType: data.sourceType } : {}),
         ...(item.summary !== undefined ? { summary: data.summary } : {}),
         ...(item.workMode !== undefined ? { workMode: data.workMode } : {}),
         ...(descriptionHtml ? { descriptionHtml } : {}),
         ...(closedAt !== undefined ? { closedAt } : {}),
-        updatedAt: new Date(),
+        updatedAt: now,
       },
     });
+
+    return { outcome: existing ? 'updated' : 'created' };
   }
 
   private mapStatus(status: string): JobOpeningStatus | undefined {

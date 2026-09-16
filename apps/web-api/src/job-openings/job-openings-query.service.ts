@@ -435,9 +435,16 @@ export class JobOpeningsQueryService {
     return { ...group, roles: [role], totalRoles: 1 };
   }
 
+  /**
+   * Openings for a job-alert digest: rows matching the alert's filters that became
+   * visible on the board after `sinceTs`. Matches on `publishedAt`, never `updatedAt`,
+   * so edits and unchanged re-ingests of an already-listed row do not re-alert.
+   */
   async findNewMatchesSince(query: JobsListQuery, sinceTs: Date | null) {
     const where = this.buildWhere(query);
-    const sinceFilter: Prisma.JobOpeningWhereInput[] = sinceTs ? [{ updatedAt: { gt: sinceTs } }] : [];
+    const sinceFilter: Prisma.JobOpeningWhereInput[] = sinceTs
+      ? [{ publishedAt: { gt: sinceTs } }]
+      : [{ publishedAt: { not: null } }];
     return this.prisma.jobOpening.findMany({
       where: sinceFilter.length > 0 ? { AND: [where, ...sinceFilter] } : where,
       select: {
@@ -451,10 +458,11 @@ export class JobOpeningsQueryService {
         sourceLink: true,
         postedDate: true,
         detectionDate: true,
+        publishedAt: true,
         updatedAt: true,
         team: { select: { uid: true, name: true, logo: { select: { url: true } } } },
       },
-      orderBy: { updatedAt: 'desc' },
+      orderBy: { publishedAt: 'desc' },
     });
   }
 
