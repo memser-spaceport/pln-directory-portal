@@ -9,7 +9,7 @@ import { INVESTOR_DB_VIEW_PERMISSIONS } from '../../rbac/rbac.constants';
 import { memberHasAnyPermission } from '../../rbac/rbac-permission-check';
 import { AccessControlV2Service } from '../../access-control-v2/services/access-control-v2.service';
 import { HuskyAuthContext } from './husky-auth-context';
-import { searchTerms } from './fuzzy-match.util';
+import { fuzzySqlCondition } from './fuzzy-match.util';
 
 const MAX_RESULTS = 15;
 // A small buffer above MAX_RESULTS, not a ranking cutoff: the real filtering (structured
@@ -133,43 +133,27 @@ export class InvestorsTool {
    * `investmentFocus` is a `String[]` — Prisma's array filters are `has`/`hasSome`/`hasEvery`/
    * exact equality only, with no case-insensitive substring operator over individual elements —
    * so free-text matching against it (and against team/member name) has to be raw SQL rather
-   * than a Prisma `where`. Matches bidirectionally per term (search-in-tag AND tag-in-search) so
-   * a model-normalized single word ("neurotechnology") still matches terser stored tags
-   * ("neuro"/"tech"/"neuro tech"), and a compound tag ("DeepTech") still matches a spaced-out
-   * search ("deep tech") via one of its words — see `searchTerms`. Doing the match here, in SQL,
-   * rather than in memory over a capped candidate fetch (the previous approach) means it scales
+   * than a Prisma `where`. `fuzzySqlCondition` matches bidirectionally per term (search-in-tag
+   * AND tag-in-search) so a model-normalized single word ("neurotechnology") still matches
+   * terser stored tags ("neuro"/"tech"/"neuro tech"), and a compound tag ("DeepTech") still
+   * matches a spaced-out search ("deep tech") via one of its words, while a short token such as
+   * "ai" only matches a whole word — not every name with those two letters in it. Doing the
+   * match here, in SQL, rather than in memory over a capped candidate fetch means it scales
    * correctly to any table size: nothing gets silently excluded by a fetch limit ahead of the
    * filter, because the filter *is* the fetch.
    */
   private async findMatchingUids(search: string): Promise<string[]> {
-    const terms = searchTerms(search);
-    // `NULLIF(column, '')` matters for two distinct empty-value cases, both of which would
-    // otherwise make the reverse-direction check (`term LIKE '%' || column || '%'`) collapse to
-    // `term LIKE '%%'` — true for every term, silently matching a row that has nothing to do
-    // with the search:
-    //   - no team/member at all (COALESCE(t.name, m.name) is NULL for an orphaned profile), and
-    //   - a genuinely empty-string tag or name (data can contain one; NULL alone wouldn't catch it).
-    // NULLIF collapses either case to NULL, and NULL propagates through LOWER/`||`/LIKE to NULL,
-    // which SQL treats as false in a WHERE clause — the correct outcome here.
-    const termConditions = (column: Prisma.Sql) =>
-      Prisma.join(
-        terms.map(
-          (term) =>
-            Prisma.sql`(LOWER(NULLIF(${column}, '')) LIKE '%' || LOWER(${term}) || '%' OR LOWER(${term}) LIKE '%' || LOWER(NULLIF(${column}, '')) || '%')`
-        ),
-        ' OR '
-      );
-
     const rows = await this.prisma.$queryRaw<{ uid: string }[]>(Prisma.sql`
       SELECT DISTINCT ip.uid
       FROM "InvestorProfile" ip
       LEFT JOIN "Team" t ON t."investorProfileId" = ip.uid
       LEFT JOIN "Member" m ON m."investorProfileId" = ip.uid
       WHERE
-        EXISTS (SELECT 1 FROM unnest(ip."investmentFocus") AS focus_item WHERE ${termConditions(
-          Prisma.sql`focus_item`
+        EXISTS (SELECT 1 FROM unnest(ip."investmentFocus") AS focus_item WHERE ${fuzzySqlCondition(
+          Prisma.sql`focus_item`,
+          search
         )})
-        OR ${termConditions(Prisma.sql`COALESCE(t.name, m.name)`)}
+        OR ${fuzzySqlCondition(Prisma.sql`COALESCE(t.name, m.name)`, search)}
     `);
 
     return rows.map((row) => row.uid);

@@ -1,12 +1,31 @@
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../shared/prisma.service';
 
-const MIN_FUZZY_TOKEN_LENGTH = 2;
+const MIN_TOKEN_LENGTH = 2;
+/**
+ * Below this length a token is only allowed to match another token exactly (whole word),
+ * never as a substring: a two-letter token like "ai" (from "decentralized AI") is a substring
+ * of far too many unrelated words — "Cr*ai*g", "Cl*ai*re", "Sustain*ai*bility" — for
+ * substring containment to mean anything.
+ */
+const MIN_SUBSTRING_MATCH_LENGTH = 3;
 
-function tokenize(value: string): string[] {
+export function tokenize(value: string): string[] {
   return value
     .toLowerCase()
     .split(/[^a-z0-9]+/)
-    .filter((token) => token.length >= MIN_FUZZY_TOKEN_LENGTH);
+    .filter((token) => token.length >= MIN_TOKEN_LENGTH);
+}
+
+function contains(haystack: string, needle: string): boolean {
+  return needle.length >= MIN_SUBSTRING_MATCH_LENGTH && haystack.includes(needle);
+}
+
+function tokensMatch(a: string, b: string): boolean {
+  if (a.length < MIN_SUBSTRING_MATCH_LENGTH || b.length < MIN_SUBSTRING_MATCH_LENGTH) {
+    return a === b;
+  }
+  return a.includes(b) || b.includes(a);
 }
 
 /**
@@ -16,17 +35,38 @@ function tokenize(value: string): string[] {
  * matches get silently dropped. Falls back to per-token overlap (in either substring
  * direction) so "neurotechnology" still matches a "neuro"/"tech"/"neuro tech" tag, and a
  * compound tag like "DeepTech" still matches a search of "deep tech".
+ *
+ * Tokens shorter than `MIN_SUBSTRING_MATCH_LENGTH` only match whole tokens, so "AI" still
+ * matches an "AI/ML" tag but not a name that happens to contain those two letters.
  */
 export function fuzzyMatches(value: string, search: string): boolean {
   const normalizedValue = value.toLowerCase();
   const normalizedSearch = search.toLowerCase();
-  if (normalizedValue.includes(normalizedSearch) || normalizedSearch.includes(normalizedValue)) {
+  if (contains(normalizedValue, normalizedSearch) || contains(normalizedSearch, normalizedValue)) {
     return true;
   }
   const valueTokens = tokenize(value);
   const searchTokens = tokenize(search);
-  return searchTokens.some((searchToken) =>
-    valueTokens.some((valueToken) => valueToken.includes(searchToken) || searchToken.includes(valueToken))
+  return searchTokens.some((searchToken) => valueTokens.some((valueToken) => tokensMatch(searchToken, valueToken)));
+}
+
+/**
+ * Whether free text (a description, a bio) mentions a topic. Stricter than `fuzzyMatches`,
+ * which treats any single overlapping token as a hit — fine for a short tag, far too loose for
+ * a paragraph. The whole phrase must appear, or every topic word must appear as a word (or
+ * word prefix, so "storage" also covers "storages") in the text.
+ */
+export function textMentions(text: string, topic: string): boolean {
+  if (contains(text.toLowerCase(), topic.toLowerCase())) {
+    return true;
+  }
+  const textTokens = tokenize(text);
+  const topicTokens = tokenize(topic);
+  if (topicTokens.length === 0) return false;
+  return topicTokens.every((topicToken) =>
+    textTokens.some((textToken) =>
+      topicToken.length < MIN_SUBSTRING_MATCH_LENGTH ? textToken === topicToken : textToken.startsWith(topicToken)
+    )
   );
 }
 
@@ -40,6 +80,38 @@ export function fuzzyMatches(value: string, search: string): boolean {
  */
 export function searchTerms(search: string): string[] {
   return Array.from(new Set([search.toLowerCase(), ...tokenize(search)]));
+}
+
+/**
+ * SQL equivalent of `fuzzyMatches(column, search)`, for matching in the database rather than
+ * over a capped in-memory candidate window. Bidirectional per term (search-in-column AND
+ * column-in-search), with the same short-token rule: a term shorter than
+ * `MIN_SUBSTRING_MATCH_LENGTH` must match a whole word (`\m`/`\M` boundaries), and a stored
+ * value that short must equal one of the search's words outright.
+ *
+ * `NULLIF(column, '')` matters for the reverse-direction check (`search LIKE '%' || column || '%'`),
+ * which would otherwise collapse to `search LIKE '%%'` — true for every row — for a NULL column
+ * (e.g. `COALESCE(t.name, m.name)` on an orphaned profile) or a genuinely empty string. NULLIF
+ * collapses either to NULL, which propagates through LOWER/`||`/LIKE to NULL, i.e. false.
+ */
+export function fuzzySqlCondition(column: Prisma.Sql, search: string): Prisma.Sql {
+  const normalizedColumn = Prisma.sql`LOWER(NULLIF(${column}, ''))`;
+  const tokens = tokenize(search);
+  const forward = searchTerms(search)
+    .map((term) => {
+      if (term.length >= MIN_SUBSTRING_MATCH_LENGTH) {
+        return Prisma.sql`${normalizedColumn} LIKE '%' || ${term} || '%'`;
+      }
+      // Only plain alphanumeric short terms are safe to splice into a regex; anything else
+      // (e.g. "c+") is covered by the exact-token branch below or not at all.
+      return /^[a-z0-9]+$/.test(term) ? Prisma.sql`${normalizedColumn} ~ ${`\\m${term}\\M`}` : undefined;
+    })
+    .filter((condition): condition is Prisma.Sql => condition !== undefined);
+  const reverse = [
+    Prisma.sql`(LENGTH(${normalizedColumn}) >= ${MIN_SUBSTRING_MATCH_LENGTH} AND ${search.toLowerCase()} LIKE '%' || ${normalizedColumn} || '%')`,
+    ...(tokens.length > 0 ? [Prisma.sql`${normalizedColumn} = ANY(${tokens}::text[])`] : []),
+  ];
+  return Prisma.sql`(${Prisma.join([...forward, ...reverse], ' OR ')})`;
 }
 
 /**

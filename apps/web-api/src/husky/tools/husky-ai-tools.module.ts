@@ -17,9 +17,18 @@ import { AccessControlV2Module } from '../../access-control-v2/access-control-v2
 import { JobOpeningsModule } from '../../job-openings/job-openings.module';
 import { TeamNewsModule } from '../../team-news/team-news.module';
 import { DemoDaysModule } from '../../demo-days/demo-days.module';
+import { PLEventsModule } from '../../pl-events/pl-events.module';
 
 @Module({
-  imports: [SearchModule, RbacModule, AccessControlV2Module, JobOpeningsModule, TeamNewsModule, DemoDaysModule],
+  imports: [
+    SearchModule,
+    RbacModule,
+    AccessControlV2Module,
+    JobOpeningsModule,
+    TeamNewsModule,
+    DemoDaysModule,
+    PLEventsModule,
+  ],
   providers: [
     HuskyAiToolsService,
     IrlEventsTool,
