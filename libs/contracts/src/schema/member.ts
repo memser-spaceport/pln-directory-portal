@@ -54,6 +54,7 @@ export const MemberSchema = z.object({
   scheduleMeetingCount: z.number().nullish(),
   ohInterest: z.array(z.string()).default([]),
   ohHelpWith: z.array(z.string()).default([]),
+  customSkills: z.array(z.string()).default([]),
   airtableRecId: z.string().nullish(),
   plnFriend: z.boolean().nullish(),
   bio: z.string().nullish(),

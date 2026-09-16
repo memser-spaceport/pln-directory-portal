@@ -281,14 +281,16 @@ describe('MemberCvImportsService', () => {
 
     beforeEach(() => {
       cvFindUnique.mockResolvedValue(succeededImport);
-      memberFindUnique.mockImplementation((args: { select?: { role?: boolean } }) => {
-        if (args?.select?.role) {
+      memberFindUnique.mockImplementation((args: { select?: Record<string, unknown> }) => {
+        const select = args?.select ?? {};
+        if (Object.keys(select).length === 1 && select.role) {
           return Promise.resolve({ role: 'Engineer' });
         }
         return Promise.resolve({
           uid: 'member-1',
           role: null,
           locationUid: null,
+          customSkills: [],
           skills: [{ uid: 'skill-go', title: 'Go' }],
         });
       });
@@ -329,10 +331,11 @@ describe('MemberCvImportsService', () => {
           data: expect.objectContaining({
             role: 'Engineer',
             location: { connect: { uid: 'loc-berlin' } },
-            skills: { connect: [{ uid: 'skill-rust' }] },
+            customSkills: { set: ['Rust'] },
           }),
         })
       );
+      expect(skillCreate).not.toHaveBeenCalled();
       expect(experienceCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -359,10 +362,10 @@ describe('MemberCvImportsService', () => {
         uid: 'member-1',
         role: 'Founder',
         locationUid: 'loc-existing',
+        customSkills: [],
         skills: [],
       });
       skillFindFirst.mockResolvedValue(null);
-      skillCreate.mockResolvedValue({ uid: 'skill-rust', title: 'Rust' });
 
       await service.apply('member-1', applyBody, 'owner@example.com');
 

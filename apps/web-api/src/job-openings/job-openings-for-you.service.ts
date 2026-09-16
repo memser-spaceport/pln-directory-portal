@@ -57,6 +57,7 @@ export class JobOpeningsForYouService {
       member.role,
       ...member.teamMemberRoles.map((teamRole) => teamRole.role),
       ...member.skills.map((skill) => skill.title),
+      ...member.customSkills,
       ...member.experiences.map((experience) => experience.title),
     ]);
 
@@ -155,6 +156,7 @@ export class JobOpeningsForYouService {
         role: true,
         deletedAt: true,
         skills: { select: { title: true } },
+        customSkills: true,
         experiences: { select: { title: true } },
         teamMemberRoles: { select: { teamUid: true, role: true } },
       },
