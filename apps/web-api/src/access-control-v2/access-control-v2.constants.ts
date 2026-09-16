@@ -58,9 +58,12 @@ export const AI_APPS_PERMISSIONS = {
 // ── ATS (PL hiring) ───────────────────────────────────────────────────────
 
 export const ATS_PERMISSIONS = {
-  /** Entry gate for the PL ATS; granted directly per member, not through a policy */
+  /** Entry gate for the PL ATS; grant via the pl_ats_user policy in Back Office */
   USER: 'ats_user',
 } as const;
+
+/** Assign in Back Office to grant ATS entry. Holds {@link ATS_PERMISSIONS.USER}. */
+export const ATS_POLICY_CODE = 'pl_ats_user';
 
 // ── Agent Sessions (PL Infra / code-fix-orchestrator) ────────────────────
 
