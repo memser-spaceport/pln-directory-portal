@@ -98,6 +98,7 @@ model Team {
 
   articles       Article[]           @relation("TeamArticles")
   jobOpenings    JobOpening[]
+  integrationKeys IntegrationKey[]
   jobEnrichment  TeamJobEnrichment?
   newsItems      TeamNewsItem[]
   newsEnrichment TeamNewsEnrichment?
@@ -273,6 +274,7 @@ model Member {
   jobReferralsReceived      JobReferral[]           @relation("JobReferralReferred")
   jobApplications           JobApplication[]
   jobOpeningInterests       JobOpeningInterest[]
+  integrationKeysCreated    IntegrationKey[]        @relation("IntegrationKeyCreatedBy")
   roadmapItemsCreated       RoadmapItem[]           @relation("roadmapItemCreatedBy")
   roadmapItemsPromoted      RoadmapItem[]           @relation("roadmapItemPromotedBy")
   roadmapItemUpvotes        RoadmapItemUpvote[]     @relation("roadmapItemUpvoter")
@@ -2298,6 +2300,9 @@ model JobOpening {
   uid             String           @unique @default(cuid())
   status          JobOpeningStatus @default(NEW)
   managedBy       JobOpeningManagedBy?
+  /// The integration key that owns this row when managedBy is INTEGRATION.
+  integrationKeyUid String?
+  integrationKey    IntegrationKey? @relation(fields: [integrationKeyUid], references: [uid])
   /// Set the first time the row enters a board-visible status, and again on
   /// each hidden -> visible transition. Job alert dispatch matches on this.
   publishedAt     DateTime?
@@ -2352,6 +2357,31 @@ model JobOpening {
   @@index([workMode])
   @@index([updatedAt])
   @@index([publishedAt])
+  @@index([integrationKeyUid])
+}
+
+/// A server credential bound to one team, issued and revoked by a Directory admin.
+/// Only the sha256 of the key is stored; the plaintext is returned once on creation.
+/// Integration routes (/v1/integrations) authenticate with it and may act only on
+/// the key's team. Scopes: jobs:write, candidates:read.
+model IntegrationKey {
+  id           Int       @id @default(autoincrement())
+  uid          String    @unique @default(cuid())
+  name         String
+  teamUid      String
+  team         Team      @relation(fields: [teamUid], references: [uid])
+  keyHash      String    @unique
+  /// First characters of the plaintext, for matching a configured key against the list.
+  keyPrefix    String
+  scopes       String[]  @default([])
+  createdByUid String?
+  createdBy    Member?   @relation("IntegrationKeyCreatedBy", fields: [createdByUid], references: [uid])
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+  revokedAt    DateTime?
+  jobOpenings  JobOpening[]
+
+  @@index([teamUid])
 }
 
 model JobReferral {
