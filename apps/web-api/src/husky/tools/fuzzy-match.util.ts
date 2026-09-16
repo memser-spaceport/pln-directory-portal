@@ -83,35 +83,44 @@ export function searchTerms(search: string): string[] {
 }
 
 /**
- * SQL equivalent of `fuzzyMatches(column, search)`, for matching in the database rather than
- * over a capped in-memory candidate window. Bidirectional per term (search-in-column AND
- * column-in-search), with the same short-token rule: a term shorter than
+ * SQL equivalent of `tokensMatch`/`contains` for one search term against one column, for
+ * matching in the database rather than over a capped in-memory candidate window. Bidirectional
+ * (term-in-column AND column-in-term), with the same short-token rule: a term shorter than
  * `MIN_SUBSTRING_MATCH_LENGTH` must match a whole word (`\m`/`\M` boundaries), and a stored
- * value that short must equal one of the search's words outright.
+ * value that short must equal the term outright.
  *
- * `NULLIF(column, '')` matters for the reverse-direction check (`search LIKE '%' || column || '%'`),
- * which would otherwise collapse to `search LIKE '%%'` — true for every row — for a NULL column
+ * `NULLIF(column, '')` matters for the reverse-direction check (`term LIKE '%' || column || '%'`),
+ * which would otherwise collapse to `term LIKE '%%'` — true for every row — for a NULL column
  * (e.g. `COALESCE(t.name, m.name)` on an orphaned profile) or a genuinely empty string. NULLIF
  * collapses either to NULL, which propagates through LOWER/`||`/LIKE to NULL, i.e. false.
  */
-export function fuzzySqlCondition(column: Prisma.Sql, search: string): Prisma.Sql {
+export function fuzzySqlTermCondition(column: Prisma.Sql, term: string): Prisma.Sql {
   const normalizedColumn = Prisma.sql`LOWER(NULLIF(${column}, ''))`;
-  const tokens = tokenize(search);
-  const forward = searchTerms(search)
-    .map((term) => {
-      if (term.length >= MIN_SUBSTRING_MATCH_LENGTH) {
-        return Prisma.sql`${normalizedColumn} LIKE '%' || ${term} || '%'`;
-      }
-      // Only plain alphanumeric short terms are safe to splice into a regex; anything else
-      // (e.g. "c+") is covered by the exact-token branch below or not at all.
-      return /^[a-z0-9]+$/.test(term) ? Prisma.sql`${normalizedColumn} ~ ${`\\m${term}\\M`}` : undefined;
-    })
-    .filter((condition): condition is Prisma.Sql => condition !== undefined);
-  const reverse = [
-    Prisma.sql`(LENGTH(${normalizedColumn}) >= ${MIN_SUBSTRING_MATCH_LENGTH} AND ${search.toLowerCase()} LIKE '%' || ${normalizedColumn} || '%')`,
-    ...(tokens.length > 0 ? [Prisma.sql`${normalizedColumn} = ANY(${tokens}::text[])`] : []),
-  ];
-  return Prisma.sql`(${Prisma.join([...forward, ...reverse], ' OR ')})`;
+  const normalizedTerm = term.toLowerCase();
+  const conditions: Prisma.Sql[] = [];
+  if (normalizedTerm.length >= MIN_SUBSTRING_MATCH_LENGTH) {
+    conditions.push(Prisma.sql`${normalizedColumn} LIKE '%' || ${normalizedTerm} || '%'`);
+  } else if (/^[a-z0-9]+$/.test(normalizedTerm)) {
+    // Only plain alphanumeric short terms are safe to splice into a regex; anything else
+    // (e.g. "c+") is covered by the exact-equality branch below or not at all.
+    conditions.push(Prisma.sql`${normalizedColumn} ~ ${`\\m${normalizedTerm}\\M`}`);
+  }
+  conditions.push(
+    Prisma.sql`(LENGTH(${normalizedColumn}) >= ${MIN_SUBSTRING_MATCH_LENGTH} AND ${normalizedTerm} LIKE '%' || ${normalizedColumn} || '%')`,
+    Prisma.sql`${normalizedColumn} = ${normalizedTerm}`
+  );
+  return Prisma.sql`(${Prisma.join(conditions, ' OR ')})`;
+}
+
+/**
+ * SQL equivalent of `fuzzyMatches(column, search)`: the column matches the raw search string or
+ * any of its tokens (see `searchTerms`), each via `fuzzySqlTermCondition`.
+ */
+export function fuzzySqlCondition(column: Prisma.Sql, search: string): Prisma.Sql {
+  return Prisma.sql`(${Prisma.join(
+    searchTerms(search).map((term) => fuzzySqlTermCondition(column, term)),
+    ' OR '
+  )})`;
 }
 
 /**

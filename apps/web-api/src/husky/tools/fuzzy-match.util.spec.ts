@@ -74,7 +74,7 @@ describe('fuzzySqlCondition', () => {
     expect(sql.values).toContain('\\mai\\M');
     expect(rendered).not.toContain(`LIKE '%' || "ai" || '%'`);
     expect(rendered).toContain(`LENGTH(LOWER(NULLIF(focus_item, ''))) >= 3`);
-    expect(rendered).toContain(`= ANY(["decentralized","ai"]::text[])`);
+    expect(rendered).toContain(`LOWER(NULLIF(focus_item, '')) = "ai"`);
   });
 
   it('never splices a non-alphanumeric short term into the regex', () => {

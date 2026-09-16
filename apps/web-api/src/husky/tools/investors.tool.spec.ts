@@ -54,7 +54,7 @@ describe('InvestorsTool', () => {
     // candidate window and filtering in memory. So the tool must: query for matching uids first,
     // then scope the real fetch to exactly those.
     const { tool, queryRaw, findMany } = setup();
-    queryRaw.mockResolvedValue([{ uid: 'ip-1' }]);
+    queryRaw.mockResolvedValue([{ uid: 'ip-1', score: 100 }]);
     findMany.mockResolvedValue([profile()]);
 
     const result = await execute(tool, { search: 'neurotechnology' });
@@ -62,7 +62,61 @@ describe('InvestorsTool', () => {
     expect(queryRaw).toHaveBeenCalledTimes(1);
     expect(findMany).toHaveBeenCalledTimes(1);
     expect(findMany.mock.calls[0][0].where.uid).toEqual({ in: ['ip-1'] });
+    // Every match is fetched so relevance ordering sees all of them, not a check-size-ordered slice.
+    expect(findMany.mock.calls[0][0].take).toBeUndefined();
     expect(result).toContain('Vova');
+    expect(result).toContain('Matched search terms: "neurotechnology"');
+  });
+
+  it('orders by relevance score first, then check size with missing sizes last, and caps at 15', async () => {
+    // Reproduces the prod "neuro tech" case: hundreds of funds match the generic token "tech",
+    // most with no check size, so ordering by check size alone (NULLs first in Postgres) shows an
+    // arbitrary slice of them and buries the one investor whose focus is literally "neuro tech".
+    const { tool, queryRaw, findMany } = setup();
+    const generic = Array.from({ length: 20 }, (_, i) =>
+      profile({
+        uid: `fund-${i}`,
+        id: i + 10,
+        typicalCheckSize: i % 2 ? null : 5_000_000,
+        team: { uid: `team-${i}`, name: `Fintech Fund ${i}` },
+        member: null,
+        investmentFocus: ['Fintech'],
+      })
+    );
+    const vova = profile({ uid: 'ip-vova', id: 1, typicalCheckSize: 10_000 });
+    queryRaw.mockResolvedValue([...generic.map((p) => ({ uid: p.uid, score: 1.5 })), { uid: 'ip-vova', score: 125 }]);
+    // Prisma returns check-size-desc with NULLs first; the tool must not rely on that order.
+    findMany.mockResolvedValue([
+      ...generic.filter((p) => p.typicalCheckSize === null),
+      ...generic.filter((p) => p.typicalCheckSize !== null),
+      vova,
+    ]);
+
+    const result = (await execute(tool, { search: 'neuro tech' })) as string;
+
+    const names = [...result.matchAll(/Investor: ([^\[]+)\[/g)].map((m) => m[1].trim());
+    expect(names[0]).toBe('Vova');
+    expect(names).toHaveLength(15);
+    // Among equally-scored funds, those with a check size come before those without.
+    const funded = names.slice(1).filter((n) => Number(n.replace('Fintech Fund ', '')) % 2 === 0);
+    expect(funded).toHaveLength(10);
+    expect(names.slice(1, 11)).toEqual(funded);
+    expect(result).toContain('Showing the 15 most relevant of 21 matching investors.');
+  });
+
+  it('scores the whole phrase above tokens and weights tokens by rarity in the SQL', async () => {
+    const { tool, queryRaw } = setup();
+    queryRaw.mockResolvedValue([]);
+
+    await execute(tool, { search: 'neuro tech' });
+
+    const sql = queryRaw.mock.calls[0][0].sql as string;
+    expect(sql).toContain('AS phrase_hit');
+    expect(sql).toContain('AS tok_0');
+    expect(sql).toContain('AS tok_1');
+    expect(sql).toContain('CASE WHEN phrase_hit THEN');
+    expect(sql).toContain('CASE WHEN tok_0 AND tok_1 THEN');
+    expect(sql).toMatch(/LN\(1 \+ SUM\(CASE WHEN tok_0 THEN 1 ELSE 0 END\) OVER \(\)\)/);
   });
 
   it('returns "no investors found" without querying profiles when nothing matches', async () => {
