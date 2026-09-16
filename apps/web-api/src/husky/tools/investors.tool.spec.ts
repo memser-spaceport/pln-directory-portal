@@ -117,6 +117,19 @@ describe('InvestorsTool', () => {
     expect(call.sql).not.toContain(`LIKE '%' || $`);
   });
 
+  it('keeps a single-word search bidirectional so it still matches a terser stored tag', async () => {
+    // "neurotechnology" against a profile tagged just "Neuro": the phrase column only looks for
+    // the word inside stored values, so the token column must also match the other way round.
+    const { tool, queryRaw } = setup();
+    queryRaw.mockResolvedValue([]);
+
+    await execute(tool, { search: 'neurotechnology' });
+
+    const sql = queryRaw.mock.calls[0][0].sql as string;
+    expect(sql).toContain('AS tok_0');
+    expect(sql).toContain(`LIKE '%' || LOWER(NULLIF(focus_item, '')) || '%'`);
+  });
+
   it('scores the whole phrase above tokens and weights tokens by rarity in the SQL', async () => {
     const { tool, queryRaw } = setup();
     queryRaw.mockResolvedValue([]);

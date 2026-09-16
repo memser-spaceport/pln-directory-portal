@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 import {
   fuzzyMatches,
-  fuzzySqlCondition,
+  fuzzySqlTermCondition,
   longestWord,
   resolveFocusAreaTitles,
   searchTerms,
@@ -24,6 +24,12 @@ describe('fuzzyMatches', () => {
 
   it('does not match unrelated terms', () => {
     expect(fuzzyMatches('neuro tech', 'climate')).toBe(false);
+  });
+
+  it('still matches a short value exactly, including a single character', () => {
+    expect(fuzzyMatches('C', 'C')).toBe(true);
+    expect(fuzzyMatches('Go', 'go')).toBe(true);
+    expect(fuzzyMatches('R', 'rust')).toBe(false);
   });
 
   it('only matches a two-letter token as a whole word, never inside another word', () => {
@@ -52,7 +58,7 @@ describe('textMentions', () => {
   });
 });
 
-describe('fuzzySqlCondition', () => {
+describe('fuzzySqlTermCondition', () => {
   function render(sql: Prisma.Sql): string {
     return sql.strings.reduce(
       (out, part, index) => out + part + (index < sql.values.length ? JSON.stringify(sql.values[index]) : ''),
@@ -60,16 +66,16 @@ describe('fuzzySqlCondition', () => {
     );
   }
 
-  it('uses a substring LIKE for terms long enough to be distinctive', () => {
-    const rendered = render(fuzzySqlCondition(Prisma.sql`focus_item`, 'neurotechnology'));
+  it('uses a substring LIKE for terms long enough to be distinctive, in both directions', () => {
+    const rendered = render(fuzzySqlTermCondition(Prisma.sql`focus_item`, 'neurotechnology'));
     expect(rendered).toContain(`LIKE '%' || "neurotechnology" || '%'`);
+    expect(rendered).toContain(`"neurotechnology" LIKE '%' || LOWER(NULLIF(focus_item, '')) || '%'`);
     expect(rendered).not.toContain(' ~ ');
   });
 
-  it('matches a short token only at word boundaries, and a short stored value only as a whole search word', () => {
-    const sql = fuzzySqlCondition(Prisma.sql`focus_item`, 'decentralized ai');
+  it('matches a short term only at word boundaries, and a short stored value only by equality', () => {
+    const sql = fuzzySqlTermCondition(Prisma.sql`focus_item`, 'ai');
     const rendered = render(sql);
-    expect(rendered).toContain(`LIKE '%' || "decentralized" || '%'`);
     expect(rendered).toContain(' ~ ');
     expect(sql.values).toContain('\\mai\\M');
     expect(rendered).not.toContain(`LIKE '%' || "ai" || '%'`);
@@ -78,8 +84,9 @@ describe('fuzzySqlCondition', () => {
   });
 
   it('never splices a non-alphanumeric short term into the regex', () => {
-    const rendered = render(fuzzySqlCondition(Prisma.sql`focus_item`, 'c+'));
+    const rendered = render(fuzzySqlTermCondition(Prisma.sql`focus_item`, 'c+'));
     expect(rendered).not.toContain(' ~ ');
+    expect(rendered).toContain(`= "c+"`);
   });
 });
 

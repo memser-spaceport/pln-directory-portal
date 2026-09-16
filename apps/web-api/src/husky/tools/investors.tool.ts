@@ -225,7 +225,10 @@ export class InvestorsTool {
    */
   private async findMatches(search: string): Promise<Map<string, number>> {
     const phrase = search.toLowerCase();
-    const tokens = tokenize(search).filter((token) => token !== phrase);
+    // A single-word search is its own token: the phrase column only looks for it inside stored
+    // values, while the token column also matches the other way round ("neurotechnology" against
+    // a terser "neuro" tag).
+    const tokens = tokenize(search);
     const hit = (condition: (column: Prisma.Sql) => Prisma.Sql) =>
       Prisma.sql`(EXISTS (SELECT 1 FROM unnest(ip."investmentFocus") AS focus_item WHERE ${condition(
         Prisma.sql`focus_item`

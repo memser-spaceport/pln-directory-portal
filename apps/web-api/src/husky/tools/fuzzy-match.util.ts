@@ -18,12 +18,18 @@ export function tokenize(value: string): string[] {
 }
 
 function contains(haystack: string, needle: string): boolean {
-  return needle.length >= MIN_SUBSTRING_MATCH_LENGTH && haystack.includes(needle);
+  return haystack === needle || (needle.length >= MIN_SUBSTRING_MATCH_LENGTH && haystack.includes(needle));
 }
 
+/**
+ * Tokens shorter than `MIN_SUBSTRING_MATCH_LENGTH` only match exactly. That also rules out a
+ * 2-letter prefix like "zk" against a "zkEVM" tag — accepted, since letting short tokens match
+ * prefixes would let "AI" match every name starting with "Ai".
+ */
 function tokensMatch(a: string, b: string): boolean {
+  if (a === b) return true;
   if (a.length < MIN_SUBSTRING_MATCH_LENGTH || b.length < MIN_SUBSTRING_MATCH_LENGTH) {
-    return a === b;
+    return false;
   }
   return a.includes(b) || b.includes(a);
 }
@@ -122,17 +128,6 @@ export function fuzzySqlContainsCondition(column: Prisma.Sql, term: string): Pri
     return Prisma.sql`${normalizedColumn} ~ ${`\\m${normalizedTerm}\\M`}`;
   }
   return Prisma.sql`${normalizedColumn} = ${normalizedTerm}`;
-}
-
-/**
- * SQL equivalent of `fuzzyMatches(column, search)`: the column matches the raw search string or
- * any of its tokens (see `searchTerms`), each via `fuzzySqlTermCondition`.
- */
-export function fuzzySqlCondition(column: Prisma.Sql, search: string): Prisma.Sql {
-  return Prisma.sql`(${Prisma.join(
-    searchTerms(search).map((term) => fuzzySqlTermCondition(column, term)),
-    ' OR '
-  )})`;
 }
 
 /**
