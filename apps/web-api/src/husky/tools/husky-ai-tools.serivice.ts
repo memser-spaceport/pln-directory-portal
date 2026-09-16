@@ -42,7 +42,7 @@ export class HuskyAiToolsService implements OnModuleInit {
   public getTools(auth: HuskyAuthContext): Record<string, CoreTool> {
     const { isLoggedIn } = auth;
     const tools: Record<string, CoreTool> = {
-      getIrlEvents: this.irlEventsTool.getTool(),
+      getIrlEvents: this.irlEventsTool.getTool(auth),
       getMembers: this.membersTool.getTool(isLoggedIn),
       getTeams: this.teamsTool.getTool(),
       getProjects: this.projectsTool.getTool(),

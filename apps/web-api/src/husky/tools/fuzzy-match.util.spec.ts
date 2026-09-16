@@ -1,4 +1,12 @@
-import { fuzzyMatches, longestWord, resolveFocusAreaTitles, searchTerms } from './fuzzy-match.util';
+import { Prisma } from '@prisma/client';
+import {
+  fuzzyMatches,
+  fuzzySqlTermCondition,
+  longestWord,
+  resolveFocusAreaTitles,
+  searchTerms,
+  textMentions,
+} from './fuzzy-match.util';
 
 describe('fuzzyMatches', () => {
   it('matches a model-normalized single word against a terser multi-word tag', () => {
@@ -16,6 +24,69 @@ describe('fuzzyMatches', () => {
 
   it('does not match unrelated terms', () => {
     expect(fuzzyMatches('neuro tech', 'climate')).toBe(false);
+  });
+
+  it('still matches a short value exactly, including a single character', () => {
+    expect(fuzzyMatches('C', 'C')).toBe(true);
+    expect(fuzzyMatches('Go', 'go')).toBe(true);
+    expect(fuzzyMatches('R', 'rust')).toBe(false);
+  });
+
+  it('only matches a two-letter token as a whole word, never inside another word', () => {
+    // "decentralized AI" tokenizes to "ai", which is a substring of plenty of unrelated names.
+    for (const name of ['Craig', 'Claire Lim', 'Haim Sadger', 'Yolan Romailler', 'Champ Suthipongchai', 'Aaileen']) {
+      expect(fuzzyMatches(name, 'decentralized ai')).toBe(false);
+    }
+    expect(fuzzyMatches('Sustainability', 'AI')).toBe(false);
+    expect(fuzzyMatches('AI/ML', 'decentralized ai')).toBe(true);
+    expect(fuzzyMatches('Decentralized AI', 'decentralized ai investments')).toBe(true);
+    expect(fuzzyMatches('AI & Robotics', 'AI')).toBe(true);
+  });
+});
+
+describe('textMentions', () => {
+  it('matches the whole phrase or every topic word as a word prefix', () => {
+    expect(textMentions('FilOz builds decentralized storage on Filecoin', 'storage')).toBe(true);
+    expect(textMentions('Long-term data storages for the network', 'storage')).toBe(true);
+    expect(textMentions('We work on decentralized storage networks', 'decentralized storage')).toBe(true);
+  });
+
+  it('does not treat a single overlapping word or an embedded two-letter token as a mention', () => {
+    expect(textMentions('We work on decentralized identity', 'decentralized storage')).toBe(false);
+    expect(textMentions('Craig leads the team', 'ai')).toBe(false);
+    expect(textMentions('Applied AI research lab', 'ai')).toBe(true);
+  });
+});
+
+describe('fuzzySqlTermCondition', () => {
+  function render(sql: Prisma.Sql): string {
+    return sql.strings.reduce(
+      (out, part, index) => out + part + (index < sql.values.length ? JSON.stringify(sql.values[index]) : ''),
+      ''
+    );
+  }
+
+  it('uses a substring LIKE for terms long enough to be distinctive, in both directions', () => {
+    const rendered = render(fuzzySqlTermCondition(Prisma.sql`focus_item`, 'neurotechnology'));
+    expect(rendered).toContain(`LIKE '%' || "neurotechnology" || '%'`);
+    expect(rendered).toContain(`"neurotechnology" LIKE '%' || LOWER(NULLIF(focus_item, '')) || '%'`);
+    expect(rendered).not.toContain(' ~ ');
+  });
+
+  it('matches a short term only at word boundaries, and a short stored value only by equality', () => {
+    const sql = fuzzySqlTermCondition(Prisma.sql`focus_item`, 'ai');
+    const rendered = render(sql);
+    expect(rendered).toContain(' ~ ');
+    expect(sql.values).toContain('\\mai\\M');
+    expect(rendered).not.toContain(`LIKE '%' || "ai" || '%'`);
+    expect(rendered).toContain(`LENGTH(LOWER(NULLIF(focus_item, ''))) >= 3`);
+    expect(rendered).toContain(`LOWER(NULLIF(focus_item, '')) = "ai"`);
+  });
+
+  it('never splices a non-alphanumeric short term into the regex', () => {
+    const rendered = render(fuzzySqlTermCondition(Prisma.sql`focus_item`, 'c+'));
+    expect(rendered).not.toContain(' ~ ');
+    expect(rendered).toContain(`= "c+"`);
   });
 });
 

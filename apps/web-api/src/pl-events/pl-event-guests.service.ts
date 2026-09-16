@@ -736,7 +736,11 @@ export class PLEventGuestsService {
    * @param {string | null} userId - The UID of the logged-in user, or null if the user is logged out.
    * @returns {Promise<PLEvent[]>} Filtered array of events based on the user’s attendance, login state, and admin status.
    */
-  async filterEventsByAttendanceAndAdminStatus(filteredEventsUid, events: PLEvent[], member): Promise<PLEvent[]> {
+  async filterEventsByAttendanceAndAdminStatus<T extends Pick<PLEvent, 'uid' | 'type'>>(
+    filteredEventsUid,
+    events: T[],
+    member
+  ): Promise<T[]> {
     if (filteredEventsUid?.length > 0 && !member) {
       return events
         .filter((event) => filteredEventsUid?.includes(event.uid))
