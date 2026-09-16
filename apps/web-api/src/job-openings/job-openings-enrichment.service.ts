@@ -130,6 +130,8 @@ export class JobOpeningsEnrichmentService {
         postedDate: job.postedDate?.toISOString() ?? null,
         lastSeenLive: job.lastSeenLive?.toISOString() ?? null,
         status: job.status,
+        managedBy: job.managedBy ?? null,
+        publishedAt: job.publishedAt?.toISOString() ?? null,
         summary: job.summary ?? null,
         descriptionHtml: job.descriptionHtml ?? null,
         detectionDate: job.detectionDate.toISOString(),

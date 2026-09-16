@@ -61,7 +61,9 @@ export class JobOpeningsServiceController {
       source: dto.source ?? null,
     });
 
-    this.logger.log(`Ingest complete: ${result.created} created, ${result.updated} updated, ${result.failed} failed`);
+    this.logger.log(
+      `Ingest complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${result.failed} failed`
+    );
 
     return result;
   }

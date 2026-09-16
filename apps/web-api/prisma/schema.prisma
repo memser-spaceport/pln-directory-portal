@@ -2283,10 +2283,24 @@ enum DataDiscrepancyFlag {
   MULTI_BOARD
 }
 
+/// Which system owns a job opening's lifecycle. Null is read as ENRICHMENT.
+/// ENRICHMENT rows are written and closed by the data-enrichment crawler via
+/// the service ingest; INTEGRATION rows by a team's ATS integration; MANUAL
+/// rows by hand. The crawler ingest never touches a row it does not own.
+enum JobOpeningManagedBy {
+  ENRICHMENT
+  INTEGRATION
+  MANUAL
+}
+
 model JobOpening {
   id              Int              @id @default(autoincrement())
   uid             String           @unique @default(cuid())
   status          JobOpeningStatus @default(NEW)
+  managedBy       JobOpeningManagedBy?
+  /// Set the first time the row enters a board-visible status, and again on
+  /// each hidden -> visible transition. Job alert dispatch matches on this.
+  publishedAt     DateTime?
   companyName     String
   signalType      String
   roleTitle       String
@@ -2337,6 +2351,7 @@ model JobOpening {
   @@index([location], map: "job_opening_location_idx", type: Gin)
   @@index([workMode])
   @@index([updatedAt])
+  @@index([publishedAt])
 }
 
 model JobReferral {

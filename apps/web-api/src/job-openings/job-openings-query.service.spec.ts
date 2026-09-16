@@ -200,3 +200,39 @@ describe('JobOpeningsQueryService.listCrawlIndex', () => {
     );
   });
 });
+
+describe('JobOpeningsQueryService.findNewMatchesSince', () => {
+  const since = new Date('2026-02-01T00:00:00.000Z');
+
+  const call = async (sinceTs: Date | null) => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const service = new JobOpeningsQueryService({ jobOpening: { findMany } } as unknown as PrismaService);
+    await service.findNewMatchesSince(JobsListQueryParams.parse({ page: 1, limit: 50, sort: 'newest' }), sinceTs);
+    return findMany.mock.calls[0][0] as {
+      where: { AND?: unknown[] };
+      orderBy: unknown;
+      select: Record<string, unknown>;
+    };
+  };
+
+  it('matches on publishedAt after the cursor and orders newest publication first', async () => {
+    const args = await call(since);
+
+    expect(args.where.AND).toContainEqual({ publishedAt: { gt: since } });
+    expect(args.orderBy).toEqual({ publishedAt: 'desc' });
+    expect(args.select.publishedAt).toBe(true);
+  });
+
+  it('never matches or orders on updatedAt', async () => {
+    const args = await call(since);
+
+    expect(JSON.stringify(args.where)).not.toContain('updatedAt');
+    expect(JSON.stringify(args.orderBy)).not.toContain('updatedAt');
+  });
+
+  it('requires a publication time even without a cursor, so never-visible rows are excluded', async () => {
+    const args = await call(null);
+
+    expect(args.where.AND).toContainEqual({ publishedAt: { not: null } });
+  });
+});
