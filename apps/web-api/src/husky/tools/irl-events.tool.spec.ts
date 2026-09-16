@@ -4,6 +4,7 @@ jest.mock('ai', () => ({ tool: (config: any) => config }));
 // pl-event-guests.service transitively imports posthog-node / axios ESM builds this jest config
 // can't parse. This spec only needs a stand-in with the two methods the tool delegates to.
 jest.mock('../../pl-events/pl-event-guests.service', () => ({ PLEventGuestsService: jest.fn() }));
+jest.mock('../../members/members.service', () => ({ MembersService: jest.fn() }));
 
 import { IrlEventsTool } from './irl-events.tool';
 import { HuskyAuthContext } from './husky-auth-context';
@@ -67,17 +68,17 @@ describe('IrlEventsTool', () => {
     const prisma = {
       pLEventLocation: { findMany: jest.fn().mockResolvedValue([]) },
       pLEvent: { findMany: jest.fn().mockResolvedValue([event()]) },
-      member: { findFirst: jest.fn().mockResolvedValue(null) },
       team: { findMany: jest.fn().mockResolvedValue([]) },
     };
+    const membersService = { findMemberByEmail: jest.fn().mockResolvedValue(null) };
     const guestsService = {
       filterEventsByAttendanceAndAdminStatus: jest.fn<Promise<any[]>, [string[], any[], any]>((_filtered, events) =>
         Promise.resolve(events)
       ),
       getPLEventGuestsByLocationAndType: jest.fn().mockResolvedValue([]),
     };
-    const tool = new IrlEventsTool(logger as any, prisma as any, guestsService as any);
-    return { tool, prisma, guestsService };
+    const tool = new IrlEventsTool(logger as any, prisma as any, guestsService as any, membersService as any);
+    return { tool, prisma, guestsService, membersService };
   }
 
   function execute(tool: IrlEventsTool, args: Record<string, unknown>, auth: HuskyAuthContext = { isLoggedIn: false }) {
@@ -138,15 +139,18 @@ describe('IrlEventsTool', () => {
   });
 
   it('fetches attendees through the IRL Gatherings page service, scoped to the event and the viewer', async () => {
-    const { tool, prisma, guestsService } = setup();
-    const viewer = { uid: 'member-1', memberRoles: [] };
-    prisma.member.findFirst.mockResolvedValue(viewer);
+    const { tool, guestsService, membersService } = setup();
+    const viewer = { uid: 'member-1', deletedAt: null, memberRoles: [], effectivePermissionCodes: [] };
+    membersService.findMemberByEmail.mockResolvedValue(viewer);
 
-    await execute(tool, { search: 'Climate Week' }, { isLoggedIn: true, memberUid: 'member-1' });
-
-    expect(prisma.member.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { uid: 'member-1', deletedAt: null } })
+    await execute(
+      tool,
+      { search: 'Climate Week' },
+      { isLoggedIn: true, memberUid: 'member-1', email: 'm1@example.com' }
     );
+
+    // The page resolves its viewer (roles + RBAC permissions) through this lookup, so the tool must too.
+    expect(membersService.findMemberByEmail).toHaveBeenCalledWith('m1@example.com');
     expect(guestsService.filterEventsByAttendanceAndAdminStatus).toHaveBeenCalledWith([], expect.any(Array), viewer);
     expect(guestsService.getPLEventGuestsByLocationAndType).toHaveBeenCalledWith(
       'loc-nyc',
@@ -156,7 +160,7 @@ describe('IrlEventsTool', () => {
   });
 
   it('passes a null viewer for anonymous callers so invite-only events and gated fields stay hidden', async () => {
-    const { tool, prisma, guestsService } = setup();
+    const { tool, prisma, guestsService, membersService } = setup();
     prisma.pLEvent.findMany.mockResolvedValue([
       event(),
       event({ uid: 'event-private', name: 'Private Dinner', type: 'INVITE_ONLY' }),
@@ -167,7 +171,7 @@ describe('IrlEventsTool', () => {
 
     const result = await execute(tool, { location: 'New York' });
 
-    expect(prisma.member.findFirst).not.toHaveBeenCalled();
+    expect(membersService.findMemberByEmail).not.toHaveBeenCalled();
     expect(guestsService.filterEventsByAttendanceAndAdminStatus).toHaveBeenCalledWith([], expect.any(Array), null);
     expect(guestsService.getPLEventGuestsByLocationAndType).toHaveBeenCalledTimes(1);
     expect(guestsService.getPLEventGuestsByLocationAndType).toHaveBeenCalledWith('loc-nyc', expect.anything(), null);

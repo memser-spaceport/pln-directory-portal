@@ -9,7 +9,13 @@ import { INVESTOR_DB_VIEW_PERMISSIONS } from '../../rbac/rbac.constants';
 import { memberHasAnyPermission } from '../../rbac/rbac-permission-check';
 import { AccessControlV2Service } from '../../access-control-v2/services/access-control-v2.service';
 import { HuskyAuthContext } from './husky-auth-context';
-import { fuzzyMatches, fuzzySqlTermCondition, searchTerms, tokenize } from './fuzzy-match.util';
+import {
+  fuzzyMatches,
+  fuzzySqlContainsCondition,
+  fuzzySqlTermCondition,
+  searchTerms,
+  tokenize,
+} from './fuzzy-match.util';
 
 const MAX_RESULTS = 15;
 // Only used when there is no free-text search: a small buffer above MAX_RESULTS to absorb the
@@ -91,15 +97,7 @@ export class InvestorsTool {
       where.uid = { in: Array.from(scores.keys()) };
     }
 
-    const profiles = await this.prisma.investorProfile.findMany({
-      where,
-      include: {
-        team: { select: { uid: true, name: true } },
-        member: { select: { uid: true, name: true, deletedAt: true } },
-      },
-      orderBy: [{ typicalCheckSize: 'desc' }, { id: 'asc' }],
-      ...(scores ? {} : { take: RESULT_FETCH_LIMIT }),
-    });
+    const profiles = await this.fetchProfiles(where, Boolean(scores));
 
     const visible = profiles
       .filter((profile) => {
@@ -154,6 +152,41 @@ export class InvestorsTool {
   }
 
   /**
+   * With a search, `where.uid` is already the exact matched set, so everything is fetched and
+   * relevance ordering sees every match. Without one, the fetch is capped — and because Postgres
+   * sorts NULLs first on a DESC order, a single check-size-ordered query would fill the cap with
+   * profiles that have no check size at all. Profiles with a check size are fetched first, and
+   * the cap is topped up with the rest only if there is room.
+   */
+  private async fetchProfiles(where: Prisma.InvestorProfileWhereInput, all: boolean): Promise<InvestorProfileRow[]> {
+    const include = {
+      team: { select: { uid: true, name: true } },
+      member: { select: { uid: true, name: true, deletedAt: true } },
+    } as const;
+    if (all) {
+      return this.prisma.investorProfile.findMany({ where, include, orderBy: [{ id: 'asc' }] });
+    }
+    const withCheckSize = await this.prisma.investorProfile.findMany({
+      where: { ...where, typicalCheckSize: { not: null, ...(where.typicalCheckSize as Prisma.FloatNullableFilter) } },
+      include,
+      orderBy: [{ typicalCheckSize: 'desc' }, { id: 'asc' }],
+      take: RESULT_FETCH_LIMIT,
+    });
+    const room = RESULT_FETCH_LIMIT - withCheckSize.length;
+    if (room <= 0 || where.typicalCheckSize) {
+      return withCheckSize;
+    }
+    const withoutCheckSize = await this.prisma.investorProfile.findMany({
+      where: { ...where, typicalCheckSize: null },
+      include,
+      orderBy: [{ id: 'asc' }],
+      take: room,
+    });
+    const seen = new Set(withCheckSize.map((profile) => profile.uid));
+    return [...withCheckSize, ...withoutCheckSize.filter((profile) => !seen.has(profile.uid))];
+  }
+
+  /**
    * Most relevant first, then the largest check size (profiles without one last), then a stable
    * fallback. Without a search every profile scores the same, so this reduces to check size.
    */
@@ -199,8 +232,7 @@ export class InvestorsTool {
       )}) OR ${condition(Prisma.sql`COALESCE(t.name, m.name)`)})`;
     // The phrase only counts when it appears whole inside the stored value; a stored tag that is
     // merely part of the phrase ("Tech" inside "neuro tech") is a token-level match, scored below.
-    const phraseCondition = (column: Prisma.Sql) =>
-      Prisma.sql`LOWER(NULLIF(${column}, '')) LIKE '%' || ${phrase} || '%'`;
+    const phraseCondition = (column: Prisma.Sql) => fuzzySqlContainsCondition(column, phrase);
     const tokenColumn = (index: number) => Prisma.raw(`tok_${index}`);
 
     const hitColumns = [

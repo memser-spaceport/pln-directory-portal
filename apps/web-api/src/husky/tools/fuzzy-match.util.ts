@@ -97,19 +97,31 @@ export function searchTerms(search: string): string[] {
 export function fuzzySqlTermCondition(column: Prisma.Sql, term: string): Prisma.Sql {
   const normalizedColumn = Prisma.sql`LOWER(NULLIF(${column}, ''))`;
   const normalizedTerm = term.toLowerCase();
-  const conditions: Prisma.Sql[] = [];
+  return Prisma.sql`(${Prisma.join(
+    [
+      fuzzySqlContainsCondition(column, term),
+      Prisma.sql`(LENGTH(${normalizedColumn}) >= ${MIN_SUBSTRING_MATCH_LENGTH} AND ${normalizedTerm} LIKE '%' || ${normalizedColumn} || '%')`,
+      Prisma.sql`${normalizedColumn} = ${normalizedTerm}`,
+    ],
+    ' OR '
+  )})`;
+}
+
+/**
+ * One direction only: the term appears inside the stored value (SQL equivalent of `contains`
+ * plus the whole-word rule for short terms). A term too short to substring-match and unsafe to
+ * splice into a regex (e.g. "c+") can only match by equality.
+ */
+export function fuzzySqlContainsCondition(column: Prisma.Sql, term: string): Prisma.Sql {
+  const normalizedColumn = Prisma.sql`LOWER(NULLIF(${column}, ''))`;
+  const normalizedTerm = term.toLowerCase();
   if (normalizedTerm.length >= MIN_SUBSTRING_MATCH_LENGTH) {
-    conditions.push(Prisma.sql`${normalizedColumn} LIKE '%' || ${normalizedTerm} || '%'`);
-  } else if (/^[a-z0-9]+$/.test(normalizedTerm)) {
-    // Only plain alphanumeric short terms are safe to splice into a regex; anything else
-    // (e.g. "c+") is covered by the exact-equality branch below or not at all.
-    conditions.push(Prisma.sql`${normalizedColumn} ~ ${`\\m${normalizedTerm}\\M`}`);
+    return Prisma.sql`${normalizedColumn} LIKE '%' || ${normalizedTerm} || '%'`;
   }
-  conditions.push(
-    Prisma.sql`(LENGTH(${normalizedColumn}) >= ${MIN_SUBSTRING_MATCH_LENGTH} AND ${normalizedTerm} LIKE '%' || ${normalizedColumn} || '%')`,
-    Prisma.sql`${normalizedColumn} = ${normalizedTerm}`
-  );
-  return Prisma.sql`(${Prisma.join(conditions, ' OR ')})`;
+  if (/^[a-z0-9]+$/.test(normalizedTerm)) {
+    return Prisma.sql`${normalizedColumn} ~ ${`\\m${normalizedTerm}\\M`}`;
+  }
+  return Prisma.sql`${normalizedColumn} = ${normalizedTerm}`;
 }
 
 /**

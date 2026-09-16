@@ -104,6 +104,19 @@ describe('InvestorsTool', () => {
     expect(result).toContain('Showing the 15 most relevant of 21 matching investors.');
   });
 
+  it('keeps the whole-word rule for a short search used as the phrase', async () => {
+    // A bare "AI" search is its own phrase; a plain LIKE '%ai%' here would bring back the
+    // Cr-ai-g / Cl-ai-re name false positives the token rule exists to prevent.
+    const { tool, queryRaw } = setup();
+    queryRaw.mockResolvedValue([]);
+
+    await execute(tool, { search: 'AI' });
+
+    const call = queryRaw.mock.calls[0][0];
+    expect(call.values).toContain('\\mai\\M');
+    expect(call.sql).not.toContain(`LIKE '%' || $`);
+  });
+
   it('scores the whole phrase above tokens and weights tokens by rarity in the SQL', async () => {
     const { tool, queryRaw } = setup();
     queryRaw.mockResolvedValue([]);
@@ -170,15 +183,46 @@ describe('InvestorsTool', () => {
 
   it('drops soft-deleted or orphaned profiles after the fetch', async () => {
     const { tool, findMany } = setup();
-    findMany.mockResolvedValue([
+    findMany.mockResolvedValueOnce([
       profile({ uid: 'deleted', member: { uid: 'm', name: 'Gone', deletedAt: new Date() } }),
       profile({ uid: 'orphan', team: null, member: null }),
       profile({ uid: 'visible' }),
     ]);
+    findMany.mockResolvedValueOnce([]);
 
     const result = await execute(tool, {});
 
     expect(result).toContain('Vova');
     expect((result as string).match(/Investor:/g)).toHaveLength(1);
+  });
+
+  it('without a search, fetches profiles with a check size first and only tops up with the rest', async () => {
+    // Postgres sorts NULLs first on DESC, so one check-size-ordered query capped at 50 would be
+    // filled by profiles with no check size (most imported team funds) — the "all teams, no
+    // members" symptom. Two queries keep the cap for profiles that actually have a size.
+    const { tool, findMany } = setup();
+    findMany.mockResolvedValueOnce([profile({ uid: 'sized', typicalCheckSize: 50_000 })]);
+    findMany.mockResolvedValueOnce([
+      profile({ uid: 'unsized', typicalCheckSize: null, member: { uid: 'm2', name: 'Nosize', deletedAt: null } }),
+    ]);
+
+    const result = (await execute(tool, { type: 'ANGEL' })) as string;
+
+    expect(findMany).toHaveBeenCalledTimes(2);
+    expect(findMany.mock.calls[0][0].where.typicalCheckSize).toEqual({ not: null });
+    expect(findMany.mock.calls[0][0].take).toBe(50);
+    expect(findMany.mock.calls[1][0].where.typicalCheckSize).toBeNull();
+    expect(findMany.mock.calls[1][0].take).toBe(49);
+    expect(result.indexOf('Vova')).toBeLessThan(result.indexOf('Nosize'));
+  });
+
+  it('skips the top-up query when a minimum check size already excludes profiles without one', async () => {
+    const { tool, findMany } = setup();
+    findMany.mockResolvedValue([profile()]);
+
+    await execute(tool, { minCheckSize: 10000 });
+
+    expect(findMany).toHaveBeenCalledTimes(1);
+    expect(findMany.mock.calls[0][0].where.typicalCheckSize).toEqual({ not: null, gte: 10000 });
   });
 });

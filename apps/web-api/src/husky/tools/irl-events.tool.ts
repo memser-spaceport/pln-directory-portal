@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { LogService } from '../../shared/log.service';
 import { PrismaService } from '../../shared/prisma.service';
 import { PLEventGuestsService } from '../../pl-events/pl-event-guests.service';
+import { MembersService } from '../../members/members.service';
 import { tool, CoreTool } from 'ai';
 import { z } from 'zod';
 import { HuskyAuthContext } from './husky-auth-context';
@@ -56,7 +57,11 @@ const IrlEventsToolParams = z.object({
 
 type IrlEventsToolArgs = z.infer<typeof IrlEventsToolParams>;
 
-type ViewerMember = Prisma.MemberGetPayload<{ include: { memberRoles: true } }>;
+/**
+ * The signed-in member as the IRL Gatherings page sees it: `MembersService.findMemberByEmail`
+ * also resolves RBAC permissions, which the page's admin check reads alongside member roles.
+ */
+type ViewerMember = NonNullable<Awaited<ReturnType<MembersService['findMemberByEmail']>>>;
 
 interface Attendee {
   memberUid: string;
@@ -91,7 +96,12 @@ type TeamProfile = Prisma.TeamGetPayload<{
 export class IrlEventsTool {
   private locationsList: string[] = [];
 
-  constructor(private logger: LogService, private prisma: PrismaService, private guestsService: PLEventGuestsService) {}
+  constructor(
+    private logger: LogService,
+    private prisma: PrismaService,
+    private guestsService: PLEventGuestsService,
+    private membersService: MembersService
+  ) {}
 
   async initialize() {
     const locations = await this.prisma.pLEventLocation.findMany({
@@ -168,13 +178,11 @@ export class IrlEventsTool {
   }
 
   private async loadViewer(auth: HuskyAuthContext): Promise<ViewerMember | null> {
-    if (!auth.isLoggedIn || !auth.memberUid) {
+    if (!auth.isLoggedIn || !auth.email) {
       return null;
     }
-    return this.prisma.member.findFirst({
-      where: { uid: auth.memberUid, deletedAt: null },
-      include: { memberRoles: true },
-    });
+    const member = await this.membersService.findMemberByEmail(auth.email);
+    return member && !member.deletedAt ? member : null;
   }
 
   private async findEvents(args: IrlEventsToolArgs, viewer: ViewerMember | null) {

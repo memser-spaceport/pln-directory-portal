@@ -177,10 +177,10 @@ export class HuskyAiService {
     }
     try {
       const memberUid = await resolveLiveMemberUidByEmail(this.prisma, userEmail);
-      return { isLoggedIn: true, memberUid };
+      return { isLoggedIn: true, memberUid, email: userEmail };
     } catch (error) {
       this.logger.error(`Failed to resolve member for Husky auth context: ${error?.message ?? error}`);
-      return { isLoggedIn: true };
+      return { isLoggedIn: true, email: userEmail };
     }
   }
 

@@ -18,6 +18,7 @@ import { JobOpeningsModule } from '../../job-openings/job-openings.module';
 import { TeamNewsModule } from '../../team-news/team-news.module';
 import { DemoDaysModule } from '../../demo-days/demo-days.module';
 import { PLEventsModule } from '../../pl-events/pl-events.module';
+import { MembersModule } from '../../members/members.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { PLEventsModule } from '../../pl-events/pl-events.module';
     TeamNewsModule,
     DemoDaysModule,
     PLEventsModule,
+    MembersModule,
   ],
   providers: [
     HuskyAiToolsService,

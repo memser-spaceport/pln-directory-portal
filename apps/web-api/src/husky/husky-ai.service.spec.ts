@@ -14,6 +14,8 @@ jest.mock('ai', () => ({
 // which ships an untranspiled ESM axios build this jest config can't parse. This spec only
 // needs HuskyAiService's own module graph to load; the tools service itself is a plain mock.
 jest.mock('./tools/demo-day.tool', () => ({ DemoDayTool: jest.fn() }));
+// irl-events.tool imports PLEventGuestsService/MembersService -> axios, same ESM problem.
+jest.mock('./tools/irl-events.tool', () => ({ IrlEventsTool: jest.fn() }));
 
 import { streamText, streamObject, generateText } from 'ai';
 import { HuskyResponseSchema } from 'libs/contracts/src/schema/husky-chat';
@@ -159,7 +161,11 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
       where: { email: 'member@example.com' },
       select: { uid: true, deletedAt: true },
     });
-    expect(toolsService.getTools).toHaveBeenCalledWith({ isLoggedIn: true, memberUid: 'member-1' });
+    expect(toolsService.getTools).toHaveBeenCalledWith({
+      isLoggedIn: true,
+      memberUid: 'member-1',
+      email: 'member@example.com',
+    });
 
     await flushBackgroundWork();
     expect(persistent.create).toHaveBeenCalledWith(
