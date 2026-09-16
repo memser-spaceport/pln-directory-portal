@@ -6,4 +6,6 @@ export const CV_IMPORT_S3_PREFIX = 'cvs';
 
 export const CV_IMPORT_PDF_MIME_TYPES = ['application/pdf', 'application/x-pdf'];
 
+export const CV_PREVIEW_URL_TTL_SECONDS = 3600;
+
 export const YEAR_MONTH_REGEX = /^\d{4}-(0[1-9]|1[0-2])$/;

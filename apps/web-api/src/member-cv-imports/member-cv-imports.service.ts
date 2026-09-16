@@ -26,6 +26,7 @@ import { MembersService } from '../members/members.service';
 import {
   CV_IMPORT_MAX_TEXT_CHARS,
   CV_IMPORT_S3_PREFIX,
+  CV_PREVIEW_URL_TTL_SECONDS,
   MEMBER_CV_PARSE_AI_PROVIDER_ENV,
   YEAR_MONTH_REGEX,
 } from './member-cv-imports.constants';
@@ -37,6 +38,13 @@ type MulterFile = {
   mimetype: string;
   originalname: string;
   size: number;
+};
+
+export type MemberCvFile = {
+  fileName: string;
+  size?: number;
+  uploadedAt: string;
+  url?: string;
 };
 
 @Injectable()
@@ -65,6 +73,8 @@ export class MemberCvImportsService {
     const importUid = randomUUID();
     const s3Key = `${CV_IMPORT_S3_PREFIX}/${importUid}.pdf`;
     const originalFilename = file.originalname || 'cv.pdf';
+    const uploadedAt = new Date();
+    const fileSizeBytes = file.size;
 
     await this.awsService.uploadFileToS3({ buffer: file.buffer, mimetype: 'application/pdf' }, bucket, s3Key);
 
@@ -78,6 +88,8 @@ export class MemberCvImportsService {
           originalFilename,
           s3Bucket: bucket,
           s3Key,
+          fileSizeBytes,
+          uploadedAt,
           payload: Prisma.DbNull,
           errorCode: null,
           errorMessage: null,
@@ -97,6 +109,8 @@ export class MemberCvImportsService {
           originalFilename,
           s3Bucket: bucket,
           s3Key,
+          fileSizeBytes,
+          uploadedAt,
         },
       });
     }
@@ -119,6 +133,7 @@ export class MemberCvImportsService {
       uid: string;
       status: MemberCvImportStatus;
       originalFilename: string;
+      file?: MemberCvFile;
       payload?: ParsedCvProfile;
       error?: { code: string; message: string };
     } = {
@@ -126,6 +141,25 @@ export class MemberCvImportsService {
       status: row.status,
       originalFilename: row.originalFilename,
     };
+
+    if (row.uploadedAt) {
+      response.file = {
+        fileName: row.originalFilename,
+        uploadedAt: row.uploadedAt.toISOString(),
+      };
+      if (row.fileSizeBytes != null) {
+        response.file.size = row.fileSizeBytes;
+      }
+      try {
+        response.file.url = await this.awsService.getSignedGetUrl(row.s3Bucket, row.s3Key, CV_PREVIEW_URL_TTL_SECONDS, {
+          disposition: 'inline',
+          filename: row.originalFilename,
+          contentType: 'application/pdf',
+        });
+      } catch (error) {
+        this.logger.error(`Failed to sign CV preview URL for ${row.uid}: ${error}`);
+      }
+    }
 
     if (row.status === MemberCvImportStatus.SUCCEEDED && row.payload) {
       response.payload = row.payload as ParsedCvProfile;
@@ -138,6 +172,48 @@ export class MemberCvImportsService {
     }
 
     return response;
+  }
+
+  async remove(memberUid: string, requestorEmail: string) {
+    await this.assertCanManage(memberUid, requestorEmail);
+    const row = await this.prisma.memberCvImport.findUnique({ where: { memberUid } });
+    if (!row) {
+      throw new NotFoundException('No CV import found for this member');
+    }
+
+    await this.prisma.memberCvImport.delete({ where: { memberUid } });
+    await this.awsService.deleteObjectFromS3(row.s3Bucket, row.s3Key).catch((error) => {
+      this.logger.error(`Failed to delete CV object ${row.s3Key}: ${error}`);
+    });
+  }
+
+  async getCurrentCv(memberUid: string): Promise<(MemberCvFile & { s3Bucket: string; s3Key: string }) | null> {
+    const row = await this.prisma.memberCvImport.findUnique({ where: { memberUid } });
+    if (!row || !row.uploadedAt) {
+      return null;
+    }
+    const file: MemberCvFile & { s3Bucket: string; s3Key: string } = {
+      fileName: row.originalFilename,
+      uploadedAt: row.uploadedAt.toISOString(),
+      s3Bucket: row.s3Bucket,
+      s3Key: row.s3Key,
+    };
+    if (row.fileSizeBytes != null) {
+      file.size = row.fileSizeBytes;
+    }
+    return file;
+  }
+
+  async getSignedPreviewUrl(memberUid: string): Promise<string | null> {
+    const row = await this.prisma.memberCvImport.findUnique({ where: { memberUid } });
+    if (!row || !row.uploadedAt) {
+      return null;
+    }
+    return this.awsService.getSignedGetUrl(row.s3Bucket, row.s3Key, CV_PREVIEW_URL_TTL_SECONDS, {
+      disposition: 'inline',
+      filename: row.originalFilename,
+      contentType: 'application/pdf',
+    });
   }
 
   async apply(memberUid: string, body: unknown, requestorEmail: string) {
@@ -173,7 +249,8 @@ export class MemberCvImportsService {
     const skillsAdded: string[] = [];
     let locationApplied = false;
     const experiencesToCreate = selection.experiences.filter(
-      (experience) => experience.title.trim() && experience.company.trim() && YEAR_MONTH_REGEX.test(experience.startDate)
+      (experience) =>
+        experience.title.trim() && experience.company.trim() && YEAR_MONTH_REGEX.test(experience.startDate)
     );
 
     await this.prisma.$transaction(async (tx) => {

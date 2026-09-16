@@ -25,7 +25,7 @@ export const apiMemberCvImports = contract.router({
     responses: {
       200: MemberCvImportLatestSchema,
     },
-    summary: 'Get the latest CV upload/parse status for a member',
+    summary: 'Get the latest CV upload/parse status and stored file for a member',
   },
   applyMemberCvImport: {
     method: 'POST',
@@ -35,5 +35,14 @@ export const apiMemberCvImports = contract.router({
       200: ApplyMemberCvImportResponseSchema,
     },
     summary: 'Apply the reviewed CV parse subset to the member profile',
+  },
+  deleteMemberCvImport: {
+    method: 'DELETE',
+    path: `${getAPIVersionAsPath('1')}/members/:uid/cv-imports`,
+    body: contract.body<Record<string, never>>(),
+    responses: {
+      204: contract.response<null>(),
+    },
+    summary: "Remove the member's stored CV file and import row",
   },
 });

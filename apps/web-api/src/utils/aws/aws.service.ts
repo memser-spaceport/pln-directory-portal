@@ -128,6 +128,21 @@ export class AwsService {
     });
   }
 
+  async getObjectBuffer(bucket: string, key: string): Promise<Buffer | null> {
+    const s3 = new AWS.S3(CONFIG);
+    try {
+      const result = await s3.getObject({ Bucket: bucket, Key: key }).promise();
+      if (!result.Body) return null;
+      if (Buffer.isBuffer(result.Body)) return result.Body;
+      if (result.Body instanceof Uint8Array) return Buffer.from(result.Body);
+      if (typeof result.Body === 'string') return Buffer.from(result.Body, 'binary');
+      return Buffer.from(result.Body as any);
+    } catch (error) {
+      if (error.statusCode === 404 || error.code === 'NoSuchKey') return null;
+      throw error;
+    }
+  }
+
   async generatePresignedPutUrl(bucket: string, key: string, contentType: string, expiresInSeconds = 900) {
     const s3 = new AWS.S3(CONFIG);
     return s3.getSignedUrlPromise('putObject', {

@@ -994,6 +994,8 @@ model MemberCvImport {
   originalFilename String
   s3Bucket         String
   s3Key            String
+  fileSizeBytes    Int?
+  uploadedAt       DateTime?
   payload          Json?
   errorCode        String?
   errorMessage     String?

@@ -52,6 +52,7 @@ describe('MemberCvImportsService', () => {
   const cvCreate = jest.fn();
   const cvUpdate = jest.fn();
   const cvUpdateMany = jest.fn();
+  const cvDelete = jest.fn();
   const skillFindFirst = jest.fn();
   const skillCreate = jest.fn();
   const locationUpsert = jest.fn();
@@ -65,6 +66,7 @@ describe('MemberCvImportsService', () => {
       create: cvCreate,
       update: cvUpdate,
       updateMany: cvUpdateMany,
+      delete: cvDelete,
     },
     skill: { findFirst: skillFindFirst, create: skillCreate },
     location: { upsert: locationUpsert },
@@ -75,6 +77,8 @@ describe('MemberCvImportsService', () => {
   const awsService = {
     uploadFileToS3: jest.fn().mockResolvedValue({ Location: '' }),
     deleteObjectFromS3: jest.fn().mockResolvedValue(undefined),
+    getSignedGetUrl: jest.fn().mockResolvedValue('https://signed.example/cv.pdf'),
+    getObjectBuffer: jest.fn().mockResolvedValue(Buffer.from('pdf-bytes')),
   } as unknown as AwsService;
 
   const aiProvider = {
@@ -166,6 +170,41 @@ describe('MemberCvImportsService', () => {
 
       expect(cvUpdate).toHaveBeenCalled();
       expect(awsService.deleteObjectFromS3).toHaveBeenCalledWith('test-uploads', 'cvs/old.pdf');
+    });
+
+    it('stamps fileSizeBytes and uploadedAt on upload', async () => {
+      jest.spyOn(service, 'runParse').mockResolvedValue(undefined);
+
+      await service.upload('member-1', PDF_FILE, 'owner@example.com');
+
+      expect(cvCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            fileSizeBytes: PDF_FILE.size,
+            uploadedAt: expect.any(Date),
+          }),
+        })
+      );
+    });
+
+    it('stamps fileSizeBytes and uploadedAt on replace', async () => {
+      jest.spyOn(service, 'runParse').mockResolvedValue(undefined);
+      cvFindUnique.mockResolvedValue({
+        uid: 'old-uid',
+        s3Bucket: 'test-uploads',
+        s3Key: 'cvs/old.pdf',
+      });
+
+      await service.upload('member-1', PDF_FILE, 'owner@example.com');
+
+      expect(cvUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            fileSizeBytes: PDF_FILE.size,
+            uploadedAt: expect.any(Date),
+          }),
+        })
+      );
     });
   });
 
@@ -444,6 +483,114 @@ describe('MemberCvImportsService', () => {
     it('404s when the member has never uploaded', async () => {
       cvFindUnique.mockResolvedValue(null);
       await expect(service.getLatest('member-1', 'owner@example.com')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('includes a signed file URL when a CV exists', async () => {
+      const uploadedAt = new Date('2026-09-01T10:00:00.000Z');
+      cvFindUnique.mockResolvedValue({
+        uid: 'import-1',
+        status: MemberCvImportStatus.SUCCEEDED,
+        originalFilename: 'cv.pdf',
+        s3Bucket: 'test-uploads',
+        s3Key: 'cvs/import-1.pdf',
+        fileSizeBytes: 1024,
+        uploadedAt,
+        payload: { role: 'Engineer' },
+      });
+
+      const result = await service.getLatest('member-1', 'owner@example.com');
+
+      expect(result.file).toEqual({
+        fileName: 'cv.pdf',
+        size: 1024,
+        uploadedAt: uploadedAt.toISOString(),
+        url: 'https://signed.example/cv.pdf',
+      });
+      expect(awsService.getSignedGetUrl).toHaveBeenCalledWith('test-uploads', 'cvs/import-1.pdf', 3600, {
+        disposition: 'inline',
+        filename: 'cv.pdf',
+        contentType: 'application/pdf',
+      });
+    });
+
+    it('omits the file when uploadedAt is missing', async () => {
+      cvFindUnique.mockResolvedValue({
+        uid: 'import-1',
+        status: MemberCvImportStatus.SUCCEEDED,
+        originalFilename: 'cv.pdf',
+        s3Bucket: 'test-uploads',
+        s3Key: 'cvs/import-1.pdf',
+        fileSizeBytes: 1024,
+        uploadedAt: null,
+        payload: { role: 'Engineer' },
+      });
+
+      const result = await service.getLatest('member-1', 'owner@example.com');
+
+      expect(result.file).toBeUndefined();
+    });
+  });
+
+  describe('remove', () => {
+    it('deletes the S3 object and the row', async () => {
+      cvFindUnique.mockResolvedValue({
+        uid: 'import-1',
+        s3Bucket: 'test-uploads',
+        s3Key: 'cvs/import-1.pdf',
+      });
+      cvDelete.mockResolvedValue({});
+
+      await service.remove('member-1', 'owner@example.com');
+
+      expect(cvDelete).toHaveBeenCalledWith({ where: { memberUid: 'member-1' } });
+      expect(awsService.deleteObjectFromS3).toHaveBeenCalledWith('test-uploads', 'cvs/import-1.pdf');
+    });
+
+    it('does not clear member profile fields', async () => {
+      cvFindUnique.mockResolvedValue({
+        uid: 'import-1',
+        s3Bucket: 'test-uploads',
+        s3Key: 'cvs/import-1.pdf',
+      });
+      cvDelete.mockResolvedValue({});
+
+      await service.remove('member-1', 'owner@example.com');
+
+      expect(memberUpdate).not.toHaveBeenCalled();
+      expect(experienceCreate).not.toHaveBeenCalled();
+    });
+
+    it('404s when the member has no CV', async () => {
+      cvFindUnique.mockResolvedValue(null);
+      await expect(service.remove('member-1', 'owner@example.com')).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('getCurrentCv', () => {
+    it('returns the stored file metadata', async () => {
+      const uploadedAt = new Date('2026-09-01T10:00:00.000Z');
+      cvFindUnique.mockResolvedValue({
+        originalFilename: 'cv.pdf',
+        fileSizeBytes: 2048,
+        uploadedAt,
+        s3Bucket: 'test-uploads',
+        s3Key: 'cvs/import-1.pdf',
+      });
+
+      const result = await service.getCurrentCv('member-1');
+
+      expect(result).toEqual({
+        fileName: 'cv.pdf',
+        size: 2048,
+        uploadedAt: uploadedAt.toISOString(),
+        s3Bucket: 'test-uploads',
+        s3Key: 'cvs/import-1.pdf',
+      });
+    });
+
+    it('returns null when there is no CV', async () => {
+      cvFindUnique.mockResolvedValue(null);
+      await expect(service.getCurrentCv('member-1')).resolves.toBeNull();
     });
   });
 });
