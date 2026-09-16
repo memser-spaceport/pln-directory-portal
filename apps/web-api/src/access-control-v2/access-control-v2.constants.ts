@@ -55,6 +55,13 @@ export const AI_APPS_PERMISSIONS = {
   WRITE: 'ai_apps.write',
 } as const;
 
+// ── ATS (PL hiring) ───────────────────────────────────────────────────────
+
+export const ATS_PERMISSIONS = {
+  /** Entry gate for the PL ATS; granted directly per member, not through a policy */
+  USER: 'ats_user',
+} as const;
+
 // ── Agent Sessions (PL Infra / code-fix-orchestrator) ────────────────────
 
 export const CODE_AGENT_SESSIONS_PERMISSIONS = {
@@ -243,6 +250,9 @@ export const ALL_PERMISSION_CODES = [
   // AI Apps
   AI_APPS_PERMISSIONS.READ,
   AI_APPS_PERMISSIONS.WRITE,
+
+  // ATS
+  ATS_PERMISSIONS.USER,
 
   // Agent Sessions
   CODE_AGENT_SESSIONS_PERMISSIONS.VIEW,
