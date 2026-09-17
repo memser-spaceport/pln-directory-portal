@@ -73,6 +73,11 @@ export class JobOpeningsSignUpService {
         policyUid: policy.uid,
       },
     });
+
+    await this.prisma.member.update({
+      where: { uid: memberUid },
+      data: { isInvestor: false },
+    });
   }
 
   private async assignProfileVisiblePermission(memberUid: string) {
