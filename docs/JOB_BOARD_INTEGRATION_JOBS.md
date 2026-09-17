@@ -20,12 +20,12 @@ flowchart LR
 
   ATS[Team's ATS]
 
-  Member -- browse, apply, "I'm interested" --> Directory
-  Crawler -- crawled roles, only rows it owns --> Board
+  Member -->|browse, apply, mark interest| Directory
+  Crawler -->|crawled roles, only rows it owns| Board
 
-  ATS -- "publish / edit / pause / close a role<br/>claim an existing row<br/>(team-scoped key)" --> Board
-  Board -- "the team's roles" --> ATS
-  Candidates -- "applicants and interested members" --> ATS
+  ATS -->|publish, edit, pause, close a role<br/>claim an existing row<br/>team-scoped key| Board
+  Board -->|the team's roles| ATS
+  Candidates -->|applicants and interested members| ATS
 ```
 
 Three rules hold the picture together:
