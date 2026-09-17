@@ -37,6 +37,7 @@ const extractPdfTextMock = extractPdfText as jest.MockedFunction<typeof extractP
 
 const OWNER = { uid: 'member-1', isDirectoryAdmin: false };
 const ADMIN = { uid: 'admin-1', isDirectoryAdmin: true };
+const TEAM_LEAD = { uid: 'lead-1', isDirectoryAdmin: false, leadingTeams: ['team-1'] };
 const PDF_BUFFER = Buffer.concat([Buffer.from('%PDF-1.4\n'), Buffer.from('fake-pdf-body')]);
 const PDF_FILE = {
   buffer: PDF_BUFFER,
@@ -57,6 +58,7 @@ describe('MemberCvImportsService', () => {
   const skillCreate = jest.fn();
   const locationUpsert = jest.fn();
   const experienceCreate = jest.fn();
+  const jobApplicationFindFirst = jest.fn();
   const transaction = jest.fn();
 
   const prisma = {
@@ -71,6 +73,7 @@ describe('MemberCvImportsService', () => {
     skill: { findFirst: skillFindFirst, create: skillCreate },
     location: { upsert: locationUpsert },
     memberExperience: { create: experienceCreate },
+    jobApplication: { findFirst: jobApplicationFindFirst },
     $transaction: transaction,
   } as unknown as PrismaService;
 
@@ -108,6 +111,7 @@ describe('MemberCvImportsService', () => {
     cvCreate.mockResolvedValue({});
     cvUpdate.mockResolvedValue({});
     cvUpdateMany.mockResolvedValue({ count: 1 });
+    jobApplicationFindFirst.mockResolvedValue(null);
     transaction.mockImplementation(async (fn: (tx: typeof prisma) => Promise<unknown>) => fn(prisma));
     service = new MemberCvImportsService(
       prisma,
@@ -511,6 +515,35 @@ describe('MemberCvImportsService', () => {
         filename: 'cv.pdf',
         contentType: 'application/pdf',
       });
+    });
+
+    it('forbids a member who is neither the owner nor an admin', async () => {
+      (membersService.findMemberByEmail as jest.Mock).mockResolvedValue(TEAM_LEAD);
+
+      await expect(service.getLatest('member-1', 'lead@example.com')).rejects.toBeInstanceOf(ForbiddenException);
+      expect(jobApplicationFindFirst).toHaveBeenCalledWith({
+        where: { memberUid: 'member-1', jobOpening: { teamUid: { in: ['team-1'] } } },
+        select: { uid: true },
+      });
+    });
+
+    it('allows a team lead when the member applied to one of their team openings', async () => {
+      (membersService.findMemberByEmail as jest.Mock).mockResolvedValue(TEAM_LEAD);
+      jobApplicationFindFirst.mockResolvedValue({ uid: 'application-1' });
+      cvFindUnique.mockResolvedValue({
+        uid: 'import-1',
+        status: MemberCvImportStatus.SUCCEEDED,
+        originalFilename: 'cv.pdf',
+        s3Bucket: 'test-uploads',
+        s3Key: 'cvs/import-1.pdf',
+        fileSizeBytes: 1024,
+        uploadedAt: new Date('2026-09-01T10:00:00.000Z'),
+        payload: { role: 'Engineer' },
+      });
+
+      const result = await service.getLatest('member-1', 'lead@example.com');
+
+      expect(result.file?.url).toBe('https://signed.example/cv.pdf');
     });
 
     it('omits the file when uploadedAt is missing', async () => {

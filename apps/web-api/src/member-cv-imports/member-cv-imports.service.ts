@@ -123,7 +123,7 @@ export class MemberCvImportsService {
   }
 
   async getLatest(memberUid: string, requestorEmail: string) {
-    await this.assertCanManage(memberUid, requestorEmail);
+    await this.assertCanView(memberUid, requestorEmail);
     const row = await this.prisma.memberCvImport.findUnique({ where: { memberUid } });
     if (!row) {
       throw new NotFoundException('No CV import found for this member');
@@ -409,6 +409,34 @@ export class MemberCvImportsService {
     }
     if (memberUid !== requestor.uid && !requestor.isDirectoryAdmin) {
       throw new ForbiddenException(`Member isn't authorized to update the member`);
+    }
+    return requestor;
+  }
+
+  /**
+   * Reading is wider than managing: a team lead also sees the CV of a member
+   * who applied to one of their team's job openings, since that is the CV the
+   * application was made with.
+   */
+  private async assertCanView(memberUid: string, requestorEmail: string) {
+    const requestor = await this.membersService.findMemberByEmail(requestorEmail);
+    if (!requestor) {
+      throw new NotFoundException(`Requestor not found for ${requestorEmail}`);
+    }
+    if (memberUid === requestor.uid || requestor.isDirectoryAdmin) {
+      return requestor;
+    }
+
+    const leadingTeams: string[] = requestor.leadingTeams ?? [];
+    const application =
+      leadingTeams.length > 0
+        ? await this.prisma.jobApplication.findFirst({
+            where: { memberUid, jobOpening: { teamUid: { in: leadingTeams } } },
+            select: { uid: true },
+          })
+        : null;
+    if (!application) {
+      throw new ForbiddenException(`Member isn't authorized to view the CV`);
     }
     return requestor;
   }
