@@ -6,6 +6,34 @@
 
 ---
 
+## How the Directory and an ATS talk
+
+```mermaid
+flowchart LR
+  Member([Member])
+  Crawler([Enrichment crawler])
+
+  subgraph Directory[Directory / LabOS job board]
+    Board[(Job openings)]
+    Candidates[(Applications and interests)]
+  end
+
+  ATS[Team's ATS]
+
+  Member -- browse, apply, "I'm interested" --> Directory
+  Crawler -- crawled roles, only rows it owns --> Board
+
+  ATS -- "publish / edit / pause / close a role<br/>claim an existing row<br/>(team-scoped key)" --> Board
+  Board -- "the team's roles" --> ATS
+  Candidates -- "applicants and interested members" --> ATS
+```
+
+Three rules hold the picture together:
+
+- **The board is the single record of a role.** Alerts, referrals, applications and interests all hang off one job opening, whoever authored it.
+- **Each row has one owner.** The crawler writes only crawler rows; an ATS writes only rows its key created or claimed. Neither can touch the other's.
+- **The ATS is the author, the board is the apply path.** Members never apply inside the ATS; applicants and interests flow from the Directory to the ATS.
+
 ## The contract
 
 `libs/contracts/src/schema/publishable-job.ts` is the single shape an integration submits. It imports only zod so an integration can vendor the file verbatim (with a header naming this path).
