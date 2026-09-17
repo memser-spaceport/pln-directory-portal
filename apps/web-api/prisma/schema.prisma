@@ -2305,6 +2305,14 @@ model JobOpening {
   /// The integration key that owns this row when managedBy is INTEGRATION.
   integrationKeyUid String?
   integrationKey    IntegrationKey? @relation(fields: [integrationKeyUid], references: [uid])
+  /// The owning integration's own id for this role; unique per key. Null on crawler rows.
+  integrationExternalId String?
+  /// Public pay range in whole units; all four set or all four null. Shown on the board when set.
+  payMin      Int?
+  payMax      Int?
+  payCurrency String?
+  payPeriod   String?
+  equityNote  String?
   /// Set the first time the row enters a board-visible status, and again on
   /// each hidden -> visible transition. Job alert dispatch matches on this.
   publishedAt     DateTime?
@@ -2360,6 +2368,7 @@ model JobOpening {
   @@index([updatedAt])
   @@index([publishedAt])
   @@index([integrationKeyUid])
+  @@unique([integrationKeyUid, integrationExternalId])
 }
 
 /// A server credential bound to one team, issued and revoked by a Directory admin.

@@ -4,6 +4,7 @@ import { JobsListQueryParams, type JobsListQuery } from 'libs/contracts/src/sche
 import { PrismaService } from '../shared/prisma.service';
 import { resolveLiveMemberUidByEmail } from '../shared/resolve-live-member-uid.util';
 import { buildJobOpeningDateWhere } from './job-opening-date.where';
+import { toPublicPay } from './job-openings-public-role';
 import { isInAppApplyAvailable, pinProtocolLabsThenPage } from './pin-protocol-labs-team';
 
 const TOP_LEVEL_FOCUS_AREAS = [
@@ -345,6 +346,12 @@ export class JobOpeningsQueryService {
               postedDate: true,
               detectionDate: true,
               updatedAt: true,
+              department: true,
+              payMin: true,
+              payMax: true,
+              payCurrency: true,
+              payPeriod: true,
+              equityNote: true,
             },
             orderBy: [{ uid: 'asc' }],
           },
@@ -426,6 +433,9 @@ export class JobOpeningsQueryService {
             lastUpdated: role.updatedAt.toISOString(),
             postedDate: role.postedDate ? role.postedDate.toISOString() : null,
             detectionDate: role.detectionDate.toISOString(),
+            department: role.department ?? null,
+            pay: toPublicPay(role),
+            equityNote: role.equityNote ?? null,
             interestedCount: interestCounts.get(role.uid) ?? 0,
             viewerIsInterested: viewerInterested.has(role.uid),
           })),
@@ -495,6 +505,12 @@ export class JobOpeningsQueryService {
         detectionDate: true,
         publishedAt: true,
         updatedAt: true,
+        department: true,
+        payMin: true,
+        payMax: true,
+        payCurrency: true,
+        payPeriod: true,
+        equityNote: true,
         team: { select: { uid: true, name: true, logo: { select: { url: true } } } },
       },
       orderBy: { publishedAt: 'desc' },

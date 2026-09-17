@@ -11,7 +11,7 @@
 | Value | Written by | Updated or closed by |
 |-------|------------|----------------------|
 | `ENRICHMENT` | data-enrichment crawler via `POST /v1/service/job-openings/ingest` | crawler only |
-| `INTEGRATION` | a team's ATS integration, authenticated by a team-scoped key (see [INTEGRATION_KEYS.md](./INTEGRATION_KEYS.md); job endpoints land with LAB-2577) | the key recorded in `integrationKeyUid` only |
+| `INTEGRATION` | a team's ATS integration, authenticated by a team-scoped key (see [INTEGRATION_KEYS.md](./INTEGRATION_KEYS.md)) through the routes in [JOB_BOARD_INTEGRATION_JOBS.md](./JOB_BOARD_INTEGRATION_JOBS.md) | the key recorded in `integrationKeyUid` only |
 | `MANUAL` | hand-run SQL or the import script | manual only |
 | `null` | rows created before the column existed | read as `ENRICHMENT` everywhere |
 
