@@ -21,6 +21,9 @@ import {
  * over" if all three are advanced together. Rows are read one page past the
  * limit, then the page is cut at the limit and the cursor set to the last row
  * that made it — so nothing is skipped when several rows share a timestamp.
+ *
+ * The cursor is a stream position, not a "more pages" flag: it is returned for
+ * any non-empty page, and only an empty page ends the walk.
  */
 
 export const CANDIDATE_PAGE_DEFAULT = 100;
@@ -127,7 +130,10 @@ export class IntegrationCandidatesService {
 
     const page = merged.slice(0, limit);
     const last = page[page.length - 1];
-    const nextCursor = merged.length > page.length && last ? encodeCursor({ t: last.updatedAt.toISOString(), u: last.uid }) : null;
+    // A cursor comes back whenever rows were delivered, not only when more remain:
+    // a caller handed null has no position to store and would re-read the whole
+    // history on its next poll. "Nothing new" is an empty page with a null cursor.
+    const nextCursor = last ? encodeCursor({ t: last.updatedAt.toISOString(), u: last.uid }) : null;
 
     const applicationRows = page.filter((e) => e.kind === 'application');
     const cvUrls = await this.cvImports.getSignedPreviewUrls(
