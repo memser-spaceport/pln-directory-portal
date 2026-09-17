@@ -165,6 +165,13 @@ export const JobOpeningInterestListResponseSchema = z.object({
   interests: z.array(JobOpeningInterestSchema),
 });
 
+/** Same cap as a job application's cover letter. */
+export const MarkTeamInterestSchema = z.object({
+  message: z.string().trim().max(2000).optional(),
+});
+
+export type MarkTeamInterestInput = z.infer<typeof MarkTeamInterestSchema>;
+
 export const TeamInterestStatusSchema = z.object({
   teamUid: z.string(),
   interestedCount: z.number().int().min(0),

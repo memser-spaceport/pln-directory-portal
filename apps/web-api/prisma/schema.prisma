@@ -2471,6 +2471,10 @@ model JobOpeningInterest {
 model TeamInterest {
   id        Int      @id @default(autoincrement())
   uid       String   @unique @default(cuid())
+  /// What the member wrote when they said they were interested. Optional, and
+  /// overwritten by a later mark: there is no un-marking, so the latest note is
+  /// the one that stands.
+  message   String?
   teamUid   String
   team      Team     @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
   memberUid String

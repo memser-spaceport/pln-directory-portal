@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import type { JobOpeningInterestStatus, TeamInterestStatus } from 'libs/contracts/src/schema/job-opening';
+import type { JobOpeningInterestStatus, MarkTeamInterestInput, TeamInterestStatus } from 'libs/contracts/src/schema/job-opening';
 import { PrismaService } from '../shared/prisma.service';
 import { AtsPushService } from '../integration-keys/ats-push.service';
 import { resolveVisibleJobOpening } from './job-openings-resolve';
@@ -29,17 +29,24 @@ export class JobOpeningsInterestService {
    * one-way: there is no un-marking, so an integrated ATS never has to reason
    * about someone withdrawing.
    */
-  async markTeamInterest(teamUid: string, memberEmail: string | undefined): Promise<TeamInterestStatus> {
+  async markTeamInterest(
+    teamUid: string,
+    memberEmail: string | undefined,
+    input?: MarkTeamInterestInput
+  ): Promise<TeamInterestStatus> {
     const memberUid = await this.resolveMemberUid(memberEmail);
     const team = await this.prisma.team.findUnique({ where: { uid: teamUid }, select: { uid: true } });
     if (!team) {
       throw new NotFoundException('Team not found');
     }
 
+    const message = input?.message?.trim() || null;
     const interest = await this.prisma.teamInterest.upsert({
       where: { teamUid_memberUid: { teamUid, memberUid } },
-      create: { teamUid, memberUid },
-      update: {},
+      create: { teamUid, memberUid, message },
+      // Marking again with something to say replaces what was there; marking again
+      // with nothing leaves the earlier message alone rather than wiping it.
+      update: message ? { message } : {},
       select: { uid: true },
     });
     this.atsPush.pushTeamInterest(interest.uid);

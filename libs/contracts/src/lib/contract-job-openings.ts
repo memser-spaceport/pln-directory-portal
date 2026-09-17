@@ -9,6 +9,7 @@ import {
   JobsListQueryParams,
   JobsListResponseSchema,
   JobTeamGroupSchema,
+  MarkTeamInterestSchema,
   TeamInterestStatusSchema,
 } from '../schema/job-opening';
 import {
@@ -142,7 +143,7 @@ export const apiJobOpenings = contract.router({
     method: 'POST',
     path: `${getAPIVersionAsPath('1')}/job-openings/teams/:uid/interest`,
     pathParams: z.object({ uid: z.string() }),
-    body: z.object({}).optional(),
+    body: MarkTeamInterestSchema.optional(),
     responses: {
       200: TeamInterestStatusSchema,
     },

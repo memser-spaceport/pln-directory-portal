@@ -43,6 +43,8 @@ export interface CandidateInterestRow {
   email: string | null;
   profileUrl: string;
   profileSnapshot: CandidateProfileSnapshot;
+  /** What the member wrote when marking interest. Only team interest collects one. */
+  message: string | null;
   interestedAt: string;
 }
 
@@ -75,6 +77,7 @@ export const jobInterestSelect = {
 export const teamInterestSelect = {
   uid: true,
   teamUid: true,
+  message: true,
   createdAt: true,
   updatedAt: true,
   member: { select: memberSelect },
@@ -131,6 +134,7 @@ export function toJobInterestRow(row: JobInterestSource): CandidateInterestRow {
     email: row.member.email,
     profileUrl: memberProfileUrl(row.member.uid),
     profileSnapshot: snapshotOf(row.member),
+    message: null,
     interestedAt: row.createdAt.toISOString(),
   };
 }
@@ -145,6 +149,7 @@ export function toTeamInterestRow(row: TeamInterestSource): CandidateInterestRow
     email: row.member.email,
     profileUrl: memberProfileUrl(row.member.uid),
     profileSnapshot: snapshotOf(row.member),
+    message: row.message,
     interestedAt: row.createdAt.toISOString(),
   };
 }
