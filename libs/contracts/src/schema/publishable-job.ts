@@ -69,6 +69,10 @@ export const IntegrationJobResponseSchema = z.object({
 });
 export type IntegrationJobResponse = z.infer<typeof IntegrationJobResponseSchema>;
 
+/**
+ * A team row as the integration sees it. Carries the public fields so an ATS can
+ * import a board row as a draft role (adoption) without a second read.
+ */
 export const IntegrationJobListItemSchema = z.object({
   uid: z.string(),
   /** Null for rows the calling key does not own. */
@@ -76,10 +80,22 @@ export const IntegrationJobListItemSchema = z.object({
   ownedByCaller: z.boolean(),
   managedBy: z.string().nullable(),
   status: z.string(),
-  roleTitle: z.string(),
   dedupKey: z.string(),
   publishedAt: z.string().nullable(),
   closedAt: z.string().nullable(),
   boardUrl: z.string(),
+  title: z.string(),
+  department: z.string().nullable(),
+  roleCategory: z.string().nullable(),
+  seniority: z.string().nullable(),
+  workMode: z.string().nullable(),
+  locations: z.array(z.string()),
+  summary: z.string().nullable(),
+  descriptionHtml: z.string().nullable(),
+  postedAt: z.string().nullable(),
+  /** The external apply link a crawled row still carries; null once claimed. */
+  applyUrl: z.string().nullable(),
+  pay: PaySchema.nullable(),
+  equityNote: z.string().nullable(),
 });
 export type IntegrationJobListItem = z.infer<typeof IntegrationJobListItemSchema>;

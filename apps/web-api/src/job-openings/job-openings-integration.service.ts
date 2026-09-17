@@ -6,6 +6,7 @@ import { JOB_INGEST_COMPLETED, JobIngestCompletedPayload } from '../job-alerts/j
 import { IntegrationKeyRequestContext, IntegrationKeysService } from '../integration-keys/integration-keys.service';
 import { sanitizeJobDescriptionHtml } from './job-description-html.util';
 import { resolvePublishedAt } from './job-opening-visibility';
+import { toPublicPay } from './job-openings-public-role';
 import { jobBoardDetailUrl } from './job-openings-url';
 import {
   ExternalIdSchema,
@@ -243,11 +244,30 @@ export class JobOpeningsIntegrationService {
     return toResponse(claimed, externalId);
   }
 
+  /**
+   * Every row of the key's team with its public fields, so an ATS can import a
+   * board row as a draft role (adoption) without a second read.
+   */
   async listForTeam(key: IntegrationKeyRequestContext): Promise<IntegrationJobListItem[]> {
     const rows = await this.prisma.jobOpening.findMany({
       where: { teamUid: key.teamUid },
       orderBy: { createdAt: 'desc' },
-      select: rowSelect,
+      select: {
+        ...rowSelect,
+        department: true,
+        roleCategory: true,
+        seniority: true,
+        workMode: true,
+        location: true,
+        summary: true,
+        descriptionHtml: true,
+        postedDate: true,
+        payMin: true,
+        payMax: true,
+        payCurrency: true,
+        payPeriod: true,
+        equityNote: true,
+      },
     });
     return rows.map((row) => {
       const ownedByCaller = row.integrationKeyUid === key.uid;
@@ -257,11 +277,22 @@ export class JobOpeningsIntegrationService {
         ownedByCaller,
         managedBy: row.managedBy ?? null,
         status: row.status,
-        roleTitle: row.roleTitle,
         dedupKey: row.dedupKey,
         publishedAt: row.publishedAt?.toISOString() ?? null,
         closedAt: row.closedAt?.toISOString() ?? null,
         boardUrl: jobBoardDetailUrl(row.uid),
+        title: row.roleTitle,
+        department: row.department ?? null,
+        roleCategory: row.roleCategory ?? null,
+        seniority: row.seniority ?? null,
+        workMode: row.workMode ?? null,
+        locations: row.location ?? [],
+        summary: row.summary ?? null,
+        descriptionHtml: row.descriptionHtml ?? null,
+        postedAt: row.postedDate?.toISOString() ?? null,
+        applyUrl: row.sourceLink ?? null,
+        pay: toPublicPay(row),
+        equityNote: row.equityNote ?? null,
       };
     });
   }

@@ -402,10 +402,57 @@ describe('JobOpeningsIntegrationService', () => {
       expect(out[0]).toMatchObject({
         managedBy: 'INTEGRATION',
         status: 'CONFIRMED',
-        roleTitle: 'Platform Lead',
+        title: 'Platform Lead',
         publishedAt: '2026-01-01T00:00:00.000Z',
         closedAt: null,
         boardUrl: 'https://os.example/jobs/openings/job-1',
+      });
+    });
+
+    it('carries a crawler row’s public fields so the ATS can import it as a draft role', async () => {
+      prisma.jobOpening.findMany.mockResolvedValue([
+        row({
+          uid: 'manual-pl-79560093',
+          managedBy: null,
+          integrationKeyUid: null,
+          integrationExternalId: null,
+          dedupKey: 'https://jobs.polychain.capital/79560093',
+          sourceLink: 'https://jobs.polychain.capital/79560093',
+          roleTitle: 'Platform Lead',
+          department: null,
+          roleCategory: 'Engineering',
+          seniority: 'Lead (L5)',
+          workMode: 'remote',
+          location: ['Lisbon', 'Remote (EU)'],
+          summary: 'Lead the platform team',
+          descriptionHtml: '<p>Full posting</p>',
+          postedDate: new Date('2026-08-01T00:00:00.000Z'),
+          payMin: null,
+          payMax: null,
+          payCurrency: null,
+          payPeriod: null,
+          equityNote: null,
+        }),
+      ]);
+
+      const [item] = await service.listForTeam(key);
+
+      expect(item).toMatchObject({
+        externalId: null,
+        ownedByCaller: false,
+        managedBy: null,
+        title: 'Platform Lead',
+        department: null,
+        roleCategory: 'Engineering',
+        seniority: 'Lead (L5)',
+        workMode: 'remote',
+        locations: ['Lisbon', 'Remote (EU)'],
+        summary: 'Lead the platform team',
+        descriptionHtml: '<p>Full posting</p>',
+        postedAt: '2026-08-01T00:00:00.000Z',
+        applyUrl: 'https://jobs.polychain.capital/79560093',
+        pay: null,
+        equityNote: null,
       });
     });
   });

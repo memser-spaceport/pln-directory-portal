@@ -86,7 +86,7 @@ Adopts an existing row of the key's team whose `managedBy` is null, `MANUAL` or 
 GET /v1/integrations/jobs
 ```
 
-Every job opening of the key's team, in any status: `uid`, `externalId` (null unless the key owns the row), `ownedByCaller`, `managedBy`, `status`, `roleTitle`, `dedupKey`, `publishedAt`, `closedAt`, `boardUrl`.
+Every job opening of the key's team, in any status. Identity and state: `uid`, `externalId` (null unless the key owns the row), `ownedByCaller`, `managedBy`, `status`, `dedupKey`, `publishedAt`, `closedAt`, `boardUrl`. Public fields, so an ATS can import a board row as a draft role without a second read: `title`, `department`, `roleCategory`, `seniority`, `workMode`, `locations`, `summary`, `descriptionHtml`, `postedAt`, `applyUrl` (the external link a crawled row still carries; null once claimed), `pay`, `equityNote`.
 
 ## Publication and alerts
 
