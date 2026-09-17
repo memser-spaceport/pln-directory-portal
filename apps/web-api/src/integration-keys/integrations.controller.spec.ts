@@ -1,5 +1,11 @@
+// The real service reaches MemberCvImportsService, whose dependency graph includes
+// an ESM-only package Jest will not parse. This spec only checks the controller's
+// metadata and delegation, so the class is stubbed at the module boundary.
+jest.mock('./integration-candidates.service', () => ({ IntegrationCandidatesService: class {} }));
+
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { IntegrationKeyGuard } from '../guards/integration-key.guard';
+import type { IntegrationCandidatesService } from './integration-candidates.service';
 import type { IntegrationKeysService } from './integration-keys.service';
 import { IntegrationsController } from './integrations.controller';
 
@@ -12,7 +18,10 @@ describe('IntegrationsController', () => {
 
   beforeEach(() => {
     service = { describe: jest.fn() };
-    controller = new IntegrationsController(service as unknown as IntegrationKeysService);
+    controller = new IntegrationsController(
+      service as unknown as IntegrationKeysService,
+      { feed: jest.fn(), applicationCvUrl: jest.fn() } as unknown as IntegrationCandidatesService
+    );
   });
 
   it('is guarded by IntegrationKeyGuard', () => {

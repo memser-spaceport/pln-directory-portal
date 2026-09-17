@@ -103,7 +103,8 @@ describe('JobOpeningsApplicationService', () => {
       prisma as unknown as PrismaService,
       notificationServiceClient as never,
       memberCvImportsService as never,
-      awsService as never
+      awsService as never,
+      { pushApplication: jest.fn() } as never
     );
     process.env.WEB_UI_BASE_URL = 'https://directory.test';
   });

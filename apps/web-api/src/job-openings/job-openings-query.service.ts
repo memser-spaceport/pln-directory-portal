@@ -135,6 +135,36 @@ export class JobOpeningsQueryService {
     };
   }
 
+  /**
+   * Interest in the teams themselves rather than in their roles, stamped the
+   * same way roles are so a page costs two queries, not one per team.
+   */
+  async loadTeamInterestStamps(
+    teamUids: string[],
+    viewerMemberUid?: string
+  ): Promise<{ counts: Map<string, number>; viewerInterested: Set<string> }> {
+    if (teamUids.length === 0) {
+      return { counts: new Map(), viewerInterested: new Set() };
+    }
+    const [grouped, viewerRows] = await Promise.all([
+      this.prisma.teamInterest.groupBy({
+        by: ['teamUid'],
+        where: { teamUid: { in: teamUids } },
+        _count: { _all: true },
+      }),
+      viewerMemberUid
+        ? this.prisma.teamInterest.findMany({
+            where: { teamUid: { in: teamUids }, memberUid: viewerMemberUid },
+            select: { teamUid: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    return {
+      counts: new Map(grouped.map((g) => [g.teamUid, g._count._all])),
+      viewerInterested: new Set(viewerRows.map((r) => r.teamUid)),
+    };
+  }
+
   private async queryPagedTeamGroups(query: JobsListQuery) {
     const page = query.page;
     const limit = query.limit;
@@ -336,7 +366,10 @@ export class JobOpeningsQueryService {
     const teamByUid = new Map(pageTeams.map((team) => [team.uid, team]));
 
     const allRoleUids = pageTeams.flatMap((team) => team.jobOpenings.map((role) => role.uid));
-    const { counts: interestCounts, viewerInterested } = await this.loadInterestStamps(allRoleUids, viewerMemberUid);
+    const [{ counts: interestCounts, viewerInterested }, teamStamps] = await Promise.all([
+      this.loadInterestStamps(allRoleUids, viewerMemberUid),
+      this.loadTeamInterestStamps(pageTeamUids, viewerMemberUid),
+    ]);
 
     const ancestorByTeam = new Map<string, Map<string, string>>();
     const leafByTeam = new Map<string, Map<string, string>>();
@@ -377,6 +410,8 @@ export class JobOpeningsQueryService {
               jobReferEmail: team.jobReferEmail,
               hasInactiveLeadEmails: team.hasInactiveLeadEmails,
             }),
+            interestedInTeamCount: teamStamps.counts.get(team.uid) ?? 0,
+            viewerIsInterestedInTeam: teamStamps.viewerInterested.has(team.uid),
           },
           totalRoles: roleCountByTeamUid.get(group.teamUid) ?? teamRoles.length,
           roles: teamRoles.map((role) => ({

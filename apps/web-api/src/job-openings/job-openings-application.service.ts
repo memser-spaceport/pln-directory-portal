@@ -6,6 +6,7 @@ import { PrismaService } from '../shared/prisma.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { AwsService } from '../utils/aws/aws.service';
 import { MemberCvImportsService } from '../member-cv-imports/member-cv-imports.service';
+import { AtsPushService } from '../integration-keys/ats-push.service';
 import { directoryVisibleMemberWhere } from '../members/member-visibility';
 import { MEMBER_APPROVED, MemberApprovedPayload } from '../member-approvals/member-approvals.events';
 import { noteToHtml } from './job-openings-email-html';
@@ -60,7 +61,8 @@ export class JobOpeningsApplicationService {
     private readonly prisma: PrismaService,
     private readonly notificationServiceClient: NotificationServiceClient,
     private readonly memberCvImportsService: MemberCvImportsService,
-    private readonly awsService: AwsService
+    private readonly awsService: AwsService,
+    private readonly atsPush: AtsPushService
   ) {}
 
   async apply(jobUid: string, applicantEmail: string | undefined, input: CreateJobApplicationInput) {
@@ -96,6 +98,8 @@ export class JobOpeningsApplicationService {
           sentAt: profileVisible ? new Date() : null,
         },
       });
+
+      this.atsPush.pushApplication(record.uid);
 
       return {
         uid: record.uid,

@@ -80,6 +80,10 @@ export const JobTeamSchema = z.object({
   subFocusAreas: z.array(z.string()),
   jobReferEmail: z.string().email().nullable(),
   inAppApplyAvailable: z.boolean(),
+  // Interest in the team itself rather than in one of its roles. Always
+  // present (0 / false when none, and false for anonymous requests).
+  interestedInTeamCount: z.number().int().min(0),
+  viewerIsInterestedInTeam: z.boolean(),
 });
 
 export const JobTeamGroupSchema = z.object({
@@ -154,3 +158,11 @@ export const JobOpeningInterestSchema = z.object({
 export const JobOpeningInterestListResponseSchema = z.object({
   interests: z.array(JobOpeningInterestSchema),
 });
+
+export const TeamInterestStatusSchema = z.object({
+  teamUid: z.string(),
+  interestedCount: z.number().int().min(0),
+  viewerIsInterested: z.boolean(),
+});
+
+export type TeamInterestStatus = z.infer<typeof TeamInterestStatusSchema>;

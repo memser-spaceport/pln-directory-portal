@@ -122,6 +122,13 @@ export class JobOpeningsController {
     return this.jobOpeningsInterestService.removeInterest(request.params.uid, request.userEmail);
   }
 
+  @Api(server.route.markTeamInterest)
+  @UseGuards(UserAuthValidateGuard)
+  @NoCache()
+  async markTeamInterest(@Req() request: Request & { userEmail?: string }) {
+    return this.jobOpeningsInterestService.markTeamInterest(request.params.uid, request.userEmail);
+  }
+
   // Schema.parse() throws a raw ZodError, which the global exception filter
   // doesn't recognize as an HttpException — it falls through to a generic
   // 500 instead of a 400. Route contract-schema parsing through here so

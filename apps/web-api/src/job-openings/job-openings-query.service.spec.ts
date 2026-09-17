@@ -158,6 +158,8 @@ describe('JobTeamSchema inAppApplyAvailable', () => {
     focusAreas: [],
     subFocusAreas: [],
     jobReferEmail: null as string | null,
+    interestedInTeamCount: 0,
+    viewerIsInterestedInTeam: false,
   };
 
   it('requires inAppApplyAvailable on the jobs-list team', () => {

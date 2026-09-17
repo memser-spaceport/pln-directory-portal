@@ -99,6 +99,7 @@ model Team {
   articles       Article[]           @relation("TeamArticles")
   jobOpenings    JobOpening[]
   integrationKeys IntegrationKey[]
+  teamInterests  TeamInterest[]
   jobEnrichment  TeamJobEnrichment?
   newsItems      TeamNewsItem[]
   newsEnrichment TeamNewsEnrichment?
@@ -274,6 +275,7 @@ model Member {
   jobReferralsReceived      JobReferral[]           @relation("JobReferralReferred")
   jobApplications           JobApplication[]
   jobOpeningInterests       JobOpeningInterest[]
+  teamInterests             TeamInterest[]
   integrationKeysCreated    IntegrationKey[]        @relation("IntegrationKeyCreatedBy")
   roadmapItemsCreated       RoadmapItem[]           @relation("roadmapItemCreatedBy")
   roadmapItemsPromoted      RoadmapItem[]           @relation("roadmapItemPromotedBy")
@@ -2430,10 +2432,12 @@ model JobApplication {
   ccEmails        String[]   @default([])
   sentAt          DateTime?
   createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
   @@unique([jobOpeningUid, memberUid])
   @@index([memberUid])
   @@index([jobOpeningUid])
+  @@index([updatedAt])
 }
 
 model JobOpeningInterest {
@@ -2444,10 +2448,31 @@ model JobOpeningInterest {
   memberUid     String
   member        Member     @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
   createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
   @@unique([jobOpeningUid, memberUid])
   @@index([jobOpeningUid])
   @@index([memberUid])
+  @@index([updatedAt])
+}
+
+/// A member telling a team "I would like to work here", with no job attached.
+/// Job-level interest is JobOpeningInterest; this is the team-level one, and it
+/// is what an integrated ATS files as a talent-pool entry rather than a candidacy.
+model TeamInterest {
+  id        Int      @id @default(autoincrement())
+  uid       String   @unique @default(cuid())
+  teamUid   String
+  team      Team     @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+  memberUid String
+  member    Member   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([teamUid, memberUid])
+  @@index([teamUid])
+  @@index([memberUid])
+  @@index([updatedAt])
 }
 
 model TeamJobEnrichment {

@@ -216,6 +216,32 @@ export class MemberCvImportsService {
     });
   }
 
+  /**
+   * Signed links for several members at once, for callers rendering a page of
+   * people: one query instead of one per member. Members without an uploaded
+   * CV are simply absent from the map.
+   */
+  async getSignedPreviewUrls(memberUids: string[]): Promise<Map<string, string>> {
+    if (memberUids.length === 0) {
+      return new Map();
+    }
+    const rows = await this.prisma.memberCvImport.findMany({
+      where: { memberUid: { in: memberUids }, uploadedAt: { not: null } },
+    });
+    const urls = new Map<string, string>();
+    for (const row of rows) {
+      urls.set(
+        row.memberUid,
+        await this.awsService.getSignedGetUrl(row.s3Bucket, row.s3Key, CV_PREVIEW_URL_TTL_SECONDS, {
+          disposition: 'inline',
+          filename: row.originalFilename,
+          contentType: 'application/pdf',
+        })
+      );
+    }
+    return urls;
+  }
+
   async apply(memberUid: string, body: unknown, requestorEmail: string) {
     await this.assertCanManage(memberUid, requestorEmail);
     const selection = this.parseApplyBody(body);

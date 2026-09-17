@@ -96,7 +96,13 @@ export class JobOpeningsForYouService {
       .slice(0, FOR_YOU_GROUP_LIMIT);
 
     const roleUids = rankedTeams.flatMap((roles) => roles.map((matched) => matched.role.uid));
-    const { counts, viewerInterested } = await this.queryService.loadInterestStamps(roleUids, member.uid);
+    const [{ counts, viewerInterested }, teamStamps] = await Promise.all([
+      this.queryService.loadInterestStamps(roleUids, member.uid),
+      this.queryService.loadTeamInterestStamps(
+        [...new Set(rankedTeams.map((roles) => (roles[0].role.team as NonNullable<CandidateJob['team']>).uid))],
+        member.uid
+      ),
+    ]);
 
     return {
       groups: rankedTeams.map((roles) => {
@@ -123,6 +129,8 @@ export class JobOpeningsForYouService {
               jobReferEmail: team.jobReferEmail,
               hasInactiveLeadEmails: team.hasInactiveLeadEmails,
             }),
+            interestedInTeamCount: teamStamps.counts.get(team.uid) ?? 0,
+            viewerIsInterestedInTeam: teamStamps.viewerInterested.has(team.uid),
           },
           // The MATCHED count, not the team's whole board: this card lists only
           // matched roles, so "View all N" has to count the set it is the tail of.
