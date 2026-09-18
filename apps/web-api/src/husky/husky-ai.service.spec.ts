@@ -24,6 +24,8 @@ import {
   encodeJsonStringFragment,
   HUSKY_SEARCH_FALLBACK_PROVIDER,
   HUSKY_SEARCH_PROVIDER_ENV_VAR,
+  HUSKY_SEARCH_STALL_TIMEOUT_ENV_VAR,
+  HUSKY_SEARCH_STALLED_NOTICE,
 } from './husky-ai.service';
 
 if (!(globalThis as any).ReadableStream) {
@@ -49,6 +51,21 @@ async function* failingChunks(parts: string[], error: Error) {
   throw error;
 }
 
+/**
+ * Yields `parts`, then goes silent the way a stalled provider connection does: the
+ * iterator settles only when the SDK-style abort signal fires.
+ */
+async function* stallingChunks(parts: string[], abortSignal: AbortSignal) {
+  for (const part of parts) {
+    yield part;
+  }
+  await new Promise((_, reject) => {
+    const fail = () => reject(Object.assign(new Error('This operation was aborted'), { name: 'AbortError' }));
+    if (abortSignal.aborted) fail();
+    else abortSignal.addEventListener('abort', fail, { once: true });
+  });
+}
+
 async function readAll(stream: ReadableStream<Uint8Array>): Promise<string> {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
@@ -72,6 +89,11 @@ const STRUCTURED = {
   sources: ['https://example.com/team'],
   actions: [{ name: 'Example Team', directoryLink: '/teams/abc', type: 'Team' }],
 };
+
+/** A streamText result: the answer chunks plus the finish reason the model reported. */
+function answerStream(parts: string[], finishReason = 'stop') {
+  return { textStream: chunks(parts), finishReason: Promise.resolve(finishReason) };
+}
 
 function structuredStream(parts: string[], object: Promise<unknown> = Promise.resolve(STRUCTURED)) {
   return { textStream: chunks(parts), object };
@@ -126,7 +148,7 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
   });
 
   it('resolves the model through the shared provider, pinned to Gemini without search grounding', async () => {
-    streamTextMock.mockReturnValue({ textStream: chunks(['Hello']) });
+    streamTextMock.mockReturnValue(answerStream(['Hello']));
     streamObjectMock.mockReturnValue(structuredStream(['{"followUpQuestions":[],"sources":[],"actions":[]}']));
 
     await readAll(await service.createContextualToolsResponse(chatInfo, false));
@@ -145,7 +167,7 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
   it('streams one valid JSON object even when the answer contains quotes, backslashes and newlines', async () => {
     prisma.member.findUnique.mockResolvedValue({ uid: 'member-1', deletedAt: null });
     const answer = 'Example Team builds "storage" tools.\nSee C:\\path for details.';
-    streamTextMock.mockReturnValue({ textStream: chunks([answer.slice(0, 20), answer.slice(20)]) });
+    streamTextMock.mockReturnValue(answerStream([answer.slice(0, 20), answer.slice(20)]));
     // Gemini may lead with whitespace and split the JSON arbitrarily across chunks.
     const json = JSON.stringify(STRUCTURED);
     streamObjectMock.mockReturnValue(structuredStream(['\n ', json.slice(0, 15), json.slice(15)]));
@@ -194,7 +216,7 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
   });
 
   it('keeps the streamed answer valid when the structured generation fails', async () => {
-    streamTextMock.mockReturnValue({ textStream: chunks(['Just the answer']) });
+    streamTextMock.mockReturnValue(answerStream(['Just the answer']));
     streamObjectMock.mockReturnValue({
       textStream: failingChunks([], new Error('schema mismatch')),
       object: Promise.reject(new Error('schema mismatch')),
@@ -230,8 +252,150 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
     expect(logger.error).toHaveBeenCalled();
   });
 
+  describe('when the answer is cut off', () => {
+    beforeEach(() => {
+      process.env[HUSKY_SEARCH_STALL_TIMEOUT_ENV_VAR] = '20';
+    });
+
+    afterEach(() => {
+      delete process.env[HUSKY_SEARCH_STALL_TIMEOUT_ENV_VAR];
+    });
+
+    it('continues a stalled answer from where it stopped, without tools, using the gathered context', async () => {
+      streamTextMock
+        .mockImplementationOnce(({ abortSignal, onStepFinish }) => {
+          onStepFinish({ finishReason: 'tool-calls', toolResults: [{ result: 'news item A' }], text: '' });
+          return { textStream: stallingChunks(['| Title |'], abortSignal), finishReason: new Promise(() => undefined) };
+        })
+        .mockReturnValueOnce(answerStream([' Event |\n| A | X |']));
+      streamObjectMock.mockReturnValue(structuredStream([JSON.stringify(STRUCTURED)]));
+
+      const raw = await readAll(await service.createContextualToolsResponse(chatInfo, false));
+      const parsed = HuskyResponseSchema.parse(JSON.parse(raw));
+
+      expect(parsed).toEqual({ content: '| Title | Event |\n| A | X |', ...STRUCTURED });
+      expect(streamTextMock).toHaveBeenCalledTimes(2);
+      expect(streamTextMock.mock.calls[0][0].abortSignal.aborted).toBe(true);
+      const continuation = streamTextMock.mock.calls[1][0];
+      expect(continuation.tools).toBeUndefined();
+      expect(continuation.prompt).toContain('partialAnswer: | Title |');
+      expect(continuation.prompt).toContain('context: news item A');
+      expect(streamObjectMock.mock.calls[0][0].prompt).toContain('content: | Title | Event |');
+      expect(streamObjectMock.mock.calls[0][0].prompt).toContain('context: news item A');
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('cut off after 9 chars'));
+
+      await flushBackgroundWork();
+      expect(persistent.create).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          contextual: [expect.objectContaining({ response: '| Title | Event |\n| A | X |' })],
+        })
+      );
+    });
+
+    it('drops the part of the continuation that restates the end of the partial answer', async () => {
+      const header = '| Title | Event Type |';
+      streamTextMock
+        .mockReturnValueOnce(answerStream([`## News\n\n${header}`], 'length'))
+        .mockReturnValueOnce(answerStream(['| Title |', ' Event Type |\n|---|---|', '\n| A | LAUNCH |']));
+      streamObjectMock.mockReturnValue(structuredStream([JSON.stringify(STRUCTURED)]));
+
+      const raw = await readAll(await service.createContextualToolsResponse(chatInfo, false));
+
+      expect(HuskyResponseSchema.parse(JSON.parse(raw)).content).toBe(
+        `## News\n\n${header}\n|---|---|\n| A | LAUNCH |`
+      );
+    });
+
+    it('treats any finish reason other than stop as cut off and continues', async () => {
+      streamTextMock
+        .mockReturnValueOnce(answerStream(['Half of the'], 'content-filter'))
+        .mockReturnValueOnce(answerStream([' answer.']));
+      streamObjectMock.mockReturnValue(structuredStream([JSON.stringify(STRUCTURED)]));
+
+      const raw = await readAll(await service.createContextualToolsResponse(chatInfo, false));
+
+      expect(HuskyResponseSchema.parse(JSON.parse(raw)).content).toBe('Half of the answer.');
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('finish reason "content-filter"'));
+    });
+
+    it('starts over with tools when the stall happened before any text or tool result', async () => {
+      streamTextMock
+        .mockImplementationOnce(({ abortSignal }) => ({
+          textStream: stallingChunks([], abortSignal),
+          finishReason: new Promise(() => undefined),
+        }))
+        .mockReturnValueOnce(answerStream(['Fresh answer']));
+      streamObjectMock.mockReturnValue(structuredStream([JSON.stringify(STRUCTURED)]));
+
+      const raw = await readAll(await service.createContextualToolsResponse(chatInfo, false));
+
+      expect(HuskyResponseSchema.parse(JSON.parse(raw)).content).toBe('Fresh answer');
+      expect(streamTextMock.mock.calls[1][0].tools).toBeDefined();
+      expect(streamTextMock.mock.calls[1][0].prompt).not.toContain('partialAnswer');
+    });
+
+    it('appends a notice and still closes the object when the continuation is cut off too', async () => {
+      streamTextMock
+        .mockImplementationOnce(({ abortSignal }) => ({
+          textStream: stallingChunks(['partial'], abortSignal),
+          finishReason: new Promise(() => undefined),
+        }))
+        .mockImplementationOnce(({ abortSignal }) => ({
+          textStream: stallingChunks([' more'], abortSignal),
+          finishReason: new Promise(() => undefined),
+        }));
+      streamObjectMock.mockReturnValue(structuredStream([JSON.stringify(STRUCTURED)]));
+
+      const raw = await readAll(await service.createContextualToolsResponse(chatInfo, false));
+
+      expect(HuskyResponseSchema.parse(JSON.parse(raw))).toEqual({
+        content: `partial more${HUSKY_SEARCH_STALLED_NOTICE}`,
+        ...STRUCTURED,
+      });
+      expect(streamTextMock).toHaveBeenCalledTimes(2);
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('cut off as well'));
+    });
+
+    it('closes the object with empty fields when the structured stream stalls before any JSON', async () => {
+      streamTextMock.mockReturnValue(answerStream(['Full answer']));
+      streamObjectMock.mockImplementation(({ abortSignal }) => ({
+        textStream: stallingChunks([], abortSignal),
+        object: new Promise(() => undefined),
+      }));
+
+      const raw = await readAll(await service.createContextualToolsResponse(chatInfo, false));
+
+      expect(HuskyResponseSchema.parse(JSON.parse(raw))).toEqual({
+        content: 'Full answer',
+        followUpQuestions: [],
+        sources: [],
+        actions: [],
+      });
+      expect(streamObjectMock.mock.calls[0][0].abortSignal.aborted).toBe(true);
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('stalled'));
+    });
+
+    it('does not wait forever on an object promise that never settles after the stream ended', async () => {
+      streamTextMock.mockReturnValue(answerStream(['Full answer']));
+      streamObjectMock.mockReturnValue({
+        textStream: chunks([]),
+        object: new Promise(() => undefined),
+      });
+
+      const raw = await readAll(await service.createContextualToolsResponse(chatInfo, false));
+
+      expect(HuskyResponseSchema.parse(JSON.parse(raw))).toEqual({
+        content: 'Full answer',
+        followUpQuestions: [],
+        sources: [],
+        actions: [],
+      });
+    });
+  });
+
   it('records a handed-over first exchange under its own chat id before answering', async () => {
-    streamTextMock.mockReturnValue({ textStream: chunks(['Follow-up answer']) });
+    streamTextMock.mockReturnValue(answerStream(['Follow-up answer']));
     streamObjectMock.mockReturnValue(structuredStream(['{"followUpQuestions":[],"sources":[],"actions":[]}']));
 
     const handedOver = {
