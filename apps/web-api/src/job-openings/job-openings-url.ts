@@ -22,6 +22,11 @@ export const JOB_APPLICATION_EMAIL_UTM_SOURCE = 'job_application_email';
  * the send. `content` says whose card the link was on, since the referral
  * email carries both the referrer's and the referred person's.
  */
+/** A member's profile page, untagged — for API responses rather than emails. */
+export function memberProfileUrl(memberUid: string): string {
+  return `${webUiBase()}/members/${encodeURIComponent(memberUid)}`;
+}
+
 export function memberProfileEmailUrl(memberUid: string, utm: EmailUtm): string {
   return `${webUiBase()}/members/${encodeURIComponent(memberUid)}?${emailUtmQuery(utm)}`;
 }
@@ -45,7 +50,8 @@ function emailUtmQuery(utm: EmailUtm): string {
   }).toString();
 }
 
-function webUiBase(): string {
+/** The Directory's public base URL, for links handed to people and to integrations. */
+export function webUiBase(): string {
   const base = process.env.WEB_UI_BASE_URL || process.env.APPLICATION_BASE_URL;
   if (!base) {
     throw new Error('WEB_UI_BASE_URL or APPLICATION_BASE_URL must be set');

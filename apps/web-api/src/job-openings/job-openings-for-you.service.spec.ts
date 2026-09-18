@@ -10,6 +10,7 @@ type MemberRow = {
   role: string | null;
   deletedAt: Date | null;
   skills: Array<{ title: string }>;
+  customSkills: string[];
   experiences: Array<{ title: string }>;
   teamMemberRoles: Array<{ teamUid: string; role: string | null }>;
 };
@@ -19,6 +20,7 @@ const member = (overrides: Partial<MemberRow> = {}): MemberRow => ({
   role: null,
   deletedAt: null,
   skills: [],
+  customSkills: [],
   experiences: [],
   teamMemberRoles: [],
   ...overrides,
@@ -66,6 +68,7 @@ const build = ({ memberRow, jobs }: { memberRow: MemberRow | null; jobs: ReturnT
   } as unknown as PrismaService;
   const queryService = {
     loadInterestStamps: jest.fn().mockResolvedValue({ counts: new Map(), viewerInterested: new Set() }),
+    loadTeamInterestStamps: jest.fn().mockResolvedValue({ counts: new Map(), viewerInterested: new Set() }),
   } as unknown as JobOpeningsQueryService;
   return {
     service: new JobOpeningsForYouService(prisma, queryService),

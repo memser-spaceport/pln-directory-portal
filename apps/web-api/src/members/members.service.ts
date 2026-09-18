@@ -1141,6 +1141,66 @@ export class MembersService {
     return isEmailChanged;
   }
 
+  private static readonly CUSTOM_SKILL_MAX_LENGTH = 64;
+
+  private normalizeCustomSkillTitles(titles: string[]): string[] {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const raw of titles) {
+      const title = raw.trim();
+      if (!title || title.length > MembersService.CUSTOM_SKILL_MAX_LENGTH) continue;
+      const key = title.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push(title);
+    }
+    return result;
+  }
+
+  private async resolveCustomSkills(
+    tx: Prisma.TransactionClient,
+    customTitles: string[],
+    existingSkillUids: string[]
+  ): Promise<{ skillUids: string[]; customSkills: string[] }> {
+    const normalized = this.normalizeCustomSkillTitles(customTitles);
+    const skillUids = [...existingSkillUids];
+    const uidSet = new Set(existingSkillUids);
+    const catalogTitlesLower = new Set<string>();
+
+    if (skillUids.length > 0) {
+      const catalogSkills = await tx.skill.findMany({
+        where: { uid: { in: skillUids } },
+        select: { uid: true, title: true },
+      });
+      for (const skill of catalogSkills) {
+        catalogTitlesLower.add(skill.title.toLowerCase());
+      }
+    }
+
+    const customSkills: string[] = [];
+    for (const title of normalized) {
+      const titleLower = title.toLowerCase();
+      if (catalogTitlesLower.has(titleLower)) continue;
+
+      const catalogMatch = await tx.skill.findFirst({
+        where: { title: { equals: title, mode: 'insensitive' } },
+        select: { uid: true, title: true },
+      });
+
+      if (catalogMatch) {
+        if (!uidSet.has(catalogMatch.uid)) {
+          uidSet.add(catalogMatch.uid);
+          skillUids.push(catalogMatch.uid);
+          catalogTitlesLower.add(catalogMatch.title.toLowerCase());
+        }
+      } else {
+        customSkills.push(title);
+      }
+    }
+
+    return { skillUids, customSkills };
+  }
+
   /**
    * prepare member data for creation or update
    *
@@ -1193,10 +1253,18 @@ export class MembersService {
       : type === 'Update'
       ? { disconnect: true }
       : undefined;
+    let skillUids: string[] = [];
     if (Array.isArray(memberData.skills)) {
       memberData.skills = memberData.skills
         .map((skill: any) => (typeof skill === 'string' ? { uid: skill } : skill))
         .filter((skill: any) => skill?.uid);
+      skillUids = memberData.skills.map((skill: any) => skill.uid);
+    }
+
+    if (Array.isArray(memberData.customSkills)) {
+      const resolved = await this.resolveCustomSkills(tx, memberData.customSkills, skillUids);
+      memberData.skills = resolved.skillUids.map((uid) => ({ uid }));
+      member.customSkills = resolved.customSkills;
     }
 
     member['skills'] = buildMultiRelationMapping('skills', memberData, type);
@@ -2138,7 +2206,7 @@ export class MembersService {
 
       // Get member IDs that match ohInterest/ohHelpWith topics using raw SQL
       if (topicsArray.length > 0) {
-        const [ohInterestMemberIds, ohHelpWithMemberIds] = await Promise.all([
+        const [ohInterestMemberIds, ohHelpWithMemberIds, customSkillsMemberIds] = await Promise.all([
           this.prisma.$queryRaw<{ id: number }[]>`
             SELECT DISTINCT id FROM "Member"
             WHERE ${Prisma.raw(
@@ -2169,11 +2237,27 @@ export class MembersService {
                 .join(' OR ')
             )}
           `,
+          this.prisma.$queryRaw<{ id: number }[]>`
+            SELECT DISTINCT id FROM "Member"
+            WHERE ${Prisma.raw(
+              topicsArray
+                .map(
+                  (topic) => `
+                  EXISTS (
+                    SELECT 1 FROM unnest("customSkills") AS skill_item
+                    WHERE LOWER(skill_item) LIKE LOWER('%${topic.replace(/'/g, "''")}%')
+                  )
+                `
+                )
+                .join(' OR ')
+            )}
+          `,
         ]);
 
         const allOhMemberIds = [
           ...ohInterestMemberIds.map((row) => row.id),
           ...ohHelpWithMemberIds.map((row) => row.id),
+          ...customSkillsMemberIds.map((row) => row.id),
         ];
 
         if (allOhMemberIds.length > 0) {
@@ -2774,7 +2858,7 @@ export class MembersService {
       let ohMemberIds: number[] = [];
       if (query.trim()) {
         // Get member IDs that match the search query in ohInterest or ohHelpWith
-        const [ohInterestIds, ohHelpWithIds] = await Promise.all([
+        const [ohInterestIds, ohHelpWithIds, customSkillsIds] = await Promise.all([
           this.prisma.$queryRaw<{ id: number }[]>`
             SELECT DISTINCT id FROM "Member"
             WHERE EXISTS (
@@ -2789,9 +2873,20 @@ export class MembersService {
               WHERE LOWER(help_item) LIKE LOWER(${`%${searchQuery}%`})
             )
           `,
+          this.prisma.$queryRaw<{ id: number }[]>`
+            SELECT DISTINCT id FROM "Member"
+            WHERE EXISTS (
+              SELECT 1 FROM unnest("customSkills") AS skill_item
+              WHERE LOWER(skill_item) LIKE LOWER(${`%${searchQuery}%`})
+            )
+          `,
         ]);
 
-        ohMemberIds = [...ohInterestIds.map((row) => row.id), ...ohHelpWithIds.map((row) => row.id)];
+        ohMemberIds = [
+          ...ohInterestIds.map((row) => row.id),
+          ...ohHelpWithIds.map((row) => row.id),
+          ...customSkillsIds.map((row) => row.id),
+        ];
       }
 
       const ohDataPromise = this.prisma.member.findMany({
@@ -2816,6 +2911,11 @@ export class MembersService {
                   isEmpty: false,
                 },
               },
+              {
+                customSkills: {
+                  isEmpty: false,
+                },
+              },
             ],
           }),
         },
@@ -2823,6 +2923,7 @@ export class MembersService {
           uid: true,
           ohInterest: true,
           ohHelpWith: true,
+          customSkills: true,
         },
       });
 
@@ -2876,6 +2977,18 @@ export class MembersService {
           // If no query, include all topics; if query, filter by it
           if (!query.trim() || help.toLowerCase().includes(searchQuery)) {
             const topic = help.toLowerCase();
+            if (!topicMemberSets.has(topic)) {
+              topicMemberSets.set(topic, new Set());
+            }
+            const memberSet = topicMemberSets.get(topic);
+            if (memberSet) {
+              memberSet.add(member.uid);
+            }
+          }
+        });
+        member.customSkills.forEach((skill) => {
+          if (!query.trim() || skill.toLowerCase().includes(searchQuery)) {
+            const topic = skill.toLowerCase();
             if (!topicMemberSets.has(topic)) {
               topicMemberSets.set(topic, new Set());
             }

@@ -37,6 +37,7 @@ const newDataMemberSchema = z.object({
   plnStartDate: z.string().optional().nullable(),
   teamAndRoles: z.array(teamMappingSchema).optional(),
   skills: z.array(skillsMappingSchema).optional(),
+  customSkills: z.array(z.string()).optional(),
   city: z.string().optional().nullable(),
   country: z.string().optional().nullable(),
   region: z.string().optional().nullable(),

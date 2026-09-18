@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Controller,
+  Delete,
   HttpCode,
   HttpStatus,
   Param,
@@ -61,5 +62,16 @@ export class MemberCvImportsController {
     @Req() req: { userEmail?: string }
   ) {
     return this.memberCvImportsService.apply(uid, body, req.userEmail!);
+  }
+
+  @Api(server.route.deleteMemberCvImport)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @NoCache()
+  @UseGuards(UserTokenValidation)
+  async remove(
+    @ApiDecorator() { params: { uid } }: RouteShape['deleteMemberCvImport'],
+    @Req() req: { userEmail?: string }
+  ) {
+    await this.memberCvImportsService.remove(uid, req.userEmail!);
   }
 }

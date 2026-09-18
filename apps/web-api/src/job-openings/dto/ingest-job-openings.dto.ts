@@ -32,6 +32,8 @@ export interface JobOpeningIngestItem {
   needsReview?: string;
   notes?: string;
   portfolio?: string;
+  /** Ownership the caller claims for the row. This endpoint is the crawler's, so only 'ENRICHMENT' is accepted. */
+  managedBy?: string;
 }
 
 export interface IngestJobOpeningsDto {
@@ -44,6 +46,10 @@ export interface IngestJobOpeningsResponse {
   received: number;
   created: number;
   updated: number;
+  /** Items whose existing row is owned by another system (INTEGRATION or MANUAL). Never written. */
+  skipped: number;
   failed: number;
   errors?: string[];
+  /** One `<reason>: <dedupKey>` entry per skipped item. */
+  skippedReasons: string[];
 }

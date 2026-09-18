@@ -1,3 +1,5 @@
+jest.mock('../integration-keys/ats-push.service', () => ({ AtsPushService: class AtsPushService {} }));
+
 import { NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { JobOpeningStatus } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
@@ -24,7 +26,9 @@ describe('JobOpeningsInterestService', () => {
     },
   } as unknown as PrismaService;
 
-  beforeEach(() => {
+const atsPushMock = { pushJobInterest: jest.fn(), pushTeamInterest: jest.fn() };
+
+    beforeEach(() => {
     jest.clearAllMocks();
     memberFindUnique.mockResolvedValue({ uid: 'member-1', deletedAt: null });
     jobOpeningFindUnique.mockResolvedValue({
@@ -35,11 +39,11 @@ describe('JobOpeningsInterestService', () => {
       teamUid: 'team-1',
       team: { uid: 'team-1', name: 'Acme', jobReferEmail: null, jobReferCcEmails: [] },
     });
-    interestUpsert.mockResolvedValue({});
+    interestUpsert.mockResolvedValue({ uid: 'interest-1' });
     interestDeleteMany.mockResolvedValue({ count: 1 });
     interestCount.mockResolvedValue(2);
     interestFindMany.mockResolvedValue([]);
-    service = new JobOpeningsInterestService(prismaMock);
+    service = new JobOpeningsInterestService(prismaMock, atsPushMock as never);
   });
 
   describe('markInterest', () => {
@@ -69,6 +73,7 @@ describe('JobOpeningsInterestService', () => {
         where: { jobOpeningUid_memberUid: { jobOpeningUid: 'job-1', memberUid: 'member-1' } },
         create: { jobOpeningUid: 'job-1', memberUid: 'member-1' },
         update: {},
+        select: { uid: true },
       });
       expect(result).toEqual({ jobUid: 'job-1', interestedCount: 2, viewerIsInterested: true });
     });

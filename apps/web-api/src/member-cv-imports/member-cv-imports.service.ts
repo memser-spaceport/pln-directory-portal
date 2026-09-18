@@ -26,6 +26,7 @@ import { MembersService } from '../members/members.service';
 import {
   CV_IMPORT_MAX_TEXT_CHARS,
   CV_IMPORT_S3_PREFIX,
+  CV_PREVIEW_URL_TTL_SECONDS,
   MEMBER_CV_PARSE_AI_PROVIDER_ENV,
   YEAR_MONTH_REGEX,
 } from './member-cv-imports.constants';
@@ -37,6 +38,13 @@ type MulterFile = {
   mimetype: string;
   originalname: string;
   size: number;
+};
+
+export type MemberCvFile = {
+  fileName: string;
+  size?: number;
+  uploadedAt: string;
+  url?: string;
 };
 
 @Injectable()
@@ -65,6 +73,8 @@ export class MemberCvImportsService {
     const importUid = randomUUID();
     const s3Key = `${CV_IMPORT_S3_PREFIX}/${importUid}.pdf`;
     const originalFilename = file.originalname || 'cv.pdf';
+    const uploadedAt = new Date();
+    const fileSizeBytes = file.size;
 
     await this.awsService.uploadFileToS3({ buffer: file.buffer, mimetype: 'application/pdf' }, bucket, s3Key);
 
@@ -78,6 +88,8 @@ export class MemberCvImportsService {
           originalFilename,
           s3Bucket: bucket,
           s3Key,
+          fileSizeBytes,
+          uploadedAt,
           payload: Prisma.DbNull,
           errorCode: null,
           errorMessage: null,
@@ -97,6 +109,8 @@ export class MemberCvImportsService {
           originalFilename,
           s3Bucket: bucket,
           s3Key,
+          fileSizeBytes,
+          uploadedAt,
         },
       });
     }
@@ -109,7 +123,7 @@ export class MemberCvImportsService {
   }
 
   async getLatest(memberUid: string, requestorEmail: string) {
-    await this.assertCanManage(memberUid, requestorEmail);
+    await this.assertCanView(memberUid, requestorEmail);
     const row = await this.prisma.memberCvImport.findUnique({ where: { memberUid } });
     if (!row) {
       throw new NotFoundException('No CV import found for this member');
@@ -119,6 +133,7 @@ export class MemberCvImportsService {
       uid: string;
       status: MemberCvImportStatus;
       originalFilename: string;
+      file?: MemberCvFile;
       payload?: ParsedCvProfile;
       error?: { code: string; message: string };
     } = {
@@ -126,6 +141,25 @@ export class MemberCvImportsService {
       status: row.status,
       originalFilename: row.originalFilename,
     };
+
+    if (row.uploadedAt) {
+      response.file = {
+        fileName: row.originalFilename,
+        uploadedAt: row.uploadedAt.toISOString(),
+      };
+      if (row.fileSizeBytes != null) {
+        response.file.size = row.fileSizeBytes;
+      }
+      try {
+        response.file.url = await this.awsService.getSignedGetUrl(row.s3Bucket, row.s3Key, CV_PREVIEW_URL_TTL_SECONDS, {
+          disposition: 'inline',
+          filename: row.originalFilename,
+          contentType: 'application/pdf',
+        });
+      } catch (error) {
+        this.logger.error(`Failed to sign CV preview URL for ${row.uid}: ${error}`);
+      }
+    }
 
     if (row.status === MemberCvImportStatus.SUCCEEDED && row.payload) {
       response.payload = row.payload as ParsedCvProfile;
@@ -138,6 +172,74 @@ export class MemberCvImportsService {
     }
 
     return response;
+  }
+
+  async remove(memberUid: string, requestorEmail: string) {
+    await this.assertCanManage(memberUid, requestorEmail);
+    const row = await this.prisma.memberCvImport.findUnique({ where: { memberUid } });
+    if (!row) {
+      throw new NotFoundException('No CV import found for this member');
+    }
+
+    await this.prisma.memberCvImport.delete({ where: { memberUid } });
+    await this.awsService.deleteObjectFromS3(row.s3Bucket, row.s3Key).catch((error) => {
+      this.logger.error(`Failed to delete CV object ${row.s3Key}: ${error}`);
+    });
+  }
+
+  async getCurrentCv(memberUid: string): Promise<(MemberCvFile & { s3Bucket: string; s3Key: string }) | null> {
+    const row = await this.prisma.memberCvImport.findUnique({ where: { memberUid } });
+    if (!row || !row.uploadedAt) {
+      return null;
+    }
+    const file: MemberCvFile & { s3Bucket: string; s3Key: string } = {
+      fileName: row.originalFilename,
+      uploadedAt: row.uploadedAt.toISOString(),
+      s3Bucket: row.s3Bucket,
+      s3Key: row.s3Key,
+    };
+    if (row.fileSizeBytes != null) {
+      file.size = row.fileSizeBytes;
+    }
+    return file;
+  }
+
+  async getSignedPreviewUrl(memberUid: string): Promise<string | null> {
+    const row = await this.prisma.memberCvImport.findUnique({ where: { memberUid } });
+    if (!row || !row.uploadedAt) {
+      return null;
+    }
+    return this.awsService.getSignedGetUrl(row.s3Bucket, row.s3Key, CV_PREVIEW_URL_TTL_SECONDS, {
+      disposition: 'inline',
+      filename: row.originalFilename,
+      contentType: 'application/pdf',
+    });
+  }
+
+  /**
+   * Signed links for several members at once, for callers rendering a page of
+   * people: one query instead of one per member. Members without an uploaded
+   * CV are simply absent from the map.
+   */
+  async getSignedPreviewUrls(memberUids: string[]): Promise<Map<string, string>> {
+    if (memberUids.length === 0) {
+      return new Map();
+    }
+    const rows = await this.prisma.memberCvImport.findMany({
+      where: { memberUid: { in: memberUids }, uploadedAt: { not: null } },
+    });
+    const urls = new Map<string, string>();
+    for (const row of rows) {
+      urls.set(
+        row.memberUid,
+        await this.awsService.getSignedGetUrl(row.s3Bucket, row.s3Key, CV_PREVIEW_URL_TTL_SECONDS, {
+          disposition: 'inline',
+          filename: row.originalFilename,
+          contentType: 'application/pdf',
+        })
+      );
+    }
+    return urls;
   }
 
   async apply(memberUid: string, body: unknown, requestorEmail: string) {
@@ -157,7 +259,12 @@ export class MemberCvImportsService {
 
     const member = await this.prisma.member.findUnique({
       where: { uid: memberUid },
-      include: { skills: { select: { uid: true, title: true } } },
+      select: {
+        role: true,
+        locationUid: true,
+        customSkills: true,
+        skills: { select: { uid: true, title: true } },
+      },
     });
     if (!member) {
       throw new NotFoundException('Member not found');
@@ -168,19 +275,30 @@ export class MemberCvImportsService {
     const skillsAdded: string[] = [];
     let locationApplied = false;
     const experiencesToCreate = selection.experiences.filter(
-      (experience) => experience.title.trim() && experience.company.trim() && YEAR_MONTH_REGEX.test(experience.startDate)
+      (experience) =>
+        experience.title.trim() && experience.company.trim() && YEAR_MONTH_REGEX.test(experience.startDate)
     );
 
     await this.prisma.$transaction(async (tx) => {
-      const skillConnect = await this.unionSkills(tx, member.skills, selection.skills);
-      skillsAdded.push(...skillConnect.addedTitles);
+      const skillUnion = await this.unionSkills(
+        tx,
+        member.skills ?? [],
+        member.customSkills ?? [],
+        selection.skills ?? []
+      );
+      skillsAdded.push(...skillUnion.addedTitles, ...skillUnion.customSkillsToAdd);
 
       const memberUpdate: Prisma.MemberUpdateInput = {};
       if (shouldFillRole) {
         memberUpdate.role = selection.role.trim();
       }
-      if (skillConnect.connect.length > 0) {
-        memberUpdate.skills = { connect: skillConnect.connect };
+      if (skillUnion.connect.length > 0) {
+        memberUpdate.skills = { connect: skillUnion.connect };
+      }
+      if (skillUnion.customSkillsToAdd.length > 0) {
+        memberUpdate.customSkills = {
+          set: [...(member.customSkills ?? []), ...skillUnion.customSkillsToAdd],
+        };
       }
       if (shouldFillLocation) {
         const locationUid = await this.resolveLocationUid(tx, selection.location.trim());
@@ -295,6 +413,34 @@ export class MemberCvImportsService {
     return requestor;
   }
 
+  /**
+   * Reading is wider than managing: a team lead also sees the CV of a member
+   * who applied to one of their team's job openings, since that is the CV the
+   * application was made with.
+   */
+  private async assertCanView(memberUid: string, requestorEmail: string) {
+    const requestor = await this.membersService.findMemberByEmail(requestorEmail);
+    if (!requestor) {
+      throw new NotFoundException(`Requestor not found for ${requestorEmail}`);
+    }
+    if (memberUid === requestor.uid || requestor.isDirectoryAdmin) {
+      return requestor;
+    }
+
+    const leadingTeams: string[] = requestor.leadingTeams ?? [];
+    const application =
+      leadingTeams.length > 0
+        ? await this.prisma.jobApplication.findFirst({
+            where: { memberUid, jobOpening: { teamUid: { in: leadingTeams } } },
+            select: { uid: true },
+          })
+        : null;
+    if (!application) {
+      throw new ForbiddenException(`Member isn't authorized to view the CV`);
+    }
+    return requestor;
+  }
+
   private async assertMemberExists(memberUid: string) {
     const member = await this.prisma.member.findUnique({ where: { uid: memberUid }, select: { uid: true } });
     if (!member) {
@@ -315,46 +461,45 @@ export class MemberCvImportsService {
 
   private async unionSkills(
     tx: Prisma.TransactionClient,
-    existing: Array<{ uid: string; title: string }>,
-    titles: string[]
-  ): Promise<{ connect: Array<{ uid: string }>; addedTitles: string[] }> {
+    existing: Array<{ uid: string; title: string }> = [],
+    existingCustomSkills: string[] = [],
+    titles: string[] = []
+  ): Promise<{ connect: Array<{ uid: string }>; addedTitles: string[]; customSkillsToAdd: string[] }> {
     const existingUids = new Set(existing.map((skill) => skill.uid));
     const connect: Array<{ uid: string }> = [];
     const addedTitles: string[] = [];
+    const customSkillsToAdd: string[] = [];
     const seen = new Set<string>();
+    const haveTitlesLower = new Set([
+      ...existing.map((skill) => skill.title.toLowerCase()),
+      ...existingCustomSkills.map((skill) => skill.toLowerCase()),
+    ]);
 
     for (const raw of titles) {
       const title = raw.trim();
       if (!title) continue;
       const key = title.toLowerCase();
-      if (seen.has(key)) continue;
+      if (seen.has(key) || haveTitlesLower.has(key)) continue;
       seen.add(key);
 
-      let skill = await tx.skill.findFirst({
+      const skill = await tx.skill.findFirst({
         where: { title: { equals: title, mode: 'insensitive' } },
         select: { uid: true, title: true },
       });
-      if (!skill) {
-        try {
-          skill = await tx.skill.create({ data: { title }, select: { uid: true, title: true } });
-        } catch (error) {
-          if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-            skill = await tx.skill.findFirst({
-              where: { title: { equals: title, mode: 'insensitive' } },
-              select: { uid: true, title: true },
-            });
-          } else {
-            throw error;
-          }
+      if (skill) {
+        if (!existingUids.has(skill.uid)) {
+          existingUids.add(skill.uid);
+          connect.push({ uid: skill.uid });
+          addedTitles.push(skill.title);
+          haveTitlesLower.add(skill.title.toLowerCase());
         }
+      } else {
+        customSkillsToAdd.push(title);
+        haveTitlesLower.add(key);
       }
-      if (!skill || existingUids.has(skill.uid)) continue;
-      existingUids.add(skill.uid);
-      connect.push({ uid: skill.uid });
-      addedTitles.push(skill.title);
     }
 
-    return { connect, addedTitles };
+    return { connect, addedTitles, customSkillsToAdd };
   }
 
   private async resolveLocationUid(tx: Prisma.TransactionClient, location: string): Promise<string | null> {

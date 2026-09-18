@@ -4,7 +4,7 @@ import { Request } from 'express';
 import { ZodError, ZodType } from 'zod';
 import { apiJobOpenings } from 'libs/contracts/src/lib/contract-job-openings';
 import { CreateJobApplicationSchema, JobBoardSignUpSchema } from 'libs/contracts/src/schema/job-application';
-import { JobsListQueryParams } from 'libs/contracts/src/schema/job-opening';
+import { JobsListQueryParams, MarkTeamInterestSchema } from 'libs/contracts/src/schema/job-opening';
 import { CreateJobReferralSchema, JobReferralDraftQuerySchema } from 'libs/contracts/src/schema/job-referral';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserAuthValidateGuard } from '../guards/user-auth-validate.guard';
@@ -120,6 +120,14 @@ export class JobOpeningsController {
   @NoCache()
   async removeJobInterest(@Req() request: Request & { userEmail?: string }) {
     return this.jobOpeningsInterestService.removeInterest(request.params.uid, request.userEmail);
+  }
+
+  @Api(server.route.markTeamInterest)
+  @UseGuards(UserAuthValidateGuard)
+  @NoCache()
+  async markTeamInterest(@Req() request: Request & { userEmail?: string }) {
+    const input = this.parse(MarkTeamInterestSchema, request.body ?? {});
+    return this.jobOpeningsInterestService.markTeamInterest(request.params.uid, request.userEmail, input);
   }
 
   // Schema.parse() throws a raw ZodError, which the global exception filter

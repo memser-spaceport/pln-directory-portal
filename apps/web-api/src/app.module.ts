@@ -86,6 +86,7 @@ import { FounderSourcingModule } from './founder-sourcing/founder-sourcing.modul
 import { AffinityModule } from './affinity/affinity.module';
 import { RoadmapModule } from './roadmap/roadmap.module';
 import { AiAppsModule } from './ai-apps/ai-apps.module';
+import { IntegrationKeysModule } from './integration-keys/integration-keys.module';
 import { AgentSessionsModule } from './agent-sessions/agent-sessions.module';
 import { McpModule } from './mcp/mcp.module';
 
@@ -194,6 +195,7 @@ import { McpModule } from './mcp/mcp.module';
     AffinityModule,
     RoadmapModule,
     AiAppsModule,
+    IntegrationKeysModule,
     AgentSessionsModule,
     McpModule,
   ],

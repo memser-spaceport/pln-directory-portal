@@ -37,6 +37,7 @@ const extractPdfTextMock = extractPdfText as jest.MockedFunction<typeof extractP
 
 const OWNER = { uid: 'member-1', isDirectoryAdmin: false };
 const ADMIN = { uid: 'admin-1', isDirectoryAdmin: true };
+const TEAM_LEAD = { uid: 'lead-1', isDirectoryAdmin: false, leadingTeams: ['team-1'] };
 const PDF_BUFFER = Buffer.concat([Buffer.from('%PDF-1.4\n'), Buffer.from('fake-pdf-body')]);
 const PDF_FILE = {
   buffer: PDF_BUFFER,
@@ -52,10 +53,12 @@ describe('MemberCvImportsService', () => {
   const cvCreate = jest.fn();
   const cvUpdate = jest.fn();
   const cvUpdateMany = jest.fn();
+  const cvDelete = jest.fn();
   const skillFindFirst = jest.fn();
   const skillCreate = jest.fn();
   const locationUpsert = jest.fn();
   const experienceCreate = jest.fn();
+  const jobApplicationFindFirst = jest.fn();
   const transaction = jest.fn();
 
   const prisma = {
@@ -65,16 +68,20 @@ describe('MemberCvImportsService', () => {
       create: cvCreate,
       update: cvUpdate,
       updateMany: cvUpdateMany,
+      delete: cvDelete,
     },
     skill: { findFirst: skillFindFirst, create: skillCreate },
     location: { upsert: locationUpsert },
     memberExperience: { create: experienceCreate },
+    jobApplication: { findFirst: jobApplicationFindFirst },
     $transaction: transaction,
   } as unknown as PrismaService;
 
   const awsService = {
     uploadFileToS3: jest.fn().mockResolvedValue({ Location: '' }),
     deleteObjectFromS3: jest.fn().mockResolvedValue(undefined),
+    getSignedGetUrl: jest.fn().mockResolvedValue('https://signed.example/cv.pdf'),
+    getObjectBuffer: jest.fn().mockResolvedValue(Buffer.from('pdf-bytes')),
   } as unknown as AwsService;
 
   const aiProvider = {
@@ -104,6 +111,7 @@ describe('MemberCvImportsService', () => {
     cvCreate.mockResolvedValue({});
     cvUpdate.mockResolvedValue({});
     cvUpdateMany.mockResolvedValue({ count: 1 });
+    jobApplicationFindFirst.mockResolvedValue(null);
     transaction.mockImplementation(async (fn: (tx: typeof prisma) => Promise<unknown>) => fn(prisma));
     service = new MemberCvImportsService(
       prisma,
@@ -166,6 +174,41 @@ describe('MemberCvImportsService', () => {
 
       expect(cvUpdate).toHaveBeenCalled();
       expect(awsService.deleteObjectFromS3).toHaveBeenCalledWith('test-uploads', 'cvs/old.pdf');
+    });
+
+    it('stamps fileSizeBytes and uploadedAt on upload', async () => {
+      jest.spyOn(service, 'runParse').mockResolvedValue(undefined);
+
+      await service.upload('member-1', PDF_FILE, 'owner@example.com');
+
+      expect(cvCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            fileSizeBytes: PDF_FILE.size,
+            uploadedAt: expect.any(Date),
+          }),
+        })
+      );
+    });
+
+    it('stamps fileSizeBytes and uploadedAt on replace', async () => {
+      jest.spyOn(service, 'runParse').mockResolvedValue(undefined);
+      cvFindUnique.mockResolvedValue({
+        uid: 'old-uid',
+        s3Bucket: 'test-uploads',
+        s3Key: 'cvs/old.pdf',
+      });
+
+      await service.upload('member-1', PDF_FILE, 'owner@example.com');
+
+      expect(cvUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            fileSizeBytes: PDF_FILE.size,
+            uploadedAt: expect.any(Date),
+          }),
+        })
+      );
     });
   });
 
@@ -281,14 +324,16 @@ describe('MemberCvImportsService', () => {
 
     beforeEach(() => {
       cvFindUnique.mockResolvedValue(succeededImport);
-      memberFindUnique.mockImplementation((args: { select?: { role?: boolean } }) => {
-        if (args?.select?.role) {
+      memberFindUnique.mockImplementation((args: { select?: Record<string, unknown> }) => {
+        const select = args?.select ?? {};
+        if (Object.keys(select).length === 1 && select.role) {
           return Promise.resolve({ role: 'Engineer' });
         }
         return Promise.resolve({
           uid: 'member-1',
           role: null,
           locationUid: null,
+          customSkills: [],
           skills: [{ uid: 'skill-go', title: 'Go' }],
         });
       });
@@ -329,10 +374,11 @@ describe('MemberCvImportsService', () => {
           data: expect.objectContaining({
             role: 'Engineer',
             location: { connect: { uid: 'loc-berlin' } },
-            skills: { connect: [{ uid: 'skill-rust' }] },
+            customSkills: { set: ['Rust'] },
           }),
         })
       );
+      expect(skillCreate).not.toHaveBeenCalled();
       expect(experienceCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -359,10 +405,10 @@ describe('MemberCvImportsService', () => {
         uid: 'member-1',
         role: 'Founder',
         locationUid: 'loc-existing',
+        customSkills: [],
         skills: [],
       });
       skillFindFirst.mockResolvedValue(null);
-      skillCreate.mockResolvedValue({ uid: 'skill-rust', title: 'Rust' });
 
       await service.apply('member-1', applyBody, 'owner@example.com');
 
@@ -441,6 +487,143 @@ describe('MemberCvImportsService', () => {
     it('404s when the member has never uploaded', async () => {
       cvFindUnique.mockResolvedValue(null);
       await expect(service.getLatest('member-1', 'owner@example.com')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('includes a signed file URL when a CV exists', async () => {
+      const uploadedAt = new Date('2026-09-01T10:00:00.000Z');
+      cvFindUnique.mockResolvedValue({
+        uid: 'import-1',
+        status: MemberCvImportStatus.SUCCEEDED,
+        originalFilename: 'cv.pdf',
+        s3Bucket: 'test-uploads',
+        s3Key: 'cvs/import-1.pdf',
+        fileSizeBytes: 1024,
+        uploadedAt,
+        payload: { role: 'Engineer' },
+      });
+
+      const result = await service.getLatest('member-1', 'owner@example.com');
+
+      expect(result.file).toEqual({
+        fileName: 'cv.pdf',
+        size: 1024,
+        uploadedAt: uploadedAt.toISOString(),
+        url: 'https://signed.example/cv.pdf',
+      });
+      expect(awsService.getSignedGetUrl).toHaveBeenCalledWith('test-uploads', 'cvs/import-1.pdf', 3600, {
+        disposition: 'inline',
+        filename: 'cv.pdf',
+        contentType: 'application/pdf',
+      });
+    });
+
+    it('forbids a member who is neither the owner nor an admin', async () => {
+      (membersService.findMemberByEmail as jest.Mock).mockResolvedValue(TEAM_LEAD);
+
+      await expect(service.getLatest('member-1', 'lead@example.com')).rejects.toBeInstanceOf(ForbiddenException);
+      expect(jobApplicationFindFirst).toHaveBeenCalledWith({
+        where: { memberUid: 'member-1', jobOpening: { teamUid: { in: ['team-1'] } } },
+        select: { uid: true },
+      });
+    });
+
+    it('allows a team lead when the member applied to one of their team openings', async () => {
+      (membersService.findMemberByEmail as jest.Mock).mockResolvedValue(TEAM_LEAD);
+      jobApplicationFindFirst.mockResolvedValue({ uid: 'application-1' });
+      cvFindUnique.mockResolvedValue({
+        uid: 'import-1',
+        status: MemberCvImportStatus.SUCCEEDED,
+        originalFilename: 'cv.pdf',
+        s3Bucket: 'test-uploads',
+        s3Key: 'cvs/import-1.pdf',
+        fileSizeBytes: 1024,
+        uploadedAt: new Date('2026-09-01T10:00:00.000Z'),
+        payload: { role: 'Engineer' },
+      });
+
+      const result = await service.getLatest('member-1', 'lead@example.com');
+
+      expect(result.file?.url).toBe('https://signed.example/cv.pdf');
+    });
+
+    it('omits the file when uploadedAt is missing', async () => {
+      cvFindUnique.mockResolvedValue({
+        uid: 'import-1',
+        status: MemberCvImportStatus.SUCCEEDED,
+        originalFilename: 'cv.pdf',
+        s3Bucket: 'test-uploads',
+        s3Key: 'cvs/import-1.pdf',
+        fileSizeBytes: 1024,
+        uploadedAt: null,
+        payload: { role: 'Engineer' },
+      });
+
+      const result = await service.getLatest('member-1', 'owner@example.com');
+
+      expect(result.file).toBeUndefined();
+    });
+  });
+
+  describe('remove', () => {
+    it('deletes the S3 object and the row', async () => {
+      cvFindUnique.mockResolvedValue({
+        uid: 'import-1',
+        s3Bucket: 'test-uploads',
+        s3Key: 'cvs/import-1.pdf',
+      });
+      cvDelete.mockResolvedValue({});
+
+      await service.remove('member-1', 'owner@example.com');
+
+      expect(cvDelete).toHaveBeenCalledWith({ where: { memberUid: 'member-1' } });
+      expect(awsService.deleteObjectFromS3).toHaveBeenCalledWith('test-uploads', 'cvs/import-1.pdf');
+    });
+
+    it('does not clear member profile fields', async () => {
+      cvFindUnique.mockResolvedValue({
+        uid: 'import-1',
+        s3Bucket: 'test-uploads',
+        s3Key: 'cvs/import-1.pdf',
+      });
+      cvDelete.mockResolvedValue({});
+
+      await service.remove('member-1', 'owner@example.com');
+
+      expect(memberUpdate).not.toHaveBeenCalled();
+      expect(experienceCreate).not.toHaveBeenCalled();
+    });
+
+    it('404s when the member has no CV', async () => {
+      cvFindUnique.mockResolvedValue(null);
+      await expect(service.remove('member-1', 'owner@example.com')).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('getCurrentCv', () => {
+    it('returns the stored file metadata', async () => {
+      const uploadedAt = new Date('2026-09-01T10:00:00.000Z');
+      cvFindUnique.mockResolvedValue({
+        originalFilename: 'cv.pdf',
+        fileSizeBytes: 2048,
+        uploadedAt,
+        s3Bucket: 'test-uploads',
+        s3Key: 'cvs/import-1.pdf',
+      });
+
+      const result = await service.getCurrentCv('member-1');
+
+      expect(result).toEqual({
+        fileName: 'cv.pdf',
+        size: 2048,
+        uploadedAt: uploadedAt.toISOString(),
+        s3Bucket: 'test-uploads',
+        s3Key: 'cvs/import-1.pdf',
+      });
+    });
+
+    it('returns null when there is no CV', async () => {
+      cvFindUnique.mockResolvedValue(null);
+      await expect(service.getCurrentCv('member-1')).resolves.toBeNull();
     });
   });
 });

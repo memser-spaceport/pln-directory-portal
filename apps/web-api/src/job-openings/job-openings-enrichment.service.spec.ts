@@ -107,6 +107,8 @@ describe('JobOpeningsEnrichmentService', () => {
           postedDate: new Date('2025-09-16T17:04:06.000Z'),
           lastSeenLive,
           status: JobOpeningStatus.NEW,
+          managedBy: 'INTEGRATION',
+          publishedAt: new Date('2026-05-03T00:19:50.371Z'),
           summary: 'Coordinate strategy across teams',
           descriptionHtml: '<p>Full posting body</p>',
           detectionDate,
@@ -127,9 +129,34 @@ describe('JobOpeningsEnrichmentService', () => {
         roleTitle: 'Strategy Coordinator',
         lastSeenLive: lastSeenLive.toISOString(),
         status: JobOpeningStatus.NEW,
+        managedBy: 'INTEGRATION',
+        publishedAt: '2026-05-03T00:19:50.371Z',
         summary: 'Coordinate strategy across teams',
         descriptionHtml: '<p>Full posting body</p>',
       });
+    });
+
+    it('returns null managedBy and publishedAt for legacy rows without them', async () => {
+      prisma.team.findUnique.mockResolvedValue({ uid: teamUid, name: 'Airship' });
+      prisma.jobOpening.findMany.mockResolvedValue([
+        {
+          uid: 'job-uid-2',
+          canonicalKey: 'airship||engineer||remote',
+          dedupKey: 'https://job-boards.eu.greenhouse.io/airship/jobs/1',
+          teamUid,
+          roleTitle: 'Engineer',
+          location: [],
+          status: JobOpeningStatus.STALE,
+          managedBy: null,
+          publishedAt: null,
+          detectionDate,
+          updatedAt,
+        },
+      ]);
+
+      const out = await service.getJobOpeningsByTeam(teamUid);
+
+      expect(out.jobOpenings[0]).toMatchObject({ managedBy: null, publishedAt: null });
     });
 
     it('throws when team is not found', async () => {

@@ -9,6 +9,8 @@ import {
   JobsListQueryParams,
   JobsListResponseSchema,
   JobTeamGroupSchema,
+  MarkTeamInterestSchema,
+  TeamInterestStatusSchema,
 } from '../schema/job-opening';
 import {
   CreateJobApplicationSchema,
@@ -136,6 +138,16 @@ export const apiJobOpenings = contract.router({
       200: JobOpeningInterestStatusSchema,
     },
     summary: "Remove the current member's interest in a job opening (idempotent)",
+  },
+  markTeamInterest: {
+    method: 'POST',
+    path: `${getAPIVersionAsPath('1')}/job-openings/teams/:uid/interest`,
+    pathParams: z.object({ uid: z.string() }),
+    body: MarkTeamInterestSchema.optional(),
+    responses: {
+      200: TeamInterestStatusSchema,
+    },
+    summary: "Mark the current member's interest in a team, with no job attached (idempotent)",
   },
   getJob: {
     method: 'GET',

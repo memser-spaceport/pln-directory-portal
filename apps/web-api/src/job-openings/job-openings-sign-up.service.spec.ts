@@ -14,6 +14,7 @@ type PrismaMock = {
   policyAssignment: { upsert: jest.Mock };
   permission: { findUnique: jest.Mock };
   memberPermissionV2: { upsert: jest.Mock };
+  member: { update: jest.Mock };
 };
 
 const buildPrismaMock = (): PrismaMock => ({
@@ -21,6 +22,7 @@ const buildPrismaMock = (): PrismaMock => ({
   policyAssignment: { upsert: jest.fn().mockResolvedValue({ uid: 'assignment-1' }) },
   permission: { findUnique: jest.fn().mockResolvedValue({ uid: 'perm-profile-visible' }) },
   memberPermissionV2: { upsert: jest.fn().mockResolvedValue({ uid: 'member-perm-1' }) },
+  member: { update: jest.fn().mockResolvedValue({ uid: 'member-1' }) },
 });
 
 describe('JobOpeningsSignUpService', () => {
@@ -83,6 +85,10 @@ describe('JobOpeningsSignUpService', () => {
         policyUid: 'policy-job-aspirant',
       },
     });
+    expect(prisma.member.update).toHaveBeenCalledWith({
+      where: { uid: 'member-1' },
+      data: { isInvestor: false },
+    });
   });
 
   it('does not assign Job Aspirant when an existing team is selected', async () => {
@@ -96,6 +102,7 @@ describe('JobOpeningsSignUpService', () => {
     expect(membersService.createMemberAndAttach.mock.calls[0][0].signUpSource).toBe('job-board');
     expect(prisma.policy.findUnique).not.toHaveBeenCalled();
     expect(prisma.policyAssignment.upsert).not.toHaveBeenCalled();
+    expect(prisma.member.update).not.toHaveBeenCalled();
   });
 
   it('grants member.profile.visible when an existing team is selected', async () => {
@@ -137,6 +144,7 @@ describe('JobOpeningsSignUpService', () => {
     expect(membersService.createMemberAndAttach.mock.calls[0][0].signUpSource).toBe('job-board');
     expect(prisma.policy.findUnique).not.toHaveBeenCalled();
     expect(prisma.policyAssignment.upsert).not.toHaveBeenCalled();
+    expect(prisma.member.update).not.toHaveBeenCalled();
   });
 
   it('grants member.profile.visible when creating a new team', async () => {

@@ -44,6 +44,13 @@ export const MemberCvImportErrorSchema = z.object({
   message: z.string(),
 });
 
+export const MemberCvFileSchema = z.object({
+  fileName: z.string(),
+  size: z.number().int().optional(),
+  uploadedAt: z.string(),
+  url: z.string().optional(),
+});
+
 export const MemberCvImportAcceptedSchema = z.object({
   uid: z.string(),
   status: z.literal('PROCESSING'),
@@ -53,6 +60,7 @@ export const MemberCvImportLatestSchema = z.object({
   uid: z.string(),
   status: MemberCvImportStatusSchema,
   originalFilename: z.string(),
+  file: MemberCvFileSchema.optional(),
   payload: ParsedCvProfileSchema.optional(),
   error: MemberCvImportErrorSchema.optional(),
 });

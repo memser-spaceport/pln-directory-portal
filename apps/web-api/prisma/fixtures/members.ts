@@ -50,6 +50,7 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(({ sequence, onCreate 
     ohStatus: null,
     ohInterest: [],
     ohHelpWith: [],
+    customSkills: [],
     moreDetails: faker.helpers.arrayElement([null, faker.lorem.paragraph()]),
     plnFriend: faker.datatype.boolean(),
     airtableRecId: `airtable-rec-id-${sequence}`,

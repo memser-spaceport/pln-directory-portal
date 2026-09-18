@@ -98,6 +98,8 @@ model Team {
 
   articles       Article[]           @relation("TeamArticles")
   jobOpenings    JobOpening[]
+  integrationKeys IntegrationKey[]
+  teamInterests  TeamInterest[]
   jobEnrichment  TeamJobEnrichment?
   newsItems      TeamNewsItem[]
   newsEnrichment TeamNewsEnrichment?
@@ -159,6 +161,7 @@ model Member {
   ohStatus                           String?
   ohInterest                         String[]                          @default([])
   ohHelpWith                         String[]                          @default([])
+  customSkills                       String[]                          @default([])
   moreDetails                        String?
   bio                                String?
   plnFriend                          Boolean?                          @default(false)
@@ -272,6 +275,8 @@ model Member {
   jobReferralsReceived      JobReferral[]           @relation("JobReferralReferred")
   jobApplications           JobApplication[]
   jobOpeningInterests       JobOpeningInterest[]
+  teamInterests             TeamInterest[]
+  integrationKeysCreated    IntegrationKey[]        @relation("IntegrationKeyCreatedBy")
   roadmapItemsCreated       RoadmapItem[]           @relation("roadmapItemCreatedBy")
   roadmapItemsPromoted      RoadmapItem[]           @relation("roadmapItemPromotedBy")
   roadmapItemUpvotes        RoadmapItemUpvote[]     @relation("roadmapItemUpvoter")
@@ -993,6 +998,8 @@ model MemberCvImport {
   originalFilename String
   s3Bucket         String
   s3Key            String
+  fileSizeBytes    Int?
+  uploadedAt       DateTime?
   payload          Json?
   errorCode        String?
   errorMessage     String?
@@ -2280,10 +2287,27 @@ enum DataDiscrepancyFlag {
   MULTI_BOARD
 }
 
+/// Which system owns a job opening's lifecycle. Null is read as ENRICHMENT.
+/// ENRICHMENT rows are written and closed by the data-enrichment crawler via
+/// the service ingest; INTEGRATION rows by a team's ATS integration; MANUAL
+/// rows by hand. The crawler ingest never touches a row it does not own.
+enum JobOpeningManagedBy {
+  ENRICHMENT
+  INTEGRATION
+  MANUAL
+}
+
 model JobOpening {
   id              Int              @id @default(autoincrement())
   uid             String           @unique @default(cuid())
   status          JobOpeningStatus @default(NEW)
+  managedBy       JobOpeningManagedBy?
+  /// The integration key that owns this row when managedBy is INTEGRATION.
+  integrationKeyUid String?
+  integrationKey    IntegrationKey? @relation(fields: [integrationKeyUid], references: [uid])
+  /// Set the first time the row enters a board-visible status, and again on
+  /// each hidden -> visible transition. Job alert dispatch matches on this.
+  publishedAt     DateTime?
   companyName     String
   signalType      String
   roleTitle       String
@@ -2334,6 +2358,32 @@ model JobOpening {
   @@index([location], map: "job_opening_location_idx", type: Gin)
   @@index([workMode])
   @@index([updatedAt])
+  @@index([publishedAt])
+  @@index([integrationKeyUid])
+}
+
+/// A server credential bound to one team, issued and revoked by a Directory admin.
+/// Only the sha256 of the key is stored; the plaintext is returned once on creation.
+/// Integration routes (/v1/integrations) authenticate with it and may act only on
+/// the key's team. Scopes: jobs:write, candidates:read.
+model IntegrationKey {
+  id           Int       @id @default(autoincrement())
+  uid          String    @unique @default(cuid())
+  name         String
+  teamUid      String
+  team         Team      @relation(fields: [teamUid], references: [uid])
+  keyHash      String    @unique
+  /// First characters of the plaintext, for matching a configured key against the list.
+  keyPrefix    String
+  scopes       String[]  @default([])
+  createdByUid String?
+  createdBy    Member?   @relation("IntegrationKeyCreatedBy", fields: [createdByUid], references: [uid])
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+  revokedAt    DateTime?
+  jobOpenings  JobOpening[]
+
+  @@index([teamUid])
 }
 
 model JobReferral {
@@ -2382,10 +2432,12 @@ model JobApplication {
   ccEmails        String[]   @default([])
   sentAt          DateTime?
   createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
   @@unique([jobOpeningUid, memberUid])
   @@index([memberUid])
   @@index([jobOpeningUid])
+  @@index([updatedAt])
 }
 
 model JobOpeningInterest {
@@ -2396,10 +2448,35 @@ model JobOpeningInterest {
   memberUid     String
   member        Member     @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
   createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
   @@unique([jobOpeningUid, memberUid])
   @@index([jobOpeningUid])
   @@index([memberUid])
+  @@index([updatedAt])
+}
+
+/// A member telling a team "I would like to work here", with no job attached.
+/// Job-level interest is JobOpeningInterest; this is the team-level one, and it
+/// is what an integrated ATS files as a talent-pool entry rather than a candidacy.
+model TeamInterest {
+  id        Int      @id @default(autoincrement())
+  uid       String   @unique @default(cuid())
+  /// What the member wrote when they said they were interested. Optional, and
+  /// overwritten by a later mark: there is no un-marking, so the latest note is
+  /// the one that stands.
+  message   String?
+  teamUid   String
+  team      Team     @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+  memberUid String
+  member    Member   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([teamUid, memberUid])
+  @@index([teamUid])
+  @@index([memberUid])
+  @@index([updatedAt])
 }
 
 model TeamJobEnrichment {

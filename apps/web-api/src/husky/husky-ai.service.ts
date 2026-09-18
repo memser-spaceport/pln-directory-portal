@@ -9,6 +9,7 @@ import {
   PROMPT_FOR_GENERATE_TITLE,
   HUSKY_CONTEXTUAL_TOOLS_SYSTEM_PROMPT,
   HUSKY_CONTEXTUAL_TOOLS_STRUCTURED_PROMPT,
+  HUSKY_CONTEXTUAL_TOOLS_CONTINUATION_PROMPT,
 } from '../utils/ai-prompts';
 import Handlebars from 'handlebars';
 import { PrismaService } from '../shared/prisma.service';
@@ -17,6 +18,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { HuskyAiToolsService } from './tools/husky-ai-tools.serivice';
 import { HuskyAuthContext } from './tools/husky-auth-context';
 import { AiProviderService, AiProviderType } from '../shared/ai-provider.service';
+import { StallWatchdog } from './stall-watchdog';
+import { MAX_OVERLAP_CHARS, trimRepeatedPrefix } from './answer-continuation.util';
 import { z } from 'zod';
 
 /**
@@ -26,6 +29,38 @@ import { z } from 'zod';
  */
 export const HUSKY_SEARCH_PROVIDER_ENV_VAR = 'HUSKY_SEARCH_AI_PROVIDER';
 export const HUSKY_SEARCH_FALLBACK_PROVIDER: AiProviderType = 'gemini';
+
+/**
+ * Longest silence tolerated from the model before its stream is aborted and the
+ * response is closed with whatever has been generated so far. Set
+ * HUSKY_SEARCH_STALL_TIMEOUT_MS to override.
+ */
+export const HUSKY_SEARCH_STALL_TIMEOUT_ENV_VAR = 'HUSKY_SEARCH_STALL_TIMEOUT_MS';
+export const DEFAULT_HUSKY_SEARCH_STALL_TIMEOUT_MS = 30_000;
+
+/** Appended to an answer that stayed incomplete after the one continuation attempt. */
+export const HUSKY_SEARCH_STALLED_NOTICE =
+  '\n\n_The answer was cut short because the AI provider stopped responding. Please try again._';
+
+/**
+ * How the answer text is generated: from scratch with the directory tools, or as
+ * the continuation of an interrupted answer from the tool results already gathered.
+ */
+type AnswerMode = { kind: 'initial' } | { kind: 'continuation'; partialAnswer: string; toolResults: string };
+
+interface AnswerInput {
+  historyPrompt: string;
+  question: string;
+  currentDate: string;
+}
+
+interface AnswerResult {
+  text: string;
+  toolResults: string;
+  /** True when the model ended the answer itself (finish reason `stop`). */
+  complete: boolean;
+  reason: string;
+}
 
 type HuskyResponseContext = z.infer<typeof HuskyResponseContextSchema>;
 
@@ -62,6 +97,11 @@ export class HuskyAiService {
     });
   }
 
+  private getStallTimeoutMs(): number {
+    const configured = Number(process.env[HUSKY_SEARCH_STALL_TIMEOUT_ENV_VAR]);
+    return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_HUSKY_SEARCH_STALL_TIMEOUT_MS;
+  }
+
   /**
    * Streams a JSON object `{ content, followUpQuestions, sources, actions }` in two
    * phases so the client can render the answer while the structured data is still
@@ -69,6 +109,10 @@ export class HuskyAiService {
    *   1. the answer text, produced with the directory database tools, streamed
    *      into the `content` string;
    *   2. sources / follow-up questions / actions, streamed as the remaining fields.
+   * Each phase runs under a stall watchdog: if the model stops sending chunks, its
+   * request is aborted so the client always sees the stream end. An answer that is
+   * cut off (stall, token limit, content filter) is continued once from where it
+   * stopped before the structured tail is generated.
    */
   async createContextualToolsResponse(chatInfo: HuskyChatInterface, isLoggedIn: boolean, userEmail?: string) {
     const { question, threadId, chatId, chatSummary } = chatInfo;
@@ -103,28 +147,31 @@ export class HuskyAiService {
         try {
           enqueue('{ "content": "');
 
-          let toolResults = '';
-          const { textStream } = streamText({
-            model,
-            system: HUSKY_CONTEXTUAL_TOOLS_SYSTEM_PROMPT,
-            tools: this.huskyAiToolsService.getTools(auth),
-            prompt: `
-          ${historyPrompt}
-            - question: ${question}
-            - currentDate: ${currentDate}
-          `,
-            maxSteps: 5,
-            temperature: 0.001,
-            onStepFinish: async (step) => {
-              if (step.toolResults?.length > 0) {
-                toolResults += step.toolResults.map((tool: { result: string }) => tool.result).join('\n\n');
-              }
-            },
-          });
+          const input: AnswerInput = { historyPrompt, question, currentDate };
+          const answer = await this.streamAnswer(model, auth, input, { kind: 'initial' }, enqueue);
+          content = answer.text;
+          let toolResults = answer.toolResults;
 
-          for await (const chunk of textStream) {
-            content += chunk;
-            enqueue(encodeJsonStringFragment(chunk));
+          if (!answer.complete) {
+            this.logger.error(
+              `Husky answer for thread ${threadId}, chat ${chatId} was cut off after ${content.length} chars (${answer.reason}); continuing once`
+            );
+            // Nothing reached the client yet and no context was gathered: start over.
+            // Otherwise complete the visible text from the context already in hand.
+            const mode: AnswerMode =
+              content || toolResults
+                ? { kind: 'continuation', partialAnswer: content, toolResults }
+                : { kind: 'initial' };
+            const continuation = await this.streamAnswer(model, auth, input, mode, enqueue);
+            content += continuation.text;
+            toolResults += continuation.toolResults;
+            if (!continuation.complete) {
+              this.logger.error(
+                `Husky answer continuation for thread ${threadId}, chat ${chatId} was cut off as well (${continuation.reason})`
+              );
+              content += HUSKY_SEARCH_STALLED_NOTICE;
+              enqueue(encodeJsonStringFragment(HUSKY_SEARCH_STALLED_NOTICE));
+            }
           }
 
           enqueue('", ');
@@ -166,6 +213,107 @@ export class HuskyAiService {
   }
 
   /**
+   * Streams one answer generation, forwarding every chunk to `enqueue` as a JSON
+   * string fragment. Returns what was produced and whether the model finished on
+   * its own; a stall (see StallWatchdog) or any other finish reason counts as cut
+   * off, and the caller decides whether to continue the text.
+   */
+  private async streamAnswer(
+    model: LanguageModel,
+    auth: HuskyAuthContext,
+    input: AnswerInput,
+    mode: AnswerMode,
+    enqueue: (text: string) => void
+  ): Promise<AnswerResult> {
+    const watchdog = new StallWatchdog(this.getStallTimeoutMs());
+    let text = '';
+    let toolResults = '';
+    const emit = (chunk: string) => {
+      text += chunk;
+      enqueue(encodeJsonStringFragment(chunk));
+    };
+
+    // A continuation often restates the line it picks up from. Its opening is held
+    // back until it is long enough to compare with the end of the partial answer,
+    // then forwarded with any repetition removed.
+    const partialAnswer = mode.kind === 'continuation' ? mode.partialAnswer : '';
+    const holdBackChars = Math.min(partialAnswer.length, MAX_OVERLAP_CHARS);
+    let heldBack = '';
+    let opened = holdBackChars === 0;
+    const forward = (chunk: string) => {
+      if (opened) {
+        emit(chunk);
+        return;
+      }
+      heldBack += chunk;
+      if (heldBack.length >= holdBackChars) {
+        release();
+      }
+    };
+    const release = () => {
+      if (opened) {
+        return;
+      }
+      opened = true;
+      emit(trimRepeatedPrefix(partialAnswer, heldBack));
+    };
+
+    const generation =
+      mode.kind === 'initial'
+        ? {
+            system: HUSKY_CONTEXTUAL_TOOLS_SYSTEM_PROMPT,
+            tools: this.huskyAiToolsService.getTools(auth),
+            maxSteps: 5,
+            prompt: `
+          ${input.historyPrompt}
+            - question: ${input.question}
+            - currentDate: ${input.currentDate}
+          `,
+          }
+        : {
+            system: HUSKY_CONTEXTUAL_TOOLS_CONTINUATION_PROMPT,
+            prompt: `
+          ${input.historyPrompt}
+            - question: ${input.question}
+            - currentDate: ${input.currentDate}
+            - context: ${mode.toolResults}
+            - partialAnswer: ${mode.partialAnswer}
+          `,
+          };
+
+    const result = streamText({
+      model,
+      ...generation,
+      temperature: 0.001,
+      abortSignal: watchdog.signal,
+      onStepFinish: async (step) => {
+        if (step.toolResults?.length > 0) {
+          toolResults += step.toolResults.map((tool: { result: string }) => tool.result).join('\n\n');
+        }
+      },
+    });
+
+    try {
+      for await (const chunk of result.textStream) {
+        watchdog.touch();
+        forward(chunk);
+      }
+      release();
+      watchdog.touch();
+      const finishReason = await watchdog.race(result.finishReason);
+      return { text, toolResults, complete: finishReason === 'stop', reason: `finish reason "${finishReason}"` };
+    } catch (error) {
+      if (!watchdog.stalled) {
+        throw error;
+      }
+      release();
+      return { text, toolResults, complete: false, reason: `no chunk for ${watchdog.timeoutMs}ms` };
+    } finally {
+      watchdog.stop();
+    }
+  }
+
+  /**
    * Resolves the directory member behind the signed-in caller so tools can gate
    * their own data by this member's actual permissions (Investor DB access,
    * etc.), not just by whether a session exists. Failure to resolve degrades to
@@ -177,18 +325,19 @@ export class HuskyAiService {
     }
     try {
       const memberUid = await resolveLiveMemberUidByEmail(this.prisma, userEmail);
-      return { isLoggedIn: true, memberUid };
+      return { isLoggedIn: true, memberUid, email: userEmail };
     } catch (error) {
       this.logger.error(`Failed to resolve member for Husky auth context: ${error?.message ?? error}`);
-      return { isLoggedIn: true };
+      return { isLoggedIn: true, email: userEmail };
     }
   }
 
   /**
    * Streams the structured tail of the response (everything after `content`).
    * The model's JSON is forwarded without its opening brace so it continues the
-   * object already opened by the caller. If the structured generation fails, the
-   * object is closed with empty fields so the already streamed answer stays valid.
+   * object already opened by the caller. If the structured generation fails or
+   * stalls, the object is closed with empty fields so the already streamed answer
+   * stays valid.
    */
   private async streamResponseContext(
     model: LanguageModel,
@@ -196,6 +345,7 @@ export class HuskyAiService {
     enqueue: (text: string) => void
   ): Promise<HuskyResponseContext> {
     let openingBraceStripped = false;
+    const watchdog = new StallWatchdog(this.getStallTimeoutMs());
     try {
       const objectStream = streamObject({
         model,
@@ -209,6 +359,7 @@ export class HuskyAiService {
             - context: ${input.toolResults}
           `,
         temperature: 0.001,
+        abortSignal: watchdog.signal,
       });
       // The object promise rejects together with the text stream; mark it handled so a
       // stream failure surfaces once, through the catch below, and never as an
@@ -217,6 +368,7 @@ export class HuskyAiService {
       objectPromise.catch(() => undefined);
 
       for await (const chunk of objectStream.textStream) {
+        watchdog.touch();
         let text = chunk;
         if (!openingBraceStripped) {
           const braceIndex = text.indexOf('{');
@@ -229,17 +381,26 @@ export class HuskyAiService {
         enqueue(text);
       }
 
-      const object = await objectPromise;
+      // The object promise settles from the stream's own finish, which an aborted
+      // stream never reaches, so it is raced against the watchdog as well.
+      watchdog.touch();
+      const object = await watchdog.race(objectPromise);
       if (!openingBraceStripped) {
         enqueue(`${JSON.stringify(object).substring(1)}`);
       }
       return object;
     } catch (error) {
-      this.logger.error('Husky structured response generation failed:', error);
+      if (watchdog.stalled) {
+        this.logger.error(`Husky structured response generation stalled: no chunk for ${watchdog.timeoutMs}ms`);
+      } else {
+        this.logger.error('Husky structured response generation failed:', error);
+      }
       if (!openingBraceStripped) {
         enqueue(`${JSON.stringify(EMPTY_RESPONSE_CONTEXT).substring(1)}`);
       }
       return EMPTY_RESPONSE_CONTEXT;
+    } finally {
+      watchdog.stop();
     }
   }
 
