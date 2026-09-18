@@ -20,6 +20,11 @@ for (const [canonical, short] of Object.entries(SENIORITY_DISPLAY)) {
   SENIORITY_ALIASES.set(short.toLowerCase(), pair);
 }
 
+/** Directory job page for a role, matching the frontend's `/jobs/openings/[uid]` route. */
+export function jobOpeningPath(roleUid: string): string {
+  return `/jobs/openings/${roleUid}`;
+}
+
 function resolveSeniority(input?: string): string[] | undefined {
   if (!input) return undefined;
   return SENIORITY_ALIASES.get(input.trim().toLowerCase()) ?? [input];
@@ -94,12 +99,14 @@ export class JobOpeningsTool {
     return groups
       .map((group) => {
         const roles = group.roles
-          .map((role) => {
-            const applyLink = role.applyUrl ? ` [ApplyLink](${role.applyUrl})` : '';
-            return `- ${role.roleTitle} (${role.seniority ?? 'Not specified'}, ${
-              role.location.join(', ') || 'Not specified'
-            }, ${role.workMode ?? 'Not specified'})${applyLink}`;
-          })
+          .map(
+            // Roles link to the directory's own job page (which carries the apply flow),
+            // never to the team's external board, so citations stay inside the directory.
+            (role) =>
+              `- ${role.roleTitle} (${role.seniority ?? 'Not specified'}, ${
+                role.location.join(', ') || 'Not specified'
+              }, ${role.workMode ?? 'Not specified'}) [JobLink](${jobOpeningPath(role.uid)})`
+          )
           .join('\n');
 
         return `Team: ${group.team.name} [TeamLink](/teams/${group.team.uid})
