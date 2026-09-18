@@ -387,6 +387,7 @@ export const HUSKY_CONTENT_GUIDELINES = `
 - **Formatting**:
   - Use tables for structured data with columns and rows, especially when there are more than 1 items to represent.
   - Prioritize table format over list, bullet points in appropriate cases.
+  - News items (from getTeamNews): one entry per item — the title in bold with its source citation, the event type and date on the next line, then a one-sentence summary. Never output raw field labels such as "Title:" or "Event Type:", cite each item once, and use a table only when the user asks for one.
   - Convert comma-separated lists or any listed items (>3 items) to bullet points or table format whichever is appropriate
   - For large sets of information:
   - Apply code blocks for technical content when appropriate or when user specifically asks for it. Eg. give me the result in markdown. Then use code blocks. with language as markdown.
