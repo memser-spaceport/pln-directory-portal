@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PaySchema } from './publishable-job';
 
 const toStringArray = (value: unknown): string[] => {
   if (Array.isArray(value)) {
@@ -65,6 +66,11 @@ export const JobRoleSchema = z.object({
   lastUpdated: z.string(),
   postedDate: z.string().nullable(),
   detectionDate: z.string(),
+  // Sub-organisation label the hiring team publishes (for example "PL Infra"). Null for most crawled roles.
+  department: z.string().nullable(),
+  // Public pay range, present only when the hiring team published all four parts.
+  pay: PaySchema.nullable(),
+  equityNote: z.string().nullable(),
   // Aggregate "I'm interested" count. Always present (0 when none).
   interestedCount: z.number().int().min(0),
   // True when the authenticated caller has marked interest. Always false

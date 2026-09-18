@@ -4,6 +4,7 @@ import { PrismaService } from '../shared/prisma.service';
 import { buildJobOpeningDateWhere } from './job-opening-date.where';
 import { hasJobTextMatch, tokenizeJobMatchText } from './job-openings-for-you-match';
 import { HIDDEN_JOB_OPENING_STATUSES, JobOpeningsQueryService } from './job-openings-query.service';
+import { toPublicPay } from './job-openings-public-role';
 import { isInAppApplyAvailable } from './pin-protocol-labs-team';
 
 /** "Only include jobs from the last two weeks" — the same window the newsfeed
@@ -147,6 +148,9 @@ export class JobOpeningsForYouService {
             lastUpdated: role.updatedAt.toISOString(),
             postedDate: role.postedDate ? role.postedDate.toISOString() : null,
             detectionDate: role.detectionDate.toISOString(),
+            department: role.department ?? null,
+            pay: toPublicPay(role),
+            equityNote: role.equityNote ?? null,
             interestedCount: counts.get(role.uid) ?? 0,
             viewerIsInterested: viewerInterested.has(role.uid),
           })),
@@ -209,6 +213,11 @@ function loadCandidates(prisma: PrismaService, ownTeamUids: ReadonlySet<string>)
       postedDate: true,
       detectionDate: true,
       updatedAt: true,
+      payMin: true,
+      payMax: true,
+      payCurrency: true,
+      payPeriod: true,
+      equityNote: true,
       team: {
         select: {
           uid: true,

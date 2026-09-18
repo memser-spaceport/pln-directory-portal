@@ -131,6 +131,7 @@ export class JobOpeningsEnrichmentService {
         lastSeenLive: job.lastSeenLive?.toISOString() ?? null,
         status: job.status,
         managedBy: job.managedBy ?? null,
+        integrationKeyUid: job.integrationKeyUid ?? null,
         publishedAt: job.publishedAt?.toISOString() ?? null,
         summary: job.summary ?? null,
         descriptionHtml: job.descriptionHtml ?? null,

@@ -93,6 +93,7 @@ export const JobOpeningsPerTeamResponseSchema = z.object({
       lastSeenLive: z.string().nullable(),
       status: z.string(),
       managedBy: z.string().nullable(),
+      integrationKeyUid: z.string().nullable(),
       publishedAt: z.string().nullable(),
       summary: z.string().nullable(),
       descriptionHtml: z.string().nullable(),

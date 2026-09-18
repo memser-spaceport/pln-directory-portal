@@ -14,14 +14,23 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { MembersModule } from '../members/members.module';
 import { MemberCvImportsModule } from '../member-cv-imports/member-cv-imports.module';
 import { IntegrationKeysModule } from '../integration-keys/integration-keys.module';
+import { JobOpeningsIntegrationController } from './job-openings-integration.controller';
+import { JobOpeningsIntegrationService } from './job-openings-integration.service';
 
 @Module({
-  imports: [SharedModule, NotificationsModule, forwardRef(() => MembersModule), MemberCvImportsModule, IntegrationKeysModule],
-  controllers: [JobOpeningsController, JobOpeningsServiceController],
+  imports: [
+    SharedModule,
+    NotificationsModule,
+    forwardRef(() => MembersModule),
+    MemberCvImportsModule,
+    IntegrationKeysModule,
+  ],
+  controllers: [JobOpeningsController, JobOpeningsServiceController, JobOpeningsIntegrationController],
   providers: [
     JobOpeningsQueryService,
     JobOpeningsForYouService,
     JobOpeningsService,
+    JobOpeningsIntegrationService,
     JobOpeningsEnrichmentService,
     JobOpeningsReferralService,
     JobOpeningsApplicationService,
