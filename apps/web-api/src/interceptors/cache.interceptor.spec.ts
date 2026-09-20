@@ -19,6 +19,7 @@ describe('MyCacheInterceptor', () => {
 
     reflectorMock = createMock<Reflector>({
       get: () => false,
+      getAllAndOverride: () => false,
     });
 
     interceptor = new MyCacheInterceptor(mockExecutionContext, reflectorMock);
@@ -36,6 +37,23 @@ describe('MyCacheInterceptor', () => {
       it('Should ignore cache', () => {
         reflectorMock = createMock<Reflector>({
           get: () => true,
+          getAllAndOverride: () => true,
+        });
+        interceptor = new MyCacheInterceptor(
+          mockExecutionContext,
+          reflectorMock
+        );
+        expect(
+          interceptor.isRequestCacheable(mockExecutionContext)
+        ).toBeFalsy();
+      });
+    });
+
+    describe('and the controller class is flagged to ignore cache', () => {
+      it('Should ignore cache', () => {
+        reflectorMock = createMock<Reflector>({
+          get: () => false,
+          getAllAndOverride: () => true,
         });
         interceptor = new MyCacheInterceptor(
           mockExecutionContext,

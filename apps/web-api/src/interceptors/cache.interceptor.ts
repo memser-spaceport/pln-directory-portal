@@ -16,8 +16,8 @@ export class MyCacheInterceptor extends CacheInterceptor {
     const http = context.switchToHttp();
     const request = http.getRequest<Request>();
 
-    // Get the ignoreCaching metadata from the handler
-    const ignoreCaching: boolean = this.reflector.get('ignoreCaching', context.getHandler());
+    // Get the ignoreCaching metadata from the handler or the controller class
+    const ignoreCaching: boolean = this.reflector.getAllAndOverride('ignoreCaching', [context.getHandler(), context.getClass()]);
 
     if (ignoreCaching || request.method !== 'GET') {
       return false;

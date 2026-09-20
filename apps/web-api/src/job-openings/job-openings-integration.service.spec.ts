@@ -1,5 +1,6 @@
 import { ConflictException, ForbiddenException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type { EventEmitter2 } from '@nestjs/event-emitter';
+import { Prisma } from '@prisma/client';
 import type { PrismaService } from '../shared/prisma.service';
 import type { IntegrationKeysService } from '../integration-keys/integration-keys.service';
 import {
@@ -374,6 +375,16 @@ describe('JobOpeningsIntegrationService', () => {
     it('returns 404 for an unknown uid', async () => {
       prisma.jobOpening.findUnique.mockResolvedValue(null);
       await expect(service.claim(key, 'nope', 'role-7')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('maps a unique-constraint race on the external id to 409', async () => {
+      prisma.jobOpening.findUnique.mockResolvedValue(crawlerRow);
+      prisma.jobOpening.findFirst.mockResolvedValue(null);
+      prisma.jobOpening.update.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', 'P2002', 'test')
+      );
+      await expect(service.claim(key, 'manual-pl-79560093', 'role-7')).rejects.toBeInstanceOf(ConflictException);
+      expect(emit).not.toHaveBeenCalled();
     });
   });
 

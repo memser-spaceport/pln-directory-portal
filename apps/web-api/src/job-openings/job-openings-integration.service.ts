@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { JobOpeningManagedBy, JobOpeningStatus } from '@prisma/client';
+import { JobOpeningManagedBy, JobOpeningStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { JOB_INGEST_COMPLETED, JobIngestCompletedPayload } from '../job-alerts/job-alerts.events';
 import { IntegrationKeyRequestContext, IntegrationKeysService } from '../integration-keys/integration-keys.service';
@@ -230,16 +230,27 @@ export class JobOpeningsIntegrationService {
     }
 
     const now = new Date();
-    const claimed = await this.prisma.jobOpening.update({
-      where: { uid },
-      data: {
-        managedBy: JobOpeningManagedBy.INTEGRATION,
-        integrationKeyUid: key.uid,
-        integrationExternalId: externalId,
-        sourceLink: null,
-      },
-      select: rowSelect,
-    });
+    let claimed: Row;
+    try {
+      claimed = await this.prisma.jobOpening.update({
+        where: { uid },
+        data: {
+          managedBy: JobOpeningManagedBy.INTEGRATION,
+          integrationKeyUid: key.uid,
+          integrationExternalId: externalId,
+          sourceLink: null,
+        },
+        select: rowSelect,
+      });
+    } catch (error) {
+      // A concurrent claim with the same external id can slip past the findOwned
+      // check above and hit the (integrationKeyUid, integrationExternalId) unique
+      // constraint; surface it as the same 409 the check would have raised.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException(`externalId ${externalId} is already used by another job opening of this key`);
+      }
+      throw error;
+    }
     this.emitIngestCompleted(key, now, 0, 1);
     return toResponse(claimed, externalId);
   }
