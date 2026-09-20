@@ -21,7 +21,7 @@ The crawler is not an integration. It keeps using the shared `INTERNAL_SERVICE_S
 
 Revocation is permanent and idempotent. The row is kept so the audit trail survives.
 
-`JobOpening.integrationKeyUid` links a job opening to the key that owns it when `managedBy = INTEGRATION`. Nothing writes it yet; the integration job endpoints (LAB-2577) do.
+`JobOpening.integrationKeyUid` links a job opening to the key that owns it when `managedBy = INTEGRATION`. The integration job endpoints write it; see [JOB_BOARD_INTEGRATION_JOBS.md](./JOB_BOARD_INTEGRATION_JOBS.md).
 
 ## Admin routes
 

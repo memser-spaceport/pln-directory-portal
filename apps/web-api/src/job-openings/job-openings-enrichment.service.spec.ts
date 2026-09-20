@@ -108,6 +108,7 @@ describe('JobOpeningsEnrichmentService', () => {
           lastSeenLive,
           status: JobOpeningStatus.NEW,
           managedBy: 'INTEGRATION',
+          integrationKeyUid: 'ik-1',
           publishedAt: new Date('2026-05-03T00:19:50.371Z'),
           summary: 'Coordinate strategy across teams',
           descriptionHtml: '<p>Full posting body</p>',
@@ -130,6 +131,7 @@ describe('JobOpeningsEnrichmentService', () => {
         lastSeenLive: lastSeenLive.toISOString(),
         status: JobOpeningStatus.NEW,
         managedBy: 'INTEGRATION',
+        integrationKeyUid: 'ik-1',
         publishedAt: '2026-05-03T00:19:50.371Z',
         summary: 'Coordinate strategy across teams',
         descriptionHtml: '<p>Full posting body</p>',
@@ -156,7 +158,7 @@ describe('JobOpeningsEnrichmentService', () => {
 
       const out = await service.getJobOpeningsByTeam(teamUid);
 
-      expect(out.jobOpenings[0]).toMatchObject({ managedBy: null, publishedAt: null });
+      expect(out.jobOpenings[0]).toMatchObject({ managedBy: null, integrationKeyUid: null, publishedAt: null });
     });
 
     it('throws when team is not found', async () => {
