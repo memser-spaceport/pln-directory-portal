@@ -6,16 +6,11 @@ import { JobOpeningManagedBy, JobOpeningStatus, Prisma } from '@prisma/client';
 import { JobOpeningIngestItem, IngestJobOpeningsResponse } from './dto/ingest-job-openings.dto';
 import { JOB_INGEST_COMPLETED, JobIngestCompletedPayload } from '../job-alerts/job-alerts.events';
 import { sanitizeJobDescriptionHtml } from './job-description-html.util';
-import { HIDDEN_JOB_OPENING_STATUSES } from './job-openings-query.service';
+import { resolvePublishedAt } from './job-opening-visibility';
 
 type SkipReason = 'owned-by-integration' | 'owned-by-manual';
 
 type UpsertOutcome = { outcome: 'created' | 'updated' } | { outcome: 'skipped'; reason: SkipReason };
-
-/** A row is visible on the board when its status is outside the hidden set. */
-function isVisibleStatus(status: JobOpeningStatus | null | undefined): boolean {
-  return status != null && !HIDDEN_JOB_OPENING_STATUSES.includes(status);
-}
 
 @Injectable()
 export class JobOpeningsService {
@@ -110,24 +105,6 @@ export class JobOpeningsService {
     return new Date();
   }
 
-  /**
-   * Stamp rule for `publishedAt`: set when a row is created visible, and when an
-   * update takes it from hidden to visible. `undefined` means "leave as is".
-   */
-  private resolvePublishedAt(
-    existing: { status: JobOpeningStatus } | null,
-    resolvedStatus: JobOpeningStatus,
-    now: Date
-  ): Date | null | undefined {
-    if (!existing) {
-      return isVisibleStatus(resolvedStatus) ? now : null;
-    }
-    if (!isVisibleStatus(existing.status) && isVisibleStatus(resolvedStatus)) {
-      return now;
-    }
-    return undefined;
-  }
-
   private async upsertJobOpening(item: JobOpeningIngestItem): Promise<UpsertOutcome> {
     const existing = await this.prisma.jobOpening.findUnique({
       where: { dedupKey: item.dedupKey },
@@ -149,7 +126,7 @@ export class JobOpeningsService {
     const now = new Date();
     // An unknown incoming status keeps the stored one on update, so it is never a transition.
     const resolvedStatus = existing ? mappedStatus ?? existing.status : status;
-    const publishedAt = this.resolvePublishedAt(existing, resolvedStatus, now);
+    const publishedAt = resolvePublishedAt(existing ? existing.status ?? null : null, resolvedStatus, now);
 
     const data: Prisma.JobOpeningUncheckedCreateInput = {
       status,
