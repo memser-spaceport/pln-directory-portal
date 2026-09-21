@@ -242,6 +242,36 @@ export class MemberCvImportsService {
     return urls;
   }
 
+  /**
+   * What a CV card prints, for several members at once, with no signed link.
+   *
+   * Separate from `getSignedPreviewUrls` because signing is the expensive half:
+   * a list that names the file and fetches the bytes only when a reader asks for
+   * one would otherwise mint a URL per row and throw all of them away. Members
+   * without an uploaded CV are simply absent from the map.
+   */
+  async getStoredCvFiles(
+    memberUids: string[]
+  ): Promise<Map<string, { fileName: string; size?: number; uploadedAt: string }>> {
+    const files = new Map<string, { fileName: string; size?: number; uploadedAt: string }>();
+    if (memberUids.length === 0) {
+      return files;
+    }
+    const rows = await this.prisma.memberCvImport.findMany({
+      where: { memberUid: { in: memberUids }, uploadedAt: { not: null } },
+      select: { memberUid: true, originalFilename: true, fileSizeBytes: true, uploadedAt: true },
+    });
+    for (const row of rows) {
+      files.set(row.memberUid, {
+        fileName: row.originalFilename,
+        ...(row.fileSizeBytes != null ? { size: row.fileSizeBytes } : {}),
+        // Narrowed by the `uploadedAt: { not: null }` filter above.
+        uploadedAt: (row.uploadedAt as Date).toISOString(),
+      });
+    }
+    return files;
+  }
+
   async apply(memberUid: string, body: unknown, requestorEmail: string) {
     await this.assertCanManage(memberUid, requestorEmail);
     const selection = this.parseApplyBody(body);
