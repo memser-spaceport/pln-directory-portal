@@ -276,6 +276,7 @@ model Member {
   jobApplications           JobApplication[]
   jobOpeningInterests       JobOpeningInterest[]
   teamInterests             TeamInterest[]
+  jobCandidateViews         JobCandidateView[]
   integrationKeysCreated    IntegrationKey[]        @relation("IntegrationKeyCreatedBy")
   roadmapItemsCreated       RoadmapItem[]           @relation("roadmapItemCreatedBy")
   roadmapItemsPromoted      RoadmapItem[]           @relation("roadmapItemPromotedBy")
@@ -2440,6 +2441,15 @@ model JobApplication {
   toEmail         String
   ccEmails        String[]   @default([])
   sentAt          DateTime?
+  /// The hiring team's own tick: they have dealt with this person. Shared by the
+  /// whole team, unlike "opened", which is per lead and lives in JobCandidateView.
+  /// Not a pipeline stage — there is no shortlist and no rejection.
+  reviewedAt      DateTime?
+  reviewedByUid   String?
+  /// Chosen to go to the team's ATS. Written by the applicants page; no reader yet.
+  sendToAts       Boolean    @default(false)
+  /// When the row was FIRST flagged. Kept when the flag is cleared again.
+  sendToAtsAt     DateTime?
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
@@ -2456,6 +2466,11 @@ model JobOpeningInterest {
   jobOpening    JobOpening @relation(fields: [jobOpeningUid], references: [uid], onDelete: Cascade)
   memberUid     String
   member        Member     @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  /// The team's tick; see JobApplication for what it does and does not mean.
+  reviewedAt    DateTime?
+  reviewedByUid String?
+  sendToAts     Boolean    @default(false)
+  sendToAtsAt   DateTime?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
@@ -2463,6 +2478,38 @@ model JobOpeningInterest {
   @@index([jobOpeningUid])
   @@index([memberUid])
   @@index([updatedAt])
+}
+
+enum JobCandidateKind {
+  APPLICATION
+  JOB_INTEREST
+}
+
+/// One hiring lead has opened one applicant's row.
+///
+/// Per viewer on purpose: "we have dealt with this person" is the team's fact and
+/// lives on the row as `reviewedAt`, but "I have looked at this" is the reader's,
+/// and a shared column would blank a co-lead's new badge for a row they never
+/// opened. The applicants page's caches are keyed by viewer for the same reason.
+///
+/// `rowUid` addresses either a JobApplication or a JobOpeningInterest, so it
+/// carries no foreign key. Those rows cascade-delete with their job opening and
+/// can leave a view row behind; it is only ever read by `rowUid IN (...)`, so an
+/// orphan is inert.
+model JobCandidateView {
+  id        Int              @id @default(autoincrement())
+  uid       String           @unique @default(cuid())
+  /// The lead who opened it, not the applicant.
+  memberUid String
+  member    Member           @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  kind      JobCandidateKind
+  rowUid    String
+  /// The FIRST open. A second open leaves this alone.
+  seenAt    DateTime         @default(now())
+
+  @@unique([memberUid, kind, rowUid])
+  @@index([rowUid])
+  @@index([memberUid])
 }
 
 /// A member telling a team "I would like to work here", with no job attached.
