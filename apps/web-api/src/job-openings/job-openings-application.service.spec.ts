@@ -4,10 +4,6 @@ jest.mock('../analytics/service/analytics.service', () => ({
 jest.mock('../notifications/notification-service.client', () => ({
   NotificationServiceClient: class NotificationServiceClient {},
 }));
-jest.mock('../member-cv-imports/member-cv-imports.service', () => ({
-  MemberCvImportsService: class MemberCvImportsService {},
-}));
-jest.mock('../utils/aws/aws.service', () => ({ AwsService: class AwsService {} }));
 
 import { BadRequestException, ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { JobOpeningStatus, JobSearchStatus } from '@prisma/client';
@@ -94,21 +90,15 @@ describe('JobOpeningsApplicationService', () => {
   let service: JobOpeningsApplicationService;
   let prisma: PrismaMock;
   let notificationServiceClient: { sendNotification: jest.Mock };
-  let memberCvImportsService: { getCurrentCv: jest.Mock };
-  let awsService: { getObjectBuffer: jest.Mock };
   let analytics: { trackEvent: jest.Mock };
 
   beforeEach(() => {
     prisma = buildPrismaMock();
     notificationServiceClient = { sendNotification: jest.fn().mockResolvedValue({}) };
-    memberCvImportsService = { getCurrentCv: jest.fn().mockResolvedValue(null) };
-    awsService = { getObjectBuffer: jest.fn().mockResolvedValue(null) };
     analytics = { trackEvent: jest.fn() };
     service = new JobOpeningsApplicationService(
       prisma as unknown as PrismaService,
       notificationServiceClient as never,
-      memberCvImportsService as never,
-      awsService as never,
       { pushApplication: jest.fn() } as never,
       analytics as never
     );
@@ -185,56 +175,13 @@ describe('JobOpeningsApplicationService', () => {
     expect(prisma.jobApplication.count).not.toHaveBeenCalled();
   });
 
-  it('attaches the applicant CV to the email when one exists', async () => {
+  it('sends the application email without a CV filename or attachment', async () => {
     mockHappyPath();
-    memberCvImportsService.getCurrentCv.mockResolvedValue({
-      fileName: 'ada-cv.pdf',
-      size: 1024,
-      uploadedAt: '2026-08-01T00:00:00.000Z',
-      s3Bucket: 'test-uploads',
-      s3Key: 'cvs/import-1.pdf',
-    });
-    awsService.getObjectBuffer.mockResolvedValue(Buffer.from('pdf-bytes'));
 
     await service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' });
 
     const payload = notificationServiceClient.sendNotification.mock.calls[0][0].deliveryPayload;
-    expect(payload.body.applicantCv).toBe('ada-cv.pdf');
-    expect(payload.attachments).toEqual([
-      {
-        filename: 'ada-cv.pdf',
-        contentType: 'application/pdf',
-        content: Buffer.from('pdf-bytes').toString('base64'),
-      },
-    ]);
-  });
-
-  it('sends the email without an attachment when the applicant has no CV', async () => {
-    mockHappyPath();
-    memberCvImportsService.getCurrentCv.mockResolvedValue(null);
-
-    await service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' });
-
-    const payload = notificationServiceClient.sendNotification.mock.calls[0][0].deliveryPayload;
-    expect(payload.body.applicantCv).toBeNull();
-    expect(payload.attachments).toBeUndefined();
-  });
-
-  it('still sends the email when the CV object cannot be fetched', async () => {
-    mockHappyPath();
-    memberCvImportsService.getCurrentCv.mockResolvedValue({
-      fileName: 'ada-cv.pdf',
-      size: 1024,
-      uploadedAt: '2026-08-01T00:00:00.000Z',
-      s3Bucket: 'test-uploads',
-      s3Key: 'cvs/import-1.pdf',
-    });
-    awsService.getObjectBuffer.mockRejectedValue(new Error('S3 down'));
-
-    await service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' });
-
-    const payload = notificationServiceClient.sendNotification.mock.calls[0][0].deliveryPayload;
-    expect(payload.body.applicantCv).toBe('ada-cv.pdf');
+    expect(payload.body.applicantCv).toBeUndefined();
     expect(payload.attachments).toBeUndefined();
   });
 
