@@ -7,6 +7,8 @@ import { NotificationServiceClient } from '../notifications/notification-service
 import { AwsService } from '../utils/aws/aws.service';
 import { MemberCvImportsService } from '../member-cv-imports/member-cv-imports.service';
 import { AtsPushService } from '../integration-keys/ats-push.service';
+import { AnalyticsService } from '../analytics/service/analytics.service';
+import { trackJobApplicationRecorded } from './job-openings-analytics';
 import { directoryVisibleMemberWhere } from '../members/member-visibility';
 import { MEMBER_APPROVED, MemberApprovedPayload } from '../member-approvals/member-approvals.events';
 import { noteToHtml } from './job-openings-email-html';
@@ -62,7 +64,8 @@ export class JobOpeningsApplicationService {
     private readonly notificationServiceClient: NotificationServiceClient,
     private readonly memberCvImportsService: MemberCvImportsService,
     private readonly awsService: AwsService,
-    private readonly atsPush: AtsPushService
+    private readonly atsPush: AtsPushService,
+    private readonly analytics: AnalyticsService
   ) {}
 
   async apply(jobUid: string, applicantEmail: string | undefined, input: CreateJobApplicationInput) {
@@ -99,6 +102,11 @@ export class JobOpeningsApplicationService {
         },
       });
 
+      trackJobApplicationRecorded(this.analytics, {
+        applicationUid: record.uid,
+        jobUid: jobOpening.uid,
+        teamUid: jobOpening.teamUid!,
+      });
       this.atsPush.pushApplication(record.uid);
 
       return {

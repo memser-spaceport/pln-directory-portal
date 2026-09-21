@@ -15,6 +15,8 @@ import {
   type PublishableJob,
   type PublishableJobState,
 } from 'libs/contracts/src/schema/publishable-job';
+import { AnalyticsService } from '../analytics/service/analytics.service';
+import { trackIntegrationStatusTransitions, trackJobClaimed } from './job-openings-analytics';
 
 export const INTEGRATION_SIGNAL_TYPE = 'integration';
 export const INTEGRATION_SOURCE_TYPE = 'ATS Integration';
@@ -107,7 +109,8 @@ export class JobOpeningsIntegrationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
-    private readonly integrationKeys: IntegrationKeysService
+    private readonly integrationKeys: IntegrationKeysService,
+    private readonly analytics: AnalyticsService
   ) {}
 
   async upsertByExternalId(
@@ -182,6 +185,13 @@ export class JobOpeningsIntegrationService {
     }
 
     this.emitIngestCompleted(key, now, created, updated);
+    trackIntegrationStatusTransitions(this.analytics, {
+      previousStatus: existing?.status ?? null,
+      nextStatus: row.status,
+      jobUid: row.uid,
+      teamUid: key.teamUid,
+      externalId,
+    });
     return toResponse(row, externalId);
   }
 
@@ -202,6 +212,13 @@ export class JobOpeningsIntegrationService {
       select: rowSelect,
     });
     this.emitIngestCompleted(key, now, 0, 1);
+    trackIntegrationStatusTransitions(this.analytics, {
+      previousStatus: existing.status,
+      nextStatus: row.status,
+      jobUid: row.uid,
+      teamUid: key.teamUid,
+      externalId,
+    });
     return toResponse(row, externalId);
   }
 
@@ -252,6 +269,11 @@ export class JobOpeningsIntegrationService {
       throw error;
     }
     this.emitIngestCompleted(key, now, 0, 1);
+    trackJobClaimed(this.analytics, {
+      jobUid: claimed.uid,
+      teamUid: key.teamUid,
+      externalId,
+    });
     return toResponse(claimed, externalId);
   }
 

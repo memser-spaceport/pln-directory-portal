@@ -1,3 +1,6 @@
+jest.mock('../analytics/service/analytics.service', () => ({
+  AnalyticsService: class AnalyticsService {},
+}));
 jest.mock('../notifications/notification-service.client', () => ({
   NotificationServiceClient: class NotificationServiceClient {},
 }));
@@ -93,18 +96,21 @@ describe('JobOpeningsApplicationService', () => {
   let notificationServiceClient: { sendNotification: jest.Mock };
   let memberCvImportsService: { getCurrentCv: jest.Mock };
   let awsService: { getObjectBuffer: jest.Mock };
+  let analytics: { trackEvent: jest.Mock };
 
   beforeEach(() => {
     prisma = buildPrismaMock();
     notificationServiceClient = { sendNotification: jest.fn().mockResolvedValue({}) };
     memberCvImportsService = { getCurrentCv: jest.fn().mockResolvedValue(null) };
     awsService = { getObjectBuffer: jest.fn().mockResolvedValue(null) };
+    analytics = { trackEvent: jest.fn() };
     service = new JobOpeningsApplicationService(
       prisma as unknown as PrismaService,
       notificationServiceClient as never,
       memberCvImportsService as never,
       awsService as never,
-      { pushApplication: jest.fn() } as never
+      { pushApplication: jest.fn() } as never,
+      analytics as never
     );
     process.env.WEB_UI_BASE_URL = 'https://directory.test';
   });
@@ -133,6 +139,19 @@ describe('JobOpeningsApplicationService', () => {
       jobUid: 'job-1',
       appliedAt: '2026-08-19T12:00:00.000Z',
     });
+    expect(analytics.trackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'job-application-recorded',
+        distinctId: 'application:app-1',
+        properties: expect.objectContaining({
+          application_uid: 'app-1',
+          job_uid: 'job-1',
+          team_uid: 'team-1',
+          origin: 'in-app-apply',
+        }),
+      })
+    );
+    expect(analytics.trackEvent.mock.calls[0][0].properties).not.toHaveProperty('loggedInUserEmail');
     expect(notificationServiceClient.sendNotification).toHaveBeenCalledWith(
       expect.objectContaining({
         templateName: 'JOB_BOARD_APPLICATION_EMAIL',
