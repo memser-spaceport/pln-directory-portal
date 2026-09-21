@@ -27,6 +27,7 @@ export const ALLOWED_CORS_ORIGINS = {
     /dev-analytics.plnetwork.io/,
     /staging-admin.plnetwork.io/,
     /protocol-ai-git-fix-home-page-polaris-01.vercel.app/,
+    'https://os.pl.xyz',
     /\.os\.pl\.xyz$/,
     // Feature/preview frontend deployments.
     // Required because feature frontends run on random Vercel preview hosts
@@ -59,6 +60,7 @@ export const ALLOWED_CORS_ORIGINS = {
     /admin.plnetwork.io/,
     /plnetwork.io/,
     /protocol.ai/,
+    'https://os.pl.xyz',
     /\.os\.pl\.xyz$/,
   ],
 };

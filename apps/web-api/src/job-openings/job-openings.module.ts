@@ -12,7 +12,6 @@ import { JobOpeningsSignUpService } from './job-openings-sign-up.service';
 import { SharedModule } from '../shared/shared.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { MembersModule } from '../members/members.module';
-import { MemberCvImportsModule } from '../member-cv-imports/member-cv-imports.module';
 import { IntegrationKeysModule } from '../integration-keys/integration-keys.module';
 import { JobOpeningsIntegrationController } from './job-openings-integration.controller';
 import { JobOpeningsIntegrationService } from './job-openings-integration.service';
@@ -22,7 +21,6 @@ import { JobOpeningsIntegrationService } from './job-openings-integration.servic
     SharedModule,
     NotificationsModule,
     forwardRef(() => MembersModule),
-    MemberCvImportsModule,
     IntegrationKeysModule,
   ],
   controllers: [JobOpeningsController, JobOpeningsServiceController, JobOpeningsIntegrationController],

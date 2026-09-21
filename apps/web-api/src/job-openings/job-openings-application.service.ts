@@ -4,8 +4,6 @@ import { Prisma } from '@prisma/client';
 import type { CreateJobApplicationInput } from 'libs/contracts/src/schema/job-application';
 import { PrismaService } from '../shared/prisma.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
-import { AwsService } from '../utils/aws/aws.service';
-import { MemberCvImportsService } from '../member-cv-imports/member-cv-imports.service';
 import { AtsPushService } from '../integration-keys/ats-push.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
 import { trackJobApplicationRecorded } from './job-openings-analytics';
@@ -62,8 +60,6 @@ export class JobOpeningsApplicationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationServiceClient: NotificationServiceClient,
-    private readonly memberCvImportsService: MemberCvImportsService,
-    private readonly awsService: AwsService,
     private readonly atsPush: AtsPushService,
     private readonly analytics: AnalyticsService
   ) {}
@@ -191,36 +187,6 @@ export class JobOpeningsApplicationService {
   ) {
     const coverLetterHtml = noteToHtml(coverLetter);
     const jobBoardUrl = jobBoardDetailUrl(jobOpening.uid);
-    const cv = await this.memberCvImportsService.getCurrentCv(applicant.uid);
-    let cvBuffer: Buffer | null = null;
-
-    if (cv) {
-      cvBuffer = await this.awsService.getObjectBuffer(cv.s3Bucket, cv.s3Key).catch((error) => {
-        this.logger.error(`Failed to fetch CV for application email: ${error}`);
-        return null;
-      });
-    }
-
-    const deliveryPayload: any = {
-      body: {
-        applicant: this.buildMemberCard(applicant, jobOpening.uid),
-        roleTitle: jobOpening.roleTitle,
-        teamName: jobOpening.team.name,
-        coverLetterHtml,
-        applyUrl: jobBoardUrl,
-        applicantCv: cv?.fileName ?? null,
-      },
-    };
-
-    if (cv && cvBuffer) {
-      deliveryPayload.attachments = [
-        {
-          filename: cv.fileName,
-          contentType: 'application/pdf',
-          content: cvBuffer.toString('base64'),
-        },
-      ];
-    }
 
     await this.notificationServiceClient.sendNotification({
       isPriority: true,
@@ -232,7 +198,15 @@ export class JobOpeningsApplicationService {
         bcc: process.env.LABOS_EMAIL ? [process.env.LABOS_EMAIL] : [],
         replyTo: applicant.email,
       },
-      deliveryPayload,
+      deliveryPayload: {
+        body: {
+          applicant: this.buildMemberCard(applicant, jobOpening.uid),
+          roleTitle: jobOpening.roleTitle,
+          teamName: jobOpening.team.name,
+          coverLetterHtml,
+          applyUrl: jobBoardUrl,
+        },
+      },
       entityType: 'JOB_OPENING',
       actionType: 'APPLICATION',
       sourceMeta: {
