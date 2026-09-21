@@ -1,17 +1,32 @@
 import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import type { JobOpeningInterestStatus, MarkTeamInterestInput, TeamInterestStatus } from 'libs/contracts/src/schema/job-opening';
+import type {
+  JobOpeningInterestStatus,
+  MarkTeamInterestInput,
+  TeamInterestStatus,
+} from 'libs/contracts/src/schema/job-opening';
 import { PrismaService } from '../shared/prisma.service';
 import { AtsPushService } from '../integration-keys/ats-push.service';
+import { AnalyticsService } from '../analytics/service/analytics.service';
 import { resolveVisibleJobOpening } from './job-openings-resolve';
+import { trackJobInterestRecorded, trackTeamInterestRecorded } from './job-openings-analytics';
 
 @Injectable()
 export class JobOpeningsInterestService {
-  constructor(private readonly prisma: PrismaService, private readonly atsPush: AtsPushService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly atsPush: AtsPushService,
+    private readonly analytics: AnalyticsService
+  ) {}
 
   /** Mark interest in a job opening. Idempotent: re-marking succeeds without double-counting. */
   async markInterest(jobUid: string, memberEmail: string | undefined): Promise<JobOpeningInterestStatus> {
     const memberUid = await this.resolveMemberUid(memberEmail);
-    await resolveVisibleJobOpening(this.prisma, jobUid);
+    const jobOpening = await resolveVisibleJobOpening(this.prisma, jobUid);
+
+    const existing = await this.prisma.jobOpeningInterest.findUnique({
+      where: { jobOpeningUid_memberUid: { jobOpeningUid: jobUid, memberUid } },
+      select: { uid: true },
+    });
 
     const interest = await this.prisma.jobOpeningInterest.upsert({
       where: { jobOpeningUid_memberUid: { jobOpeningUid: jobUid, memberUid } },
@@ -19,6 +34,13 @@ export class JobOpeningsInterestService {
       update: {},
       select: { uid: true },
     });
+    if (!existing) {
+      trackJobInterestRecorded(this.analytics, {
+        interestUid: interest.uid,
+        jobUid,
+        teamUid: jobOpening.teamUid!,
+      });
+    }
     this.atsPush.pushJobInterest(interest.uid);
 
     return this.buildStatus(jobUid, true);
@@ -41,6 +63,11 @@ export class JobOpeningsInterestService {
     }
 
     const message = input?.message?.trim() || null;
+    const existing = await this.prisma.teamInterest.findUnique({
+      where: { teamUid_memberUid: { teamUid, memberUid } },
+      select: { uid: true },
+    });
+
     const interest = await this.prisma.teamInterest.upsert({
       where: { teamUid_memberUid: { teamUid, memberUid } },
       create: { teamUid, memberUid, message },
@@ -49,6 +76,9 @@ export class JobOpeningsInterestService {
       update: message ? { message } : {},
       select: { uid: true },
     });
+    if (!existing) {
+      trackTeamInterestRecorded(this.analytics, { interestUid: interest.uid, teamUid });
+    }
     this.atsPush.pushTeamInterest(interest.uid);
 
     const interestedCount = await this.prisma.teamInterest.count({ where: { teamUid } });

@@ -351,6 +351,15 @@ export const ANALYTICS_EVENTS = {
   MCP: {
     TOOL_INVOKED: 'mcp-tool-invoked',
   },
+  JOB_BOARD: {
+    APPLICATION_RECORDED: 'job-application-recorded',
+    INTEREST_RECORDED: 'job-interest-recorded',
+    TEAM_INTEREST_RECORDED: 'team-interest-recorded',
+    INTEREST_PUSHED_TO_ATS: 'job-interest-pushed-to-ats',
+    PUBLISHED_VIA_INTEGRATION: 'job-published-via-integration',
+    CLOSED_VIA_INTEGRATION: 'job-closed-via-integration',
+    CLAIMED: 'job-claimed',
+  },
 };
 
 export const ANALYTICS_SOURCE = 'directory-backend';

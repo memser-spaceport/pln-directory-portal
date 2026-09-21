@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
 import { MemberCvImportsService } from '../member-cv-imports/member-cv-imports.service';
+import { AnalyticsService } from '../analytics/service/analytics.service';
+import { trackJobInterestPushedToAts } from '../job-openings/job-openings-analytics';
 import {
   applicationSelect,
   jobInterestSelect,
@@ -25,11 +27,20 @@ import {
  */
 const PUSH_TIMEOUT_MS = 5000;
 
+type PushDelivery = {
+  body: object;
+  onSuccess?: () => void;
+};
+
 @Injectable()
 export class AtsPushService {
   private readonly logger = new Logger(AtsPushService.name);
 
-  constructor(private readonly prisma: PrismaService, private readonly cvImports: MemberCvImportsService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cvImports: MemberCvImportsService,
+    private readonly analytics: AnalyticsService
+  ) {}
 
   private config(): { url: string; key: string; teamUid: string } | null {
     const url = process.env.ATS_PUSH_URL;
@@ -50,7 +61,7 @@ export class AtsPushService {
       });
       if (!row) return null;
       const cvUrl = await this.cvImports.getSignedPreviewUrl(row.member.uid);
-      return { applications: [toApplicationRow(row, cvUrl)] };
+      return { body: { applications: [toApplicationRow(row, cvUrl)] } };
     });
   }
 
@@ -60,24 +71,46 @@ export class AtsPushService {
         where: { uid: interestUid, jobOpening: { teamUid } },
         select: jobInterestSelect,
       });
-      return row ? { interests: [toJobInterestRow(row)] } : null;
+      if (!row) return null;
+      return {
+        body: { interests: [toJobInterestRow(row)] },
+        onSuccess: () =>
+          trackJobInterestPushedToAts(this.analytics, {
+            interestUid: row.uid,
+            teamUid,
+            jobUid: row.jobOpening.uid,
+            origin: 'job-interest',
+          }),
+      };
     });
   }
 
   pushTeamInterest(interestUid: string): void {
     void this.deliver(async (teamUid) => {
-      const row = await this.prisma.teamInterest.findFirst({ where: { uid: interestUid, teamUid }, select: teamInterestSelect });
-      return row ? { interests: [toTeamInterestRow(row)] } : null;
+      const row = await this.prisma.teamInterest.findFirst({
+        where: { uid: interestUid, teamUid },
+        select: teamInterestSelect,
+      });
+      if (!row) return null;
+      return {
+        body: { interests: [toTeamInterestRow(row)] },
+        onSuccess: () =>
+          trackJobInterestPushedToAts(this.analytics, {
+            interestUid: row.uid,
+            teamUid,
+            origin: 'team-interest',
+          }),
+      };
     });
   }
 
-  private async deliver(build: (teamUid: string) => Promise<object | null>): Promise<void> {
+  private async deliver(build: (teamUid: string) => Promise<PushDelivery | null>): Promise<void> {
     const config = this.config();
     if (!config) return;
     try {
-      const body = await build(config.teamUid);
+      const payload = await build(config.teamUid);
       // Null means the row belongs to another team, which is not this ATS's business.
-      if (!body) return;
+      if (!payload) return;
       const abort = new AbortController();
       const timer = setTimeout(() => abort.abort(), PUSH_TIMEOUT_MS);
       let response: Response;
@@ -85,7 +118,7 @@ export class AtsPushService {
         response = await fetch(config.url, {
           method: 'POST',
           headers: { Authorization: `Bearer ${config.key}`, 'content-type': 'application/json' },
-          body: JSON.stringify(body),
+          body: JSON.stringify(payload.body),
           signal: abort.signal,
         });
       } finally {
@@ -93,9 +126,13 @@ export class AtsPushService {
       }
       if (!response.ok) {
         this.logger.warn(`ATS push answered ${response.status}; the ATS poll will pick this up`);
+        return;
       }
+      payload.onSuccess?.();
     } catch (error) {
-      this.logger.warn(`ATS push failed (${error instanceof Error ? error.message : String(error)}); the ATS poll will pick this up`);
+      this.logger.warn(
+        `ATS push failed (${error instanceof Error ? error.message : String(error)}); the ATS poll will pick this up`
+      );
     }
   }
 }

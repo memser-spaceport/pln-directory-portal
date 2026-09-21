@@ -1,3 +1,7 @@
+jest.mock('../analytics/service/analytics.service', () => ({
+  AnalyticsService: class AnalyticsService {},
+}));
+
 import { ConflictException, ForbiddenException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@prisma/client';
@@ -106,6 +110,7 @@ describe('JobOpeningsIntegrationService', () => {
   };
   let emit: jest.Mock;
   let assertKeyOwnsTeam: jest.Mock;
+  let trackEvent: jest.Mock;
   let service: JobOpeningsIntegrationService;
 
   beforeEach(() => {
@@ -120,13 +125,15 @@ describe('JobOpeningsIntegrationService', () => {
       team: { findUnique: jest.fn().mockResolvedValue({ name: 'Protocol Labs' }) },
     };
     emit = jest.fn();
+    trackEvent = jest.fn();
     assertKeyOwnsTeam = jest.fn((k: { teamUid: string }, teamUid: string | null) => {
       if (!teamUid || teamUid !== k.teamUid) throw new ForbiddenException();
     });
     service = new JobOpeningsIntegrationService(
       prisma as unknown as PrismaService,
       { emit } as unknown as EventEmitter2,
-      { assertKeyOwnsTeam } as unknown as IntegrationKeysService
+      { assertKeyOwnsTeam } as unknown as IntegrationKeysService,
+      { trackEvent } as never
     );
   });
 
@@ -174,6 +181,18 @@ describe('JobOpeningsIntegrationService', () => {
         boardUrl: 'https://os.example/jobs/openings/job-new',
       });
       expect(out.publishedAt).not.toBeNull();
+      expect(trackEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'job-published-via-integration',
+          distinctId: 'job:job-new',
+          properties: expect.objectContaining({
+            job_uid: 'job-new',
+            team_uid: 'team-1',
+            external_id: 'role-42',
+            origin: 'ats',
+          }),
+        })
+      );
     });
 
     it('updates the owned row in place, nulls omitted optionals, keeps dedupKey and publishedAt', async () => {
@@ -277,6 +296,7 @@ describe('JobOpeningsIntegrationService', () => {
       expect(data.status).toBe('CONFIRMED');
       expect(data.publishedAt).toBeInstanceOf(Date);
       expect(data.publishedAt.getTime()).toBeGreaterThan(new Date('2026-01-01T00:00:00.000Z').getTime());
+      expect(trackEvent).toHaveBeenCalledWith(expect.objectContaining({ name: 'job-published-via-integration' }));
     });
 
     it('closes: CLOSED_ROLE_FILLED with closedAt set', async () => {
@@ -287,6 +307,7 @@ describe('JobOpeningsIntegrationService', () => {
       expect(data.status).toBe('CLOSED_ROLE_FILLED');
       expect(data.closedAt).toBeInstanceOf(Date);
       expect(data).not.toHaveProperty('publishedAt');
+      expect(trackEvent).toHaveBeenCalledWith(expect.objectContaining({ name: 'job-closed-via-integration' }));
     });
 
     it('re-publishes a closed row: closedAt cleared, publishedAt now', async () => {
@@ -336,6 +357,12 @@ describe('JobOpeningsIntegrationService', () => {
       }
       expect(out).toMatchObject({ uid: 'manual-pl-79560093', externalId: 'role-7', dedupKey: crawlerRow.dedupKey });
       expect(emit).toHaveBeenCalledWith('job-ingest.completed', expect.objectContaining({ created: 0, updated: 1 }));
+      expect(trackEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'job-claimed',
+          distinctId: 'job:manual-pl-79560093',
+        })
+      );
     });
 
     it('is a no-op when the row is already claimed by this key', async () => {
@@ -343,6 +370,7 @@ describe('JobOpeningsIntegrationService', () => {
       const out = await service.claim(key, 'job-1', 'role-42');
       expect(prisma.jobOpening.update).not.toHaveBeenCalled();
       expect(emit).not.toHaveBeenCalled();
+      expect(trackEvent).not.toHaveBeenCalled();
       expect(out.uid).toBe('job-1');
     });
 

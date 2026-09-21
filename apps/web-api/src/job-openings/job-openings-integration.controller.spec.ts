@@ -1,3 +1,7 @@
+jest.mock('../analytics/service/analytics.service', () => ({
+  AnalyticsService: class AnalyticsService {},
+}));
+
 import { RequestMethod } from '@nestjs/common';
 import { GUARDS_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { INTEGRATION_SCOPES_KEY } from '../decorators/require-integration-scopes.decorator';
