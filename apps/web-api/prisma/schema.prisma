@@ -3701,6 +3701,10 @@ model AiAppAllowedMember {
   memberUid  String
   /// Who added this member (owner or directory admin).
   addedByUid String
+  /// When the member got their "shared with you" notification. Set once the
+  /// app is PRIVATE and has shipped; rows saved while the app is OPEN start
+  /// stamped (the open broadcast already covered them).
+  notifiedAt DateTime?
   createdAt  DateTime @default(now())
 
   @@id([appUid, memberUid])

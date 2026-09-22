@@ -371,6 +371,7 @@ export function aiAppDetailPath(appUid: string): string {
 export const AI_APPS_NOTIFICATION_TRIGGERS = {
   DEPLOY_SUCCEEDED: 'deploy_succeeded',
   DEPLOY_FAILED: 'deploy_failed',
+  ACCESS_GRANTED: 'access_granted',
 } as const;
 
 /**
@@ -389,5 +390,9 @@ export const AI_APPS_NOTIFICATION_MESSAGES = {
     // AiAppDeploymentInfo.failureReason) — the owner sees the real reason on
     // the app page this notification links to, not in the notification body.
     description: 'Your app failed to deploy — open the app page for details and to retry.',
+  }),
+  accessGranted: (appName: string, ownerName: string | null) => ({
+    title: `${appName} was shared with you`,
+    description: `${ownerName ?? 'Its owner'} gave you access to this private AI App.`,
   }),
 } as const;

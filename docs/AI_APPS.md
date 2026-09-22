@@ -695,6 +695,7 @@ model AiAppAllowedMember {    // whitelist of a PRIVATE app (kept while OPEN)
   appUid     String           // AiApp.uid (no FK relation)
   memberUid  String
   addedByUid String           // owner or directory admin who added them
+  notifiedAt DateTime?        // when they got the "shared with you" notification
   createdAt  DateTime @default(now())
   @@id([appUid, memberUid])
 }
@@ -773,7 +774,7 @@ Both are seeded in migration `20260623120000_ai_apps` and attached to the **PL I
 
 ## Deploy lifecycle bell notifications
 
-Two in-app (bell) notifications, both category `AI_APP` (added in migration
+Three in-app (bell) notifications, all category `AI_APP` (added in migration
 `20260811120000_add_ai_app_notification_category`), distinguished by
 `metadata.trigger` — the same one-category-many-triggers convention the roadmap
 module uses for `GANTRY`. The category is deliberately generic (not
@@ -793,6 +794,18 @@ of growing a new category per event:
     can't both send.
   - Private apps are never announced. Apps that existed before the access-control
     migration were backfilled with `announcedAt` and are never re-announced.
+- **Shared with you** (`trigger: 'access_granted'`) — a private notification to one
+  whitelisted member (`recipientUid`), saying the owner gave them access to a private
+  app. See `AiAppsService.notifyAllowedMembers`.
+  - It is sent only while the app is `PRIVATE` and has shipped (`lastDeployedAt`
+    set). It fires from `PUT /v1/ai-apps/:uid/access` right after a save, and from
+    `markReady`. So members added to a never-deployed draft are notified on its first
+    successful deploy.
+  - Each whitelist row carries `notifiedAt`, stamped with a conditional `updateMany`
+    before sending. A member is notified at most once while on the list; removing and
+    re-adding them creates a fresh row, so they are notified again.
+  - Rows saved while the app is `OPEN` start stamped. The open broadcast already
+    covered those members, so a later switch to `PRIVATE` doesn't ping them.
 - **Deploy failure** (`trigger: 'deploy_failed'`) — private notification to the app's
   **owner only** (`recipientUid: app.memberUid`), sent from every place a deploy can
   fail: `failDeploy` (S3 upload failure, hard runner error, a 2xx body reporting

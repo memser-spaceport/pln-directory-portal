@@ -1311,6 +1311,37 @@ export class AiAppsService {
   }
 
   /**
+   * "Shared with you" notification for members on a PRIVATE app's whitelist,
+   * once the app has shipped (so the link opens a live app). Each member is
+   * notified at most once while on the list: the per-row stamp is conditional,
+   * so a deploy finishing while the owner saves can't double-send.
+   */
+  async notifyAllowedMembers(
+    app: Pick<AiApp, 'uid' | 'name' | 'memberUid' | 'access' | 'lastDeployedAt'>
+  ): Promise<void> {
+    if (app.access !== 'PRIVATE' || !app.lastDeployedAt) {
+      return;
+    }
+    const pending = await this.prisma.aiAppAllowedMember.findMany({
+      where: { appUid: app.uid, notifiedAt: null },
+      select: { memberUid: true },
+    });
+    if (!pending.length) {
+      return;
+    }
+    const owner = await this.prisma.member.findUnique({ where: { uid: app.memberUid }, select: { name: true } });
+    for (const { memberUid } of pending) {
+      const { count } = await this.prisma.aiAppAllowedMember.updateMany({
+        where: { appUid: app.uid, memberUid, notifiedAt: null },
+        data: { notifiedAt: new Date() },
+      });
+      if (count === 1) {
+        await this.notifyAccessGranted(app, memberUid, owner?.name ?? null);
+      }
+    }
+  }
+
+  /**
    * The one-time "new AI App" broadcast to PL Infra members, for an app that
    * is OPEN, has shipped, and was never announced. The stamp is conditional
    * so concurrent callers (a deploy finishing while the owner opens the app)
@@ -1712,6 +1743,7 @@ export class AiAppsService {
       });
       await this.recordEvent('DEPLOY_SUCCEEDED', memberUid, { ...eventContext, message: url });
       await this.announceIfEligible(updated);
+      await this.notifyAllowedMembers(updated);
       return this.toApiApp((await this.withMember([updated]))[0], true);
     };
 
@@ -1936,6 +1968,33 @@ export class AiAppsService {
   }
 
   /** Tells the app's owner (only) that their deploy failed — never a redeploy actor who isn't the owner. */
+  private async notifyAccessGranted(
+    app: Pick<AiApp, 'uid' | 'name'>,
+    recipientUid: string,
+    ownerName: string | null
+  ): Promise<void> {
+    try {
+      await this.pushNotifications.create({
+        category: PushNotificationCategory.AI_APP,
+        ...AI_APPS_NOTIFICATION_MESSAGES.accessGranted(app.name, ownerName),
+        link: aiAppDetailPath(app.uid),
+        recipientUid,
+        isPublic: false,
+        metadata: {
+          eventType: 'ai_app_access',
+          appUid: app.uid,
+          trigger: AI_APPS_NOTIFICATION_TRIGGERS.ACCESS_GRANTED,
+        },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `AI App access-granted notification failed for ${app.uid} → ${recipientUid}: ${
+          error instanceof Error ? error.message : error
+        }`
+      );
+    }
+  }
+
   private async notifyDeployFailed(app: Pick<AiApp, 'uid' | 'name' | 'memberUid'>): Promise<void> {
     try {
       await this.pushNotifications.create({

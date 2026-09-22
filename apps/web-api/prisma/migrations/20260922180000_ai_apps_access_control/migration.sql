@@ -20,6 +20,7 @@ CREATE TABLE "AiAppAllowedMember" (
     "appUid" TEXT NOT NULL,
     "memberUid" TEXT NOT NULL,
     "addedByUid" TEXT NOT NULL,
+    "notifiedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "AiAppAllowedMember_pkey" PRIMARY KEY ("appUid","memberUid")

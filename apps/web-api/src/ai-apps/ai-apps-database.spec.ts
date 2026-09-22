@@ -55,6 +55,7 @@ function buildService(initial: Record<string, any> | null = null) {
       }),
     },
     aiAppEvent: { create: jest.fn().mockResolvedValue({}) },
+    aiAppAllowedMember: { findMany: jest.fn().mockResolvedValue([]) },
     member: {
       findMany: jest.fn().mockResolvedValue([]),
       findUnique: jest.fn().mockResolvedValue(null),

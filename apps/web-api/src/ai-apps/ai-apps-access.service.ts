@@ -65,7 +65,9 @@ export class AiAppsAccessService {
    * Replaces the app's access mode and whole whitelist atomically. The owner is
    * dropped from the list (they always have access); every other uid must be a
    * member holding AI Apps access, or nothing is saved. A deployed app switched
-   * to OPEN for the first time gets its one-time "new AI App" broadcast.
+   * to OPEN for the first time gets its one-time "new AI App" broadcast; newly
+   * whitelisted members of a deployed PRIVATE app get a "shared with you"
+   * notification.
    */
   async updateAccess(requesterUid: string, uid: string, dto: UpdateAiAppAccessDto): Promise<AiAppAccessSettings> {
     const app = await this.findManageableApp(requesterUid, uid);
@@ -85,12 +87,20 @@ export class AiAppsAccessService {
       this.prisma.aiApp.update({ where: { uid: app.uid }, data: { access: dto.access } }),
       this.prisma.aiAppAllowedMember.deleteMany({ where: { appUid: app.uid, memberUid: { in: removed } } }),
       this.prisma.aiAppAllowedMember.createMany({
-        data: added.map((memberUid) => ({ appUid: app.uid, memberUid, addedByUid: requesterUid })),
+        data: added.map((memberUid) => ({
+          appUid: app.uid,
+          memberUid,
+          addedByUid: requesterUid,
+          // Saved while OPEN: the open broadcast covers them, so a later
+          // switch to PRIVATE must not ping them as newly shared.
+          notifiedAt: dto.access === 'OPEN' ? new Date() : null,
+        })),
         skipDuplicates: true,
       }),
     ]);
 
     await this.aiAppsService.announceIfEligible(updated);
+    await this.aiAppsService.notifyAllowedMembers(updated);
     return this.toSettings(updated);
   }
 

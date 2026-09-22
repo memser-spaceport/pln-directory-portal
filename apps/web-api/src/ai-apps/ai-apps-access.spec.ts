@@ -112,9 +112,20 @@ function buildPrisma(apps: Row[] = [PRIVATE_APP, OPEN_APP], allowed: Row[] = [],
             (where.memberUid === undefined ||
               (typeof where.memberUid === 'string'
                 ? row.memberUid === where.memberUid
-                : where.memberUid.in.includes(row.memberUid)))
+                : where.memberUid.in.includes(row.memberUid))) &&
+            (where.notifiedAt === undefined || (row.notifiedAt ?? null) === where.notifiedAt)
         )
       ),
+      updateMany: jest.fn(async ({ where, data }) => {
+        const rows = state.allowed.filter(
+          (row) =>
+            row.appUid === where.appUid &&
+            row.memberUid === where.memberUid &&
+            (where.notifiedAt === undefined || (row.notifiedAt ?? null) === where.notifiedAt)
+        );
+        rows.forEach((row) => Object.assign(row, data));
+        return { count: rows.length };
+      }),
       deleteMany: jest.fn(async ({ where }) => {
         state.allowed = state.allowed.filter(
           (row) => !(row.appUid === where.appUid && where.memberUid.in.includes(row.memberUid))
@@ -354,6 +365,70 @@ describe('announcement', () => {
     const { accessService, pushNotifications } = buildServices(buildPrisma([legacy]));
     await accessService.updateAccess(OWNER, 'app-private', { access: 'OPEN', memberUids: [] });
     expect(pushNotifications.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('"shared with you" notifications', () => {
+  beforeEach(() => mockedAxios.post.mockResolvedValue({ status: 200, data: { port: 31001 } }));
+
+  const accessGrants = (pushNotifications: { create: jest.Mock }) =>
+    pushNotifications.create.mock.calls.map(([dto]) => dto).filter((dto) => dto.metadata?.trigger === 'access_granted');
+
+  it('notifies only the newly added member of a deployed private app', async () => {
+    const prisma = buildPrisma([PRIVATE_APP], [{ appUid: 'app-private', memberUid: VIEWER, notifiedAt: new Date() }]);
+    prisma.member.findUnique.mockImplementation(async ({ where }: Row) =>
+      where.uid === OWNER ? { name: 'Olivia', memberRoles: [] } : { memberRoles: [] }
+    );
+    const { accessService, pushNotifications } = buildServices(prisma);
+
+    await accessService.updateAccess(OWNER, 'app-private', { access: 'PRIVATE', memberUids: [VIEWER, 'friend-1'] });
+
+    const grants = accessGrants(pushNotifications);
+    expect(grants).toHaveLength(1);
+    expect(grants[0]).toMatchObject({
+      recipientUid: 'friend-1',
+      isPublic: false,
+      link: '/pl-infra/ai-apps/app-private',
+      title: 'Secret tool was shared with you',
+      description: 'Olivia gave you access to this private AI App.',
+    });
+    expect(grants[0]).not.toHaveProperty('requiredPermissions');
+  });
+
+  it('saving again does not re-notify anyone', async () => {
+    const { accessService, pushNotifications } = buildServices();
+    await accessService.updateAccess(OWNER, 'app-private', { access: 'PRIVATE', memberUids: ['friend-1'] });
+    await accessService.updateAccess(OWNER, 'app-private', { access: 'PRIVATE', memberUids: ['friend-1'] });
+    expect(accessGrants(pushNotifications)).toHaveLength(1);
+  });
+
+  it('a draft notifies its members on the first successful deploy, not before', async () => {
+    const draft = { ...PRIVATE_APP, status: 'DRAFT', lastDeployedAt: null };
+    const { accessService, aiAppsService, pushNotifications } = buildServices(buildPrisma([draft]));
+
+    await accessService.updateAccess(OWNER, 'app-private', { access: 'PRIVATE', memberUids: ['friend-1'] });
+    expect(accessGrants(pushNotifications)).toHaveLength(0);
+
+    await aiAppsService.deployDraft(OWNER, 'app-private', undefined);
+    expect(accessGrants(pushNotifications).map((dto) => dto.recipientUid)).toEqual(['friend-1']);
+
+    await aiAppsService.deployDraft(OWNER, 'app-private', undefined);
+    expect(accessGrants(pushNotifications)).toHaveLength(1);
+  });
+
+  it('members saved while OPEN are never pinged, even after a switch to PRIVATE', async () => {
+    const { accessService, pushNotifications } = buildServices();
+    await accessService.updateAccess(OWNER, 'app-open', { access: 'OPEN', memberUids: ['friend-1'] });
+    await accessService.updateAccess(OWNER, 'app-open', { access: 'PRIVATE', memberUids: ['friend-1'] });
+    expect(accessGrants(pushNotifications)).toHaveLength(0);
+  });
+
+  it('a removed and re-added member is notified again', async () => {
+    const { accessService, pushNotifications } = buildServices();
+    await accessService.updateAccess(OWNER, 'app-private', { access: 'PRIVATE', memberUids: ['friend-1'] });
+    await accessService.updateAccess(OWNER, 'app-private', { access: 'PRIVATE', memberUids: [] });
+    await accessService.updateAccess(OWNER, 'app-private', { access: 'PRIVATE', memberUids: ['friend-1'] });
+    expect(accessGrants(pushNotifications)).toHaveLength(2);
   });
 });
 
