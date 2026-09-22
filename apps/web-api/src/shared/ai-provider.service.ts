@@ -11,25 +11,80 @@ export type AiProviderType = 'openai' | 'gemini' | 'anthropic';
 const VALID_PROVIDERS: ReadonlySet<AiProviderType> = new Set(['openai', 'gemini', 'anthropic']);
 
 /**
- * The `ai` package turns a missing temperature into 0 before the provider sees it.
- * Opus rejects any temperature field, so the outgoing JSON must not contain one.
+ * Opus rejects `temperature`, and `ai@4.0.19` throws on reasoning chunks.
+ * Thinking is on by default and must be echoed through tool calls, which this
+ * SDK cannot do, so turn it off and drop any reasoning events that still arrive.
  */
-export function omitDeprecatedTemperature(next: typeof fetch = globalThis.fetch): typeof fetch {
+export function adaptOpusFetch(next: typeof fetch = globalThis.fetch): typeof fetch {
   return async (input, init) => {
-    if (typeof init?.body !== 'string') {
-      return next(input, init);
-    }
-    try {
-      const parsed = JSON.parse(init.body);
-      if (parsed && typeof parsed === 'object' && 'temperature' in parsed) {
-        delete parsed.temperature;
-        return next(input, { ...init, body: JSON.stringify(parsed) });
-      }
-    } catch {
-      // Non-JSON bodies are sent unchanged.
-    }
-    return next(input, init);
+    const response = await next(input, rewriteOpusRequest(init));
+    return stripOpusReasoningEvents(response);
   };
+}
+
+function rewriteOpusRequest(init?: RequestInit): RequestInit | undefined {
+  if (typeof init?.body !== 'string') return init;
+  try {
+    const parsed = JSON.parse(init.body);
+    if (!parsed || typeof parsed !== 'object') return init;
+    if ('temperature' in parsed) delete parsed.temperature;
+    parsed.thinking = { type: 'disabled' };
+    return { ...init, body: JSON.stringify(parsed) };
+  } catch {
+    return init;
+  }
+}
+
+/** True for SSE events this SDK turns into unhandled `reasoning` chunks. */
+export function isOpusReasoningSseEvent(event: string): boolean {
+  const dataLine = event.split('\n').find((line) => line.startsWith('data:'));
+  if (!dataLine) return false;
+  const raw = dataLine.slice('data:'.length).trim();
+  if (!raw || raw === '[DONE]') return false;
+  try {
+    const parsed = JSON.parse(raw);
+    const deltaType = parsed?.delta?.type;
+    if (deltaType === 'thinking_delta' || deltaType === 'signature_delta') return true;
+    return parsed?.content_block?.type === 'redacted_thinking';
+  } catch {
+    return false;
+  }
+}
+
+function stripOpusReasoningEvents(response: Response): Response {
+  if (!response?.body || typeof response.headers?.get !== 'function') return response;
+  const contentType = response.headers.get('content-type') ?? '';
+  if (!contentType.includes('text/event-stream')) return response;
+
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
+  let buffer = '';
+  const stream = response.body.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        buffer += decoder.decode(chunk, { stream: true });
+        const events = buffer.split(/\r?\n\r?\n/);
+        buffer = events.pop() ?? '';
+        enqueueKeptEvents(events, encoder, controller);
+      },
+      flush(controller) {
+        buffer += decoder.decode();
+        if (buffer) enqueueKeptEvents([buffer], encoder, controller);
+      },
+    })
+  );
+  return new Response(stream, { status: response.status, statusText: response.statusText, headers: response.headers });
+}
+
+function enqueueKeptEvents(
+  events: string[],
+  encoder: TextEncoder,
+  controller: TransformStreamDefaultController<Uint8Array>
+) {
+  for (const event of events) {
+    if (!event || isOpusReasoningSseEvent(event)) continue;
+    controller.enqueue(encoder.encode(`${event}\n\n`));
+  }
 }
 
 @Injectable()
@@ -55,11 +110,11 @@ export class AiProviderService {
     return this.anthropicClient;
   }
 
-  /** Opus requests go through a fetch that drops `temperature` before they leave. */
+  /** Opus requests drop `temperature` and thinking, which this SDK cannot stream. */
   private getAnthropicClientOmittingTemperature(): AnthropicProvider {
     if (this.anthropicClientOmittingTemperature) return this.anthropicClientOmittingTemperature;
     const inner = anthropicAuth.mode === 'wif' ? anthropicAuth.createWifFetch() : globalThis.fetch;
-    this.anthropicClientOmittingTemperature = this.createAnthropicProvider(omitDeprecatedTemperature(inner));
+    this.anthropicClientOmittingTemperature = this.createAnthropicProvider(adaptOpusFetch(inner));
     return this.anthropicClientOmittingTemperature;
   }
 

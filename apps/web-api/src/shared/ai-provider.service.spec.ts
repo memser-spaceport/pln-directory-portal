@@ -7,7 +7,7 @@ jest.mock('@ai-sdk/google', () => ({ google: jest.fn() }));
 jest.mock('@ai-sdk/anthropic', () => ({ anthropic: jest.fn(), createAnthropic: jest.fn() }));
 
 import { createAnthropic } from '@ai-sdk/anthropic';
-import { AiProviderService } from './ai-provider.service';
+import { AiProviderService, isOpusReasoningSseEvent } from './ai-provider.service';
 
 /**
  * Locks the provider-resolution precedence: feature env var > per-feature
@@ -86,8 +86,23 @@ describe('AiProviderService provider resolution', () => {
       body: JSON.stringify({ model: 'claude-opus-5-5', temperature: 0, max_tokens: 4096 }),
     });
     const sent = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
-    expect(sent).toEqual({ model: 'claude-opus-5-5', max_tokens: 4096 });
+    expect(sent).toEqual({
+      model: 'claude-opus-5-5',
+      max_tokens: 4096,
+      thinking: { type: 'disabled' },
+    });
     expect(sent).not.toHaveProperty('temperature');
+  });
+
+  it('drops thinking stream events this SDK cannot handle', () => {
+    const thinking = 'data: {"type":"content_block_delta","delta":{"type":"thinking_delta","thinking":"x"}}';
+    const signature = 'data: {"type":"content_block_delta","delta":{"type":"signature_delta","signature":"abc"}}';
+    const redacted = 'data: {"type":"content_block_start","content_block":{"type":"redacted_thinking","data":"x"}}';
+    const text = 'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"hi"}}';
+    expect(isOpusReasoningSseEvent(thinking)).toBe(true);
+    expect(isOpusReasoningSseEvent(signature)).toBe(true);
+    expect(isOpusReasoningSseEvent(redacted)).toBe(true);
+    expect(isOpusReasoningSseEvent(text)).toBe(false);
   });
 
   it('returns the web_search_preview tool only for openai', () => {
