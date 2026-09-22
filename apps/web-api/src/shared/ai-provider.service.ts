@@ -10,11 +10,34 @@ export type AiProviderType = 'openai' | 'gemini' | 'anthropic';
 
 const VALID_PROVIDERS: ReadonlySet<AiProviderType> = new Set(['openai', 'gemini', 'anthropic']);
 
+/**
+ * The `ai` package turns a missing temperature into 0 before the provider sees it.
+ * Opus rejects any temperature field, so the outgoing JSON must not contain one.
+ */
+export function omitDeprecatedTemperature(next: typeof fetch = globalThis.fetch): typeof fetch {
+  return async (input, init) => {
+    if (typeof init?.body !== 'string') {
+      return next(input, init);
+    }
+    try {
+      const parsed = JSON.parse(init.body);
+      if (parsed && typeof parsed === 'object' && 'temperature' in parsed) {
+        delete parsed.temperature;
+        return next(input, { ...init, body: JSON.stringify(parsed) });
+      }
+    } catch {
+      // Non-JSON bodies are sent unchanged.
+    }
+    return next(input, init);
+  };
+}
+
 @Injectable()
 export class AiProviderService {
   private readonly logger = new Logger(AiProviderService.name);
   private readonly defaultProvider: AiProviderType;
   private anthropicClient?: AnthropicProvider;
+  private anthropicClientOmittingTemperature?: AnthropicProvider;
 
   constructor() {
     this.defaultProvider = (process.env.AI_PROVIDER as AiProviderType) || 'gemini';
@@ -28,22 +51,35 @@ export class AiProviderService {
    */
   private getAnthropicClient(): AnthropicProvider {
     if (this.anthropicClient) return this.anthropicClient;
+    this.anthropicClient = this.createAnthropicProvider();
+    return this.anthropicClient;
+  }
 
+  /** Opus requests go through a fetch that drops `temperature` before they leave. */
+  private getAnthropicClientOmittingTemperature(): AnthropicProvider {
+    if (this.anthropicClientOmittingTemperature) return this.anthropicClientOmittingTemperature;
+    const inner = anthropicAuth.mode === 'wif' ? anthropicAuth.createWifFetch() : globalThis.fetch;
+    this.anthropicClientOmittingTemperature = this.createAnthropicProvider(omitDeprecatedTemperature(inner));
+    return this.anthropicClientOmittingTemperature;
+  }
+
+  private createAnthropicProvider(fetchImpl?: typeof fetch): AnthropicProvider {
     if (anthropicAuth.mode === 'wif') {
       this.logger.log('Anthropic authentication mode: WIF');
-      this.anthropicClient = createAnthropic({
+      return createAnthropic({
         // @ai-sdk/anthropic@1.x validates that an API key exists before its
         // fetch hook runs. This value is never sent: createWifFetch removes
         // x-api-key and injects the short-lived bearer token instead.
         apiKey: 'wif-managed',
-        fetch: anthropicAuth.createWifFetch(),
+        fetch: fetchImpl ?? anthropicAuth.createWifFetch(),
       });
-      return this.anthropicClient;
     }
 
     const apiKey = anthropicAuth.getApiKey();
-    this.anthropicClient = apiKey ? createAnthropic({ apiKey }) : anthropic;
-    return this.anthropicClient;
+    if (!fetchImpl) {
+      return apiKey ? createAnthropic({ apiKey }) : anthropic;
+    }
+    return createAnthropic({ apiKey: apiKey || 'unset', fetch: fetchImpl });
   }
 
   /**
@@ -104,7 +140,8 @@ export class AiProviderService {
     if (provider === 'anthropic') {
       const model =
         options?.modelOverride || process.env.CLAUDE_MODEL || process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
-      return this.getAnthropicClient()(model) as LanguageModel;
+      const client = /opus/i.test(model) ? this.getAnthropicClientOmittingTemperature() : this.getAnthropicClient();
+      return client(model) as LanguageModel;
     }
 
     const model = options?.modelOverride || process.env.OPENAI_LLM_MODEL || 'gpt-4o';
