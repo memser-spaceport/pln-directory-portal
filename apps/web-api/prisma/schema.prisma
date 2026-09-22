@@ -275,6 +275,7 @@ model Member {
   jobReferralsReceived      JobReferral[]           @relation("JobReferralReferred")
   jobApplications           JobApplication[]
   jobOpeningInterests       JobOpeningInterest[]
+  savedJobOpenings          SavedJobOpening[]
   teamInterests             TeamInterest[]
   jobCandidateViews         JobCandidateView[]
   integrationKeysCreated    IntegrationKey[]        @relation("IntegrationKeyCreatedBy")
@@ -2355,6 +2356,7 @@ model JobOpening {
   referrals       JobReferral[]
   applications    JobApplication[]
   interests       JobOpeningInterest[]
+  savedBy         SavedJobOpening[]
 
   @@index([status])
   @@index([companyName])
@@ -2478,6 +2480,32 @@ model JobOpeningInterest {
   @@index([jobOpeningUid])
   @@index([memberUid])
   @@index([updatedAt])
+}
+
+/// A member's private bookmark on a job opening.
+///
+/// Not JobOpeningInterest with a flag: interest is a signal TO the hiring team,
+/// one-way and pushed to their ATS, while a save is visible to nobody and is
+/// meant to be undone. Nothing here is reviewed, so the triage columns its
+/// neighbour carries are absent.
+///
+/// `createdAt` is the clock the Saved tab reads back ("Saved 3d ago"); a repeat
+/// save leaves it alone. A save of a role that later closes is kept, not
+/// deleted — the reads filter on the job's visibility, so it returns if the
+/// role does.
+model SavedJobOpening {
+  id            Int        @id @default(autoincrement())
+  uid           String     @unique @default(cuid())
+  jobOpeningUid String
+  jobOpening    JobOpening @relation(fields: [jobOpeningUid], references: [uid], onDelete: Cascade)
+  memberUid     String
+  member        Member     @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@unique([jobOpeningUid, memberUid])
+  @@index([jobOpeningUid])
+  @@index([memberUid])
 }
 
 enum JobCandidateKind {

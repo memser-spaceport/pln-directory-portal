@@ -1,5 +1,9 @@
 import { JobOpeningStatus } from '@prisma/client';
-import { trackIntegrationStatusTransitions, trackJobApplicationRecorded } from './job-openings-analytics';
+import {
+  trackIntegrationStatusTransitions,
+  trackJobApplicationRecorded,
+  trackJobSaveRecorded,
+} from './job-openings-analytics';
 
 describe('job-openings-analytics', () => {
   const analytics = { trackEvent: jest.fn() };
@@ -23,6 +27,21 @@ describe('job-openings-analytics', () => {
         job_uid: 'job-1',
         team_uid: 'team-1',
         origin: 'in-app-apply',
+      },
+    });
+  });
+
+  it('tracks a save with no member on it', () => {
+    trackJobSaveRecorded(analytics as never, { saveUid: 'save-1', jobUid: 'job-1', teamUid: 'team-1' });
+
+    expect(analytics.trackEvent).toHaveBeenCalledWith({
+      name: 'job-save-recorded',
+      distinctId: 'save:save-1',
+      properties: {
+        save_uid: 'save-1',
+        job_uid: 'job-1',
+        team_uid: 'team-1',
+        origin: 'job-save',
       },
     });
   });
