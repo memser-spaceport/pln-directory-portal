@@ -10,10 +10,21 @@ export type AiProviderType = 'openai' | 'gemini' | 'anthropic';
 
 const VALID_PROVIDERS: ReadonlySet<AiProviderType> = new Set(['openai', 'gemini', 'anthropic']);
 
+type OpusThinkingBlock =
+  | { type: 'thinking'; thinking: string; signature: string }
+  | { type: 'redacted_thinking'; data: string };
+type OpusTurnPart = OpusThinkingBlock | { type: 'tool_use'; id: string };
+
+/**
+ * Tool-call ids from a response whose thinking blocks this SDK dropped.
+ * The follow-up request must send those blocks back unchanged.
+ */
+const pendingTurnByToolCallId = new Map<string, OpusTurnPart[]>();
+
 /**
  * Opus rejects `temperature`, and `ai@4.0.19` throws on reasoning chunks.
- * Thinking is on by default and must be echoed through tool calls, which this
- * SDK cannot do, so turn it off and drop any reasoning events that still arrive.
+ * Thinking stays on (this model rejects `disabled`). Reasoning events are
+ * removed from the stream, then restored on the tool-call follow-up.
  */
 export function adaptOpusFetch(next: typeof fetch = globalThis.fetch): typeof fetch {
   return async (input, init) => {
@@ -25,30 +36,140 @@ export function adaptOpusFetch(next: typeof fetch = globalThis.fetch): typeof fe
 function rewriteOpusRequest(init?: RequestInit): RequestInit | undefined {
   if (typeof init?.body !== 'string') return init;
   try {
-    const parsed = JSON.parse(init.body);
-    if (!parsed || typeof parsed !== 'object') return init;
-    if ('temperature' in parsed) delete parsed.temperature;
-    parsed.thinking = { type: 'disabled' };
-    return { ...init, body: JSON.stringify(parsed) };
+    return { ...init, body: prepareOpusRequestBody(init.body) };
   } catch {
     return init;
   }
 }
 
+/** Drops `temperature` and puts captured thinking blocks back on tool-use turns. */
+export function prepareOpusRequestBody(body: string): string {
+  const parsed = JSON.parse(body);
+  if (!parsed || typeof parsed !== 'object') return body;
+  if ('temperature' in parsed) delete parsed.temperature;
+  if (parsed.thinking?.type === 'disabled') delete parsed.thinking;
+  restoreThinkingBlocks(parsed.messages);
+  return JSON.stringify(parsed);
+}
+
+function restoreThinkingBlocks(messages: unknown) {
+  if (!Array.isArray(messages)) return;
+  for (const message of messages) {
+    if (!message || message.role !== 'assistant' || !Array.isArray(message.content)) continue;
+    if (message.content.some((part) => part?.type === 'thinking' || part?.type === 'redacted_thinking')) continue;
+    const toolUse = message.content.find((part) => part?.type === 'tool_use' && pendingTurnByToolCallId.has(part.id));
+    if (!toolUse) continue;
+    const recorded = pendingTurnByToolCallId.get(toolUse.id) ?? [];
+    message.content = mergeThinkingBlocks(recorded, message.content);
+    for (const part of recorded) {
+      if (part.type === 'tool_use') pendingTurnByToolCallId.delete(part.id);
+    }
+  }
+}
+
+function mergeThinkingBlocks(recorded: OpusTurnPart[], content: Array<{ type?: string; id?: string }>) {
+  const merged: unknown[] = [];
+  let index = 0;
+  while (recorded[index] && recorded[index].type !== 'tool_use') {
+    merged.push(recorded[index]);
+    index += 1;
+  }
+  for (const part of content) {
+    merged.push(part);
+    if (part?.type !== 'tool_use') continue;
+    const recordedPart = recorded[index];
+    if (recordedPart?.type === 'tool_use' && recordedPart.id === part.id) index += 1;
+    while (recorded[index] && recorded[index].type !== 'tool_use') {
+      merged.push(recorded[index]);
+      index += 1;
+    }
+  }
+  return merged;
+}
+
+/** Parses one assistant stream and remembers thinking blocks keyed by tool-call id. */
+export function recordOpusSse(sse: string) {
+  const capture = new OpusTurnCapture();
+  for (const event of sse.split(/\r?\n\r?\n/)) capture.observe(event);
+  capture.finish();
+}
+
+class OpusTurnCapture {
+  private readonly parts: OpusTurnPart[] = [];
+  private readonly openThinking = new Map<number, { type: 'thinking'; thinking: string; signature: string }>();
+  private finished = false;
+
+  observe(event: string) {
+    const parsed = parseSseData(event);
+    if (!parsed) return;
+    if (parsed.type === 'content_block_start') {
+      const block = parsed.content_block;
+      if (block?.type === 'thinking' && parsed.index != null) {
+        this.openThinking.set(parsed.index, { type: 'thinking', thinking: block.thinking ?? '', signature: '' });
+      } else if (block?.type === 'redacted_thinking' && block.data) {
+        this.parts.push({ type: 'redacted_thinking', data: block.data });
+      } else if (block?.type === 'tool_use' && block.id) {
+        this.parts.push({ type: 'tool_use', id: block.id });
+      }
+      return;
+    }
+    if (parsed.type === 'content_block_delta' && parsed.index != null) {
+      const open = this.openThinking.get(parsed.index);
+      if (!open) return;
+      if (parsed.delta?.type === 'thinking_delta') open.thinking += parsed.delta.thinking ?? '';
+      if (parsed.delta?.type === 'signature_delta') open.signature += parsed.delta.signature ?? '';
+      return;
+    }
+    if (parsed.type === 'content_block_stop' && parsed.index != null) {
+      const open = this.openThinking.get(parsed.index);
+      if (!open) return;
+      this.openThinking.delete(parsed.index);
+      if (open.signature) this.parts.push(open);
+      return;
+    }
+    if (parsed.type === 'message_stop') this.finish();
+  }
+
+  finish() {
+    if (this.finished) return;
+    this.finished = true;
+    for (const open of this.openThinking.values()) {
+      if (open.signature) this.parts.push(open);
+    }
+    this.openThinking.clear();
+    const toolIds = this.parts.filter((part): part is { type: 'tool_use'; id: string } => part.type === 'tool_use');
+    if (!toolIds.length || toolIds.length === this.parts.length) return;
+    for (const tool of toolIds) pendingTurnByToolCallId.set(tool.id, this.parts);
+  }
+}
+
+function parseSseData(event: string):
+  | {
+      type?: string;
+      index?: number;
+      content_block?: { type?: string; thinking?: string; data?: string; id?: string };
+      delta?: { type?: string; thinking?: string; signature?: string };
+    }
+  | undefined {
+  const dataLine = event.split('\n').find((line) => line.startsWith('data:'));
+  if (!dataLine) return undefined;
+  const raw = dataLine.slice('data:'.length).trim();
+  if (!raw || raw === '[DONE]') return undefined;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+}
+
 /** True for SSE events this SDK turns into unhandled `reasoning` chunks. */
 export function isOpusReasoningSseEvent(event: string): boolean {
-  const dataLine = event.split('\n').find((line) => line.startsWith('data:'));
-  if (!dataLine) return false;
-  const raw = dataLine.slice('data:'.length).trim();
-  if (!raw || raw === '[DONE]') return false;
-  try {
-    const parsed = JSON.parse(raw);
-    const deltaType = parsed?.delta?.type;
-    if (deltaType === 'thinking_delta' || deltaType === 'signature_delta') return true;
-    return parsed?.content_block?.type === 'redacted_thinking';
-  } catch {
-    return false;
-  }
+  const parsed = parseSseData(event);
+  if (!parsed) return false;
+  const deltaType = parsed.delta?.type;
+  if (deltaType === 'thinking_delta' || deltaType === 'signature_delta') return true;
+  const blockType = parsed.content_block?.type;
+  return blockType === 'thinking' || blockType === 'redacted_thinking';
 }
 
 function stripOpusReasoningEvents(response: Response): Response {
@@ -58,6 +179,7 @@ function stripOpusReasoningEvents(response: Response): Response {
 
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
+  const capture = new OpusTurnCapture();
   let buffer = '';
   const stream = response.body.pipeThrough(
     new TransformStream<Uint8Array, Uint8Array>({
@@ -65,11 +187,12 @@ function stripOpusReasoningEvents(response: Response): Response {
         buffer += decoder.decode(chunk, { stream: true });
         const events = buffer.split(/\r?\n\r?\n/);
         buffer = events.pop() ?? '';
-        enqueueKeptEvents(events, encoder, controller);
+        enqueueKeptEvents(events, encoder, controller, capture);
       },
       flush(controller) {
         buffer += decoder.decode();
-        if (buffer) enqueueKeptEvents([buffer], encoder, controller);
+        if (buffer) enqueueKeptEvents([buffer], encoder, controller, capture);
+        capture.finish();
       },
     })
   );
@@ -79,10 +202,13 @@ function stripOpusReasoningEvents(response: Response): Response {
 function enqueueKeptEvents(
   events: string[],
   encoder: TextEncoder,
-  controller: TransformStreamDefaultController<Uint8Array>
+  controller: TransformStreamDefaultController<Uint8Array>,
+  capture: OpusTurnCapture
 ) {
   for (const event of events) {
-    if (!event || isOpusReasoningSseEvent(event)) continue;
+    if (!event) continue;
+    capture.observe(event);
+    if (isOpusReasoningSseEvent(event)) continue;
     controller.enqueue(encoder.encode(`${event}\n\n`));
   }
 }
@@ -110,7 +236,7 @@ export class AiProviderService {
     return this.anthropicClient;
   }
 
-  /** Opus requests drop `temperature` and thinking, which this SDK cannot stream. */
+  /** Opus requests drop `temperature`. Thinking events are restored on tool follow-ups. */
   private getAnthropicClientOmittingTemperature(): AnthropicProvider {
     if (this.anthropicClientOmittingTemperature) return this.anthropicClientOmittingTemperature;
     const inner = anthropicAuth.mode === 'wif' ? anthropicAuth.createWifFetch() : globalThis.fetch;
