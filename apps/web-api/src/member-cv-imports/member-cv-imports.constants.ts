@@ -1,6 +1,6 @@
 export const MEMBER_CV_PARSE_AI_PROVIDER_ENV = 'MEMBER_CV_PARSE_AI_PROVIDER';
 
-export const CV_IMPORT_MAX_BYTES = 5 * 1024 * 1024;
+export const CV_IMPORT_MAX_BYTES = 10 * 1024 * 1024;
 export const CV_IMPORT_MAX_TEXT_CHARS = 100_000;
 export const CV_IMPORT_S3_PREFIX = 'cvs';
 

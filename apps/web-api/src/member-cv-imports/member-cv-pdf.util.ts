@@ -6,7 +6,7 @@ export function assertPdfFile(file: { buffer?: Buffer; mimetype?: string; size?:
     throw new BadRequestException('File is required');
   }
   if ((file.size ?? file.buffer.length) > CV_IMPORT_MAX_BYTES) {
-    throw new BadRequestException('PDF must be 5MB or smaller');
+    throw new BadRequestException('PDF must be 10MB or smaller');
   }
   const mime = (file.mimetype || '').toLowerCase();
   if (mime && !CV_IMPORT_PDF_MIME_TYPES.includes(mime)) {
