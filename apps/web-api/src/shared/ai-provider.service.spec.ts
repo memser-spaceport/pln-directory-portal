@@ -6,6 +6,7 @@ jest.mock('@ai-sdk/openai', () => ({
 jest.mock('@ai-sdk/google', () => ({ google: jest.fn() }));
 jest.mock('@ai-sdk/anthropic', () => ({ anthropic: jest.fn(), createAnthropic: jest.fn() }));
 
+import { anthropic } from '@ai-sdk/anthropic';
 import { AiProviderService } from './ai-provider.service';
 
 /**
@@ -60,11 +61,26 @@ describe('AiProviderService provider resolution', () => {
     expect(service.getModelName(FEATURE_VAR, 'openai')).toBe('openai-model');
   });
 
+  it('forces the provider and model id when overrides are set, ignoring the feature env and CLAUDE_MODEL', () => {
+    process.env[FEATURE_VAR] = 'gemini';
+    process.env.CLAUDE_MODEL = 'claude-sonnet-4-6';
+    delete process.env.CLAUDE_API_KEY;
+    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.ANTHROPIC_AUTH_MODE;
+    const service = new AiProviderService();
+
+    service.getResponsesModel(FEATURE_VAR, {
+      useSearchGrounding: false,
+      providerOverride: 'anthropic',
+      modelOverride: 'claude-opus-5-5',
+    });
+
+    expect(anthropic).toHaveBeenCalledWith('claude-opus-5-5');
+  });
+
   it('returns the web_search_preview tool only for openai', () => {
     const service = new AiProviderService();
-    expect(service.getWebSearchTool(FEATURE_VAR, { fallbackProvider: 'openai' })).toHaveProperty(
-      'web_search_preview'
-    );
+    expect(service.getWebSearchTool(FEATURE_VAR, { fallbackProvider: 'openai' })).toHaveProperty('web_search_preview');
     process.env[FEATURE_VAR] = 'gemini';
     expect(service.getWebSearchTool(FEATURE_VAR, { fallbackProvider: 'openai' })).toEqual({});
   });

@@ -100,12 +100,13 @@ export class JobOpeningsTool {
       .map((group) => {
         const roles = group.roles
           .map(
-            // Roles link to the directory's own job page (which carries the apply flow),
-            // never to the team's external board, so citations stay inside the directory.
-            (role) =>
-              `- ${role.roleTitle} (${role.seniority ?? 'Not specified'}, ${
+            // Citations stay on the directory job page. Apply is the external board, for source refs only.
+            (role) => {
+              const apply = role.applyUrl ? ` Apply: ${role.applyUrl}` : '';
+              return `- ${role.roleTitle} (${role.seniority ?? 'Not specified'}, ${
                 role.location.join(', ') || 'Not specified'
-              }, ${role.workMode ?? 'Not specified'}) [JobLink](${jobOpeningPath(role.uid)})`
+              }, ${role.workMode ?? 'Not specified'}) [JobLink](${jobOpeningPath(role.uid)})${apply}`;
+            }
           )
           .join('\n');
 

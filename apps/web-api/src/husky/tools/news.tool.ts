@@ -20,9 +20,9 @@ export const DEFAULT_NEWS_WINDOW_DAYS = 90;
  * paragraph, or as a table whose summary column is unreadable.
  */
 export const NEWS_PRESENTATION_HINT =
-  'Present each news item as its own short entry: the title in bold with a citation to its Source, ' +
-  'then the event type and date on one line, then a one-sentence summary. Do not repeat the field ' +
-  'labels below, cite each item once, and do not use a table unless the user asks for one.';
+  'Present each news item as its own short entry: the title in bold with a citation to its [NewsLink] path, ' +
+  'not the external Source URL, then the event type and date on one line, then a one-sentence summary. ' +
+  'Do not repeat the field labels below, cite each item once, and do not use a table unless the user asks for one.';
 
 const NewsToolParams = z.object({
   search: z.string().describe('Search term to look for in the news title, summary, or team name').optional(),
@@ -84,7 +84,7 @@ export class NewsTool {
 
     const entries = items.map(
       (item) => `Team: ${item.teamName} [TeamLink](/teams/${item.teamUid})
-                Title: ${item.title}
+                Title: ${item.title} [NewsLink](/home?news=${item.uid})
                 Event Type: ${item.eventType}
                 Date: ${item.eventDate.slice(0, 10)}
                 Summary: ${item.summary || 'Not provided'}

@@ -79,23 +79,35 @@ export class AiProviderService {
    */
   getResponsesModel(
     featureProviderEnvVar?: string,
-    options?: { useSearchGrounding?: boolean; fallbackProvider?: AiProviderType }
+    options?: {
+      useSearchGrounding?: boolean;
+      fallbackProvider?: AiProviderType;
+      /** Skip feature env resolution and use this provider for this call only. */
+      providerOverride?: AiProviderType;
+      /** Skip OPENAI_LLM_MODEL / GEMINI_MODEL / CLAUDE_MODEL for this call only. */
+      modelOverride?: string;
+    }
   ): LanguageModel {
-    const provider = this.resolveProvider(featureProviderEnvVar, options?.fallbackProvider);
+    const override = options?.providerOverride;
+    const provider =
+      override && VALID_PROVIDERS.has(override)
+        ? override
+        : this.resolveProvider(featureProviderEnvVar, options?.fallbackProvider);
 
     if (provider === 'gemini') {
-      const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+      const model = options?.modelOverride || process.env.GEMINI_MODEL || 'gemini-2.5-flash';
       return google(model, {
         useSearchGrounding: options?.useSearchGrounding ?? true,
       }) as unknown as LanguageModel;
     }
 
     if (provider === 'anthropic') {
-      const model = process.env.CLAUDE_MODEL || process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
+      const model =
+        options?.modelOverride || process.env.CLAUDE_MODEL || process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
       return this.getAnthropicClient()(model) as LanguageModel;
     }
 
-    const model = process.env.OPENAI_LLM_MODEL || 'gpt-4o';
+    const model = options?.modelOverride || process.env.OPENAI_LLM_MODEL || 'gpt-4o';
     return openai.responses(model) as LanguageModel;
   }
 

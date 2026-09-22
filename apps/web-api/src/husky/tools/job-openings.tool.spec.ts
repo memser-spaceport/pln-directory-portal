@@ -49,7 +49,8 @@ describe('JobOpeningsTool', () => {
 
     expect(result).toContain(`[JobLink](${jobOpeningPath('role-1')})`);
     expect(result).toContain('[JobLink](/jobs/openings/role-1)');
-    expect(result).not.toContain('jobs.example-team.com');
+    expect(result).toContain('Apply: https://jobs.example-team.com/apply/123');
+    expect(result).not.toContain('[JobLink](https://jobs.example-team.com/apply/123)');
     expect(result).not.toContain('ApplyLink');
     expect(result).toContain('[TeamLink](/teams/team-1)');
   });

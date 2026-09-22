@@ -387,7 +387,7 @@ export const HUSKY_CONTENT_GUIDELINES = `
 - **Formatting**:
   - Use tables for structured data with columns and rows, especially when there are more than 1 items to represent.
   - Prioritize table format over list, bullet points in appropriate cases.
-  - News items (from getTeamNews): one entry per item — the title in bold with its source citation, the event type and date on the next line, then a one-sentence summary. Never output raw field labels such as "Title:" or "Event Type:", cite each item once, and use a table only when the user asks for one.
+  - News items (from getTeamNews): one entry per item — the title in bold with a citation to its [NewsLink] path, not the external Source URL, the event type and date on the next line, then a one-sentence summary. Never output raw field labels such as "Title:" or "Event Type:", cite each item once, and use a table only when the user asks for one.
   - Convert comma-separated lists or any listed items (>3 items) to bullet points or table format whichever is appropriate
   - For large sets of information:
   - Apply code blocks for technical content when appropriate or when user specifically asks for it. Eg. give me the result in markdown. Then use code blocks. with language as markdown.
@@ -404,6 +404,7 @@ export const HUSKY_CONTENT_GUIDELINES = `
    - **Strictly** use index numbers as citation labels (e.g., [1](url1), [2](url2))
    - **Strictly** NEVER use URL names as citation labels (e.g., NEVER use the format [example1](example1.com) or [example2](example2.com) instead use index numbers like [1](url1), [2](url2)) 
    - ALWAYS use same citation label when same url is used in more than one place. Eg 1: If source1.com is first cited as [1](source1.com), all subsequent citations of source1.com must also use [1](source1.com)
+   - When the context marks an in-product page ([MemberLink], [TeamLink], [ProjectLink], [EventLink], [JobLink], [NewsLink], or [ForumLink]), cite that path. Do not cite a Source, Website, Apply, or Forum Link URL from the same record instead.
    - Another Eg:
      - First citation of source1.com → 1 - > [1](source1.com)
      - First citation of source2.com → 2 - > [2](source2.com)
@@ -444,7 +445,7 @@ export const HUSKY_CONTEXTUAL_TOOLS_STRUCTURED_PROMPT = `
 You are an AI assistant of Protocol Labs Directory that generates structured data for a response. Based on the provided content and context, generate:
 1. A list of unique sources mentioned in the content
 2. Follow-up questions that would be relevant to explore the topic further
-3. Any relevant actions that could be taken based on the context. Only links marked as [MemberLink](link), [TeamLink](link), [ProjectLink](link), [EventLink](link) from the provided context are allowed.
+3. Any relevant actions that could be taken based on the context. Only links marked as [MemberLink](link), [TeamLink](link), [ProjectLink](link), [EventLink](link), [JobLink](link), [NewsLink](link), or [ForumLink](link) from the provided context are allowed.
 
 ## Response Format
 Return a valid JSON object with the following structure:
@@ -455,7 +456,7 @@ Return a valid JSON object with the following structure:
     {
       "name": "Action name",
       "directoryLink": "link/to/action",
-      "type": "Member|Team|Project|Event"
+      "type": "Member|Team|Project|Event|Job|News|Forum"
     }
   ]
 }
@@ -467,11 +468,12 @@ Return a valid JSON object with the following structure:
 
 ### Actions
 - Include up to 6 relevant actions
-- Only use links that are explicitly marked in the context as [MemberLink](link), [TeamLink](link), [ProjectLink](link), or [EventLink](link)
+- Only use links that are explicitly marked in the context as [MemberLink](link), [TeamLink](link), [ProjectLink](link), [EventLink](link), [JobLink](link), [NewsLink](link), or [ForumLink](link)
 - Do not create new links or use any other types of links
 - Extract the actual link from the markdown format (e.g., from [MemberLink](/members/123) use /members/123)
 - Return an empty array if no relevant actions are available
-- Action name should only be the name of the Member, Team, Project, or Event
+- Action name should only be the name of the Member, Team, Project, Event, Job, News item, or Forum topic
+- Action type must be one of Member, Team, Project, Event, Job, News, or Forum, matching the marker
 - Do not use call-to-action names for action names
 `;
 
