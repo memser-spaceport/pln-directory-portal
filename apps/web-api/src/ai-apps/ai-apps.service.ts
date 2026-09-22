@@ -146,11 +146,19 @@ interface AiAppDatabaseInfo {
   credentialsInjected?: boolean | null;
 }
 
-/** App responses: the raw `failureStream`/`database` columns replaced by requester-facing `deployment`/`database` blocks. */
-type ApiAiApp<T extends { memberUid: string }> = Omit<WithMember<T>, 'failureStream' | 'database'> & {
+/**
+ * App responses: the raw `failureStream`/`database` columns replaced by
+ * requester-facing `deployment`/`database` blocks. `announcedAt` never leaves
+ * the API; `directLinkGateReady` is manager-only.
+ */
+type ApiAiApp<T extends { memberUid: string }> = Omit<
+  WithMember<T>,
+  'failureStream' | 'database' | 'announcedAt' | 'directLinkGateReady'
+> & {
   deployment: AiAppDeploymentInfo;
   database: AiAppDatabaseInfo;
   weeklyActiveUsers: number;
+  directLinkGateReady?: boolean;
 };
 
 /** One newest-first (`order=desc`) log line as served to the dashboard. */
@@ -410,7 +418,8 @@ export class AiAppsService {
    * only writer of `lastDeployedAt` is markReady).
    */
   private toApiApp<T extends AiApp>(app: WithMember<T>, isManager: boolean, weeklyActiveUsers = 0): ApiAiApp<T> {
-    const { failureStream, database: storedDatabase, ...rest } = app;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { failureStream, database: storedDatabase, announcedAt, directLinkGateReady, ...rest } = app;
     const serving: AiAppServing = app.status === 'READY' ? 'latest' : app.lastDeployedAt ? 'previous' : 'none';
     const deployment: AiAppDeploymentInfo = { serving };
     if (isManager) {
@@ -430,6 +439,7 @@ export class AiAppsService {
       database,
       viewCount: app.viewCount ?? 0,
       weeklyActiveUsers,
+      ...(isManager ? { directLinkGateReady } : {}),
     };
   }
 
@@ -461,6 +471,7 @@ export class AiAppsService {
     if (!app || app.status === 'DELETED') {
       throw new NotFoundException(`AI App not found: ${uid}`);
     }
+    await this.assertCanViewApp(memberUid, app);
 
     if (memberUid !== app.memberUid) {
       const updated = await this.prisma.$executeRaw`
@@ -479,16 +490,21 @@ export class AiAppsService {
     });
   }
 
-  /** Dashboard list — all non-deleted apps across PL Infra users, newest first, with owner info. */
+  /**
+   * Dashboard list — non-deleted apps the requester may view (OPEN apps, their
+   * own, and private apps they are whitelisted on; directory admins see all),
+   * newest first, with owner info.
+   */
   async listApps(requesterUid?: string): Promise<Array<ApiAiApp<AiApp>>> {
-    const apps = await this.prisma.aiApp.findMany({
-      where: { status: { not: 'DELETED' } },
-      orderBy: { updatedAt: 'desc' },
-    });
-    const settled = await Promise.all(apps.map((app) => this.settleStuckDeploy(app)));
     // One admin lookup for the requester, then a per-row creator compare —
     // never a per-row query.
     const isAdmin = !!requesterUid && (await this.isRequesterDirectoryAdmin(requesterUid));
+    const visible = await this.visibleAppsWhere(requesterUid, isAdmin);
+    const apps = await this.prisma.aiApp.findMany({
+      where: { status: { not: 'DELETED' }, ...(visible ? { AND: [visible] } : {}) },
+      orderBy: { updatedAt: 'desc' },
+    });
+    const settled = await Promise.all(apps.map((app) => this.settleStuckDeploy(app)));
     const withMembers = await this.withMember(settled);
     const wau = await this.weeklyActiveUsersByApp(settled.map((app) => app.uid));
     return withMembers.map((app, index) =>
@@ -504,12 +520,15 @@ export class AiAppsService {
    * Single app detail. When the requester is known, the response carries
    * `canManage` (creator or directory admin) — computed server-side so the UI
    * never has to compare member uids from a possibly stale login cookie.
+   * 403 for a private app the requester may not view (an unresolved requester
+   * only sees OPEN apps).
    */
   async getApp(uid: string, requesterUid?: string): Promise<ApiAiApp<AiApp> & { canManage?: boolean }> {
     let app = await this.prisma.aiApp.findUnique({ where: { uid } });
     if (!app) {
       throw new NotFoundException(`AI App not found: ${uid}`);
     }
+    await this.assertCanViewApp(requesterUid, app);
     app = await this.settleStuckDeploy(app);
     const result = (await this.withMember([app]))[0];
     const wau = await this.weeklyActiveUsersByApp([app.uid]);
@@ -641,11 +660,12 @@ export class AiAppsService {
    * the polling cadence belongs to the client (unlike `verifyAppLive`, which
    * does its own retry loop inside the deploy flow).
    */
-  async checkAppLive(uid: string): Promise<{ live: boolean }> {
+  async checkAppLive(uid: string, requesterUid?: string): Promise<{ live: boolean }> {
     const app = await this.prisma.aiApp.findUnique({ where: { uid } });
     if (!app) {
       throw new NotFoundException(`AI App not found: ${uid}`);
     }
+    await this.assertCanViewApp(requesterUid, app);
     if (!app.url) {
       return { live: false };
     }
@@ -1101,10 +1121,26 @@ export class AiAppsService {
     await this.recordEvent('KIT_DOWNLOADED', memberUid, { message: `Starter kit v${AI_APPS_STARTER_KIT_VERSION}` });
   }
 
-  /** Event log (audit feed) — newest first, optionally scoped to one app. */
-  async listEvents(appUid?: string, limit = 100): Promise<Array<WithMember<AiAppEvent>>> {
+  /**
+   * Event log (audit feed) — newest first, optionally scoped to one app
+   * (callers check access to that app first). The unscoped feed leaves out
+   * events of private apps the requester may not view; events tied to no app
+   * (kit downloads, connect approvals) stay in.
+   */
+  async listEvents(appUid?: string, limit = 100, requesterUid?: string): Promise<Array<WithMember<AiAppEvent>>> {
+    let where: Prisma.AiAppEventWhereInput | undefined = appUid ? { appUid } : undefined;
+    if (!appUid) {
+      const isAdmin = !!requesterUid && (await this.isRequesterDirectoryAdmin(requesterUid));
+      const visible = await this.visibleAppsWhere(requesterUid, isAdmin);
+      if (visible) {
+        const hidden = await this.prisma.aiApp.findMany({ where: { NOT: visible }, select: { uid: true } });
+        if (hidden.length) {
+          where = { OR: [{ appUid: null }, { appUid: { notIn: hidden.map((app) => app.uid) } }] };
+        }
+      }
+    }
     const events = await this.prisma.aiAppEvent.findMany({
-      where: appUid ? { appUid } : undefined,
+      where,
       orderBy: { createdAt: 'desc' },
       take: Math.min(Math.max(limit, 1), 500),
     });
@@ -1121,6 +1157,7 @@ export class AiAppsService {
     if (!app) {
       throw new NotFoundException(`AI App not found: ${appUid}`);
     }
+    await this.assertCanViewApp(memberUid, app);
     const withoutDataUris = text.replace(/<img\b[^>]*\bsrc=["']data:[^"']+["'][^>]*>/gi, '');
     const sanitized = DOMPurify.sanitize(withoutDataUris);
     if (isBlankFeedbackHtml(sanitized)) {
@@ -1204,11 +1241,94 @@ export class AiAppsService {
   }
 
   /** True when the requester created the app or is a directory admin. */
-  private async isCreatorOrDirectoryAdmin(requesterUid: string, app: Pick<AiApp, 'memberUid'>): Promise<boolean> {
+  async isCreatorOrDirectoryAdmin(requesterUid: string, app: Pick<AiApp, 'memberUid'>): Promise<boolean> {
     if (app.memberUid === requesterUid) {
       return true;
     }
     return this.isRequesterDirectoryAdmin(requesterUid);
+  }
+
+  /**
+   * Whether the requester may find and open the app: it is OPEN, or they own
+   * it, are a directory admin, or are on its whitelist. The PL Infra
+   * permission itself is checked by the caller (RbacGuard on dashboard routes,
+   * explicitly in the sidecar access check).
+   */
+  async canViewApp(
+    requesterUid: string | undefined,
+    app: Pick<AiApp, 'uid' | 'memberUid' | 'access'>
+  ): Promise<boolean> {
+    if (app.access === 'OPEN') {
+      return true;
+    }
+    if (!requesterUid) {
+      return false;
+    }
+    if (await this.isCreatorOrDirectoryAdmin(requesterUid, app)) {
+      return true;
+    }
+    const allowed = await this.prisma.aiAppAllowedMember.findUnique({
+      where: { appUid_memberUid: { appUid: app.uid, memberUid: requesterUid } },
+      select: { memberUid: true },
+    });
+    return !!allowed;
+  }
+
+  private async assertCanViewApp(
+    requesterUid: string | undefined,
+    app: Pick<AiApp, 'uid' | 'memberUid' | 'access'>
+  ): Promise<void> {
+    if (!(await this.canViewApp(requesterUid, app))) {
+      throw new ForbiddenException('This AI App is private');
+    }
+  }
+
+  /**
+   * Filter matching the apps the requester may view, or undefined when they
+   * may view all of them (directory admins).
+   */
+  private async visibleAppsWhere(
+    requesterUid: string | undefined,
+    isAdmin: boolean
+  ): Promise<Prisma.AiAppWhereInput | undefined> {
+    if (isAdmin) {
+      return undefined;
+    }
+    if (!requesterUid) {
+      return { access: 'OPEN' };
+    }
+    const allowed = await this.prisma.aiAppAllowedMember.findMany({
+      where: { memberUid: requesterUid },
+      select: { appUid: true },
+    });
+    return {
+      OR: [
+        { access: 'OPEN' },
+        { memberUid: requesterUid },
+        ...(allowed.length ? [{ uid: { in: allowed.map((row) => row.appUid) } }] : []),
+      ],
+    };
+  }
+
+  /**
+   * The one-time "new AI App" broadcast to PL Infra members, for an app that
+   * is OPEN, has shipped, and was never announced. The stamp is conditional
+   * so concurrent callers (a deploy finishing while the owner opens the app)
+   * can't both send.
+   */
+  async announceIfEligible(
+    app: Pick<AiApp, 'uid' | 'name' | 'access' | 'announcedAt' | 'lastDeployedAt'>
+  ): Promise<void> {
+    if (app.access !== 'OPEN' || app.announcedAt || !app.lastDeployedAt) {
+      return;
+    }
+    const { count } = await this.prisma.aiApp.updateMany({
+      where: { uid: app.uid, access: 'OPEN', announcedAt: null },
+      data: { announcedAt: new Date() },
+    });
+    if (count === 1) {
+      await this.notifyDeploySucceeded(app);
+    }
   }
 
   /**
@@ -1306,6 +1426,9 @@ export class AiAppsService {
         agentModel: dto.agentModel ?? null,
         tags: dto.tags ?? [],
         database: dto.database ? { enabled: true, type: dto.database.type } : Prisma.DbNull,
+        // New apps start private to their owner; access is changed only from
+        // LabOS, never by a deploy (so `update` leaves it alone).
+        access: 'PRIVATE',
       },
       update: {
         name: dto.name,
@@ -1410,6 +1533,9 @@ export class AiAppsService {
         agentModel: dto.agentModel ?? null,
         tags: dto.tags ?? [],
         database: dto.database ? { enabled: true, type: dto.database.type } : Prisma.DbNull,
+        // New apps start private to their owner; access is changed only from
+        // LabOS, never by a deploy (so `update` leaves it alone).
+        access: 'PRIVATE',
       },
       update: {
         name: dto.name,
@@ -1539,11 +1665,6 @@ export class AiAppsService {
     const url = buildAppUrl(app.appId);
     const httpUrl = buildAppHttpUrl(app.appId);
     const requestedDatabase = app.database as AiAppDatabaseInfo | null;
-    // Snapshot taken before this deploy touches the row — `lastDeployedAt` is
-    // only ever set by a PRIOR successful deploy, so null here means this is
-    // the app's first ship (only then do we broadcast the deploy-succeeded
-    // notification; redeploys/updates stay silent per the PRD).
-    const isFirstDeploy = app.lastDeployedAt === null;
     await this.prisma.aiApp.update({
       where: { uid: app.uid },
       data: { status: 'DEPLOYING', deploymentId, s3Key, url, httpUrl, host, notes: null, failureStream: null },
@@ -1566,6 +1687,10 @@ export class AiAppsService {
           notes: null,
           failureStream: null,
           lastDeployedAt: new Date(),
+          // Every deploy ships the current auth sidecar, which asks the
+          // Directory for a per-app decision — so a PRIVATE setting now also
+          // covers the app's direct URL.
+          directLinkGateReady: true,
           // Non-sensitive connection metadata the orchestrator reports once it
           // provisions the database, merged into the same JSON blob we asked
           // it to provision from. Never the password — that lives only in the
@@ -1586,9 +1711,7 @@ export class AiAppsService {
         },
       });
       await this.recordEvent('DEPLOY_SUCCEEDED', memberUid, { ...eventContext, message: url });
-      if (isFirstDeploy) {
-        await this.notifyDeploySucceeded(app);
-      }
+      await this.announceIfEligible(updated);
       return this.toApiApp((await this.withMember([updated]))[0], true);
     };
 
@@ -1788,9 +1911,8 @@ export class AiAppsService {
 
   /**
    * Broadcasts that a new app just went live, to everyone with AI Apps access
-   * (read or write — either grants dashboard visibility). Fired only on an
-   * app's FIRST successful deploy (see `isFirstDeploy` in `proxyDeploy`); a
-   * later redeploy/update never re-fires this.
+   * (read or write — either grants dashboard visibility). Sent at most once per
+   * app and only while it is OPEN — see `announceIfEligible`.
    */
   private async notifyDeploySucceeded(app: Pick<AiApp, 'uid' | 'name'>): Promise<void> {
     try {

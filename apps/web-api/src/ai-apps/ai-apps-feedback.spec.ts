@@ -16,7 +16,7 @@ jest.mock('../analytics/service/analytics.service', () => ({
 
 import { AiAppsService } from './ai-apps.service';
 
-const APP = { uid: 'app-1', memberUid: 'creator-1', appId: 'demo' };
+const APP = { uid: 'app-1', memberUid: 'creator-1', appId: 'demo', access: 'OPEN' };
 const FEEDBACK = {
   uid: 'fb-1',
   appUid: 'app-1',

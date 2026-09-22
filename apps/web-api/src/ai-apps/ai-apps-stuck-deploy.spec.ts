@@ -35,6 +35,7 @@ const mockedAxios = axios as jest.Mocked<typeof axios>;
 const STUCK_AGE_MS = AI_APPS_DEPLOY_STUCK_MS + 60 * 1000;
 
 const APP = {
+  access: 'OPEN',
   uid: 'app-1',
   memberUid: 'creator-1',
   appId: 'demo',

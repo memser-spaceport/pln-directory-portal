@@ -11,7 +11,13 @@
  */
 
 /** Starter kit version shown in the README, ZIP filename, and LabOS UI. Bump when the kit contents or flow change. */
-export const AI_APPS_STARTER_KIT_VERSION = '1.12';
+export const AI_APPS_STARTER_KIT_VERSION = '1.13';
+
+/** Max members on one private app's whitelist (the owner and directory admins never count). */
+export const AI_APPS_MAX_ALLOWED_MEMBERS = 200;
+
+/** Max results of the whitelist member search. */
+export const AI_APPS_ACCESS_CANDIDATES_LIMIT = 10;
 
 /** Header the AI agent sends with its short-lived deploy token. */
 export const AI_APP_TOKEN_HEADER = 'x-app-token';

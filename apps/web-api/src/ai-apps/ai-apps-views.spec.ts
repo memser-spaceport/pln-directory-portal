@@ -24,6 +24,7 @@ const UPDATED_AT = new Date('2026-08-01T00:00:00.000Z');
 const APP = {
   uid: 'app-1',
   memberUid: 'creator-1',
+  access: 'OPEN',
   appId: 'demo',
   name: 'Demo',
   status: 'READY',

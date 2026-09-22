@@ -47,6 +47,8 @@ const APP = {
   requiredEnvVars: [] as string[],
   providedEnvVars: [] as string[],
   lastDeployedAt: LAST_SHIP as Date | null,
+  access: 'OPEN',
+  announcedAt: LAST_SHIP as Date | null,
   failureStream: null as string | null,
   updatedAt: new Date(),
 };
@@ -67,6 +69,7 @@ function buildService(app: Record<string, any> | null = APP) {
       findUnique: jest.fn().mockResolvedValue(null),
     },
     aiAppActiveMember: { groupBy: jest.fn().mockResolvedValue([]) },
+    aiAppAllowedMember: { findMany: jest.fn().mockResolvedValue([]) },
   };
   const aws = { uploadFileToS3: jest.fn().mockResolvedValue(undefined) };
   const pushNotifications = { create: jest.fn().mockResolvedValue({}) };
@@ -264,8 +267,13 @@ describe('deploy outcome writes', () => {
 });
 
 describe('deploy lifecycle bell notifications', () => {
-  it('a FIRST successful deploy (lastDeployedAt was null) broadcasts to AI Apps access holders', async () => {
-    const { service, pushNotifications } = buildService({ ...APP, status: 'DRAFT', lastDeployedAt: null });
+  it('a FIRST successful deploy of an OPEN, never-announced app broadcasts to AI Apps access holders', async () => {
+    const { service, pushNotifications } = buildService({
+      ...APP,
+      status: 'DRAFT',
+      lastDeployedAt: null,
+      announcedAt: null,
+    });
     mockedAxios.post.mockResolvedValue({ status: 200, data: { port: 31001 } });
 
     await service.deployDraft('creator-1', 'app-1', undefined);
@@ -281,7 +289,7 @@ describe('deploy lifecycle bell notifications', () => {
     expect(pushNotifications.create.mock.calls[0][0]).not.toHaveProperty('recipientUid');
   });
 
-  it('a redeploy (lastDeployedAt already set) never re-fires the broadcast', async () => {
+  it('a redeploy of an already-announced app never re-fires the broadcast', async () => {
     const { service, pushNotifications } = buildService({ ...APP, status: 'READY', lastDeployedAt: LAST_SHIP });
     mockedAxios.post.mockResolvedValue({ status: 200, data: { port: 31001 } });
 

@@ -148,6 +148,9 @@ to the Protocol Labs Network sandbox with a single instruction.
    deploy. Your agent then ships the app to the PL sandbox; the first deploy
    can take a minute or two.
 4. Your app appears on the PL Infra → AI Apps dashboard, where you can open it.
+   New apps are **private** — only you can see and open them. To share yours,
+   open its ⋮ menu on the dashboard → **Manage access**: add specific members,
+   or open it to all PL Infra members. You can change this anytime.
    After the first deploy your agent offers an optional **one-pager PRD** — a
    short product brief (why the app exists and what it does) shown with your
    app; say yes and approve the draft, or skip it. You can rename your app,
@@ -508,7 +511,10 @@ follow "Apps that need secrets" above instead of deploying directly. In short:
    and runs the build — you do not need any cloud credentials.
 6. Save the \`uid\` from the response as \`appUid\` in \`pln-app.config.json\`, then
    tell the member the deploy succeeded and that they can open their app from the
-   PL Infra → AI Apps dashboard. **Do NOT reveal the deployment URL, host, or port**
+   PL Infra → AI Apps dashboard. After the FIRST deploy, also tell them the app is
+   **private to them** by default and that they can share it — with specific
+   members or all PL Infra members — from the app's ⋮ menu → **Manage access** in
+   LabOS (you cannot change who has access). **Do NOT reveal the deployment URL, host, or port**
    (see "Keep the deployment URL private" in the deploy skill). That privacy rule
    covers only the app's own \`<appId>\` address — LabOS links (\`connectUrl\`,
    \`appPageUrl\`) must always be shared with the member.
@@ -1406,7 +1412,12 @@ connection string into the LabOS secrets page, same as an API key.
    the metadata endpoint later). Use the URL only for the internal checks below —
    **do not reveal it to the member** (see "Keep the deployment URL private").
    On \`READY\`, tell the member the app is live and can be opened from the
-   PL Infra → AI Apps dashboard. If \`status\` is \`ERROR\`, surface \`notes\`
+   PL Infra → AI Apps dashboard. On the app's FIRST successful deploy, also tell
+   them it is **private**: only they (and directory admins) can see and open it
+   until they share it from the app's ⋮ menu → **Manage access** in LabOS, where
+   they can add specific members or open it to all PL Infra members. Access is a
+   LabOS setting — there is no deploy field for it, and redeploys never change it.
+   If \`status\` is \`ERROR\`, surface \`notes\`
    (never the URL) — and when \`notes\` alone doesn't explain the failure, fetch
    the **build logs** via the app-logs skill (\`.claude/skills/app-logs/SKILL.md\`)
    to find the real error before retrying.
