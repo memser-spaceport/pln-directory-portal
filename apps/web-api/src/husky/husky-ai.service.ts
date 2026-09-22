@@ -105,9 +105,18 @@ export class HuskyAiService {
     });
   }
 
+  private isOpusEnabled(): boolean {
+    return process.env[HUSKY_SEARCH_OPUS_ENABLED_ENV_VAR]?.trim().toLowerCase() === 'true';
+  }
+
+  /** Opus rejects `temperature`; other search models keep the near-deterministic setting. */
+  private searchCallOptions(): { temperature?: number } {
+    return this.isOpusEnabled() ? {} : { temperature: 0.001 };
+  }
+
   /** Search answers and the structured tail. Summaries and titles stay on getModel(). */
   private getSearchModel(): LanguageModel {
-    if (process.env[HUSKY_SEARCH_OPUS_ENABLED_ENV_VAR]?.trim().toLowerCase() !== 'true') {
+    if (!this.isOpusEnabled()) {
       return this.getModel();
     }
     return this.aiProvider.getResponsesModel(undefined, {
@@ -306,7 +315,7 @@ export class HuskyAiService {
     const result = streamText({
       model,
       ...generation,
-      temperature: 0.001,
+      ...this.searchCallOptions(),
       abortSignal: watchdog.signal,
       onStepFinish: async (step) => {
         if (step.toolResults?.length > 0) {
@@ -380,7 +389,7 @@ export class HuskyAiService {
             - content: ${input.content}
             - context: ${input.toolResults}
           `,
-        temperature: 0.001,
+        ...this.searchCallOptions(),
         abortSignal: watchdog.signal,
       });
       // The object promise rejects together with the text stream; mark it handled so a

@@ -175,7 +175,9 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
     });
     expect(HUSKY_SEARCH_FALLBACK_PROVIDER).toBe('gemini');
     expect(streamTextMock.mock.calls[0][0].model).toBe('model-handle');
+    expect(streamTextMock.mock.calls[0][0].temperature).toBe(0.001);
     expect(streamObjectMock.mock.calls[0][0].model).toBe('model-handle');
+    expect(streamObjectMock.mock.calls[0][0].temperature).toBe(0.001);
     expect(toolsService.getTools).toHaveBeenCalledWith({ isLoggedIn: false });
     expect(prisma.member.findUnique).not.toHaveBeenCalled();
   });
@@ -194,7 +196,9 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
       modelOverride: 'claude-opus-5-5',
     });
     expect(streamTextMock.mock.calls[0][0].model).toBe('opus-handle');
+    expect(streamTextMock.mock.calls[0][0].temperature).toBeUndefined();
     expect(streamObjectMock.mock.calls[0][0].model).toBe('opus-handle');
+    expect(streamObjectMock.mock.calls[0][0].temperature).toBeUndefined();
 
     await flushBackgroundWork();
     expect(generateTextMock).toHaveBeenCalledWith(expect.objectContaining({ model: 'current-handle' }));
