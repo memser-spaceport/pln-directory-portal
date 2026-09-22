@@ -8,6 +8,7 @@ import { JobOpeningsEnrichmentService } from './job-openings-enrichment.service'
 import { JobOpeningsReferralService } from './job-openings-referral.service';
 import { JobOpeningsApplicationService } from './job-openings-application.service';
 import { JobOpeningsInterestService } from './job-openings-interest.service';
+import { JobOpeningsSavedService } from './job-openings-saved.service';
 import { JobOpeningsSignUpService } from './job-openings-sign-up.service';
 import { SharedModule } from '../shared/shared.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -34,6 +35,7 @@ import { JobOpeningsIntegrationService } from './job-openings-integration.servic
     JobOpeningsApplicationService,
     JobOpeningsSignUpService,
     JobOpeningsInterestService,
+    JobOpeningsSavedService,
   ],
   exports: [JobOpeningsQueryService, JobOpeningsService, JobOpeningsEnrichmentService],
 })

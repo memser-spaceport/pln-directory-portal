@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { JobOpeningStatus, Prisma } from '@prisma/client';
 import { JobsListQueryParams, type JobsListQuery } from 'libs/contracts/src/schema/job-opening';
 import { PrismaService } from '../shared/prisma.service';
@@ -43,8 +43,20 @@ type FacetOverrides = {
 export class JobOpeningsQueryService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private buildWhere(query: JobsListQuery, overrides: FacetOverrides = {}): Prisma.JobOpeningWhereInput {
+  private buildWhere(
+    query: JobsListQuery,
+    overrides: FacetOverrides = {},
+    savedByMemberUid?: string
+  ): Prisma.JobOpeningWhereInput {
     const and: Prisma.JobOpeningWhereInput[] = [];
+
+    // The board's Saved tab. Pushed in with the other predicates rather than
+    // filtered afterwards, so the paging, the totals and every facet count
+    // describe the saved set — and so the narrowing happens in Postgres against
+    // SavedJobOpening_memberUid_idx. Not a facet: it survives count-overrides.
+    if (savedByMemberUid) {
+      and.push({ savedBy: { some: { memberUid: savedByMemberUid } } });
+    }
 
     // Pushed into `and` rather than set alongside the returned `teamUid: { not: null }`,
     // which a second top-level key would overwrite. Not subject to a FacetOverride: the
@@ -166,10 +178,10 @@ export class JobOpeningsQueryService {
     };
   }
 
-  private async queryPagedTeamGroups(query: JobsListQuery) {
+  private async queryPagedTeamGroups(query: JobsListQuery, savedByMemberUid?: string) {
     const page = query.page;
     const limit = query.limit;
-    const where = this.buildWhere(query);
+    const where = this.buildWhere(query, {}, savedByMemberUid);
     const [totalGroups, totalRoles] = await Promise.all([
       this.prisma.team.count({
         where: {
@@ -294,8 +306,12 @@ export class JobOpeningsQueryService {
   async listJobOpenings(query: JobsListQuery, viewerEmail?: string) {
     const page = query.page;
     const limit = query.limit;
-    const where = this.buildWhere(query);
-    const { pageRows, totalGroups, totalRoles } = await this.queryPagedTeamGroups(query);
+    // The saved scope needs the viewer before the first query, where every other
+    // caller resolves it alongside the page. Resolved here only when it is asked
+    // for, so an anonymous board read still costs no member lookup.
+    const savedByMemberUid = query.saved ? await this.resolveSavedScopeViewer(viewerEmail) : undefined;
+    const where = this.buildWhere(query, {}, savedByMemberUid);
+    const { pageRows, totalGroups, totalRoles } = await this.queryPagedTeamGroups(query, savedByMemberUid);
 
     if (totalGroups === 0) {
       return {
@@ -367,7 +383,7 @@ export class JobOpeningsQueryService {
           ancestorArea: { select: { title: true } },
         },
       }),
-      resolveLiveMemberUidByEmail(this.prisma, viewerEmail),
+      savedByMemberUid ? Promise.resolve(savedByMemberUid) : resolveLiveMemberUidByEmail(this.prisma, viewerEmail),
     ]);
 
     const teamByUid = new Map(pageTeams.map((team) => [team.uid, team]));
@@ -517,12 +533,13 @@ export class JobOpeningsQueryService {
     });
   }
 
-  async getFilters(query: JobsListQuery) {
-    const functionWhere = this.buildWhere(query, { dropFunction: true });
-    const seniorityWhere = this.buildWhere(query, { dropSeniority: true });
-    const locationWhere = this.buildWhere(query, { dropLocation: true });
-    const workModeWhere = this.buildWhere(query, { dropWorkMode: true });
-    const focusWhere = this.buildWhere(query, { dropFocus: true });
+  async getFilters(query: JobsListQuery, viewerEmail?: string) {
+    const savedByMemberUid = query.saved ? await this.resolveSavedScopeViewer(viewerEmail) : undefined;
+    const functionWhere = this.buildWhere(query, { dropFunction: true }, savedByMemberUid);
+    const seniorityWhere = this.buildWhere(query, { dropSeniority: true }, savedByMemberUid);
+    const locationWhere = this.buildWhere(query, { dropLocation: true }, savedByMemberUid);
+    const workModeWhere = this.buildWhere(query, { dropWorkMode: true }, savedByMemberUid);
+    const focusWhere = this.buildWhere(query, { dropFocus: true }, savedByMemberUid);
 
     const [roleCategoryCounts, seniorityCounts, locationCounts, workModeCounts, focusTree] = await Promise.all([
       this.countByField('roleCategory', functionWhere),
@@ -539,6 +556,20 @@ export class JobOpeningsQueryService {
       workMode: workModeCounts,
       focus: focusTree,
     };
+  }
+
+  /**
+   * Strict, unlike the tolerant resolve every other viewer-aware read uses: a
+   * saved scope with no viewer is a refusal, because widening it to the whole
+   * board or answering an empty list would both make a signed-out Saved tab
+   * indistinguishable from an empty one.
+   */
+  private async resolveSavedScopeViewer(viewerEmail?: string): Promise<string> {
+    const memberUid = await resolveLiveMemberUidByEmail(this.prisma, viewerEmail);
+    if (!memberUid) {
+      throw new UnauthorizedException('Authenticated member required for the saved scope');
+    }
+    return memberUid;
   }
 
   private async countByField(

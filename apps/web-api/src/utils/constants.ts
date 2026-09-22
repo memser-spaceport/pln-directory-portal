@@ -354,6 +354,7 @@ export const ANALYTICS_EVENTS = {
   JOB_BOARD: {
     APPLICATION_RECORDED: 'job-application-recorded',
     INTEREST_RECORDED: 'job-interest-recorded',
+    SAVE_RECORDED: 'job-save-recorded',
     TEAM_INTEREST_RECORDED: 'team-interest-recorded',
     INTEREST_PUSHED_TO_ATS: 'job-interest-pushed-to-ats',
     PUBLISHED_VIA_INTEGRATION: 'job-published-via-integration',

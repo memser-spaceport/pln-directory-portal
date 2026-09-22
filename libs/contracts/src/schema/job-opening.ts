@@ -33,6 +33,14 @@ export const JobsListQueryParams = z.object({
   location: ListParam,
   workMode: ListParam,
   q: z.string().optional(),
+  // Narrows the list to the roles the authenticated caller has saved, before
+  // every other filter — the board's Saved tab. Requires a session: a saved
+  // scope with no viewer is refused, never silently widened to the whole board.
+  // Absent or false leaves every existing caller untouched.
+  saved: z
+    .preprocess((v) => v === true || v === 'true', z.boolean())
+    .optional()
+    .default(false),
   sort: z.enum(['newest', 'company_az', 'company_za']).optional().default('newest'),
   // Optional feed/list date window. Omitted = no date filter (existing jobs page).
   since: z.string().optional(),
@@ -163,6 +171,28 @@ export const JobOpeningInterestSchema = z.object({
 
 export const JobOpeningInterestListResponseSchema = z.object({
   interests: z.array(JobOpeningInterestSchema),
+});
+
+/**
+ * A member's private bookmark on a role. No aggregate count, unlike interest:
+ * how many people saved a job is nobody's business, including the team's.
+ */
+export const SavedJobStatusSchema = z.object({
+  jobUid: z.string(),
+  viewerHasSaved: z.boolean(),
+});
+
+export type SavedJobStatus = z.infer<typeof SavedJobStatusSchema>;
+
+export const SavedJobSchema = z.object({
+  uid: z.string(),
+  jobUid: z.string(),
+  savedAt: z.string(),
+});
+
+/** The whole list, unpaged: a jobUid absent from it means "not saved". */
+export const SavedJobsListResponseSchema = z.object({
+  savedJobs: z.array(SavedJobSchema),
 });
 
 /** Same cap as a job application's cover letter. */

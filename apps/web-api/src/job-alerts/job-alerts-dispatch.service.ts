@@ -136,7 +136,8 @@ export class JobAlertsDispatchService {
 
         try {
           const matches = await this.jobOpeningsQueryService.findNewMatchesSince(
-            { ...filterState, page: 1, limit: 50, sort: 'newest' },
+            // `saved` is a board-only scope; a digest matches on the alert's filters alone.
+            { ...filterState, page: 1, limit: 50, sort: 'newest', saved: false },
             sinceTs
           );
 
