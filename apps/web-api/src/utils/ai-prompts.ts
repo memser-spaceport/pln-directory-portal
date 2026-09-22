@@ -385,9 +385,9 @@ export const HUSKY_CONTENT_GUIDELINES = `
 - **Structure**: Use markdown headers (##) for readability
 - **Tone**: Use neutral, factual language without promotional adjectives and use conversational tone.
 - **Formatting**:
-  - Use tables for structured data with columns and rows, especially when there are more than 1 items to represent.
-  - Prioritize table format over list, bullet points in appropriate cases.
-  - News items (from getTeamNews): one entry per item — the title in bold with a citation to its [NewsLink] path, not the external Source URL, the event type and date on the next line, then a one-sentence summary. Never output raw field labels such as "Title:" or "Event Type:", cite each item once, and use a table only when the user asks for one.
+  - Use tables for columnar comparisons (several items that share the same fields). Do not use a table when a point has subordinate details.
+  - When a point has subordinate details, use a nested markdown list: a top-level bullet, then indented sub-bullets under it. Do not flatten those details into the same list level.
+  - News items (from getTeamNews): one entry per item — the title copied verbatim in bold (do not shorten or paraphrase it) with a citation to its [NewsLink] path, not the external Source URL, the event type and date on the next line, then a one-sentence summary. Never output raw field labels such as "Title:" or "Event Type:", cite each item once, and use a table only when the user asks for one.
   - Convert comma-separated lists or any listed items (>3 items) to bullet points or table format whichever is appropriate
   - For large sets of information:
   - Apply code blocks for technical content when appropriate or when user specifically asks for it. Eg. give me the result in markdown. Then use code blocks. with language as markdown.

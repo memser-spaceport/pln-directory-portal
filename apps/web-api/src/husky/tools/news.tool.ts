@@ -20,9 +20,9 @@ export const DEFAULT_NEWS_WINDOW_DAYS = 90;
  * paragraph, or as a table whose summary column is unreadable.
  */
 export const NEWS_PRESENTATION_HINT =
-  'Present each news item as its own short entry: the title in bold with a citation to its [NewsLink] path, ' +
-  'not the external Source URL, then the event type and date on one line, then a one-sentence summary. ' +
-  'Do not repeat the field labels below, cite each item once, and do not use a table unless the user asks for one.';
+  'Present each news item as its own short entry: the title copied verbatim in bold (do not shorten or paraphrase it) ' +
+  'with a citation to its [NewsLink] path, not the external Source URL, then the event type and date on one line, ' +
+  'then a one-sentence summary. Do not repeat the field labels below, cite each item once, and do not use a table unless the user asks for one.';
 
 const NewsToolParams = z.object({
   search: z.string().describe('Search term to look for in the news title, summary, or team name').optional(),
