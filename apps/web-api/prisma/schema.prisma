@@ -3600,6 +3600,14 @@ enum AiAppStatus {
   DELETED
 }
 
+/// Who may find and open an app. OPEN = every PL Infra member (AI Apps access);
+/// PRIVATE = the owner, directory admins, and members on its AiAppAllowedMember
+/// whitelist (who still need AI Apps access).
+enum AiAppAccess {
+  OPEN
+  PRIVATE
+}
+
 /// One vibe-coded sandbox app, lazy-created on first deploy by its owning member.
 model AiApp {
   id              Int         @id @default(autoincrement())
@@ -3664,12 +3672,43 @@ model AiApp {
   /// Slugs from the controlled vocabulary in `ai-apps-tags.ts` (max 5). Set by
   /// the agent on first upload, editable by the creator/admin afterwards.
   tags            String[]    @default([])
+  /// New apps are private to their owner; the owner (or a directory admin)
+  /// opens or shares them from LabOS. Deploys never change it.
+  access          AiAppAccess @default(PRIVATE)
+  /// True once the app has shipped with an auth sidecar that asks the
+  /// Directory for a per-app decision. Apps last deployed before that keep a
+  /// sidecar that only checks the PL Infra permission, so a PRIVATE setting
+  /// hides them in LabOS/API but their direct URL stays open until a redeploy.
+  directLinkGateReady Boolean @default(false)
+  /// When the "new AI App" broadcast went out. Sent at most once, and only
+  /// while the app is OPEN (first successful deploy, or first switch to OPEN
+  /// after deploying).
+  announcedAt     DateTime?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
   @@unique([memberUid, appId])
   @@index([memberUid])
   @@index([status])
+}
+
+/// Whitelist of a PRIVATE app: members (besides the owner and directory
+/// admins) who may find and open it. Kept while the app is OPEN so switching
+/// back restores it.
+model AiAppAllowedMember {
+  /// AiApp.uid (no FK relation, matching the other POC tables).
+  appUid     String
+  memberUid  String
+  /// Who added this member (owner or directory admin).
+  addedByUid String
+  /// When the member got their "shared with you" notification. Set once the
+  /// app is PRIVATE and has shipped; rows saved while the app is OPEN start
+  /// stamped (the open broadcast already covered them).
+  notifiedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  @@id([appUid, memberUid])
+  @@index([memberUid])
 }
 
 /// One row per member who has loaded an app's iframe. `lastSeenAt` is the

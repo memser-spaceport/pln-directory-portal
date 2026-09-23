@@ -35,6 +35,7 @@ import { RegisterDraftSchema } from './dto/register-draft.dto';
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 const APP = {
+  access: 'OPEN',
   uid: 'app-1',
   memberUid: 'creator-1',
   appId: 'demo',
@@ -56,6 +57,7 @@ function buildService(app: Record<string, any> | null = APP) {
       findFirst: jest.fn().mockResolvedValue(null),
       upsert: jest.fn().mockImplementation(({ create }) => Promise.resolve({ ...APP, ...create, uid: 'app-1' })),
       update: jest.fn().mockImplementation(({ data }) => Promise.resolve({ ...APP, ...data })),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     aiAppEvent: { create: jest.fn().mockResolvedValue({}) },
     member: {

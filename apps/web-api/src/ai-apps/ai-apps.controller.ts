@@ -9,6 +9,7 @@ import {
   Param,
   Post,
   Patch,
+  Put,
   Body,
   Query,
   Req,
@@ -31,6 +32,7 @@ import { RbacGuard } from '../rbac/rbac.guard';
 import { RbacService } from '../rbac/rbac.service';
 import { AI_APPS_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { AiAppsService } from './ai-apps.service';
+import { AiAppsAccessService } from './ai-apps-access.service';
 import { AiAppsConnectService } from './ai-apps-connect.service';
 import { AiAppsStarterKitService } from './ai-apps-starter-kit.service';
 import { AiAppTokenGuard } from './guards/ai-app-token.guard';
@@ -43,6 +45,7 @@ import { SubmitFeedbackDto } from './dto/submit-feedback.dto';
 import { UpdateFeedbackStatusDto } from './dto/update-feedback-status.dto';
 import { UpdateAppMetadataDto } from './dto/update-app-metadata.dto';
 import { TrackEventDto } from './dto/track-event.dto';
+import { AiAppAccessCandidatesQueryDto, AiAppAccessCheckQueryDto, UpdateAiAppAccessDto } from './dto/ai-app-access.dto';
 import {
   AI_APPS_LOG_DEPLOYMENT_ID_PATTERN,
   AI_APPS_MAX_PRD_BYTES,
@@ -61,7 +64,8 @@ export class AiAppsController {
     private readonly aiAppsService: AiAppsService,
     private readonly connectService: AiAppsConnectService,
     private readonly starterKitService: AiAppsStarterKitService,
-    private readonly rbacService: RbacService
+    private readonly rbacService: RbacService,
+    private readonly accessService: AiAppsAccessService
   ) {}
 
   /**
@@ -143,8 +147,12 @@ export class AiAppsController {
   @Get('events')
   @UseGuards(UserTokenCheckGuard, RbacGuard)
   @RequirePermissions(READ)
-  async listEvents(@Query('appUid') appUid?: string, @Query('limit') limit?: string) {
-    return this.aiAppsService.listEvents(appUid, limit ? Number(limit) : undefined);
+  async listEvents(@Req() req: any, @Query('appUid') appUid?: string, @Query('limit') limit?: string) {
+    const memberUid = await this.resolveMemberUid(req).catch(() => undefined);
+    if (appUid) {
+      await this.aiAppsService.getApp(appUid, memberUid); // 404 unknown, 403 private
+    }
+    return this.aiAppsService.listEvents(appUid, limit ? Number(limit) : undefined, memberUid);
   }
 
   /**
@@ -201,6 +209,23 @@ export class AiAppsController {
       properties: body.properties as Record<string, unknown> | undefined,
       events: body.events as Array<{ event?: string; properties?: Record<string, unknown> }> | undefined,
     });
+  }
+
+  /**
+   * Per-app access decision for a deployed app's auth sidecar, asked on every
+   * gated request to `https://<appId>.<domain>`. 200 = serve; 401 = not signed
+   * in; 403 = missing the PL Infra permission (`reason: 'permission'`) or a
+   * private app the member may not open (`reason: 'private'`). Accepts the
+   * Bearer header or the LabOS `authToken` cookie, like `/me`. Declared before
+   * `:uid` so the literal path wins.
+   */
+  @NoCache()
+  @Get('access-check')
+  @UseGuards(UserAccessTokenValidateGuard)
+  @UsePipes(ZodValidationPipe)
+  async checkAccess(@Query() query: AiAppAccessCheckQueryDto, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.accessService.checkAccess(memberUid, query.appId, query.method);
   }
 
   /** Single AI App detail (includes `canManage` for the requesting member). */
@@ -388,8 +413,9 @@ export class AiAppsController {
   @Get(':uid/live')
   @UseGuards(UserTokenCheckGuard, RbacGuard)
   @RequirePermissions(READ)
-  async checkAppLive(@Param('uid') uid: string) {
-    return this.aiAppsService.checkAppLive(uid);
+  async checkAppLive(@Param('uid') uid: string, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req).catch(() => undefined);
+    return this.aiAppsService.checkAppLive(uid, memberUid);
   }
 
   /**
@@ -407,13 +433,53 @@ export class AiAppsController {
     await this.aiAppsService.recordView(memberUid, uid);
   }
 
+  /** Access mode + whitelist of one app. Creator or directory admin only (checked in the service). */
+  @NoCache()
+  @Get(':uid/access')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async getAccess(@Param('uid') uid: string, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.accessService.getAccess(memberUid, uid);
+  }
+
+  /**
+   * Replace the app's access mode and whole whitelist. Creator or directory
+   * admin only; 400 names any uid that isn't a member with AI Apps access.
+   */
+  @NoCache()
+  @Put(':uid/access')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  @UsePipes(ZodValidationPipe)
+  async updateAccess(@Param('uid') uid: string, @Body() body: UpdateAiAppAccessDto, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.accessService.updateAccess(memberUid, uid, body);
+  }
+
+  /** Member name search for the whitelist picker. Creator or directory admin only. */
+  @NoCache()
+  @Get(':uid/access/candidates')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  @UsePipes(ZodValidationPipe)
+  async searchAccessCandidates(
+    @Param('uid') uid: string,
+    @Query() query: AiAppAccessCandidatesQueryDto,
+    @Req() req: any
+  ) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.accessService.searchCandidates(memberUid, uid, query.search);
+  }
+
   /** Full event/status history for a single app, newest first. */
   @NoCache()
   @Get(':uid/events')
   @UseGuards(UserTokenCheckGuard, RbacGuard)
   @RequirePermissions(READ)
-  async getAppEvents(@Param('uid') uid: string, @Query('limit') limit?: string) {
-    await this.aiAppsService.getApp(uid); // 404 if the app doesn't exist
+  async getAppEvents(@Param('uid') uid: string, @Req() req: any, @Query('limit') limit?: string) {
+    const memberUid = await this.resolveMemberUid(req).catch(() => undefined);
+    await this.aiAppsService.getApp(uid, memberUid); // 404 unknown, 403 private
     return this.aiAppsService.listEvents(uid, limit ? Number(limit) : undefined);
   }
 

@@ -7,6 +7,7 @@ import { SharedModule } from '../shared/shared.module';
 import { AwsService } from '../utils/aws/aws.service';
 import { AiAppsController } from './ai-apps.controller';
 import { AiAppsService } from './ai-apps.service';
+import { AiAppsAccessService } from './ai-apps-access.service';
 import { AiAppsConnectService } from './ai-apps-connect.service';
 import { AiAppsStarterKitService } from './ai-apps-starter-kit.service';
 import { AiAppTokenGuard } from './guards/ai-app-token.guard';
@@ -14,7 +15,14 @@ import { AiAppTokenGuard } from './guards/ai-app-token.guard';
 @Module({
   imports: [SharedModule, RbacModule, AccessControlV2Module, PushNotificationsModule, AnalyticsModule],
   controllers: [AiAppsController],
-  providers: [AiAppsService, AiAppsConnectService, AiAppsStarterKitService, AiAppTokenGuard, AwsService],
+  providers: [
+    AiAppsService,
+    AiAppsAccessService,
+    AiAppsConnectService,
+    AiAppsStarterKitService,
+    AiAppTokenGuard,
+    AwsService,
+  ],
   exports: [AiAppsService],
 })
 export class AiAppsModule {}

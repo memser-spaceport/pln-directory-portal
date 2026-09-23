@@ -11,7 +11,13 @@
  */
 
 /** Starter kit version shown in the README, ZIP filename, and LabOS UI. Bump when the kit contents or flow change. */
-export const AI_APPS_STARTER_KIT_VERSION = '1.12';
+export const AI_APPS_STARTER_KIT_VERSION = '1.13';
+
+/** Max members on one private app's whitelist (the owner and directory admins never count). */
+export const AI_APPS_MAX_ALLOWED_MEMBERS = 200;
+
+/** Max results of the whitelist member search. */
+export const AI_APPS_ACCESS_CANDIDATES_LIMIT = 10;
 
 /** Header the AI agent sends with its short-lived deploy token. */
 export const AI_APP_TOKEN_HEADER = 'x-app-token';
@@ -365,6 +371,7 @@ export function aiAppDetailPath(appUid: string): string {
 export const AI_APPS_NOTIFICATION_TRIGGERS = {
   DEPLOY_SUCCEEDED: 'deploy_succeeded',
   DEPLOY_FAILED: 'deploy_failed',
+  ACCESS_GRANTED: 'access_granted',
 } as const;
 
 /**
@@ -383,5 +390,9 @@ export const AI_APPS_NOTIFICATION_MESSAGES = {
     // AiAppDeploymentInfo.failureReason) — the owner sees the real reason on
     // the app page this notification links to, not in the notification body.
     description: 'Your app failed to deploy — open the app page for details and to retry.',
+  }),
+  accessGranted: (appName: string, ownerName: string | null) => ({
+    title: `${appName} was shared with you`,
+    description: `${ownerName ?? 'Its owner'} gave you access to this private AI App.`,
   }),
 } as const;

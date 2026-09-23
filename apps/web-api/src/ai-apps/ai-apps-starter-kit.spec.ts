@@ -399,4 +399,16 @@ describe('AiAppsStarterKitService buildZip', () => {
       expect(entries.get(path) as string).toContain('existing data by default');
     }
   });
+
+  it('tells the member new apps are private and how to share them (kit 1.13)', () => {
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.13');
+    expect(entries.get('README.md')).toContain('New apps are **private**');
+    expect(entries.get('README.md')).toContain('**Manage access**');
+    for (const path of ['CLAUDE.md', 'AGENTS.md']) {
+      expect(entries.get(path) as string).toContain('**private to them** by default');
+    }
+    const deploySkill = entries.get('.claude/skills/deploy-to-labs/SKILL.md') as string;
+    expect(deploySkill).toContain("On the app's FIRST successful deploy");
+    expect(deploySkill).toContain('there is no deploy field for it');
+  });
 });

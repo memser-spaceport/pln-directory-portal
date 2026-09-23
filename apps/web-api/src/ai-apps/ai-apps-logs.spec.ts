@@ -125,7 +125,7 @@ describe('AiAppsController log routes wiring', () => {
 
   it('parses numeric query params and passes the member from the deploy token', async () => {
     const service = { getAgentLogs: jest.fn().mockResolvedValue({ events: [] }) };
-    const controller = new AiAppsController(service as any, {} as any, {} as any, {} as any);
+    const controller = new AiAppsController(service as any, {} as any, {} as any, {} as any, {} as any);
     const req = { aiAppMemberUid: 'creator-1' };
 
     await controller.getBuildLogs('app-1', req, '100', '60', 'tok', 'deploy-1');
@@ -147,7 +147,7 @@ describe('AiAppsController log routes wiring', () => {
 
   it('400s on a malformed deploymentId before it reaches the runner URL', async () => {
     const service = { getAgentLogs: jest.fn() };
-    const controller = new AiAppsController(service as any, {} as any, {} as any, {} as any);
+    const controller = new AiAppsController(service as any, {} as any, {} as any, {} as any, {} as any);
     const req = { aiAppMemberUid: 'creator-1' };
 
     for (const bad of ['', 'has space', 'a/b', '../x', 'x'.repeat(129)]) {
@@ -160,7 +160,7 @@ describe('AiAppsController log routes wiring', () => {
 
   it('400s on non-numeric or non-positive limit/sinceMinutes', async () => {
     const service = { getAgentLogs: jest.fn() };
-    const controller = new AiAppsController(service as any, {} as any, {} as any, {} as any);
+    const controller = new AiAppsController(service as any, {} as any, {} as any, {} as any, {} as any);
     const req = { aiAppMemberUid: 'creator-1' };
 
     await expect(controller.getBuildLogs('app-1', req, 'abc', undefined, undefined)).rejects.toThrow(
@@ -417,7 +417,7 @@ describe('AiAppsController member log routes — order param', () => {
       getMemberLogs: jest.fn().mockResolvedValue({ events: [] }),
       getMemberLogsDesc: jest.fn().mockResolvedValue({ events: [] }),
     };
-    const controller = new AiAppsController(service as any, {} as any, {} as any, {} as any);
+    const controller = new AiAppsController(service as any, {} as any, {} as any, {} as any, {} as any);
     jest.spyOn(controller as any, 'resolveMemberUid').mockResolvedValue('member-9');
     return { service, controller };
   }

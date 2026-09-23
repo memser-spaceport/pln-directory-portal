@@ -87,11 +87,15 @@ The `deployToken` is held in agent memory only and never written into the kit, s
 
 | Method | Path                              | Auth                         | Permission        | Purpose |
 |--------|-----------------------------------|------------------------------|-------------------|---------|
-| GET    | `/v1/ai-apps`                     | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | List apps with owner + status (excludes `DELETED`) |
-| GET    | `/v1/ai-apps/events`             | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Event log (audit feed); `?appUid=` to scope, `?limit=` (default 100, max 500) |
+| GET    | `/v1/ai-apps`                     | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | List apps with owner + status (excludes `DELETED`, and private apps the requester may not view — see "Per-app access") |
+| GET    | `/v1/ai-apps/events`             | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Event log (audit feed); `?appUid=` to scope (403 for a private app the requester may not view), `?limit=` (default 100, max 500). The unscoped feed leaves out events of private apps the requester may not view |
+| GET    | `/v1/ai-apps/access-check`       | `UserAccessTokenValidateGuard` (Bearer **or** `authToken` cookie) | checked in service | Per-app decision for a deployed app's auth sidecar: `?appId=&method=` → 200 / 401 / 403 `{ reason: 'permission' \| 'private' }` (see "Per-app access") |
 | GET    | `/v1/ai-apps/me`                 | `UserAccessTokenValidateGuard`+`RbacGuard` (Bearer **or** `authToken` cookie) | `ai_apps.read`/`write` | Member context for deployed apps: the signed-in member's public identity (see below) |
-| GET    | `/v1/ai-apps/:uid`               | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Single app detail |
-| GET    | `/v1/ai-apps/:uid/events`        | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Full event/status history for one app (404 if app missing) |
+| GET    | `/v1/ai-apps/:uid`               | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Single app detail (403 for a private app the requester may not view) |
+| GET    | `/v1/ai-apps/:uid/access`        | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | Access mode + whitelist: `{ access, directLinkGateReady, members: [{ uid, name, image, addedAt }] }` |
+| PUT    | `/v1/ai-apps/:uid/access`        | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | Replace the access mode and whole whitelist: `{ access: 'OPEN' \| 'PRIVATE', memberUids: string[] }` (max 200); 400 names uids that aren't members with AI Apps access |
+| GET    | `/v1/ai-apps/:uid/access/candidates` | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | Member name search for the whitelist picker (`?search=`, 10 results) with `hasAiAppsAccess` + `alreadyAdded` flags |
+| GET    | `/v1/ai-apps/:uid/events`        | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Full event/status history for one app (404 if app missing, 403 if private and not viewable) |
 | GET    | `/v1/ai-apps/:uid/live`          | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Liveness probe: one server-side reachability check of the app URL → `{ live }`; gateway timeouts AND 404 count as down (the ingress 404s until a first deploy's route is ready). The LabOS detail page polls it so the iframe never shows a raw gateway/404 error |
 | PATCH  | `/v1/ai-apps/:uid`               | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.write`   | Edit display metadata (`name`/`description`/`prd`) without redeploying; JSON **or** multipart (`file` = Markdown/HTML PRD, stored in S3) |
 | POST   | `/v1/ai-apps/:uid/prd`           | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.write`   | File-only PRD upload from the LabOS dashboard (multipart `file`, `.md`/`.html`) — no redeploy |
@@ -269,6 +273,98 @@ The kit's `app-metadata` skill drives a propose → confirm → save workflow so
 2. **After the first successful deploy**: the agent asks once whether the member wants a one-pager PRD. If declined, nothing happens; if wanted, it synthesizes a concise Markdown one-page brief from the conversation (problem, solution, features, how to use, goals/OKR, success metrics, out of scope — see the kit's `app-metadata` skill), gets approval, and saves it via `PATCH …/:uid/agent` — no new ZIP, no redeploy. Dashboard uploads may still be `.md` or `.html`.
 3. **Redeploys**: the saved `appName`/`appDescription` are resent verbatim and the propose flow is **not** re-run (it would otherwise revert approved metadata, since deploys overwrite it).
 4. **Metadata changes on an existing app** (rename, description edit, PRD add/update/remove): same propose → confirm → save flow through the metadata endpoint, using the `appUid` the kit saved from the deploy/draft response (`metadataEndpoint` in the config is a template with a `{appUid}` placeholder). A metadata-only session still gets its short-lived token through the normal connect flow.
+
+## Per-app access (private apps & whitelist)
+
+Every app has an access mode, `AiApp.access`:
+- `OPEN` ("All PL Infra members")
+- `PRIVATE` ("Only you and people you add")
+
+**Who may view an app.** A member may find and open an app when they hold AI Apps
+access (`ai_apps.read` or `ai_apps.write`) AND one of these holds:
+- the app is `OPEN`
+- they own it
+- they are a directory admin
+- they are on its whitelist (`AiAppAllowedMember`)
+
+Being whitelisted never bypasses the PL Infra permission. The rule lives in
+`AiAppsService.canViewApp`, and everything below uses it:
+- **Catalog:** `GET /v1/ai-apps` filters with a single `where` built by
+  `visibleAppsWhere` (one indexed whitelist lookup per request, no per-row queries).
+  The unscoped event feed leaves out events of hidden apps. Events tied to no app
+  (kit downloads, connect approvals) stay in.
+- **Per-app reads:** detail, `:uid/live`, `:uid/events`, `POST :uid/views` and
+  `POST :uid/feedback` return **403** for a private app the requester may not view,
+  and 404 for an unknown app. An unresolved requester only sees `OPEN` apps. Routes
+  already limited to the creator or admins (logs, feedback list, metrics, delete,
+  member deploy) are unchanged.
+- **Direct URL:** see "Auth sidecar" below.
+
+**Defaults:**
+- The first agent deploy or draft registration creates the app as `PRIVATE`, set
+  explicitly in the upserts' `create` blocks. The column default is also `PRIVATE`.
+- Deploys, draft re-registrations and member redeploys never touch `access` or the
+  whitelist. Access is a LabOS setting only, with no deploy field. Kits ≥1.13 tell
+  the agent to say so to the member after the first deploy.
+- Apps that existed before migration `20260922180000_ai_apps_access_control` were
+  backfilled `OPEN`.
+
+**Managing access** (creator or directory admin; everyone else gets 403):
+- `GET /v1/ai-apps/:uid/access` returns the current settings.
+- `PUT /v1/ai-apps/:uid/access` replaces the mode and the **whole** whitelist in one
+  transaction. The owner's uid is dropped and duplicates are collapsed. Every other
+  uid must be a non-deleted member holding AI Apps access, checked with the same
+  `memberHasAnyPermission` helper `RbacGuard` uses. Otherwise the request is
+  rejected with 400 and nothing is saved:
+  `{ unknownMemberUids, membersWithoutAiAppsAccess }`.
+- Switching to `OPEN` keeps the stored whitelist, so switching back restores it.
+- `GET /v1/ai-apps/:uid/access/candidates?search=` feeds the LabOS member picker.
+  It returns a case-insensitive name match (owner excluded, deleted members
+  excluded). Each result is flagged with `hasAiAppsAccess`, so the picker can
+  disable people who could never open the app, and with `alreadyAdded`.
+
+**Response fields:**
+- Every app response carries `access`.
+- Managers also get `directLinkGateReady`.
+- `announcedAt` never leaves the API.
+
+**Auth sidecar (direct URL).** Every deployed app pod has the orchestrator's
+`auth-check` sidecar in front of it (`deployment-orchestrator`: `src/authz.ts`,
+`charts/app`).
+- Each deploy passes the pod's `APP_ID`. For every gated request the sidecar calls
+  `GET /v1/ai-apps/access-check?appId=<appId>&method=<method>` with the member's
+  token. That endpoint:
+  1. checks the PL Infra permission (`GET`/`HEAD` → read or write, anything else →
+     write)
+  2. resolves the non-`DELETED` app by `appId` (a global claim, so at most one
+     matches)
+  3. applies `canViewApp`
+- If the Directory doesn't track the `appId`, the request is allowed with
+  `reason: 'untracked'`. This keeps the permission-only behavior for apps outside
+  web-api.
+- Sidecar mapping:
+  - 2xx → serve
+  - 401 → the existing LabOS login redirect on page loads, plain 401 otherwise
+  - 403 → nginx `@forbidden`, which serves an HTML "You don't have access to this
+    app" page (still status 403, linking to LabOS AI Apps) on top-level navigations,
+    and plain `Forbidden` otherwise
+  - 404 (an older API without this route) → the sidecar falls back to the legacy
+    `/v2/access-control-v2/me/access` permission check
+- nginx's `auth_request` subrequest always arrives as `GET`, so in practice every
+  request needs AI Apps read access, as before.
+- Decisions aren't cached. A whitelist change applies to the next request with no
+  redeploy.
+
+**`directLinkGateReady`:**
+- The sidecar's code and config are fixed per app at deploy time. An app last
+  deployed before per-app decisions existed keeps a sidecar that checks only the PL
+  Infra permission.
+- `AiApp.directLinkGateReady` is set by every successful deploy (`markReady`) and
+  was backfilled `false`.
+- While it is false, a `PRIVATE` setting still hides the app from the catalog and
+  API, but its direct URL stays open to PL Infra members until a redeploy. LabOS
+  warns about this and offers a one-click redeploy through
+  `POST /v1/ai-apps/:uid/deploy`.
 
 ## Build & runtime logs (agent + dashboard debugging)
 
@@ -589,7 +685,19 @@ model AiApp {
   database        Json?         // { enabled, type, host?, port?, name?, user?, credentialsInjected? } — one JSON blob,
                                  // reflects the LAST deploy/draft upload (kitVersion-style); null = not requested.
                                  // Non-sensitive connection metadata only — the password is never stored.
+  access              AiAppAccess @default(PRIVATE) // OPEN | PRIVATE — see "Per-app access"
+  directLinkGateReady Boolean     @default(false)   // true once deployed with the per-app auth sidecar
+  announcedAt         DateTime?                     // when the one-time "new AI App" broadcast went out
   @@unique([memberUid, appId])
+}
+
+model AiAppAllowedMember {    // whitelist of a PRIVATE app (kept while OPEN)
+  appUid     String           // AiApp.uid (no FK relation)
+  memberUid  String
+  addedByUid String           // owner or directory admin who added them
+  notifiedAt DateTime?        // when they got the "shared with you" notification
+  createdAt  DateTime @default(now())
+  @@id([appUid, memberUid])
 }
 
 enum AiAppConnectStatus { PENDING  APPROVED  DENIED  EXPIRED }
@@ -655,7 +763,7 @@ Apps are **lazy-created on first deploy** — there is no registration form. (A 
 
 ## RBAC
 
-- `ai_apps.read` — view the dashboard (list/detail) and submit feedback on an app.
+- `ai_apps.read` — view the dashboard (list/detail) and submit feedback on an app. Private apps additionally require being the owner, a directory admin, or whitelisted (see "Per-app access").
 - `ai_apps.write` — download the starter kit and deploy.
 
 Reading an app's feedback list additionally requires being the app's creator or a
@@ -666,19 +774,38 @@ Both are seeded in migration `20260623120000_ai_apps` and attached to the **PL I
 
 ## Deploy lifecycle bell notifications
 
-Two in-app (bell) notifications, both category `AI_APP` (added in migration
+Three in-app (bell) notifications, all category `AI_APP` (added in migration
 `20260811120000_add_ai_app_notification_category`), distinguished by
 `metadata.trigger` — the same one-category-many-triggers convention the roadmap
 module uses for `GANTRY`. The category is deliberately generic (not
 `AI_APP_DEPLOY`) so future non-deploy AI Apps notifications can reuse it instead
 of growing a new category per event:
 
-- **First successful deploy** (`trigger: 'deploy_succeeded'`) — broadcast to everyone
+- **New app announcement** (`trigger: 'deploy_succeeded'`) — broadcast to everyone
   holding `ai_apps.read` OR `ai_apps.write` (`PushNotificationsService.create`'s
-  `requiredPermissions` fan-out), including the app's own owner. Fired from
-  `proxyDeploy`'s `markReady` only when `app.lastDeployedAt` was `null` going into the
-  deploy — the only writer of `lastDeployedAt` is a successful deploy, so this is
-  exactly "first ship, not a redeploy/update".
+  `requiredPermissions` fan-out), including the app's own owner.
+  - Sent at most once per app, and only while it is `OPEN`. See
+    `AiAppsService.announceIfEligible`: `access = OPEN`, `lastDeployedAt` set,
+    `announcedAt` null.
+  - It fires from `proxyDeploy`'s `markReady` (the first successful deploy of an
+    open app) or from `PUT /v1/ai-apps/:uid/access` (a deployed private app opened
+    for the first time).
+  - The `announcedAt` stamp is a conditional `updateMany`, so concurrent callers
+    can't both send.
+  - Private apps are never announced. Apps that existed before the access-control
+    migration were backfilled with `announcedAt` and are never re-announced.
+- **Shared with you** (`trigger: 'access_granted'`) — a private notification to one
+  whitelisted member (`recipientUid`), saying the owner gave them access to a private
+  app. See `AiAppsService.notifyAllowedMembers`.
+  - It is sent only while the app is `PRIVATE` and has shipped (`lastDeployedAt`
+    set). It fires from `PUT /v1/ai-apps/:uid/access` right after a save, and from
+    `markReady`. So members added to a never-deployed draft are notified on its first
+    successful deploy.
+  - Each whitelist row carries `notifiedAt`, stamped with a conditional `updateMany`
+    before sending. A member is notified at most once while on the list; removing and
+    re-adding them creates a fresh row, so they are notified again.
+  - Rows saved while the app is `OPEN` start stamped. The open broadcast already
+    covered those members, so a later switch to `PRIVATE` doesn't ping them.
 - **Deploy failure** (`trigger: 'deploy_failed'`) — private notification to the app's
   **owner only** (`recipientUid: app.memberUid`), sent from every place a deploy can
   fail: `failDeploy` (S3 upload failure, hard runner error, a 2xx body reporting
@@ -791,6 +918,8 @@ S3 uploads reuse the shared `AwsService`, so the standard `AWS_REGION` / `AWS_AC
 - `apps/web-api/prisma/migrations/20260714120000_ai_apps_upload_meta/` — `kitVersion`/`agentClient`/`agentModel` columns (self-reported metadata about the last agent upload).
 - `apps/web-api/prisma/migrations/20260715120000_ai_apps_editable_metadata/` — `prd` column (one-pager PRD).
 - `apps/web-api/prisma/migrations/20260730120000_ai_apps_database_provisioning/` — single `database` JSON column: provisioning request + non-sensitive connection metadata (agent-driven database provisioning).
+- `apps/web-api/prisma/migrations/20260922180000_ai_apps_access_control/` — `AiAppAccess` enum + `access` column (existing rows backfilled `OPEN`, default `PRIVATE`), `directLinkGateReady`, `announcedAt` (backfilled), `AiAppAllowedMember` whitelist table.
+- `apps/web-api/src/ai-apps/ai-apps-access.service.ts` + `dto/ai-app-access.dto.ts` — access management, whitelist member search, and the sidecar `access-check` decision (visibility rule: `AiAppsService.canViewApp`).
 - `apps/web-api/src/ai-apps/dto/track-event.dto.ts` + `AiAppsService.trackAppEvent`/`resolveAppFromOrigin`/`sanitizeTrackProperties` — `POST /v1/ai-apps/track`, forwarding via the shared `AnalyticsService`/`PostHogProvider` (see "Product analytics for deployed apps" above). No dedicated migration — reuses the existing `AiApp` table for attribution lookups only.
 - LabOS UI (`pln-directory-portal-v2`): `app/pl-infra/ai-apps/connect/page.tsx` + `components/page/ai-apps/AiAppsConnectPage/` — the approval page; connect calls in `services/ai-apps/ai-apps.service.ts`.
 - `.claude/skills/ai-apps/SKILL.md` — agent guidance for working on this feature.
@@ -798,5 +927,5 @@ S3 uploads reuse the shared `AwsService`, so the standard `AWS_REGION` / `AWS_AC
 ## Out of scope (POC)
 
 - The dashboard UI (built later in `pln-directory-portal-v2`).
-- Connectors, per-app collaborators, build logs streaming.
+- Connectors, per-app co-editors (the whitelist grants viewing only), build logs streaming.
 - Reusable/long-lived deploy tokens — replaced by the short-lived connect flow.
