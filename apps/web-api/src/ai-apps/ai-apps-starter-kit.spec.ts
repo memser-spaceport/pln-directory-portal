@@ -411,4 +411,22 @@ describe('AiAppsStarterKitService buildZip', () => {
     expect(deploySkill).toContain("On the app's FIRST successful deploy");
     expect(deploySkill).toContain('there is no deploy field for it');
   });
+
+  it('documents public endpoints and that the app must secure them (kit 1.13)', () => {
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.13');
+    const deploySkill = entries.get('.claude/skills/deploy-to-labs/SKILL.md') as string;
+    expect(deploySkill).toContain('## Public endpoints (paths without LabOS sign-in)');
+    expect(deploySkill).toContain(
+      '**LabOS does NOT authenticate public paths — the app itself MUST secure every\npublic path.**'
+    );
+    expect(deploySkill).toContain(`-F 'publicPaths=["/api/*","/webhooks/stripe"]'`);
+    expect(deploySkill).toContain('patterns the member explicitly approved in this session');
+    expect(deploySkill).toContain('**omit it**');
+    expect(deploySkill).toContain('Deployment settings → Public endpoints');
+    expect(deploySkill).toContain('**CORS** is the app');
+    expect(entries.get('README.md')).toContain('**public endpoints**');
+    for (const path of ['CLAUDE.md', 'AGENTS.md']) {
+      expect(entries.get(path) as string).toContain('LabOS does NOT authenticate public\n   paths');
+    }
+  });
 });

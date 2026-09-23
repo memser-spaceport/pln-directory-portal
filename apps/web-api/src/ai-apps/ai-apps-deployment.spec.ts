@@ -27,6 +27,7 @@ jest.mock('../analytics/service/analytics.service', () => ({
   AnalyticsService: jest.fn(),
 }));
 
+import { BadRequestException } from '@nestjs/common';
 import axios from 'axios';
 import { AiAppsService } from './ai-apps.service';
 import { AI_APPS_DEPLOY_STUCK_MS } from './ai-apps.constants';
@@ -187,6 +188,90 @@ describe('manager gating of failure details', () => {
   });
 });
 
+describe('upload-time public paths (agent deploy)', () => {
+  const FILE = { buffer: Buffer.from('zip'), mimetype: 'application/zip' } as Express.Multer.File;
+  const DTO = { appId: 'demo', name: 'Demo', deploymentId: 'd2' } as any;
+
+  function buildDeploy(existing: Record<string, any> | null) {
+    const built: any = buildService(existing);
+    built.prisma.aiApp.upsert = jest
+      .fn()
+      .mockImplementation(({ create, update }) =>
+        Promise.resolve(
+          existing
+            ? { ...APP, ...existing, ...Object.fromEntries(Object.entries(update).filter(([, v]) => v !== undefined)) }
+            : { ...APP, ...create }
+        )
+      );
+    mockedAxios.post.mockResolvedValue({ status: 200, data: { port: 31001 } });
+    return built;
+  }
+  const upsertArgs = (prisma: any) => prisma.aiApp.upsert.mock.calls[0][0];
+  const publicPathEvents = (prisma: any) =>
+    prisma.aiAppEvent.create.mock.calls
+      .map(([{ data }]: any) => data)
+      .filter((d: any) => d.type === 'PUBLIC_PATHS_UPDATED');
+
+  it('a first deploy stores the declared list and audits it', async () => {
+    const { service, prisma } = buildDeploy(null);
+
+    await service.deploy('creator-1', { ...DTO, publicPaths: ['/api/*'] }, FILE);
+
+    expect(upsertArgs(prisma).create.publicPaths).toEqual(['/api/*']);
+    expect(publicPathEvents(prisma)).toEqual([expect.objectContaining({ message: 'Public paths: ["/api/*"]' })]);
+  });
+
+  it('a first deploy without the field creates an empty list and no event', async () => {
+    const { service, prisma } = buildDeploy(null);
+
+    await service.deploy('creator-1', DTO, FILE);
+
+    expect(upsertArgs(prisma).create.publicPaths).toEqual([]);
+    expect(publicPathEvents(prisma)).toEqual([]);
+  });
+
+  it('a redeploy without the field keeps the stored list', async () => {
+    const { service, prisma } = buildDeploy({ ...APP, publicPaths: ['/webhooks/stripe'] });
+
+    const result = await service.deploy('creator-1', DTO, FILE);
+
+    expect(upsertArgs(prisma).update.publicPaths).toBeUndefined();
+    expect(publicPathEvents(prisma)).toEqual([]);
+    expect(result.publicPaths).toEqual(['/webhooks/stripe']);
+  });
+
+  it('an empty list clears the stored one', async () => {
+    const { service, prisma } = buildDeploy({ ...APP, publicPaths: ['/webhooks/stripe'] });
+
+    await service.deploy('creator-1', { ...DTO, publicPaths: [] }, FILE);
+
+    expect(upsertArgs(prisma).update.publicPaths).toEqual([]);
+    expect(publicPathEvents(prisma)).toHaveLength(1);
+  });
+
+  it('an invalid list fails with 400 before anything is stored or uploaded', async () => {
+    const { service, prisma, aws } = buildDeploy(null);
+
+    await expect(service.deploy('creator-1', { ...DTO, publicPaths: ['/*'] }, FILE)).rejects.toBeInstanceOf(
+      BadRequestException
+    );
+
+    expect(prisma.aiApp.upsert).not.toHaveBeenCalled();
+    expect(aws.uploadFileToS3).not.toHaveBeenCalled();
+    expect(mockedAxios.post).not.toHaveBeenCalled();
+  });
+
+  it('a member redeploy from LabOS never writes the list', async () => {
+    const { service, prisma } = buildService({ ...APP, publicPaths: ['/api/*'] });
+    mockedAxios.post.mockResolvedValue({ status: 200, data: { port: 31001 } });
+
+    await service.deployDraft('creator-1', 'app-1', undefined);
+
+    const writes = prisma.aiApp.update.mock.calls.map(([{ data }]: any) => data);
+    expect(writes.some((data: any) => 'publicPaths' in data)).toBe(false);
+  });
+});
+
 describe('deploy outcome writes', () => {
   it('a successful deploy sets lastDeployedAt and clears failureStream (markReady)', async () => {
     const { service, prisma } = buildService({ ...APP, status: 'ERROR', notes: 'old failure', failureStream: 'build' });
@@ -197,7 +282,7 @@ describe('deploy outcome writes', () => {
     const readyWrite = prisma.aiApp.update.mock.calls
       .map(([{ data }]: any) => data)
       .find((d: any) => d.status === 'READY');
-    expect(readyWrite).toMatchObject({ notes: null, failureStream: null });
+    expect(readyWrite).toMatchObject({ notes: null, failureStream: null, publicPathsGateReady: true });
     expect(readyWrite.lastDeployedAt).toBeInstanceOf(Date);
     expect(result.deployment.serving).toBe('latest');
   });
@@ -210,6 +295,7 @@ describe('deploy outcome writes', () => {
 
     expect(errorWrite(prisma)).toMatchObject({ failureStream: 'build' });
     expect(errorWrite(prisma)).not.toHaveProperty('lastDeployedAt');
+    expect(errorWrite(prisma)).not.toHaveProperty('publicPathsGateReady');
   });
 
   it('a runner 2xx carrying status:"failed" is a failure, not a success', async () => {

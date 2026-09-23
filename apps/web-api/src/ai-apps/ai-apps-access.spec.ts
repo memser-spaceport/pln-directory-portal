@@ -15,8 +15,14 @@ import axios from 'axios';
 import { AiAppsService } from './ai-apps.service';
 import { AiAppsAccessService } from './ai-apps-access.service';
 import { AiAppsController } from './ai-apps.controller';
-import { UpdateAiAppAccessSchema, AiAppAccessCandidatesQuerySchema } from './dto/ai-app-access.dto';
-import { UserAccessTokenValidateGuard } from '../guards/user-access-token-validate.guard';
+import {
+  UpdateAiAppAccessSchema,
+  AiAppAccessCandidatesQuerySchema,
+  UpdateAiAppPublicPathsSchema,
+  AiAppAccessCheckQuerySchema,
+} from './dto/ai-app-access.dto';
+import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { RbacGuard } from '../rbac/rbac.guard';
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
@@ -33,6 +39,8 @@ const PRIVATE_APP = {
   status: 'READY',
   access: 'PRIVATE',
   directLinkGateReady: true,
+  publicPaths: [] as string[],
+  publicPathsGateReady: false,
   announcedAt: null as Date | null,
   lastDeployedAt: new Date('2026-09-01T00:00:00.000Z'),
   notes: null,
@@ -295,6 +303,21 @@ describe('response shape', () => {
     expect(asOwner).toMatchObject({ access: 'OPEN', directLinkGateReady: true, canManage: true });
     expect(asOwner).not.toHaveProperty('announcedAt');
   });
+
+  it('exposes publicPaths and publicPathsGateReady to managers only', async () => {
+    const prisma = buildPrisma([{ ...OPEN_APP, publicPaths: ['/api/*'], publicPathsGateReady: true }]);
+    const { aiAppsService } = buildServices(prisma);
+    const asViewer = await aiAppsService.getApp('app-open', VIEWER);
+    const asOwner = await aiAppsService.getApp('app-open', OWNER);
+    const asAdmin = await aiAppsService.getApp('app-open', ADMIN);
+
+    expect(asViewer).not.toHaveProperty('publicPaths');
+    expect(asViewer).not.toHaveProperty('publicPathsGateReady');
+    expect(asOwner).toMatchObject({ publicPaths: ['/api/*'], publicPathsGateReady: true });
+    expect(asAdmin).toMatchObject({ publicPaths: ['/api/*'], publicPathsGateReady: true });
+    const listed = await aiAppsService.listApps(VIEWER);
+    expect(listed[0]).not.toHaveProperty('publicPaths');
+  });
 });
 
 describe('deploys and access', () => {
@@ -547,6 +570,92 @@ describe('managing access', () => {
   });
 });
 
+describe('managing public paths', () => {
+  const eventsOf = (prisma: Row) =>
+    prisma.aiAppEvent.create.mock.calls
+      .map(([arg]: [Row]) => arg.data)
+      .filter((row: Row) => row.type === 'PUBLIC_PATHS_UPDATED');
+
+  it('the owner replaces the list, which is audited once', async () => {
+    const { accessService, prisma } = buildServices();
+
+    const saved = await accessService.updatePublicPaths(OWNER, 'app-private', {
+      publicPaths: ['/api/*', '/webhooks/stripe', '/api/*'],
+    });
+
+    expect(saved).toEqual({ publicPaths: ['/api/*', '/webhooks/stripe'], publicPathsGateReady: false });
+    expect(prisma.state.apps.find((app: Row) => app.uid === 'app-private').publicPaths).toEqual([
+      '/api/*',
+      '/webhooks/stripe',
+    ]);
+    expect(eventsOf(prisma)).toEqual([
+      expect.objectContaining({
+        memberUid: OWNER,
+        appUid: 'app-private',
+        appId: 'secret-tool',
+        message: 'Public paths: ["/api/*","/webhooks/stripe"]',
+      }),
+    ]);
+  });
+
+  it('a directory admin may manage them; the getter returns the stored list', async () => {
+    const prisma = buildPrisma([{ ...PRIVATE_APP, publicPaths: ['/api/*'] }]);
+    const { accessService } = buildServices(prisma);
+
+    await expect(accessService.getPublicPaths(ADMIN, 'app-private')).resolves.toEqual({
+      publicPaths: ['/api/*'],
+      publicPathsGateReady: false,
+    });
+    await expect(accessService.updatePublicPaths(ADMIN, 'app-private', { publicPaths: [] })).resolves.toMatchObject({
+      publicPaths: [],
+    });
+  });
+
+  it('other members get 403, unknown and deleted apps 404, and nothing changes', async () => {
+    const prisma = buildPrisma([PRIVATE_APP, { ...OPEN_APP, status: 'DELETED' }]);
+    const { accessService } = buildServices(prisma);
+
+    await expect(accessService.getPublicPaths(VIEWER, 'app-private')).rejects.toThrow(ForbiddenException);
+    await expect(accessService.updatePublicPaths(VIEWER, 'app-private', { publicPaths: ['/api/*'] })).rejects.toThrow(
+      ForbiddenException
+    );
+    await expect(accessService.getPublicPaths(OWNER, 'missing')).rejects.toThrow(NotFoundException);
+    await expect(accessService.updatePublicPaths(OWNER, 'app-open', { publicPaths: ['/api/*'] })).rejects.toThrow(
+      NotFoundException
+    );
+    expect(prisma.aiApp.update).not.toHaveBeenCalled();
+    expect(eventsOf(prisma)).toEqual([]);
+  });
+
+  it('an invalid pattern saves nothing and names the pattern in the 400', async () => {
+    const { accessService, prisma } = buildServices();
+
+    const attempt = accessService.updatePublicPaths(OWNER, 'app-private', { publicPaths: ['/api/*', '/*'] });
+
+    await expect(attempt).rejects.toThrow(BadRequestException);
+    await attempt.catch((error: BadRequestException) =>
+      expect(error.getResponse()).toMatchObject({ invalidPatterns: [expect.objectContaining({ pattern: '/*' })] })
+    );
+    expect(prisma.aiApp.update).not.toHaveBeenCalled();
+  });
+
+  it('saving the stored list again is a no-op without an event', async () => {
+    const prisma = buildPrisma([{ ...PRIVATE_APP, publicPaths: ['/api/*'] }]);
+    const { accessService } = buildServices(prisma);
+
+    await accessService.updatePublicPaths(OWNER, 'app-private', { publicPaths: ['/api/*'] });
+
+    expect(prisma.aiApp.update).not.toHaveBeenCalled();
+    expect(eventsOf(prisma)).toEqual([]);
+  });
+
+  it('validates the body shape', () => {
+    expect(UpdateAiAppPublicPathsSchema.safeParse({ publicPaths: '/api/*' }).success).toBe(false);
+    expect(UpdateAiAppPublicPathsSchema.safeParse({}).success).toBe(false);
+    expect(UpdateAiAppPublicPathsSchema.parse({ publicPaths: [] })).toEqual({ publicPaths: [] });
+  });
+});
+
 describe('sidecar access check', () => {
   it('allows OPEN apps and whitelisted members, 403s others with a reason', async () => {
     const prisma = buildPrisma([PRIVATE_APP, OPEN_APP], [{ appUid: 'app-private', memberUid: 'friend-1' }]);
@@ -596,6 +705,118 @@ describe('sidecar access check', () => {
   });
 });
 
+describe('sidecar access check with public paths (controller)', () => {
+  const PUBLIC_PRIVATE_APP = { ...PRIVATE_APP, publicPaths: ['/api/*', '/webhooks/stripe'] };
+
+  function buildController(apps: Row[] = [PUBLIC_PRIVATE_APP, OPEN_APP]) {
+    const { accessService, prisma } = buildServices(buildPrisma(apps));
+    const rbacService = { findMemberByEmail: jest.fn(async (email: string) => ({ uid: email.split('@')[0] })) };
+    const controller = new AiAppsController({} as any, {} as any, {} as any, rbacService as any, accessService);
+    return { controller, prisma };
+  }
+  const anonymous = (): Row => ({ headers: {}, cookies: {} });
+  const signedIn = (memberUid: string): Row => ({ headers: { authorization: `Bearer ${memberUid}` }, cookies: {} });
+  const introspectAs = (active: boolean) =>
+    mockedAxios.post.mockImplementation(async (_url: string, body: any) => ({
+      data: active ? { active: true, email: `${body.token}@x.test`, sub: body.token } : { active: false },
+    }));
+  const check = (controller: AiAppsController, query: Row, req: Row) =>
+    controller.checkAccess({ method: 'GET', ...query } as any, req);
+
+  beforeEach(() => mockedAxios.post.mockReset());
+
+  it('serves a matching path without a token and without introspection', async () => {
+    const { controller } = buildController();
+    await expect(check(controller, { appId: 'secret-tool', path: '/api/items?x=1' }, anonymous())).resolves.toEqual({
+      allowed: true,
+      reason: 'public',
+    });
+    await expect(
+      check(controller, { appId: 'secret-tool', path: '/webhooks/stripe', method: 'POST' }, anonymous())
+    ).resolves.toEqual({ allowed: true, reason: 'public' });
+    expect(mockedAxios.post).not.toHaveBeenCalled();
+  });
+
+  it('serves a matching path even with an invalid token', async () => {
+    introspectAs(false);
+    const { controller } = buildController();
+    await expect(check(controller, { appId: 'secret-tool', path: '/api/x' }, signedIn('stale'))).resolves.toEqual({
+      allowed: true,
+      reason: 'public',
+    });
+  });
+
+  it('serves a matching path of a PRIVATE app to a non-whitelisted member', async () => {
+    introspectAs(true);
+    const { controller } = buildController();
+    await expect(check(controller, { appId: 'secret-tool', path: '/api/x' }, signedIn(VIEWER))).resolves.toEqual({
+      allowed: true,
+      reason: 'public',
+    });
+    await expect(check(controller, { appId: 'secret-tool', path: '/dashboard' }, signedIn(VIEWER))).rejects.toThrow(
+      ForbiddenException
+    );
+  });
+
+  it('401s a non-matching path without a token', async () => {
+    const { controller } = buildController();
+    await expect(check(controller, { appId: 'secret-tool', path: '/dashboard' }, anonymous())).rejects.toMatchObject({
+      status: 401,
+    });
+    await expect(check(controller, { appId: 'secret-tool', path: '/api/../admin' }, anonymous())).rejects.toMatchObject(
+      {
+        status: 401,
+      }
+    );
+  });
+
+  it('keeps the existing decisions for a non-matching path with a valid token', async () => {
+    introspectAs(true);
+    const { controller } = buildController();
+    await expect(check(controller, { appId: 'open-tool', path: '/x' }, signedIn(VIEWER))).resolves.toEqual({
+      allowed: true,
+    });
+    await expect(check(controller, { appId: 'secret-tool', path: '/x' }, signedIn(OWNER))).resolves.toEqual({
+      allowed: true,
+    });
+    const privateDenied = check(controller, { appId: 'secret-tool', path: '/x' }, signedIn(VIEWER));
+    await expect(privateDenied).rejects.toThrow(ForbiddenException);
+    await privateDenied.catch((error: ForbiddenException) =>
+      expect(error.getResponse()).toMatchObject({ reason: 'private' })
+    );
+    const permissionDenied = check(controller, { appId: 'open-tool', path: '/x' }, signedIn('outsider'));
+    await expect(permissionDenied).rejects.toThrow(ForbiddenException);
+    await permissionDenied.catch((error: ForbiddenException) =>
+      expect(error.getResponse()).toMatchObject({ reason: 'permission' })
+    );
+  });
+
+  it('without a path behaves exactly as before', async () => {
+    const { controller, prisma } = buildController();
+    await expect(check(controller, { appId: 'secret-tool' }, anonymous())).rejects.toMatchObject({ status: 401 });
+    introspectAs(true);
+    await expect(check(controller, { appId: 'secret-tool' }, signedIn(OWNER))).resolves.toEqual({ allowed: true });
+    // One appId lookup per request: the prefetched row is reused by checkAccess.
+    expect(prisma.aiApp.findFirst).toHaveBeenCalledTimes(2);
+  });
+
+  it('an untracked appId with a path and no token is 401', async () => {
+    const { controller } = buildController();
+    await expect(check(controller, { appId: 'not-ours', path: '/api/x' }, anonymous())).rejects.toMatchObject({
+      status: 401,
+    });
+  });
+
+  it('accepts an optional path in the query', () => {
+    expect(AiAppAccessCheckQuerySchema.parse({ appId: 'a', path: '/api/x' })).toEqual({
+      appId: 'a',
+      method: 'GET',
+      path: '/api/x',
+    });
+    expect(AiAppAccessCheckQuerySchema.safeParse({ appId: 'a', path: `/${'a'.repeat(2048)}` }).success).toBe(false);
+  });
+});
+
 describe('access routes', () => {
   const proto = AiAppsController.prototype as any;
   const route = (name: string) => ({
@@ -611,8 +832,14 @@ describe('access routes', () => {
       path: ':uid/access/candidates',
       method: RequestMethod.GET,
     });
+    expect(route('getPublicPaths')).toMatchObject({ path: ':uid/public-paths', method: RequestMethod.GET });
+    expect(route('updatePublicPaths')).toMatchObject({ path: ':uid/public-paths', method: RequestMethod.PUT });
+    expect(route('getPublicPaths').guards).toEqual([UserTokenCheckGuard, RbacGuard]);
+    expect(route('updatePublicPaths').guards).toEqual([UserTokenCheckGuard, RbacGuard]);
     expect(route('checkAccess')).toMatchObject({ path: 'access-check', method: RequestMethod.GET });
-    expect(route('checkAccess').guards).toEqual([UserAccessTokenValidateGuard]);
+    // No guard: public paths are decided before any token is read; the handler
+    // validates the session itself for everything else.
+    expect(route('checkAccess').guards).toEqual([]);
   });
 
   it('declares access-check before the :uid route so the literal path wins', () => {
