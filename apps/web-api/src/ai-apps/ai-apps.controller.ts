@@ -433,7 +433,7 @@ export class AiAppsController {
     await this.aiAppsService.recordView(memberUid, uid);
   }
 
-  /** Access mode + whitelist of one app. Creator or directory admin only (checked in the service). */
+  /** Access mode + whitelist of one app. App owner only (checked in the service). */
   @NoCache()
   @Get(':uid/access')
   @UseGuards(UserTokenCheckGuard, RbacGuard)
@@ -444,8 +444,8 @@ export class AiAppsController {
   }
 
   /**
-   * Replace the app's access mode and whole whitelist. Creator or directory
-   * admin only; 400 names any uid that isn't a member with AI Apps access.
+   * Replace the app's access mode and whole whitelist. App owner only; 400
+   * names any uid that isn't a member with AI Apps access.
    */
   @NoCache()
   @Put(':uid/access')
@@ -457,7 +457,7 @@ export class AiAppsController {
     return this.accessService.updateAccess(memberUid, uid, body);
   }
 
-  /** Member name search for the whitelist picker. Creator or directory admin only. */
+  /** Member name search for the whitelist picker. App owner only. */
   @NoCache()
   @Get(':uid/access/candidates')
   @UseGuards(UserTokenCheckGuard, RbacGuard)

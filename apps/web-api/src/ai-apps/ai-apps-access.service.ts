@@ -41,7 +41,7 @@ const READ_PERMISSIONS = [AI_APPS_PERMISSIONS.READ, AI_APPS_PERMISSIONS.WRITE];
 const WRITE_PERMISSIONS = [AI_APPS_PERMISSIONS.WRITE];
 
 /**
- * Per-app access: the owner/admin-managed mode + whitelist, the member search
+ * Per-app access: the owner-managed mode + whitelist, the member search
  * that feeds it, and the decision endpoint a deployed app's auth sidecar asks
  * on every request. The visibility rule itself lives in
  * `AiAppsService.canViewApp` so the catalog, detail reads, and the sidecar all
@@ -56,6 +56,7 @@ export class AiAppsAccessService {
     private readonly accessControlV2Service: AccessControlV2Service
   ) {}
 
+  /** Owner only (see `findManageableApp`). */
   async getAccess(requesterUid: string, uid: string): Promise<AiAppAccessSettings> {
     const app = await this.findManageableApp(requesterUid, uid);
     return this.toSettings(app);
@@ -181,8 +182,10 @@ export class AiAppsAccessService {
     if (!app || app.status === 'DELETED') {
       throw new NotFoundException(`AI App not found: ${uid}`);
     }
-    if (!(await this.aiAppsService.isCreatorOrDirectoryAdmin(requesterUid, app))) {
-      throw new ForbiddenException('Only the app creator or a directory admin can manage access');
+    // Owner only: who may open an app is the owner's call. Directory admins can
+    // view every app and use the other manage actions, but not this one.
+    if (app.memberUid !== requesterUid) {
+      throw new ForbiddenException('Only the app owner can manage access');
     }
     return app;
   }

@@ -92,9 +92,9 @@ The `deployToken` is held in agent memory only and never written into the kit, s
 | GET    | `/v1/ai-apps/access-check`       | `UserAccessTokenValidateGuard` (Bearer **or** `authToken` cookie) | checked in service | Per-app decision for a deployed app's auth sidecar: `?appId=&method=` → 200 / 401 / 403 `{ reason: 'permission' \| 'private' }` (see "Per-app access") |
 | GET    | `/v1/ai-apps/me`                 | `UserAccessTokenValidateGuard`+`RbacGuard` (Bearer **or** `authToken` cookie) | `ai_apps.read`/`write` | Member context for deployed apps: the signed-in member's public identity (see below) |
 | GET    | `/v1/ai-apps/:uid`               | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Single app detail (403 for a private app the requester may not view) |
-| GET    | `/v1/ai-apps/:uid/access`        | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | Access mode + whitelist: `{ access, directLinkGateReady, members: [{ uid, name, image, addedAt }] }` |
-| PUT    | `/v1/ai-apps/:uid/access`        | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | Replace the access mode and whole whitelist: `{ access: 'OPEN' \| 'PRIVATE', memberUids: string[] }` (max 200); 400 names uids that aren't members with AI Apps access |
-| GET    | `/v1/ai-apps/:uid/access/candidates` | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | Member name search for the whitelist picker (`?search=`, 10 results) with `hasAiAppsAccess` + `alreadyAdded` flags |
+| GET    | `/v1/ai-apps/:uid/access`        | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + owner only (checked in service) | Access mode + whitelist: `{ access, directLinkGateReady, members: [{ uid, name, image, addedAt }] }` |
+| PUT    | `/v1/ai-apps/:uid/access`        | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + owner only (checked in service) | Replace the access mode and whole whitelist: `{ access: 'OPEN' \| 'PRIVATE', memberUids: string[] }` (max 200); 400 names uids that aren't members with AI Apps access |
+| GET    | `/v1/ai-apps/:uid/access/candidates` | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + owner only (checked in service) | Member name search for the whitelist picker (`?search=`, 10 results) with `hasAiAppsAccess` + `alreadyAdded` flags |
 | GET    | `/v1/ai-apps/:uid/events`        | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Full event/status history for one app (404 if app missing, 403 if private and not viewable) |
 | GET    | `/v1/ai-apps/:uid/live`          | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Liveness probe: one server-side reachability check of the app URL → `{ live }`; gateway timeouts AND 404 count as down (the ingress 404s until a first deploy's route is ready). The LabOS detail page polls it so the iframe never shows a raw gateway/404 error |
 | PATCH  | `/v1/ai-apps/:uid`               | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.write`   | Edit display metadata (`name`/`description`/`prd`) without redeploying; JSON **or** multipart (`file` = Markdown/HTML PRD, stored in S3) |
@@ -309,7 +309,7 @@ Being whitelisted never bypasses the PL Infra permission. The rule lives in
 - Apps that existed before migration `20260922180000_ai_apps_access_control` were
   backfilled `OPEN`.
 
-**Managing access** (creator or directory admin; everyone else gets 403):
+**Managing access** (the app owner only; everyone else, directory admins included, gets 403):
 - `GET /v1/ai-apps/:uid/access` returns the current settings.
 - `PUT /v1/ai-apps/:uid/access` replaces the mode and the **whole** whitelist in one
   transaction. The owner's uid is dropped and duplicates are collapsed. Every other
@@ -326,6 +326,7 @@ Being whitelisted never bypasses the PL Infra permission. The rule lives in
 **Response fields:**
 - Every app response carries `access`.
 - Managers also get `directLinkGateReady`.
+- The detail response carries `isOwner` (the requester owns the app), which gates the LabOS Manage access item. It's stricter than `canManage`, which also covers directory admins.
 - `announcedAt` never leaves the API.
 
 **Auth sidecar (direct URL).** Every deployed app pod has the orchestrator's
@@ -694,7 +695,7 @@ model AiApp {
 model AiAppAllowedMember {    // whitelist of a PRIVATE app (kept while OPEN)
   appUid     String           // AiApp.uid (no FK relation)
   memberUid  String
-  addedByUid String           // owner or directory admin who added them
+  addedByUid String           // the owner, who added them
   notifiedAt DateTime?        // when they got the "shared with you" notification
   createdAt  DateTime @default(now())
   @@id([appUid, memberUid])

@@ -292,7 +292,10 @@ describe('response shape', () => {
     expect(asViewer).toMatchObject({ access: 'OPEN' });
     expect(asViewer).not.toHaveProperty('directLinkGateReady');
     expect(asViewer).not.toHaveProperty('announcedAt');
-    expect(asOwner).toMatchObject({ access: 'OPEN', directLinkGateReady: true, canManage: true });
+    expect(asOwner).toMatchObject({ access: 'OPEN', directLinkGateReady: true, canManage: true, isOwner: true });
+    expect(asViewer).toMatchObject({ isOwner: false });
+    // A directory admin can manage the app, but isn't its owner.
+    await expect(aiAppsService.getApp('app-open', ADMIN)).resolves.toMatchObject({ canManage: true, isOwner: false });
     expect(asOwner).not.toHaveProperty('announcedAt');
   });
 });
@@ -474,14 +477,18 @@ describe('managing access', () => {
     expect(prisma.aiAppAllowedMember.createMany).toHaveBeenLastCalledWith(expect.objectContaining({ data: [] }));
   });
 
-  it('a directory admin may manage anyone’s app; other members get 403 and nothing changes', async () => {
+  it('only the owner manages access: directory admins and other members get 403 and nothing changes', async () => {
     const { accessService, prisma } = buildServices();
-    await expect(accessService.getAccess(ADMIN, 'app-private')).resolves.toMatchObject({ access: 'PRIVATE' });
-    await expect(accessService.updateAccess(VIEWER, 'app-private', { access: 'OPEN', memberUids: [] })).rejects.toThrow(
-      ForbiddenException
-    );
+    for (const requester of [ADMIN, VIEWER]) {
+      await expect(accessService.getAccess(requester, 'app-private')).rejects.toThrow(ForbiddenException);
+      await expect(
+        accessService.updateAccess(requester, 'app-private', { access: 'OPEN', memberUids: [] })
+      ).rejects.toThrow(ForbiddenException);
+      await expect(accessService.searchCandidates(requester, 'app-private', 'ali')).rejects.toThrow(ForbiddenException);
+    }
     expect(prisma.$transaction).not.toHaveBeenCalled();
-    await expect(accessService.getAccess(VIEWER, 'missing')).rejects.toThrow(NotFoundException);
+    await expect(accessService.getAccess(OWNER, 'app-private')).resolves.toMatchObject({ access: 'PRIVATE' });
+    await expect(accessService.getAccess(OWNER, 'missing')).rejects.toThrow(NotFoundException);
   });
 
   it('rejects the whole save when a uid is unknown or lacks AI Apps access', async () => {

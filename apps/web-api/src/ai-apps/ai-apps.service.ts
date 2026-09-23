@@ -523,7 +523,10 @@ export class AiAppsService {
    * 403 for a private app the requester may not view (an unresolved requester
    * only sees OPEN apps).
    */
-  async getApp(uid: string, requesterUid?: string): Promise<ApiAiApp<AiApp> & { canManage?: boolean }> {
+  async getApp(
+    uid: string,
+    requesterUid?: string
+  ): Promise<ApiAiApp<AiApp> & { canManage?: boolean; isOwner?: boolean }> {
     let app = await this.prisma.aiApp.findUnique({ where: { uid } });
     if (!app) {
       throw new NotFoundException(`AI App not found: ${uid}`);
@@ -537,7 +540,9 @@ export class AiAppsService {
       return this.toApiApp(result, false, weeklyActiveUsers);
     }
     const canManage = await this.isCreatorOrDirectoryAdmin(requesterUid, app);
-    return { ...this.toApiApp(result, canManage, weeklyActiveUsers), canManage };
+    // Stricter than canManage: gates owner-only actions (Manage access) in LabOS.
+    const isOwner = app.memberUid === requesterUid;
+    return { ...this.toApiApp(result, canManage, weeklyActiveUsers), canManage, isOwner };
   }
 
   /** Updates dashboard metadata only; this never invokes the sandbox runner or starts a deploy. */
@@ -1241,7 +1246,7 @@ export class AiAppsService {
   }
 
   /** True when the requester created the app or is a directory admin. */
-  async isCreatorOrDirectoryAdmin(requesterUid: string, app: Pick<AiApp, 'memberUid'>): Promise<boolean> {
+  private async isCreatorOrDirectoryAdmin(requesterUid: string, app: Pick<AiApp, 'memberUid'>): Promise<boolean> {
     if (app.memberUid === requesterUid) {
       return true;
     }

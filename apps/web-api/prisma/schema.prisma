@@ -3699,7 +3699,7 @@ model AiAppAllowedMember {
   /// AiApp.uid (no FK relation, matching the other POC tables).
   appUid     String
   memberUid  String
-  /// Who added this member (owner or directory admin).
+  /// Who added this member (the app owner).
   addedByUid String
   /// When the member got their "shared with you" notification. Set once the
   /// app is PRIVATE and has shipped; rows saved while the app is OPEN start
