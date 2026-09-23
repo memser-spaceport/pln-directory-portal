@@ -89,11 +89,13 @@ The `deployToken` is held in agent memory only and never written into the kit, s
 |--------|-----------------------------------|------------------------------|-------------------|---------|
 | GET    | `/v1/ai-apps`                     | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | List apps with owner + status (excludes `DELETED`, and private apps the requester may not view — see "Per-app access") |
 | GET    | `/v1/ai-apps/events`             | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Event log (audit feed); `?appUid=` to scope (403 for a private app the requester may not view), `?limit=` (default 100, max 500). The unscoped feed leaves out events of private apps the requester may not view |
-| GET    | `/v1/ai-apps/access-check`       | `UserAccessTokenValidateGuard` (Bearer **or** `authToken` cookie) | checked in service | Per-app decision for a deployed app's auth sidecar: `?appId=&method=` → 200 / 401 / 403 `{ reason: 'permission' \| 'private' }` (see "Per-app access") |
+| GET    | `/v1/ai-apps/access-check`       | none on the route — a matching public `path` is served first; otherwise the handler validates the session like `UserAccessTokenValidateGuard` (Bearer **or** `authToken` cookie) | checked in service | Per-app decision for a deployed app's auth sidecar: `?appId=&method=&path=` → 200 (`reason: 'public'` for a public path) / 401 / 403 `{ reason: 'permission' \| 'private' }` (see "Per-app access" and "Public endpoints") |
 | GET    | `/v1/ai-apps/me`                 | `UserAccessTokenValidateGuard`+`RbacGuard` (Bearer **or** `authToken` cookie) | `ai_apps.read`/`write` | Member context for deployed apps: the signed-in member's public identity (see below) |
 | GET    | `/v1/ai-apps/:uid`               | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Single app detail (403 for a private app the requester may not view) |
 | GET    | `/v1/ai-apps/:uid/access`        | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | Access mode + whitelist: `{ access, directLinkGateReady, members: [{ uid, name, image, addedAt }] }` |
 | PUT    | `/v1/ai-apps/:uid/access`        | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | Replace the access mode and whole whitelist: `{ access: 'OPEN' \| 'PRIVATE', memberUids: string[] }` (max 200); 400 names uids that aren't members with AI Apps access |
+| GET    | `/v1/ai-apps/:uid/public-paths`  | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | Public path patterns: `{ publicPaths, publicPathsGateReady }` |
+| PUT    | `/v1/ai-apps/:uid/public-paths`  | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | Replace the whole list: `{ publicPaths: string[] }` (`[]` clears); 400 whose `message` names each invalid pattern and why; audited as `PUBLIC_PATHS_UPDATED` when it changes |
 | GET    | `/v1/ai-apps/:uid/access/candidates` | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | Member name search for the whitelist picker (`?search=`, 10 results) with `hasAiAppsAccess` + `alreadyAdded` flags |
 | GET    | `/v1/ai-apps/:uid/events`        | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Full event/status history for one app (404 if app missing, 403 if private and not viewable) |
 | GET    | `/v1/ai-apps/:uid/live`          | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Liveness probe: one server-side reachability check of the app URL → `{ live }`; gateway timeouts AND 404 count as down (the ingress 404s until a first deploy's route is ready). The LabOS detail page polls it so the iframe never shows a raw gateway/404 error |
@@ -133,6 +135,8 @@ curl -X POST "$AI_APPS_DEPLOY_ENDPOINT" \
 ```
 
 `database` is optional — see "Agent-driven database provisioning" below.
+`publicPaths` is optional too (JSON array or comma list) — see "Public endpoints"
+below.
 
 `name`/`description` are member-facing: kits ≥1.5 send values the member explicitly approved (and resend the same values on redeploys — see "Editable metadata & one-pager PRD").
 
@@ -350,8 +354,8 @@ Being whitelisted never bypasses the PL Infra permission. The rule lives in
     and plain `Forbidden` otherwise
   - 404 (an older API without this route) → the sidecar falls back to the legacy
     `/v2/access-control-v2/me/access` permission check
-- nginx's `auth_request` subrequest always arrives as `GET`, so in practice every
-  request needs AI Apps read access, as before.
+- nginx's `auth_request` subrequest itself is always a `GET`, so nginx forwards the
+  client's method as `X-Original-Method` and the sidecar sends that as `method=`.
 - Decisions aren't cached. A whitelist change applies to the next request with no
   redeploy.
 
@@ -365,6 +369,59 @@ Being whitelisted never bypasses the PL Infra permission. The rule lives in
   API, but its direct URL stays open to PL Infra members until a redeploy. LabOS
   warns about this and offers a one-click redeploy through
   `POST /v1/ai-apps/:uid/deploy`.
+
+## Public endpoints (paths without LabOS auth)
+
+An owner or directory admin can make selected paths of a deployed app public —
+e.g. `/api/*` or `/webhooks/stripe`. The sidecar serves requests to those paths
+to anyone, for every HTTP method (including `OPTIONS` preflights), with or
+without a session, on `OPEN` and `PRIVATE` apps alike. **LabOS doesn't
+authenticate them; the app must secure them itself** (webhook signatures, API
+keys, rate limits, CORS). Every other path keeps the normal sign-in + per-app
+access rule.
+
+**Patterns** (`ai-apps-public-paths.ts`, the single source of the rules):
+- start with `/`; decoded path characters (`A-Za-z0-9-._~!$&'()+,;=:@/`) plus `*`;
+  at most 200 characters; at most 20 per app; duplicates collapsed
+- `*` matches any characters, including `/` — `/api/*` matches `/api/` and
+  `/api/v1/x`, not `/api`; matching is case-sensitive
+- the first segment is literal, so `/`, `/*`, `*`, `/*/x` are rejected — the whole
+  app can never be public
+- the request path is matched without its query/fragment, percent-decoded once,
+  with repeated `/` collapsed; a path with `.`/`..` segments, `\`, NUL, a
+  malformed escape or a `%` left after decoding never matches (fails closed)
+
+**Where they are set** (`AiApp.publicPaths`):
+- LabOS **Deployment settings → Public endpoints** (`GET`/`PUT
+  /v1/ai-apps/:uid/public-paths`) — applies on the next request, no redeploy.
+- The agent's deploy/draft upload: `publicPaths` sent → replaces the list (`[]`
+  clears it); absent or empty string → unchanged, so LabOS edits survive
+  redeploys. Invalid patterns fail the upload with 400 before anything is stored.
+  The member redeploy (`POST /v1/ai-apps/:uid/deploy`) never touches it.
+- Every change (either source) appends a `PUBLIC_PATHS_UPDATED` event with the
+  actor and the resulting list; saving the same list is a no-op.
+- `publicPaths` and `publicPathsGateReady` are returned to managers only.
+
+**Decision.** The sidecar sends the raw request path as `path=` on
+`access-check`. web-api resolves the app by `appId` and, on a match, answers
+`200 { allowed: true, reason: 'public' }` before reading any token — a stale
+cookie never blocks a webhook. Otherwise the session is validated and the usual
+decision applies (`401` without a session). The sidecar asks even for requests
+without a token (base URL from its `DIRECTORY_URL` env, since there is no token
+issuer to pick dev vs. prod), so anonymous requests to any path of an app with
+`APP_ID` cost one `access-check` call.
+
+**`publicPathsGateReady`.** Sidecars older than public-path support don't send
+`path`, so their apps ignore `publicPaths` until a redeploy.
+`AiApp.publicPathsGateReady` is set by every successful deploy (`markReady`),
+starts `false` for existing apps, and LabOS shows a "takes effect after one
+redeploy" notice with a redeploy button while it is false.
+
+**Already unauthenticated regardless of this list:** the sidecar's static-asset
+bypass serves `/favicon.ico`, `/robots.txt`, `/assets/`, `/static/`,
+`/_next/static/`, `/build/`, `/dist/` and any path ending in a static extension
+(`.js`, `.css`, images, `.json`, `.txt`, `.map`, …) without sign-in — so an
+`/api/*.json` route is public even with no patterns.
 
 ## Build & runtime logs (agent + dashboard debugging)
 
@@ -687,6 +744,8 @@ model AiApp {
                                  // Non-sensitive connection metadata only — the password is never stored.
   access              AiAppAccess @default(PRIVATE) // OPEN | PRIVATE — see "Per-app access"
   directLinkGateReady Boolean     @default(false)   // true once deployed with the per-app auth sidecar
+  publicPaths         String[]    @default([])      // path patterns served without LabOS auth — see "Public endpoints"
+  publicPathsGateReady Boolean    @default(false)   // true once deployed with a sidecar that forwards the request path
   announcedAt         DateTime?                     // when the one-time "new AI App" broadcast went out
   @@unique([memberUid, appId])
 }
@@ -721,6 +780,7 @@ enum AiAppEventType {
   DRAFT_CREATED   SECRETS_UPDATED
   DEPLOY_STARTED  DEPLOY_SUCCEEDED  DEPLOY_FAILED
   DELETE_STARTED  DELETE_SUCCEEDED  DELETE_FAILED
+  PUBLIC_PATHS_UPDATED                          // actor + resulting list; LabOS save or agent upload
 }
 
 model AiAppFeedback {         // free-text feedback from the app detail page
@@ -919,7 +979,9 @@ S3 uploads reuse the shared `AwsService`, so the standard `AWS_REGION` / `AWS_AC
 - `apps/web-api/prisma/migrations/20260715120000_ai_apps_editable_metadata/` — `prd` column (one-pager PRD).
 - `apps/web-api/prisma/migrations/20260730120000_ai_apps_database_provisioning/` — single `database` JSON column: provisioning request + non-sensitive connection metadata (agent-driven database provisioning).
 - `apps/web-api/prisma/migrations/20260922180000_ai_apps_access_control/` — `AiAppAccess` enum + `access` column (existing rows backfilled `OPEN`, default `PRIVATE`), `directLinkGateReady`, `announcedAt` (backfilled), `AiAppAllowedMember` whitelist table.
-- `apps/web-api/src/ai-apps/ai-apps-access.service.ts` + `dto/ai-app-access.dto.ts` — access management, whitelist member search, and the sidecar `access-check` decision (visibility rule: `AiAppsService.canViewApp`).
+- `apps/web-api/prisma/migrations/20260923120000_ai_apps_public_paths/` — `publicPaths` + `publicPathsGateReady` columns, `PUBLIC_PATHS_UPDATED` event value.
+- `apps/web-api/src/ai-apps/ai-apps-access.service.ts` + `dto/ai-app-access.dto.ts` — access management, whitelist member search, public-path management, and the sidecar `access-check` decision (visibility rule: `AiAppsService.canViewApp`).
+- `apps/web-api/src/ai-apps/ai-apps-public-paths.ts` — public path pattern validation, request-path normalization and matching.
 - `apps/web-api/src/ai-apps/dto/track-event.dto.ts` + `AiAppsService.trackAppEvent`/`resolveAppFromOrigin`/`sanitizeTrackProperties` — `POST /v1/ai-apps/track`, forwarding via the shared `AnalyticsService`/`PostHogProvider` (see "Product analytics for deployed apps" above). No dedicated migration — reuses the existing `AiApp` table for attribution lookups only.
 - LabOS UI (`pln-directory-portal-v2`): `app/pl-infra/ai-apps/connect/page.tsx` + `components/page/ai-apps/AiAppsConnectPage/` — the approval page; connect calls in `services/ai-apps/ai-apps.service.ts`.
 - `.claude/skills/ai-apps/SKILL.md` — agent guidance for working on this feature.

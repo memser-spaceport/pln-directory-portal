@@ -25,7 +25,7 @@ import { ZodValidationPipe } from '@abitia/zod-dto';
 import { Request, Response } from 'express';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
-import { UserAccessTokenValidateGuard } from '../guards/user-access-token-validate.guard';
+import { UserAccessTokenValidateGuard, validateUserAccessToken } from '../guards/user-access-token-validate.guard';
 import { extractTokenFromRequest } from '../utils/auth';
 import { RequirePermissions } from '../rbac/rbac.decorator';
 import { RbacGuard } from '../rbac/rbac.guard';
@@ -45,7 +45,12 @@ import { SubmitFeedbackDto } from './dto/submit-feedback.dto';
 import { UpdateFeedbackStatusDto } from './dto/update-feedback-status.dto';
 import { UpdateAppMetadataDto } from './dto/update-app-metadata.dto';
 import { TrackEventDto } from './dto/track-event.dto';
-import { AiAppAccessCandidatesQueryDto, AiAppAccessCheckQueryDto, UpdateAiAppAccessDto } from './dto/ai-app-access.dto';
+import {
+  AiAppAccessCandidatesQueryDto,
+  AiAppAccessCheckQueryDto,
+  UpdateAiAppAccessDto,
+  UpdateAiAppPublicPathsDto,
+} from './dto/ai-app-access.dto';
 import {
   AI_APPS_LOG_DEPLOYMENT_ID_PATTERN,
   AI_APPS_MAX_PRD_BYTES,
@@ -213,19 +218,26 @@ export class AiAppsController {
 
   /**
    * Per-app access decision for a deployed app's auth sidecar, asked on every
-   * gated request to `https://<appId>.<domain>`. 200 = serve; 401 = not signed
-   * in; 403 = missing the PL Infra permission (`reason: 'permission'`) or a
-   * private app the member may not open (`reason: 'private'`). Accepts the
-   * Bearer header or the LabOS `authToken` cookie, like `/me`. Declared before
-   * `:uid` so the literal path wins.
+   * gated request to `https://<appId>.<domain>`. A `path` matching one of the
+   * app's public patterns is served to anyone — 200 `reason: 'public'` before
+   * any token is read, so a missing or stale session never blocks it.
+   * Otherwise the session is required: 200 = serve; 401 = not signed in; 403 =
+   * missing the PL Infra permission (`reason: 'permission'`) or a private app
+   * the member may not open (`reason: 'private'`). Accepts the Bearer header
+   * or the LabOS `authToken` cookie, like `/me`. Declared before `:uid` so the
+   * literal path wins.
    */
   @NoCache()
   @Get('access-check')
-  @UseGuards(UserAccessTokenValidateGuard)
   @UsePipes(ZodValidationPipe)
   async checkAccess(@Query() query: AiAppAccessCheckQueryDto, @Req() req: any) {
+    const app = await this.accessService.findAppForAccessCheck(query.appId);
+    if (this.accessService.isPublicPath(app, query.path)) {
+      return { allowed: true, reason: 'public' };
+    }
+    await validateUserAccessToken(req);
     const memberUid = await this.resolveMemberUid(req);
-    return this.accessService.checkAccess(memberUid, query.appId, query.method);
+    return this.accessService.checkAccess(memberUid, query.appId, query.method, { app });
   }
 
   /** Single AI App detail (includes `canManage` for the requesting member). */
@@ -455,6 +467,31 @@ export class AiAppsController {
   async updateAccess(@Param('uid') uid: string, @Body() body: UpdateAiAppAccessDto, @Req() req: any) {
     const memberUid = await this.resolveMemberUid(req);
     return this.accessService.updateAccess(memberUid, uid, body);
+  }
+
+  /** Public path patterns of one app (served without LabOS auth). Creator or directory admin only. */
+  @NoCache()
+  @Get(':uid/public-paths')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async getPublicPaths(@Param('uid') uid: string, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.accessService.getPublicPaths(memberUid, uid);
+  }
+
+  /**
+   * Replace the app's whole public path list (`[]` clears it). Takes effect on
+   * the deployed URL on the next request. Creator or directory admin only; the
+   * 400 message names each invalid pattern and why.
+   */
+  @NoCache()
+  @Put(':uid/public-paths')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  @UsePipes(ZodValidationPipe)
+  async updatePublicPaths(@Param('uid') uid: string, @Body() body: UpdateAiAppPublicPathsDto, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.accessService.updatePublicPaths(memberUid, uid, body);
   }
 
   /** Member name search for the whitelist picker. Creator or directory admin only. */

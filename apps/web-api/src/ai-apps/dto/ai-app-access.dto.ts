@@ -1,6 +1,7 @@
 import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
 import { AI_APPS_MAX_ALLOWED_MEMBERS } from '../ai-apps.constants';
+import { AI_APPS_MAX_REQUEST_PATH_LENGTH } from '../ai-apps-public-paths';
 
 /**
  * Body of `PUT /v1/ai-apps/:uid/access`: the app's access mode plus its FULL
@@ -25,6 +26,21 @@ export class AiAppAccessCandidatesQueryDto extends createZodDto(AiAppAccessCandi
 export const AiAppAccessCheckQuerySchema = z.object({
   appId: z.string().trim().min(1).max(200),
   method: z.string().trim().min(1).max(16).default('GET'),
+  /** Original request path (query optional) — sent by sidecars that support public paths. */
+  path: z.string().max(AI_APPS_MAX_REQUEST_PATH_LENGTH).optional(),
 });
 
 export class AiAppAccessCheckQueryDto extends createZodDto(AiAppAccessCheckQuerySchema) {}
+
+/**
+ * Shape of a public-paths list. The pattern rules (and their 400 with
+ * `invalidPatterns`) live in `assertValidPublicPaths`, applied by the service.
+ */
+export const PublicPathsListSchema = z.array(z.string().max(500)).max(100);
+
+/** Body of `PUT /v1/ai-apps/:uid/public-paths`: the app's FULL public path list (`[]` clears it). */
+export const UpdateAiAppPublicPathsSchema = z.object({
+  publicPaths: PublicPathsListSchema,
+});
+
+export class UpdateAiAppPublicPathsDto extends createZodDto(UpdateAiAppPublicPathsSchema) {}

@@ -19,6 +19,7 @@ import {
   AI_APPS_TAGS_ENDPOINT,
 } from './ai-apps.constants';
 import { AI_APPS_MAX_TAGS_PER_APP, AI_APPS_OTHER_TAG, AI_APPS_TAGS } from './ai-apps-tags';
+import { AI_APPS_MAX_PUBLIC_PATHS } from './ai-apps-public-paths';
 
 /** Curated PL Design System folder, shipped as files inside the starter kit. */
 const DESIGN_SYSTEM_DIR = 'pl-design-system';
@@ -151,6 +152,10 @@ to the Protocol Labs Network sandbox with a single instruction.
    New apps are **private** — only you can see and open them. To share yours,
    open its ⋮ menu on the dashboard → **Manage access**: add specific members,
    or open it to all PL Infra members. You can change this anytime.
+   Need a webhook or public API that works without LabOS sign-in? Ask your
+   agent for **public endpoints** (e.g. \`/api/*\`) — anyone can call those
+   paths, so the app must protect them itself. Manage them anytime in the app's
+   ⋮ menu → **Deployment settings**.
    After the first deploy your agent offers an optional **one-pager PRD** — a
    short product brief (why the app exists and what it does) shown with your
    app; say yes and approve the draft, or skip it. You can rename your app,
@@ -518,6 +523,11 @@ follow "Apps that need secrets" above instead of deploying directly. In short:
    (see "Keep the deployment URL private" in the deploy skill). That privacy rule
    covers only the app's own \`<appId>\` address — LabOS links (\`connectUrl\`,
    \`appPageUrl\`) must always be shared with the member.
+7. **Public endpoints**: every path requires LabOS sign-in unless the member
+   approves making specific paths public (\`publicPaths\` on the deploy — see
+   "Public endpoints" in the deploy skill). LabOS does NOT authenticate public
+   paths, so the app itself MUST secure them (webhook signatures, API keys,
+   rate limits) before you make them public.
 
 ## Debugging a deployed app (build & runtime logs)
 When a deploy fails (status \`ERROR\`), the deployed app crashes or misbehaves,
@@ -1401,6 +1411,10 @@ connection string into the LabOS secrets page, same as an API key.
    member is bringing their own — see "Apps that want a provisioned database"
    below for when to include it.
 
+   Add \`publicPaths\` (e.g. \`-F 'publicPaths=["/api/*"]'\`) only when the
+   member has just approved making specific paths reachable without LabOS
+   sign-in — see "Public endpoints" below. Otherwise omit it.
+
 7. On success the response contains the app record with its deployment URL and
    status:
 
@@ -1586,6 +1600,66 @@ superuser rights. \`CREATE TABLE\`/\`INSERT\`/etc. work normally.
   \`user\`, \`credentialsInjected\`) is informational only — never the password —
   and is not something you need to show the member; the app already has what
   it needs via the injected env vars.
+
+## Public endpoints (paths without LabOS sign-in)
+
+By default every path of the deployed app requires LabOS sign-in. Some apps
+need a few paths that outside callers can reach without a LabOS session — a
+webhook receiver (Stripe, GitHub, Slack…), a small public API, or a callback
+another service calls. For those, the member can make **selected paths
+public**: LabOS then skips its sign-in check on them, and **anyone who can
+reach the URL can call them**.
+
+**LabOS does NOT authenticate public paths — the app itself MUST secure every
+public path.** Before (or together with) making a path public, implement its
+protection in the app:
+- **Webhooks**: verify the provider's signature on every request (e.g. Stripe's
+  \`Stripe-Signature\` with the endpoint secret, GitHub's
+  \`X-Hub-Signature-256\`), and reject anything unsigned or stale.
+- **Public APIs**: require an API key or token that the app checks itself
+  (stored as a runtime secret via the draft flow — never hardcoded), and
+  rate-limit the path.
+- **Never** serve member data, admin actions, or anything you'd otherwise put
+  behind sign-in on a public path. Don't rely on the LabOS \`authToken\` cookie
+  or the member-context endpoint there — a public request may come from anyone.
+- **CORS** is the app's job: if browsers on other origins call a public path,
+  the app must answer the \`OPTIONS\` preflight and send the
+  \`Access-Control-*\` headers itself (LabOS passes the preflight through).
+
+How to declare them — add \`publicPaths\` to the SAME deploy or draft call from
+step 6 (JSON array or comma-separated list):
+
+\`\`\`bash
+-F 'publicPaths=["/api/*","/webhooks/stripe"]'
+\`\`\`
+
+Pattern rules (otherwise the upload fails with \`400\` and a message naming
+each invalid pattern and why):
+- Each pattern starts with \`/\`; \`*\` matches any characters, including \`/\`.
+  \`/api/*\` covers \`/api/users\` and \`/api/v1/x\` but NOT \`/api\` itself — add
+  \`/api\` separately if the bare path must be public too.
+- The first segment must be literal: \`/\`, \`/*\` and \`/*/x\` are rejected — the
+  whole app can never be made public.
+- Plain path characters only (no \`?\`, \`#\` or \`%\` escapes), at most 200
+  characters each, at most ${AI_APPS_MAX_PUBLIC_PATHS} patterns.
+
+Rules for you:
+- Propose public paths only when the app genuinely needs outside callers, name
+  each exact pattern, explain in plain words that anyone on the internet can
+  call it, and say how the app protects it. Send \`publicPaths\` **only with
+  patterns the member explicitly approved in this session**.
+- The field **replaces** the app's list when sent (\`[]\` clears it) and leaves
+  it unchanged when omitted. So on ordinary redeploys **omit it** — the member
+  may have edited the list in LabOS since, and resending an old list would undo
+  their change. The deploy response's \`publicPaths\` shows the current list.
+- Tell the member they can add, edit or remove public endpoints anytime in
+  LabOS: the app's **⋯ menu → Deployment settings → Public endpoints**
+  (changes apply immediately, no redeploy).
+- Exception to "Keep the deployment URL private" below: when the member must
+  paste a public endpoint's address into another service (e.g. a Stripe webhook
+  URL), you may give them that one full endpoint URL
+  (\`https://<appId>.${AI_APPS_APP_DOMAIN}/webhooks/stripe\`). Never share the
+  app's root URL or any non-public path.
 
 ## Keep the deployment URL private
 This rule covers ONLY the deployed app's own address — the URL/host/port on

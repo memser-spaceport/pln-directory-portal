@@ -3684,6 +3684,16 @@ model AiApp {
   /// while the app is OPEN (first successful deploy, or first switch to OPEN
   /// after deploying).
   announcedAt     DateTime?
+  /// Path patterns (e.g. `/api/*`) the auth sidecar serves without LabOS
+  /// auth, to anyone. `*` matches any characters including `/`; the first
+  /// segment is always literal, so the whole app can never be public. Set by
+  /// the agent on deploy (when sent) or by the owner/admin in LabOS; the app
+  /// itself must secure these paths.
+  publicPaths     String[]    @default([])
+  /// True once the app has shipped with an auth sidecar that forwards the
+  /// request path to the Directory. Apps last deployed before that ignore
+  /// `publicPaths` until a redeploy.
+  publicPathsGateReady Boolean @default(false)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
@@ -3802,6 +3812,7 @@ enum AiAppEventType {
   DELETE_STARTED
   DELETE_SUCCEEDED
   DELETE_FAILED
+  PUBLIC_PATHS_UPDATED
 }
 
 /// Append-only audit log of AI Apps activity: who downloaded the kit and every

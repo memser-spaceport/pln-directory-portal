@@ -29,6 +29,7 @@ import { AnalyticsService } from '../analytics/service/analytics.service';
 import { DeployAppDto } from './dto/deploy-app.dto';
 import { RegisterDraftDto } from './dto/register-draft.dto';
 import { UpdateAppMetadataDto } from './dto/update-app-metadata.dto';
+import { assertValidPublicPaths, samePublicPaths } from './ai-apps-public-paths';
 import {
   AiAppLogPhase,
   AI_APP_ANON_ID_REGEX,
@@ -149,16 +150,19 @@ interface AiAppDatabaseInfo {
 /**
  * App responses: the raw `failureStream`/`database` columns replaced by
  * requester-facing `deployment`/`database` blocks. `announcedAt` never leaves
- * the API; `directLinkGateReady` is manager-only.
+ * the API; `directLinkGateReady`, `publicPaths` and `publicPathsGateReady` are
+ * manager-only.
  */
 type ApiAiApp<T extends { memberUid: string }> = Omit<
   WithMember<T>,
-  'failureStream' | 'database' | 'announcedAt' | 'directLinkGateReady'
+  'failureStream' | 'database' | 'announcedAt' | 'directLinkGateReady' | 'publicPaths' | 'publicPathsGateReady'
 > & {
   deployment: AiAppDeploymentInfo;
   database: AiAppDatabaseInfo;
   weeklyActiveUsers: number;
   directLinkGateReady?: boolean;
+  publicPaths?: string[];
+  publicPathsGateReady?: boolean;
 };
 
 /** One newest-first (`order=desc`) log line as served to the dashboard. */
@@ -418,8 +422,16 @@ export class AiAppsService {
    * only writer of `lastDeployedAt` is markReady).
    */
   private toApiApp<T extends AiApp>(app: WithMember<T>, isManager: boolean, weeklyActiveUsers = 0): ApiAiApp<T> {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { failureStream, database: storedDatabase, announcedAt, directLinkGateReady, ...rest } = app;
+    const {
+      failureStream,
+      database: storedDatabase,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      announcedAt,
+      directLinkGateReady,
+      publicPaths,
+      publicPathsGateReady,
+      ...rest
+    } = app;
     const serving: AiAppServing = app.status === 'READY' ? 'latest' : app.lastDeployedAt ? 'previous' : 'none';
     const deployment: AiAppDeploymentInfo = { serving };
     if (isManager) {
@@ -439,7 +451,7 @@ export class AiAppsService {
       database,
       viewCount: app.viewCount ?? 0,
       weeklyActiveUsers,
-      ...(isManager ? { directLinkGateReady } : {}),
+      ...(isManager ? { directLinkGateReady, publicPaths: publicPaths ?? [], publicPathsGateReady } : {}),
     };
   }
 
@@ -1104,6 +1116,15 @@ export class AiAppsService {
    * Append an event to the audit log. Never throws — event logging must not
    * break the primary flow (download/deploy).
    */
+  /** Audits a change of the app's public path list (from LabOS or an agent upload). */
+  async recordPublicPathsUpdated(memberUid: string, app: Pick<AiApp, 'uid' | 'appId' | 'publicPaths'>): Promise<void> {
+    await this.recordEvent('PUBLIC_PATHS_UPDATED', memberUid, {
+      appUid: app.uid,
+      appId: app.appId,
+      message: `Public paths: ${JSON.stringify(app.publicPaths ?? [])}`,
+    });
+  }
+
   private async recordEvent(
     type: AiAppEventType,
     memberUid: string,
@@ -1408,6 +1429,21 @@ export class AiAppsService {
     return uploaded ?? [];
   }
 
+  /**
+   * Upload-time public paths replace the stored list when the agent sends the
+   * field (`[]` clears it) and leave it alone when it doesn't, so LabOS edits
+   * survive redeploys. Validated before anything is stored or uploaded.
+   */
+  private publicPathsForUpload(uploaded: string[] | undefined): string[] | undefined {
+    return uploaded === undefined ? undefined : assertValidPublicPaths(uploaded);
+  }
+
+  private async auditUploadedPublicPaths(memberUid: string, existing: AiApp | null, app: AiApp): Promise<void> {
+    if (!samePublicPaths(existing?.publicPaths, app.publicPaths)) {
+      await this.recordPublicPathsUpdated(memberUid, app);
+    }
+  }
+
   async deploy(
     memberUid: string,
     dto: DeployAppDto,
@@ -1421,6 +1457,7 @@ export class AiAppsService {
       throw new InternalServerErrorException('AI_APPS_S3_BUCKET is not configured');
     }
 
+    const publicPaths = this.publicPathsForUpload(dto.publicPaths);
     await this.assertAppIdNotClaimedByAnotherMember(memberUid, dto.appId);
 
     // Block a second concurrent deploy: if a deploy is already in flight for this
@@ -1457,6 +1494,7 @@ export class AiAppsService {
         agentModel: dto.agentModel ?? null,
         tags: dto.tags ?? [],
         database: dto.database ? { enabled: true, type: dto.database.type } : Prisma.DbNull,
+        publicPaths: publicPaths ?? [],
         // New apps start private to their owner; access is changed only from
         // LabOS, never by a deploy (so `update` leaves it alone).
         access: 'PRIVATE',
@@ -1471,6 +1509,7 @@ export class AiAppsService {
         httpUrl,
         host,
         tags: this.tagsForUpload(existing, dto.tags),
+        publicPaths,
         // Upload metadata reflects the LAST upload — cleared when a client
         // that sends nothing (older kit) redeploys, so it never goes stale.
         kitVersion: dto.kitVersion ?? null,
@@ -1483,6 +1522,7 @@ export class AiAppsService {
       },
     });
 
+    await this.auditUploadedPublicPaths(memberUid, existing, app);
     const eventContext = { appUid: app.uid, appId: dto.appId, deploymentId: dto.deploymentId };
     await this.recordEvent('DEPLOY_STARTED', memberUid, eventContext);
 
@@ -1523,6 +1563,7 @@ export class AiAppsService {
       throw new InternalServerErrorException('AI_APPS_S3_BUCKET is not configured');
     }
 
+    const publicPaths = this.publicPathsForUpload(dto.publicPaths);
     await this.assertAppIdNotClaimedByAnotherMember(memberUid, dto.appId);
 
     // Don't clobber an in-flight deploy's bundle/status by re-registering the app
@@ -1564,6 +1605,7 @@ export class AiAppsService {
         agentModel: dto.agentModel ?? null,
         tags: dto.tags ?? [],
         database: dto.database ? { enabled: true, type: dto.database.type } : Prisma.DbNull,
+        publicPaths: publicPaths ?? [],
         // New apps start private to their owner; access is changed only from
         // LabOS, never by a deploy (so `update` leaves it alone).
         access: 'PRIVATE',
@@ -1576,6 +1618,7 @@ export class AiAppsService {
         s3Key,
         requiredEnvVars: dto.requiredEnvVars,
         tags: this.tagsForUpload(existing, dto.tags),
+        publicPaths,
         kitVersion: dto.kitVersion ?? null,
         agentClient: agentClient ?? null,
         agentModel: dto.agentModel ?? null,
@@ -1584,6 +1627,7 @@ export class AiAppsService {
       },
     });
 
+    await this.auditUploadedPublicPaths(memberUid, existing, app);
     await this.recordEvent('DRAFT_CREATED', memberUid, {
       appUid: app.uid,
       appId: dto.appId,
@@ -1722,6 +1766,8 @@ export class AiAppsService {
           // Directory for a per-app decision — so a PRIVATE setting now also
           // covers the app's direct URL.
           directLinkGateReady: true,
+          // …and forwards the request path, so public path patterns apply.
+          publicPathsGateReady: true,
           // Non-sensitive connection metadata the orchestrator reports once it
           // provisions the database, merged into the same JSON blob we asked
           // it to provision from. Never the password — that lives only in the

@@ -7,7 +7,8 @@ import { AI_APPS_PERMISSIONS } from '../access-control-v2/access-control-v2.cons
 import { memberHasAnyPermission } from '../rbac/rbac-permission-check';
 import { AiAppsService } from './ai-apps.service';
 import { AI_APPS_ACCESS_CANDIDATES_LIMIT } from './ai-apps.constants';
-import { UpdateAiAppAccessDto } from './dto/ai-app-access.dto';
+import { assertValidPublicPaths, matchesPublicPath, samePublicPaths } from './ai-apps-public-paths';
+import { UpdateAiAppAccessDto, UpdateAiAppPublicPathsDto } from './dto/ai-app-access.dto';
 
 /** One whitelisted member as shown in the Manage access modal. */
 export interface AiAppAllowedMemberInfo {
@@ -34,7 +35,16 @@ export interface AiAppAccessCandidate {
   alreadyAdded: boolean;
 }
 
-export type AiAppAccessCheckResult = { allowed: true; reason?: 'untracked' };
+export interface AiAppPublicPathsSettings {
+  publicPaths: string[];
+  /** False while the app still runs a sidecar that doesn't forward the request path (see `AiApp.publicPathsGateReady`). */
+  publicPathsGateReady: boolean;
+}
+
+export type AiAppAccessCheckResult = { allowed: true; reason?: 'untracked' | 'public' };
+
+/** The app row the sidecar decision needs, fetched once per `access-check` request. */
+export type AiAppAccessCheckApp = Pick<AiApp, 'uid' | 'memberUid' | 'access' | 'publicPaths'>;
 
 /** Either permission grants AI Apps visibility — the same `anyOf` the dashboard routes use. */
 const READ_PERMISSIONS = [AI_APPS_PERMISSIONS.READ, AI_APPS_PERMISSIONS.WRITE];
@@ -151,7 +161,50 @@ export class AiAppsAccessService {
    * then the app's visibility rule. An appId the Directory doesn't track keeps
    * the permission-only behavior sidecars had before per-app access existed.
    */
-  async checkAccess(requesterUid: string, appId: string, method: string): Promise<AiAppAccessCheckResult> {
+  async getPublicPaths(requesterUid: string, uid: string): Promise<AiAppPublicPathsSettings> {
+    const app = await this.findManageableApp(requesterUid, uid, 'public endpoints');
+    return toPublicPathsSettings(app);
+  }
+
+  /**
+   * Replaces the app's public path patterns (validated as a whole — one bad
+   * pattern saves nothing). A real change is audited as
+   * `PUBLIC_PATHS_UPDATED`; saving the stored list again is a no-op.
+   */
+  async updatePublicPaths(
+    requesterUid: string,
+    uid: string,
+    dto: UpdateAiAppPublicPathsDto
+  ): Promise<AiAppPublicPathsSettings> {
+    const app = await this.findManageableApp(requesterUid, uid, 'public endpoints');
+    const publicPaths = assertValidPublicPaths(dto.publicPaths);
+    if (samePublicPaths(app.publicPaths, publicPaths)) {
+      return toPublicPathsSettings(app);
+    }
+    const updated = await this.prisma.aiApp.update({ where: { uid: app.uid }, data: { publicPaths } });
+    await this.aiAppsService.recordPublicPathsUpdated(requesterUid, updated);
+    return toPublicPathsSettings(updated);
+  }
+
+  /** The non-DELETED app holding `appId` (a global claim, so at most one), with the fields the sidecar decision needs. */
+  findAppForAccessCheck(appId: string): Promise<AiAppAccessCheckApp | null> {
+    return this.prisma.aiApp.findFirst({
+      where: { appId, status: { not: 'DELETED' } },
+      select: { uid: true, memberUid: true, access: true, publicPaths: true },
+    });
+  }
+
+  /** True when the request path is one of the app's public patterns — decided before any auth. */
+  isPublicPath(app: AiAppAccessCheckApp | null, path: string | undefined): boolean {
+    return !!app && matchesPublicPath(app.publicPaths, path);
+  }
+
+  async checkAccess(
+    requesterUid: string,
+    appId: string,
+    method: string,
+    prefetched?: { app: AiAppAccessCheckApp | null }
+  ): Promise<AiAppAccessCheckResult> {
     const readOnly = ['GET', 'HEAD'].includes(method.toUpperCase());
     const hasPermission = await memberHasAnyPermission(
       this.rbacService,
@@ -162,11 +215,7 @@ export class AiAppsAccessService {
     if (!hasPermission) {
       throw new ForbiddenException({ allowed: false, reason: 'permission' });
     }
-    // appId is a global claim across non-DELETED rows, so at most one matches.
-    const app = await this.prisma.aiApp.findFirst({
-      where: { appId, status: { not: 'DELETED' } },
-      select: { uid: true, memberUid: true, access: true },
-    });
+    const app = prefetched ? prefetched.app : await this.findAppForAccessCheck(appId);
     if (!app) {
       return { allowed: true, reason: 'untracked' };
     }
@@ -176,13 +225,13 @@ export class AiAppsAccessService {
     return { allowed: true };
   }
 
-  private async findManageableApp(requesterUid: string, uid: string): Promise<AiApp> {
+  private async findManageableApp(requesterUid: string, uid: string, setting = 'access'): Promise<AiApp> {
     const app = await this.prisma.aiApp.findUnique({ where: { uid } });
     if (!app || app.status === 'DELETED') {
       throw new NotFoundException(`AI App not found: ${uid}`);
     }
     if (!(await this.aiAppsService.isCreatorOrDirectoryAdmin(requesterUid, app))) {
-      throw new ForbiddenException('Only the app creator or a directory admin can manage access');
+      throw new ForbiddenException(`Only the app creator or a directory admin can manage ${setting}`);
     }
     return app;
   }
@@ -236,4 +285,8 @@ export class AiAppsAccessService {
       }),
     };
   }
+}
+
+function toPublicPathsSettings(app: AiApp): AiAppPublicPathsSettings {
+  return { publicPaths: app.publicPaths ?? [], publicPathsGateReady: app.publicPathsGateReady };
 }

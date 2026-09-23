@@ -33,6 +33,12 @@ export function parseMultipartStringList(value: unknown): unknown {
     .filter(Boolean);
 }
 
+/**
+ * Shape of an uploaded public-paths list; the pattern rules (400 with
+ * `invalidPatterns`) are applied by the service before anything is stored.
+ */
+const UploadedPublicPathsSchema = z.array(z.string().max(500)).max(100);
+
 /** Database engines the Deployment Orchestrator can provision on request. */
 export const AI_APPS_SUPPORTED_DATABASE_TYPES = ['postgres'] as const;
 
@@ -95,6 +101,12 @@ export const DeployAppSchema = z.object({
    * Multipart delivers it as a JSON string; absent entirely when the member
    * brought their own database (or hasn't been asked yet).
    */
+  /**
+   * Public path patterns (e.g. `["/api/*"]`) served without LabOS auth, as a
+   * JSON array or comma-separated list. Sent → replaces the app's list (`[]`
+   * clears it); absent or empty string → the stored list is kept.
+   */
+  publicPaths: z.preprocess(parseMultipartStringList, UploadedPublicPathsSchema.optional()),
   database: z.preprocess((value) => {
     if (typeof value !== 'string') {
       return value;
