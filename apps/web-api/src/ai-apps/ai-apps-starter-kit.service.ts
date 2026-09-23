@@ -308,7 +308,7 @@ folder. Before any UI work, load the **pl-design-system** skill
   initial URL. So every route must work on a hard load at its real URL, every
   page needs a meaningful \`document.title\`, and the \`initRouteSync()\` part of
   the app-analytics snippet must stay in — as shipped: it reports the pathname
-  only (never the query string or hash) and posts it to the dashboard origin,
+  and query string (never the hash) and posts them to the dashboard origin,
   not to \`'*'\`.
 
 ## Signed-in member context (personalization)
@@ -1186,11 +1186,10 @@ function initRouteSync() {
   if (window.parent === window) return;
   let lastSent = '';
   const send = () => {
-    // Pathname ONLY — never location.search or location.hash. The dashboard
-    // mirrors this value into its own address bar and tab title, and query
-    // strings / fragments are where OAuth callbacks (?code=…), magic links
-    // and tokens land.
-    const path = location.pathname;
+    // Pathname + query — never location.hash. The dashboard mirrors this into
+    // its address bar and drops secret-like keys (OAuth ?code=, tokens), but
+    // that denylist is not a guarantee: do not put secrets in the query string.
+    const path = location.pathname + location.search;
     const title = document.title;
     if (path + '\\n' + title === lastSent) return;
     lastSent = path + '\\n' + title;
@@ -1236,14 +1235,14 @@ Custom events reuse the same \`trackEvent\` helper: \`trackEvent('clicked_export
   every page needs a meaningful \`document.title\` (Next.js \`metadata\` per
   route, or a \`<title>\`). Never put secrets or member data in URLs or titles;
   both are mirrored into the dashboard.
-- **Keep the route message path-only and addressed to the dashboard.** The
-  snippet sends \`location.pathname\` (never \`location.search\` or
-  \`location.hash\` — that is where OAuth \`?code=\` callbacks, magic links and
-  tokens land, and the dashboard mirrors the path into its URL and tab title)
+- **Keep the route message addressed to the dashboard, and never send the hash.** The
+  snippet sends \`location.pathname + location.search\` (never \`location.hash\`)
   and posts it to \`${AI_APPS_PORTAL_ORIGIN}\` explicitly, never to \`'*'\` (which
-  would deliver the route to whatever page frames the app). Don't widen either
-  when adapting the snippet. Route state that must survive a shared deep link
-  belongs in the path (\`/reports/42\`), not the query string.
+  would deliver the route to whatever page frames the app). The dashboard mirrors
+  that query into its own URL, except a denylist of secret-like names (\`code\`,
+  \`token\`, and similar) and its own params (\`settings\`). The denylist is not a
+  guarantee — never put secrets, tokens, or member data in the query string.
+  Don't widen the post target when adapting the snippet.
 - **Event names**: snake_case, plain words describing the action (e.g.
   \`clicked_export\`, \`created_item\`). The endpoint prefixes every name with
   \`ai_app_\` server-side — don't add that prefix yourself, and don't rely on

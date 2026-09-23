@@ -80,19 +80,20 @@ describe('AiAppsStarterKitService buildZip', () => {
     }
   });
 
-  it('posts the route path-only and to the dashboard origin only (never the query string, never "*")', () => {
+  it('posts pathname + query to the dashboard origin only (never the hash, never "*")', () => {
     const skill = entries.get('.claude/skills/app-analytics/SKILL.md') as string;
-    // The query string / hash are where OAuth `?code=` callbacks and tokens
-    // land, and the dashboard mirrors the path into its URL and tab title.
-    expect(skill).toContain('const path = location.pathname;');
-    expect(skill).not.toContain('location.pathname + location.search');
+    // The hash is not shareable route state. The dashboard mirrors the query
+    // but drops secret-like keys; the kit still must not put secrets there.
+    expect(skill).toContain('const path = location.pathname + location.search;');
+    expect(skill).not.toContain('+ location.hash');
+    expect(skill).toContain('do not put secrets in the query string');
     // Addressed to LabOS explicitly: a '*' target hands the route to any framer.
     expect(skill).toContain(`const DASHBOARD_ORIGIN = '${AI_APPS_PORTAL_ORIGIN}';`);
     expect(skill).toContain('title: title }, DASHBOARD_ORIGIN);');
     expect(skill).not.toContain("}, '*');");
-    expect(skill).toContain('Keep the route message path-only and addressed to the dashboard');
+    expect(skill).toContain('Keep the route message addressed to the dashboard, and never send the hash');
     for (const path of ['CLAUDE.md', 'AGENTS.md']) {
-      expect(entries.get(path) as string).toContain('reports the pathname\n  only');
+      expect(entries.get(path) as string).toContain('reports the pathname\n  and query string');
     }
   });
 
@@ -401,7 +402,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('tells the member new apps are private and how to share them (kit 1.13)', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.13');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.14');
     expect(entries.get('README.md')).toContain('New apps are **private**');
     expect(entries.get('README.md')).toContain('**Manage access**');
     for (const path of ['CLAUDE.md', 'AGENTS.md']) {

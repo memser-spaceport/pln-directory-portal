@@ -668,15 +668,13 @@ the frame's location. Apps built with kit ≥1.10 report it themselves: the
 `initRouteSync()` part of the `app-analytics` snippet posts
 `{ type: 'pln-ai-app:route', path, title }` to `window.parent` on load, after
 every `history.pushState/replaceState`, on `popstate`, and whenever
-`document.title` changes (deduplicated). Since kit **1.12** the message is
-**path-only** (`location.pathname` — never the query string or hash, which is
-where OAuth callbacks like `/oauth/gdrive/callback?code=<live code>`, magic
-links and tokens land) and is **addressed to `AI_APPS_PORTAL_ORIGIN`
-explicitly**, so a page other than LabOS framing the app never receives it.
-Kits 1.10–1.11 sent pathname + search + hash with targetOrigin `'*'`; apps
-built from them need a redeploy with a newer kit (or the one-line change to
-their snippet) to stop handing the route to arbitrary framers — the dashboard
-side below already refuses to mirror their query strings.
+`document.title` changes (deduplicated). Since kit **1.14** `path` is
+**pathname + query** (`location.pathname + location.search` — never the hash)
+and is **addressed to `AI_APPS_PORTAL_ORIGIN` explicitly**, so a page other
+than LabOS framing the app never receives it. Kits 1.12–1.13 sent the pathname
+only; kits 1.10–1.11 sent pathname + search + hash with targetOrigin `'*'`
+(those apps need a redeploy to stop handing the route to arbitrary framers).
+The dashboard accepts a query from any of them.
 
 Dashboard side (`AiAppDetailPage` in the frontend):
 
@@ -684,26 +682,40 @@ Dashboard side (`AiAppDetailPage` in the frontend):
   `event.source` is the mounted iframe's window; the path must resolve (via
   `new URL(path, appOrigin)`) to the same origin, which rejects `//host`,
   absolute URLs and non-http schemes. The title is trimmed and capped.
-- Keeps only the **pathname** of a reported route — the query string and hash
-  are dropped before anything reaches the address bar or tab title, whatever
-  kit the app was built with. Deep links are pathname-only too: the portal's
-  query string is never forwarded to the app.
+  `pathname + search` is capped at 2048 characters. The hash is always dropped.
+- Mirrors the app's query into the parent URL, except two groups of keys:
+  - **Reserved portal params** (`settings`, `path`) stay on the parent URL and
+    are never forwarded to the iframe. `?settings=deployment` still opens the
+    Deployment settings modal. If both sides set one, the portal value wins.
+  - **Denylist** (case-insensitive exact match) is dropped in both directions,
+    so it never reaches the address bar or is replayed as a deep link: `code`,
+    `token`, `access_token`, `id_token`, `refresh_token`, `secret`,
+    `client_secret`, `key`, `api_key`, `apikey`, `auth`, `authorization`,
+    `password`, `passwd`, `pwd`, `jwt`, `bearer`, `otp`. `state` is not listed.
+    A pasted parent URL that already carries one of these is stripped on load.
+    The denylist is not a guarantee — apps must not put secrets in the query.
+- When the app reports a route, the parent query is rebuilt as the app's
+  filtered params plus the reserved portal params currently on the URL. A
+  report with no query drops previous app params and keeps only the reserved
+  ones. Example: `/pl-infra-os/flywheels?tab=weekly&settings=deployment` —
+  `tab` is the app's, `settings` is the portal's.
 - Mirrors the path as a route segment — `/pl-infra/ai-apps/<uid>/<path>`, or
   `/pl-infra-os/<path>` for the PL Infra OS alias; the bare route for `/` —
-  with `window.history.replaceState`, keeping the portal's own query string
-  (`?settings=deployment`). No RSC round trip per in-app click, and no extra
-  history entries (the iframe owns in-app history, so Back steps the app back
-  and the URL follows). The tab title becomes `<page title> · <app name>`.
-- The iframe `src` is `appOrigin + path` computed once per deployed version
-  (from the URL segments or the last reported route), so URL updates never
-  reload the frame and a redeploy remount reopens the same subpage.
+  with `window.history.replaceState`. No RSC round trip per in-app click, and
+  no extra history entries (the iframe owns in-app history, so Back steps the
+  app back and the URL follows). The tab title becomes `<page title> · <app name>`.
+- The iframe `src` is `appOrigin + pathname + filtered query`, computed once
+  per deployed version (from the URL segments and the page's query on first
+  load, or the last reported route). URL updates never reload the frame, and a
+  redeploy remount reopens the same subpage and query. Reserved and denylisted
+  keys are stripped before they reach the iframe.
 - Legacy `?path=<encoded>` links (the pre-segment form) are 308-redirected by
   the frontend proxy to the segment URL: only the pathname of the value is
   kept, every other param survives, and a value that is not a same-origin
   path (or is `/`) lands on the bare app route.
 - Login round trip: the frontend proxy keeps the query string in the
   `backlink` for AI Apps routes only (`/pl-infra/ai-apps*`, `/pl-infra-os`),
-  so `?settings=deployment` survives login; `PrivyModals` does not
+  so `?settings=deployment` and app params survive login; `PrivyModals` does not
   double-decode it.
 - `/pl-infra/ai-apps/<uid>/prd` is the PRD viewer, so an app route literally
   named `/prd` cannot be deep-linked as a segment on that route (it works on
@@ -899,7 +911,7 @@ CLAUDE.md / AGENTS.md                          agent build + deploy instructions
 .claude/skills/pl-design-system/SKILL.md       single UI skill (components + tokens)
 .claude/skills/pln-member-context/SKILL.md     how the app gets the signed-in member's identity
 .claude/skills/db-migration/SKILL.md           migrate an existing DB onto PLN Postgres — schema + data by default (kits ≥1.8)
-.claude/skills/app-analytics/SKILL.md          baseline + custom PostHog events; route sync for subpage deep links (≥1.10; path-only, addressed to the dashboard origin ≥1.12)
+.claude/skills/app-analytics/SKILL.md          baseline + custom PostHog events; route sync for subpage deep links (≥1.10; pathname + query, never the hash, addressed to the dashboard origin ≥1.12)
 pln-app.config.json                            connect/deploy/draft/metadata/logs/member-context endpoints
                                                (+ appId, appUid, approved appName/appDescription,
                                                 database provisioning choice ≥1.6) — NO token
