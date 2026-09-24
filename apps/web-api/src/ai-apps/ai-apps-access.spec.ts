@@ -24,6 +24,10 @@ import {
 } from './dto/ai-app-access.dto';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { RbacGuard } from '../rbac/rbac.guard';
+import { AI_APPS_SIDECAR_THROTTLE_LIMIT, AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS } from './ai-apps.constants';
+
+const THROTTLER_LIMIT = 'THROTTLER:LIMIT';
+const THROTTLER_TTL = 'THROTTLER:TTL';
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
@@ -866,6 +870,8 @@ describe('access routes', () => {
     // No guard: public paths are decided before any token is read; the handler
     // validates the session itself for everything else.
     expect(route('checkAccess').guards).toEqual([]);
+    expect(Reflect.getMetadata(THROTTLER_LIMIT, proto.checkAccess)).toBe(AI_APPS_SIDECAR_THROTTLE_LIMIT);
+    expect(Reflect.getMetadata(THROTTLER_TTL, proto.checkAccess)).toBe(AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS);
   });
 
   it('declares access-check before the :uid route so the literal path wins', () => {
