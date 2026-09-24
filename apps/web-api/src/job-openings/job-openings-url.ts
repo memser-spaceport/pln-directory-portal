@@ -31,6 +31,12 @@ export function memberProfileEmailUrl(memberUid: string, utm: EmailUtm): string 
   return `${webUiBase()}/members/${encodeURIComponent(memberUid)}?${emailUtmQuery(utm)}`;
 }
 
+/** An applicant as a team lead opens them from the application email: selected on the team's Candidates page. */
+export function teamCandidateEmailUrl(teamUid: string, memberUid: string, utm: EmailUtm): string {
+  const query = new URLSearchParams({ role: utm.jobUid, candidate: memberUid }).toString();
+  return `${webUiBase()}/teams/${encodeURIComponent(teamUid)}/applicants?${query}&${emailUtmQuery(utm)}`;
+}
+
 /**
  * An outside-the-network referred person's LinkedIn URL as it appears in a
  * refer email, tagged the same way as a Directory profile link.

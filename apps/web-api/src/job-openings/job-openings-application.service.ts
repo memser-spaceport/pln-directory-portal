@@ -12,7 +12,7 @@ import { MEMBER_APPROVED, MemberApprovedPayload } from '../member-approvals/memb
 import { noteToHtml } from './job-openings-email-html';
 import { parseJobReferCcEmails, resolveVisibleJobOpening, type ResolvedJobOpening } from './job-openings-resolve';
 import { isProtocolLabsTeam } from './pin-protocol-labs-team';
-import { JOB_APPLICATION_EMAIL_UTM_SOURCE, jobBoardDetailUrl, memberProfileEmailUrl } from './job-openings-url';
+import { JOB_APPLICATION_EMAIL_UTM_SOURCE, jobBoardDetailUrl, teamCandidateEmailUrl } from './job-openings-url';
 
 const JOB_BOARD_APPLICATION_TEMPLATE = 'JOB_BOARD_APPLICATION_EMAIL';
 const PROFILE_CARD_SKILLS_LIMIT = 3;
@@ -200,7 +200,7 @@ export class JobOpeningsApplicationService {
       },
       deliveryPayload: {
         body: {
-          applicant: this.buildMemberCard(applicant, jobOpening.uid),
+          applicant: this.buildMemberCard(applicant, jobOpening),
           roleTitle: jobOpening.roleTitle,
           teamName: jobOpening.team.name,
           coverLetterHtml,
@@ -393,13 +393,13 @@ export class JobOpeningsApplicationService {
   }
 
   // Shape consumed by the `memberCard` partial in the JOB_BOARD_APPLICATION_EMAIL template.
-  private buildMemberCard(applicant: Applicant, jobUid: string) {
+  private buildMemberCard(applicant: Applicant, jobOpening: ResolvedJobOpening) {
     return {
       name: applicant.name,
-      profileUrl: memberProfileEmailUrl(applicant.uid, {
+      profileUrl: teamCandidateEmailUrl(jobOpening.team.uid, applicant.uid, {
         source: JOB_APPLICATION_EMAIL_UTM_SOURCE,
         content: 'applicant',
-        jobUid,
+        jobUid: jobOpening.uid,
       }),
       headline: this.formatHeadline(this.resolveHeadline(applicant)),
       location: this.formatLocation(applicant.location),
