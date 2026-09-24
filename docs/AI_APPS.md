@@ -136,7 +136,7 @@ curl -X POST "$AI_APPS_DEPLOY_ENDPOINT" \
 
 `database` is optional — see "Agent-driven database provisioning" below.
 `publicPaths` is optional too (JSON array or comma list) — see "Public endpoints"
-below.
+below. `access` (`OPEN` | `PRIVATE`) is optional as well — see "Per-app access".
 
 `name`/`description` are member-facing: kits ≥1.5 send values the member explicitly approved (and resend the same values on redeploys — see "Editable metadata & one-pager PRD").
 
@@ -305,11 +305,16 @@ Being whitelisted never bypasses the PL Infra permission. The rule lives in
 - **Direct URL:** see "Auth sidecar" below.
 
 **Defaults:**
-- The first agent deploy or draft registration creates the app as `PRIVATE`, set
-  explicitly in the upserts' `create` blocks. The column default is also `PRIVATE`.
-- Deploys, draft re-registrations and member redeploys never touch `access` or the
-  whitelist. Access is a LabOS setting only, with no deploy field. Kits ≥1.13 tell
-  the agent to say so to the member after the first deploy.
+- New apps are `OPEN` (all PL Infra members). The first agent deploy or draft
+  registration creates the app with the upload's `access` field, or `OPEN` when it
+  is absent. The column default is also `OPEN`.
+- The agent's deploy/draft upload accepts an optional multipart `access`
+  (`OPEN` | `PRIVATE`, case-insensitive): sent → replaces the app's mode, absent →
+  kept, so LabOS changes survive redeploys. The kit's deploy skill asks the member
+  before the first deploy and sends `access` only then, or when the member later
+  asks to change it. Member redeploys (`POST :uid/deploy`) never touch `access`.
+- The whitelist (which members of a `PRIVATE` app may open it) is managed only in
+  LabOS; no upload touches it.
 - Apps that existed before migration `20260922180000_ai_apps_access_control` were
   backfilled `OPEN`.
 
@@ -754,7 +759,7 @@ model AiApp {
   database        Json?         // { enabled, type, host?, port?, name?, user?, credentialsInjected? } — one JSON blob,
                                  // reflects the LAST deploy/draft upload (kitVersion-style); null = not requested.
                                  // Non-sensitive connection metadata only — the password is never stored.
-  access              AiAppAccess @default(PRIVATE) // OPEN | PRIVATE — see "Per-app access"
+  access              AiAppAccess @default(OPEN)    // OPEN | PRIVATE — see "Per-app access"
   directLinkGateReady Boolean     @default(false)   // true once deployed with the per-app auth sidecar
   publicPaths         String[]    @default([])      // path patterns served without LabOS auth — see "Public endpoints"
   publicPathsGateReady Boolean    @default(false)   // true once deployed with a sidecar that forwards the request path
@@ -991,6 +996,7 @@ S3 uploads reuse the shared `AwsService`, so the standard `AWS_REGION` / `AWS_AC
 - `apps/web-api/prisma/migrations/20260715120000_ai_apps_editable_metadata/` — `prd` column (one-pager PRD).
 - `apps/web-api/prisma/migrations/20260730120000_ai_apps_database_provisioning/` — single `database` JSON column: provisioning request + non-sensitive connection metadata (agent-driven database provisioning).
 - `apps/web-api/prisma/migrations/20260922180000_ai_apps_access_control/` — `AiAppAccess` enum + `access` column (existing rows backfilled `OPEN`, default `PRIVATE`), `directLinkGateReady`, `announcedAt` (backfilled), `AiAppAllowedMember` whitelist table.
+- `apps/web-api/prisma/migrations/20260924120000_ai_apps_open_by_default/` — `access` column default back to `OPEN` (existing rows unchanged).
 - `apps/web-api/prisma/migrations/20260923120000_ai_apps_public_paths/` — `publicPaths` + `publicPathsGateReady` columns, `PUBLIC_PATHS_UPDATED` event value.
 - `apps/web-api/src/ai-apps/ai-apps-access.service.ts` + `dto/ai-app-access.dto.ts` — access management, whitelist member search, public-path management, and the sidecar `access-check` decision (visibility rule: `AiAppsService.canViewApp`).
 - `apps/web-api/src/ai-apps/ai-apps-public-paths.ts` — public path pattern validation, request-path normalization and matching.

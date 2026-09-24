@@ -3672,9 +3672,10 @@ model AiApp {
   /// Slugs from the controlled vocabulary in `ai-apps-tags.ts` (max 5). Set by
   /// the agent on first upload, editable by the creator/admin afterwards.
   tags            String[]    @default([])
-  /// New apps are private to their owner; the owner (or a directory admin)
-  /// opens or shares them from LabOS. Deploys never change it.
-  access          AiAppAccess @default(PRIVATE)
+  /// New apps are open to all PL Infra members; the owner (or a directory
+  /// admin) can restrict them from LabOS, or the agent on deploy when the
+  /// member chooses. A deploy that doesn't send `access` keeps it.
+  access          AiAppAccess @default(OPEN)
   /// True once the app has shipped with an auth sidecar that asks the
   /// Directory for a per-app decision. Apps last deployed before that keep a
   /// sidecar that only checks the PL Infra permission, so a PRIVATE setting

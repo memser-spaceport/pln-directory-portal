@@ -97,16 +97,26 @@ export const DeployAppSchema = z.object({
    */
   tags: z.preprocess(parseMultipartStringList, AiAppTagsSchema.optional()),
   /**
-   * Opt-in database provisioning request, e.g. `{"enabled":true,"type":"postgres"}`.
-   * Multipart delivers it as a JSON string; absent entirely when the member
-   * brought their own database (or hasn't been asked yet).
-   */
-  /**
    * Public path patterns (e.g. `["/api/*"]`) served without LabOS auth, as a
    * JSON array or comma-separated list. Sent → replaces the app's list (`[]`
    * clears it); absent or empty string → the stored list is kept.
    */
   publicPaths: z.preprocess(parseMultipartStringList, UploadedPublicPathsSchema.optional()),
+  /**
+   * Who may open the app: `OPEN` (all PL Infra members) or `PRIVATE` (the owner,
+   * directory admins, and members whitelisted in LabOS). Case-insensitive.
+   * Sent → replaces the app's mode; absent or empty string → new apps start
+   * `OPEN` and existing apps keep theirs, so LabOS edits survive redeploys.
+   */
+  access: z.preprocess(
+    (value) => (typeof value === 'string' ? value.trim().toUpperCase() || undefined : value),
+    z.enum(['OPEN', 'PRIVATE']).optional()
+  ),
+  /**
+   * Opt-in database provisioning request, e.g. `{"enabled":true,"type":"postgres"}`.
+   * Multipart delivers it as a JSON string; absent entirely when the member
+   * brought their own database (or hasn't been asked yet).
+   */
   database: z.preprocess((value) => {
     if (typeof value !== 'string') {
       return value;

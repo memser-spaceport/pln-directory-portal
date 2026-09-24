@@ -401,16 +401,24 @@ describe('AiAppsStarterKitService buildZip', () => {
     }
   });
 
-  it('tells the member new apps are private and how to share them (kit 1.13)', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.14');
-    expect(entries.get('README.md')).toContain('New apps are **private**');
-    expect(entries.get('README.md')).toContain('**Manage access**');
+  it('defaults apps to all PL Infra members and asks about private access before the first deploy (kit 1.13)', () => {
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.13');
+    const readme = entries.get('README.md') as string;
+    expect(readme).toContain('New apps are open to **all PL Infra members**');
+    expect(readme).toContain('**Manage access**');
+    expect(readme).not.toContain('New apps are **private**');
     for (const path of ['CLAUDE.md', 'AGENTS.md']) {
-      expect(entries.get(path) as string).toContain('**private to them** by default');
+      const instructions = entries.get(path) as string;
+      expect(instructions).toContain('## Who can open the app (access)');
+      expect(instructions).toContain('As soon as you start working with the member on a new app');
+      expect(instructions).toContain("**On redeploys**, don't send `access`");
+      expect(instructions).not.toContain('**private to them** by default');
     }
     const deploySkill = entries.get('.claude/skills/deploy-to-labs/SKILL.md') as string;
-    expect(deploySkill).toContain("On the app's FIRST successful deploy");
-    expect(deploySkill).toContain('there is no deploy field for it');
+    expect(deploySkill).toContain('**Settle who can open the app (first deploy only).**');
+    expect(deploySkill).toContain('-F "access=<OPEN or PRIVATE — first deploy only, see step 2; omit on redeploys>"');
+    expect(deploySkill).toContain('-F "access=<OPEN or PRIVATE — first upload only, see step 2; omit afterwards>"');
+    expect(deploySkill).not.toContain('there is no deploy field for it');
   });
 
   it('documents public endpoints and that the app must secure them (kit 1.13)', () => {
