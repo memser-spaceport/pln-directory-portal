@@ -13,6 +13,7 @@ import { JobOpeningsForYouService } from './job-openings-for-you.service';
 import { JobOpeningsInterestService } from './job-openings-interest.service';
 import { JobOpeningsQueryService } from './job-openings-query.service';
 import { JobOpeningsReferralService } from './job-openings-referral.service';
+import { JobOpeningsSavedService } from './job-openings-saved.service';
 import { JobOpeningsSignUpService } from './job-openings-sign-up.service';
 
 const server = initNestServer(apiJobOpenings);
@@ -25,6 +26,7 @@ export class JobOpeningsController {
     private readonly jobOpeningsApplicationService: JobOpeningsApplicationService,
     private readonly jobOpeningsSignUpService: JobOpeningsSignUpService,
     private readonly jobOpeningsInterestService: JobOpeningsInterestService,
+    private readonly jobOpeningsSavedService: JobOpeningsSavedService,
     private readonly jobOpeningsForYouService: JobOpeningsForYouService
   ) {}
 
@@ -43,11 +45,14 @@ export class JobOpeningsController {
     return this.jobOpeningsForYouService.listForYou(request.userEmail);
   }
 
+  // Guarded since the facets learned the saved scope: the guard still admits a
+  // tokenless GET, so an anonymous caller reads the board's facets as before.
   @Api(server.route.getJobFilters)
+  @UseGuards(UserAuthValidateGuard)
   @NoCache()
-  async getJobFilters(@Req() request: Request) {
+  async getJobFilters(@Req() request: Request & { userEmail?: string }) {
     const params = JobsListQueryParams.parse(request.query);
-    return this.jobOpeningsQueryService.getFilters(params);
+    return this.jobOpeningsQueryService.getFilters(params, request.userEmail);
   }
 
   @Api(server.route.getCrawlIndex)
@@ -101,6 +106,13 @@ export class JobOpeningsController {
     return this.jobOpeningsInterestService.listMine(request.userEmail);
   }
 
+  @Api(server.route.getMySavedJobs)
+  @UseGuards(UserAuthValidateGuard)
+  @NoCache()
+  async getMySavedJobs(@Req() request: Request & { userEmail?: string }) {
+    return this.jobOpeningsSavedService.listMine(request.userEmail);
+  }
+
   @Api(server.route.getJob)
   @UseGuards(UserAuthValidateGuard)
   @NoCache()
@@ -120,6 +132,20 @@ export class JobOpeningsController {
   @NoCache()
   async removeJobInterest(@Req() request: Request & { userEmail?: string }) {
     return this.jobOpeningsInterestService.removeInterest(request.params.uid, request.userEmail);
+  }
+
+  @Api(server.route.saveJob)
+  @UseGuards(UserAuthValidateGuard)
+  @NoCache()
+  async saveJob(@Req() request: Request & { userEmail?: string }) {
+    return this.jobOpeningsSavedService.save(request.params.uid, request.userEmail);
+  }
+
+  @Api(server.route.unsaveJob)
+  @UseGuards(UserAuthValidateGuard)
+  @NoCache()
+  async unsaveJob(@Req() request: Request & { userEmail?: string }) {
+    return this.jobOpeningsSavedService.unsave(request.params.uid, request.userEmail);
   }
 
   @Api(server.route.markTeamInterest)

@@ -35,7 +35,7 @@ export class ForumTool {
 
       return forumPosts
         .map((post) => {
-          const rootPostInfo = `**Topic:** ${post.topicTitle}
+          const rootPostInfo = `**Topic:** ${post.topicTitle} [ForumLink](/forum/topics/${post.cid}/${post.tid})
 **Forum Link:** ${post.forumLink}
 **Root Post by ${post.rootPost.author.name} (${post.rootPost.author.username}):**
 ${post.rootPost.content}`;

@@ -72,6 +72,7 @@ import { DealsModule } from './deals/deals.module';
 import { DealRequestsModule } from './deal-requests/deal-requests.module';
 import { ArticleRequestsModule } from './article-requests/article-requests.module';
 import { JobOpeningsModule } from './job-openings/job-openings.module';
+import { TeamHiringModule } from './team-hiring/team-hiring.module';
 import { JobAlertsModule } from './job-alerts/job-alerts.module';
 import { TeamNewsModule } from './team-news/team-news.module';
 import { NetworkOverviewModule } from './network-overview/network-overview.module';
@@ -181,6 +182,7 @@ import { McpModule } from './mcp/mcp.module';
     DealRequestsModule,
     ArticleRequestsModule,
     JobOpeningsModule,
+    TeamHiringModule,
     JobAlertsModule,
     TeamNewsModule,
     NetworkOverviewModule,

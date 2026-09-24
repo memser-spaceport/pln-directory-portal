@@ -11,6 +11,7 @@ describe('NewsTool', () => {
 
   function item(overrides: Partial<Record<string, unknown>> = {}) {
     return {
+      uid: 'news-1',
       teamName: 'bio.xyz',
       teamUid: 'team-bio',
       title: 'Bio Protocol CEO on DeSci funding',
@@ -65,6 +66,7 @@ describe('NewsTool', () => {
     expect(result).toContain('Date: 2026-09-16');
     expect(result).not.toContain('2026-09-16T00:00:00.000Z');
     expect(result).toContain('[TeamLink](/teams/team-bio)');
+    expect(result).toContain('[NewsLink](/home?news=news-1)');
     expect(result).toContain('Source: https://example.com/podcast');
   });
 

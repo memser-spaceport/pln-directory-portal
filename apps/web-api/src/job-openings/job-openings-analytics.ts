@@ -2,7 +2,7 @@ import { JobOpeningStatus } from '@prisma/client';
 import { AnalyticsService } from '../analytics/service/analytics.service';
 import { ANALYTICS_EVENTS } from '../utils/constants';
 
-export type JobBoardOrigin = 'in-app-apply' | 'job-interest' | 'team-interest' | 'ats';
+export type JobBoardOrigin = 'in-app-apply' | 'job-interest' | 'job-save' | 'team-interest' | 'ats';
 
 type BaseProps = {
   team_uid: string;
@@ -58,6 +58,23 @@ export function trackTeamInterestRecorded(
       team_uid: args.teamUid,
       origin: 'team-interest',
     },
+  });
+}
+
+/** Fired on a first save only; a repeat press and an unsave record nothing. */
+export function trackJobSaveRecorded(
+  analytics: AnalyticsService,
+  args: { saveUid: string; jobUid: string; teamUid: string }
+): void {
+  void analytics.trackEvent({
+    name: ANALYTICS_EVENTS.JOB_BOARD.SAVE_RECORDED,
+    distinctId: `save:${args.saveUid}`,
+    properties: compact({
+      save_uid: args.saveUid,
+      job_uid: args.jobUid,
+      team_uid: args.teamUid,
+      origin: 'job-save',
+    }),
   });
 }
 

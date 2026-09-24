@@ -35,6 +35,7 @@ import { RegisterDraftSchema } from './dto/register-draft.dto';
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 const APP = {
+  access: 'OPEN',
   uid: 'app-1',
   memberUid: 'creator-1',
   appId: 'demo',
@@ -56,6 +57,7 @@ function buildService(app: Record<string, any> | null = APP) {
       findFirst: jest.fn().mockResolvedValue(null),
       upsert: jest.fn().mockImplementation(({ create }) => Promise.resolve({ ...APP, ...create, uid: 'app-1' })),
       update: jest.fn().mockImplementation(({ data }) => Promise.resolve({ ...APP, ...data })),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     aiAppEvent: { create: jest.fn().mockResolvedValue({}) },
     member: {
@@ -217,6 +219,53 @@ describe('AiAppsService.registerDraft', () => {
         update: expect.objectContaining({ kitVersion: null, agentClient: null, agentModel: null }),
       })
     );
+  });
+});
+
+describe('publicPaths upload field', () => {
+  const base = { appId: 'demo', name: 'Demo', deploymentId: 'd1', requiredEnvVars: 'OPENAI_API_KEY' };
+
+  it('accepts a JSON array, a comma list, and "[]" (clear); an empty string counts as omitted', () => {
+    expect(RegisterDraftSchema.parse({ ...base, publicPaths: '["/api/*","/webhooks/stripe"]' }).publicPaths).toEqual([
+      '/api/*',
+      '/webhooks/stripe',
+    ]);
+    expect(RegisterDraftSchema.parse({ ...base, publicPaths: '/api/*, /webhooks/stripe' }).publicPaths).toEqual([
+      '/api/*',
+      '/webhooks/stripe',
+    ]);
+    expect(RegisterDraftSchema.parse({ ...base, publicPaths: '[]' }).publicPaths).toEqual([]);
+    expect(RegisterDraftSchema.parse({ ...base, publicPaths: '' }).publicPaths).toBeUndefined();
+    expect(RegisterDraftSchema.parse(base).publicPaths).toBeUndefined();
+  });
+
+  it('registerDraft rejects an invalid pattern with 400 before uploading', async () => {
+    const { service, prisma, aws } = buildService(null);
+    const dto = { appId: 'demo', name: 'Demo', deploymentId: 'd2', requiredEnvVars: ['OPENAI_API_KEY'] } as any;
+
+    await expect(service.registerDraft('creator-1', { ...dto, publicPaths: ['/*'] }, FILE)).rejects.toBeInstanceOf(
+      BadRequestException
+    );
+    expect(aws.uploadFileToS3).not.toHaveBeenCalled();
+    expect(prisma.aiApp.upsert).not.toHaveBeenCalled();
+  });
+
+  it('registerDraft stores a sent list and keeps the stored one when the field is absent', async () => {
+    const dto = { appId: 'demo', name: 'Demo', deploymentId: 'd2', requiredEnvVars: ['OPENAI_API_KEY'] } as any;
+    const { service, prisma } = buildService(null);
+
+    await service.registerDraft('creator-1', { ...dto, publicPaths: ['/api/*'] }, FILE);
+    expect(prisma.aiApp.upsert).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ publicPaths: ['/api/*'] }),
+        update: expect.objectContaining({ publicPaths: ['/api/*'] }),
+      })
+    );
+    expect(eventTypes(prisma)).toEqual(['PUBLIC_PATHS_UPDATED', 'DRAFT_CREATED']);
+
+    await service.registerDraft('creator-1', dto, FILE);
+    expect(prisma.aiApp.upsert.mock.calls[1][0].update.publicPaths).toBeUndefined();
+    expect(prisma.aiApp.upsert.mock.calls[1][0].create.publicPaths).toEqual([]);
   });
 });
 

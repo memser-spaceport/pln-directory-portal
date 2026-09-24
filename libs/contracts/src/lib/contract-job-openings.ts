@@ -10,6 +10,8 @@ import {
   JobsListResponseSchema,
   JobTeamGroupSchema,
   MarkTeamInterestSchema,
+  SavedJobsListResponseSchema,
+  SavedJobStatusSchema,
   TeamInterestStatusSchema,
 } from '../schema/job-opening';
 import {
@@ -148,6 +150,34 @@ export const apiJobOpenings = contract.router({
       200: TeamInterestStatusSchema,
     },
     summary: "Mark the current member's interest in a team, with no job attached (idempotent)",
+  },
+  getMySavedJobs: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/job-openings/saved`,
+    responses: {
+      200: SavedJobsListResponseSchema,
+    },
+    summary: "List the current member's saved job openings",
+  },
+  saveJob: {
+    method: 'POST',
+    path: `${getAPIVersionAsPath('1')}/job-openings/:uid/save`,
+    pathParams: z.object({ uid: z.string() }),
+    body: z.object({}).optional(),
+    responses: {
+      200: SavedJobStatusSchema,
+    },
+    summary: 'Save a job opening for the current member (idempotent)',
+  },
+  unsaveJob: {
+    method: 'DELETE',
+    path: `${getAPIVersionAsPath('1')}/job-openings/:uid/save`,
+    pathParams: z.object({ uid: z.string() }),
+    body: z.object({}).optional(),
+    responses: {
+      200: SavedJobStatusSchema,
+    },
+    summary: "Remove the current member's save of a job opening (idempotent)",
   },
   getJob: {
     method: 'GET',

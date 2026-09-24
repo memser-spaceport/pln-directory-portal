@@ -275,7 +275,9 @@ model Member {
   jobReferralsReceived      JobReferral[]           @relation("JobReferralReferred")
   jobApplications           JobApplication[]
   jobOpeningInterests       JobOpeningInterest[]
+  savedJobOpenings          SavedJobOpening[]
   teamInterests             TeamInterest[]
+  jobCandidateViews         JobCandidateView[]
   integrationKeysCreated    IntegrationKey[]        @relation("IntegrationKeyCreatedBy")
   roadmapItemsCreated       RoadmapItem[]           @relation("roadmapItemCreatedBy")
   roadmapItemsPromoted      RoadmapItem[]           @relation("roadmapItemPromotedBy")
@@ -2354,6 +2356,7 @@ model JobOpening {
   referrals       JobReferral[]
   applications    JobApplication[]
   interests       JobOpeningInterest[]
+  savedBy         SavedJobOpening[]
 
   @@index([status])
   @@index([companyName])
@@ -2440,6 +2443,15 @@ model JobApplication {
   toEmail         String
   ccEmails        String[]   @default([])
   sentAt          DateTime?
+  /// The hiring team's own tick: they have dealt with this person. Shared by the
+  /// whole team, unlike "opened", which is per lead and lives in JobCandidateView.
+  /// Not a pipeline stage — there is no shortlist and no rejection.
+  reviewedAt      DateTime?
+  reviewedByUid   String?
+  /// Chosen to go to the team's ATS. Written by the applicants page; no reader yet.
+  sendToAts       Boolean    @default(false)
+  /// When the row was FIRST flagged. Kept when the flag is cleared again.
+  sendToAtsAt     DateTime?
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
@@ -2456,6 +2468,11 @@ model JobOpeningInterest {
   jobOpening    JobOpening @relation(fields: [jobOpeningUid], references: [uid], onDelete: Cascade)
   memberUid     String
   member        Member     @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  /// The team's tick; see JobApplication for what it does and does not mean.
+  reviewedAt    DateTime?
+  reviewedByUid String?
+  sendToAts     Boolean    @default(false)
+  sendToAtsAt   DateTime?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
@@ -2463,6 +2480,64 @@ model JobOpeningInterest {
   @@index([jobOpeningUid])
   @@index([memberUid])
   @@index([updatedAt])
+}
+
+/// A member's private bookmark on a job opening.
+///
+/// Not JobOpeningInterest with a flag: interest is a signal TO the hiring team,
+/// one-way and pushed to their ATS, while a save is visible to nobody and is
+/// meant to be undone. Nothing here is reviewed, so the triage columns its
+/// neighbour carries are absent.
+///
+/// `createdAt` is the clock the Saved tab reads back ("Saved 3d ago"); a repeat
+/// save leaves it alone. A save of a role that later closes is kept, not
+/// deleted — the reads filter on the job's visibility, so it returns if the
+/// role does.
+model SavedJobOpening {
+  id            Int        @id @default(autoincrement())
+  uid           String     @unique @default(cuid())
+  jobOpeningUid String
+  jobOpening    JobOpening @relation(fields: [jobOpeningUid], references: [uid], onDelete: Cascade)
+  memberUid     String
+  member        Member     @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@unique([jobOpeningUid, memberUid])
+  @@index([jobOpeningUid])
+  @@index([memberUid])
+}
+
+enum JobCandidateKind {
+  APPLICATION
+  JOB_INTEREST
+}
+
+/// One hiring lead has opened one applicant's row.
+///
+/// Per viewer on purpose: "we have dealt with this person" is the team's fact and
+/// lives on the row as `reviewedAt`, but "I have looked at this" is the reader's,
+/// and a shared column would blank a co-lead's new badge for a row they never
+/// opened. The applicants page's caches are keyed by viewer for the same reason.
+///
+/// `rowUid` addresses either a JobApplication or a JobOpeningInterest, so it
+/// carries no foreign key. Those rows cascade-delete with their job opening and
+/// can leave a view row behind; it is only ever read by `rowUid IN (...)`, so an
+/// orphan is inert.
+model JobCandidateView {
+  id        Int              @id @default(autoincrement())
+  uid       String           @unique @default(cuid())
+  /// The lead who opened it, not the applicant.
+  memberUid String
+  member    Member           @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  kind      JobCandidateKind
+  rowUid    String
+  /// The FIRST open. A second open leaves this alone.
+  seenAt    DateTime         @default(now())
+
+  @@unique([memberUid, kind, rowUid])
+  @@index([rowUid])
+  @@index([memberUid])
 }
 
 /// A member telling a team "I would like to work here", with no job attached.
@@ -3525,6 +3600,14 @@ enum AiAppStatus {
   DELETED
 }
 
+/// Who may find and open an app. OPEN = every PL Infra member (AI Apps access);
+/// PRIVATE = the owner, directory admins, and members on its AiAppAllowedMember
+/// whitelist (who still need AI Apps access).
+enum AiAppAccess {
+  OPEN
+  PRIVATE
+}
+
 /// One vibe-coded sandbox app, lazy-created on first deploy by its owning member.
 model AiApp {
   id              Int         @id @default(autoincrement())
@@ -3589,12 +3672,53 @@ model AiApp {
   /// Slugs from the controlled vocabulary in `ai-apps-tags.ts` (max 5). Set by
   /// the agent on first upload, editable by the creator/admin afterwards.
   tags            String[]    @default([])
+  /// New apps are private to their owner; the owner (or a directory admin)
+  /// opens or shares them from LabOS. Deploys never change it.
+  access          AiAppAccess @default(PRIVATE)
+  /// True once the app has shipped with an auth sidecar that asks the
+  /// Directory for a per-app decision. Apps last deployed before that keep a
+  /// sidecar that only checks the PL Infra permission, so a PRIVATE setting
+  /// hides them in LabOS/API but their direct URL stays open until a redeploy.
+  directLinkGateReady Boolean @default(false)
+  /// When the "new AI App" broadcast went out. Sent at most once, and only
+  /// while the app is OPEN (first successful deploy, or first switch to OPEN
+  /// after deploying).
+  announcedAt     DateTime?
+  /// Path patterns (e.g. `/api/*`) the auth sidecar serves without LabOS
+  /// auth, to anyone. `*` matches any characters including `/`; the first
+  /// segment is always literal, so the whole app can never be public. Set by
+  /// the agent on deploy (when sent) or by the owner/admin in LabOS; the app
+  /// itself must secure these paths.
+  publicPaths     String[]    @default([])
+  /// True once the app has shipped with an auth sidecar that forwards the
+  /// request path to the Directory. Apps last deployed before that ignore
+  /// `publicPaths` until a redeploy.
+  publicPathsGateReady Boolean @default(false)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
   @@unique([memberUid, appId])
   @@index([memberUid])
   @@index([status])
+}
+
+/// Whitelist of a PRIVATE app: members (besides the owner and directory
+/// admins) who may find and open it. Kept while the app is OPEN so switching
+/// back restores it.
+model AiAppAllowedMember {
+  /// AiApp.uid (no FK relation, matching the other POC tables).
+  appUid     String
+  memberUid  String
+  /// Who added this member (owner or directory admin).
+  addedByUid String
+  /// When the member got their "shared with you" notification. Set once the
+  /// app is PRIVATE and has shipped; rows saved while the app is OPEN start
+  /// stamped (the open broadcast already covered them).
+  notifiedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  @@id([appUid, memberUid])
+  @@index([memberUid])
 }
 
 /// One row per member who has loaded an app's iframe. `lastSeenAt` is the
@@ -3688,6 +3812,7 @@ enum AiAppEventType {
   DELETE_STARTED
   DELETE_SUCCEEDED
   DELETE_FAILED
+  PUBLIC_PATHS_UPDATED
 }
 
 /// Append-only audit log of AI Apps activity: who downloaded the kit and every

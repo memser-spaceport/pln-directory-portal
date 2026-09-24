@@ -201,6 +201,8 @@ export class NetworkOverviewService {
         location: [],
         workMode: [],
         sort: 'newest',
+        // The overview reads the whole board, never one member's saved roles.
+        saved: false,
         windowDays,
         page: 1,
         limit: 50,

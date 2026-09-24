@@ -23,6 +23,8 @@ import {
   HuskyAiService,
   encodeJsonStringFragment,
   HUSKY_SEARCH_FALLBACK_PROVIDER,
+  HUSKY_SEARCH_OPUS_ENABLED_ENV_VAR,
+  HUSKY_SEARCH_OPUS_MODEL_ENV_VAR,
   HUSKY_SEARCH_PROVIDER_ENV_VAR,
   HUSKY_SEARCH_STALL_TIMEOUT_ENV_VAR,
   HUSKY_SEARCH_STALLED_NOTICE,
@@ -90,6 +92,14 @@ const STRUCTURED = {
   actions: [{ name: 'Example Team', directoryLink: '/teams/abc', type: 'Team' }],
 };
 
+/** STRUCTURED.sources is not cited in the fixture answers, so it is appended. */
+const UNCITED_SOURCE_REF = {
+  index: 1,
+  title: 'https://example.com/team',
+  type: 'external' as const,
+  externalUrl: 'https://example.com/team',
+};
+
 /** A streamText result: the answer chunks plus the finish reason the model reported. */
 function answerStream(parts: string[], finishReason = 'stop') {
   return { textStream: chunks(parts), finishReason: Promise.resolve(finishReason) };
@@ -115,6 +125,8 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
     create: jest.Mock;
     updateDocByKeyValue: jest.Mock;
     upsertByKeyValue: jest.Mock;
+    findOneByKeyValue: jest.Mock;
+    updateByKeyValue: jest.Mock;
   };
   let aiProvider: { getResponsesModel: jest.Mock };
   let logger: { error: jest.Mock; info: jest.Mock };
@@ -124,12 +136,16 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    delete process.env[HUSKY_SEARCH_OPUS_ENABLED_ENV_VAR];
+    delete process.env[HUSKY_SEARCH_OPUS_MODEL_ENV_VAR];
     cache = { get: jest.fn().mockResolvedValue(null), set: jest.fn().mockResolvedValue(undefined) };
     persistent = {
       getDocByKeyValue: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockResolvedValue(undefined),
       updateDocByKeyValue: jest.fn().mockResolvedValue(undefined),
       upsertByKeyValue: jest.fn().mockResolvedValue(undefined),
+      findOneByKeyValue: jest.fn().mockResolvedValue({ threadId: 'thread-1' }),
+      updateByKeyValue: jest.fn().mockResolvedValue(undefined),
     };
     aiProvider = { getResponsesModel: jest.fn().mockReturnValue('model-handle') };
     logger = { error: jest.fn(), info: jest.fn() };
@@ -159,9 +175,59 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
     });
     expect(HUSKY_SEARCH_FALLBACK_PROVIDER).toBe('gemini');
     expect(streamTextMock.mock.calls[0][0].model).toBe('model-handle');
+    expect(streamTextMock.mock.calls[0][0].temperature).toBe(0.001);
     expect(streamObjectMock.mock.calls[0][0].model).toBe('model-handle');
+    expect(streamObjectMock.mock.calls[0][0].temperature).toBe(0.001);
     expect(toolsService.getTools).toHaveBeenCalledWith({ isLoggedIn: false });
     expect(prisma.member.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('uses Opus for the search stream when enabled, and leaves summaries and titles on the current provider', async () => {
+    process.env[HUSKY_SEARCH_OPUS_ENABLED_ENV_VAR] = 'True';
+    aiProvider.getResponsesModel.mockReset();
+    aiProvider.getResponsesModel.mockReturnValueOnce('opus-handle').mockReturnValue('current-handle');
+    streamTextMock.mockReturnValue(answerStream(['Hello']));
+    streamObjectMock.mockReturnValue(structuredStream(['{"followUpQuestions":[],"sources":[],"actions":[]}']));
+    await readAll(await service.createContextualToolsResponse(chatInfo, false));
+
+    expect(aiProvider.getResponsesModel).toHaveBeenNthCalledWith(1, undefined, {
+      useSearchGrounding: false,
+      providerOverride: 'anthropic',
+      modelOverride: 'claude-opus-5-5',
+    });
+    expect(streamTextMock.mock.calls[0][0].model).toBe('opus-handle');
+    expect(streamTextMock.mock.calls[0][0].temperature).toBeUndefined();
+    expect(streamObjectMock.mock.calls[0][0].model).toBe('opus-handle');
+    expect(streamObjectMock.mock.calls[0][0].temperature).toBeUndefined();
+
+    await flushBackgroundWork();
+    expect(generateTextMock).toHaveBeenCalledWith(expect.objectContaining({ model: 'current-handle' }));
+    expect(aiProvider.getResponsesModel).toHaveBeenNthCalledWith(2, HUSKY_SEARCH_PROVIDER_ENV_VAR, {
+      useSearchGrounding: false,
+      fallbackProvider: HUSKY_SEARCH_FALLBACK_PROVIDER,
+    });
+
+    await service.createThreadBasicInfo('thread-1', 'Name this thread');
+    expect(generateTextMock).toHaveBeenLastCalledWith(expect.objectContaining({ model: 'current-handle' }));
+    expect(aiProvider.getResponsesModel).toHaveBeenLastCalledWith(HUSKY_SEARCH_PROVIDER_ENV_VAR, {
+      useSearchGrounding: false,
+      fallbackProvider: HUSKY_SEARCH_FALLBACK_PROVIDER,
+    });
+  });
+
+  it('honors HUSKY_SEARCH_OPUS_MODEL when Opus is enabled', async () => {
+    process.env[HUSKY_SEARCH_OPUS_ENABLED_ENV_VAR] = 'true';
+    process.env[HUSKY_SEARCH_OPUS_MODEL_ENV_VAR] = 'claude-opus-custom';
+    streamTextMock.mockReturnValue(answerStream(['Hello']));
+    streamObjectMock.mockReturnValue(structuredStream(['{"followUpQuestions":[],"sources":[],"actions":[]}']));
+
+    await readAll(await service.createContextualToolsResponse(chatInfo, false));
+
+    expect(aiProvider.getResponsesModel).toHaveBeenCalledWith(undefined, {
+      useSearchGrounding: false,
+      providerOverride: 'anthropic',
+      modelOverride: 'claude-opus-custom',
+    });
   });
 
   it('streams one valid JSON object even when the answer contains quotes, backslashes and newlines', async () => {
@@ -202,6 +268,7 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
             sources: STRUCTURED.sources,
             followUpQuestions: STRUCTURED.followUpQuestions,
             actions: STRUCTURED.actions,
+            sourceRefs: [UNCITED_SOURCE_REF],
           }),
         ],
       })
@@ -273,7 +340,11 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
       const raw = await readAll(await service.createContextualToolsResponse(chatInfo, false));
       const parsed = HuskyResponseSchema.parse(JSON.parse(raw));
 
-      expect(parsed).toEqual({ content: '| Title | Event |\n| A | X |', ...STRUCTURED });
+      expect(parsed).toEqual({
+        content: '| Title | Event |\n| A | X |',
+        ...STRUCTURED,
+        sourceRefs: [UNCITED_SOURCE_REF],
+      });
       expect(streamTextMock).toHaveBeenCalledTimes(2);
       expect(streamTextMock.mock.calls[0][0].abortSignal.aborted).toBe(true);
       const continuation = streamTextMock.mock.calls[1][0];
@@ -352,6 +423,7 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
       expect(HuskyResponseSchema.parse(JSON.parse(raw))).toEqual({
         content: `partial more${HUSKY_SEARCH_STALLED_NOTICE}`,
         ...STRUCTURED,
+        sourceRefs: [UNCITED_SOURCE_REF],
       });
       expect(streamTextMock).toHaveBeenCalledTimes(2);
       expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('cut off as well'));

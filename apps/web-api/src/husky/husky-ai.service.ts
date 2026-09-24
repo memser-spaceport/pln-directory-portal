@@ -3,7 +3,7 @@ import { RedisCacheDbService } from './db/redis-cache-db.service';
 import { MongoPersistantDbService } from './db/mongo-persistant-db.service';
 import { LogService } from '../shared/log.service';
 import { generateText, LanguageModel, streamObject, streamText } from 'ai';
-import { HuskyChatInterface, HuskyResponseContextSchema } from 'libs/contracts/src/schema/husky-chat';
+import { HuskyChatInterface, HuskyResponseContextSchema, HuskySourceRef } from 'libs/contracts/src/schema/husky-chat';
 import {
   HUSKY_CHAT_SUMMARY_SYSTEM_PROMPT,
   PROMPT_FOR_GENERATE_TITLE,
@@ -20,6 +20,7 @@ import { HuskyAuthContext } from './tools/husky-auth-context';
 import { AiProviderService, AiProviderType } from '../shared/ai-provider.service';
 import { StallWatchdog } from './stall-watchdog';
 import { MAX_OVERLAP_CHARS, trimRepeatedPrefix } from './answer-continuation.util';
+import { buildSourceRefs } from './source-refs';
 import { z } from 'zod';
 
 /**
@@ -29,6 +30,12 @@ import { z } from 'zod';
  */
 export const HUSKY_SEARCH_PROVIDER_ENV_VAR = 'HUSKY_SEARCH_AI_PROVIDER';
 export const HUSKY_SEARCH_FALLBACK_PROVIDER: AiProviderType = 'gemini';
+
+/** `true` (any case) runs Husky search answers on Opus. Anything else keeps the current provider. */
+export const HUSKY_SEARCH_OPUS_ENABLED_ENV_VAR = 'HUSKY_SEARCH_OPUS_ENABLED';
+/** Optional slug override. Defaults to claude-opus-5-5. Does not change CLAUDE_MODEL. */
+export const HUSKY_SEARCH_OPUS_MODEL_ENV_VAR = 'HUSKY_SEARCH_OPUS_MODEL';
+export const DEFAULT_HUSKY_SEARCH_OPUS_MODEL = 'claude-opus-5-5';
 
 /**
  * Longest silence tolerated from the model before its stream is aborted and the
@@ -63,6 +70,7 @@ interface AnswerResult {
 }
 
 type HuskyResponseContext = z.infer<typeof HuskyResponseContextSchema>;
+type HuskyStoredContext = HuskyResponseContext & { sourceRefs?: HuskySourceRef[] };
 
 const EMPTY_RESPONSE_CONTEXT: HuskyResponseContext = { followUpQuestions: [], sources: [], actions: [] };
 
@@ -97,18 +105,40 @@ export class HuskyAiService {
     });
   }
 
+  private isOpusEnabled(): boolean {
+    return process.env[HUSKY_SEARCH_OPUS_ENABLED_ENV_VAR]?.trim().toLowerCase() === 'true';
+  }
+
+  /** Opus rejects `temperature`; other search models keep the near-deterministic setting. */
+  private searchCallOptions(): { temperature?: number } {
+    return this.isOpusEnabled() ? {} : { temperature: 0.001 };
+  }
+
+  /** Search answers and the structured tail. Summaries and titles stay on getModel(). */
+  private getSearchModel(): LanguageModel {
+    if (!this.isOpusEnabled()) {
+      return this.getModel();
+    }
+    return this.aiProvider.getResponsesModel(undefined, {
+      useSearchGrounding: false,
+      providerOverride: 'anthropic',
+      modelOverride: process.env[HUSKY_SEARCH_OPUS_MODEL_ENV_VAR] || DEFAULT_HUSKY_SEARCH_OPUS_MODEL,
+    });
+  }
+
   private getStallTimeoutMs(): number {
     const configured = Number(process.env[HUSKY_SEARCH_STALL_TIMEOUT_ENV_VAR]);
     return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_HUSKY_SEARCH_STALL_TIMEOUT_MS;
   }
 
   /**
-   * Streams a JSON object `{ content, followUpQuestions, sources, actions }` in two
-   * phases so the client can render the answer while the structured data is still
-   * being generated:
+   * Streams a JSON object `{ content, followUpQuestions, sources, sourceRefs, actions }`
+   * in two phases so the client can render the answer while the structured data is
+   * still being generated:
    *   1. the answer text, produced with the directory database tools, streamed
    *      into the `content` string;
-   *   2. sources / follow-up questions / actions, streamed as the remaining fields.
+   *   2. sources / follow-up questions / actions, plus sourceRefs built from tool
+   *      markers, sent once that call finishes.
    * Each phase runs under a stall watchdog: if the model stops sending chunks, its
    * request is aborted so the client always sees the stream end. An answer that is
    * cut off (stall, token limit, content filter) is continued once from where it
@@ -136,7 +166,7 @@ export class HuskyAiService {
 
     const chatSummaryFromDb = await this.huskyCacheDbService.get(`${threadId}:summary`);
     const historyPrompt = chatSummaryFromDb ? ` - chatHistory: ${chatSummaryFromDb}` : '';
-    const model = this.getModel();
+    const model = this.getSearchModel();
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
@@ -200,7 +230,8 @@ export class HuskyAiService {
             content,
             responseContext.sources,
             responseContext.followUpQuestions,
-            responseContext.actions
+            responseContext.actions,
+            responseContext.sourceRefs
           ).catch((error) => this.logger.error(`Failed to persist chat history for thread ${threadId}:`, error));
         } catch (error) {
           this.logger.error(`Husky search failed for thread ${threadId}, chat ${chatId}:`, error);
@@ -284,7 +315,7 @@ export class HuskyAiService {
     const result = streamText({
       model,
       ...generation,
-      temperature: 0.001,
+      ...this.searchCallOptions(),
       abortSignal: watchdog.signal,
       onStepFinish: async (step) => {
         if (step.toolResults?.length > 0) {
@@ -333,18 +364,18 @@ export class HuskyAiService {
   }
 
   /**
-   * Streams the structured tail of the response (everything after `content`).
-   * The model's JSON is forwarded without its opening brace so it continues the
-   * object already opened by the caller. If the structured generation fails or
-   * stalls, the object is closed with empty fields so the already streamed answer
-   * stays valid.
+   * Builds the structured tail (everything after `content`). The model still fills
+   * sources, follow-ups, and actions. sourceRefs are attached from tool markers
+   * before the tail is sent, so the client never sees a model-invented list.
+   * The tail is one JSON fragment: follow-ups appear when this call finishes.
+   * If generation fails or stalls, the object is closed with empty fields so the
+   * already streamed answer stays valid.
    */
   private async streamResponseContext(
     model: LanguageModel,
     input: { historyPrompt: string; question: string; currentDate: string; content: string; toolResults: string },
     enqueue: (text: string) => void
-  ): Promise<HuskyResponseContext> {
-    let openingBraceStripped = false;
+  ): Promise<HuskyStoredContext> {
     const watchdog = new StallWatchdog(this.getStallTimeoutMs());
     try {
       const objectStream = streamObject({
@@ -358,7 +389,7 @@ export class HuskyAiService {
             - content: ${input.content}
             - context: ${input.toolResults}
           `,
-        temperature: 0.001,
+        ...this.searchCallOptions(),
         abortSignal: watchdog.signal,
       });
       // The object promise rejects together with the text stream; mark it handled so a
@@ -369,39 +400,43 @@ export class HuskyAiService {
 
       for await (const chunk of objectStream.textStream) {
         watchdog.touch();
-        let text = chunk;
-        if (!openingBraceStripped) {
-          const braceIndex = text.indexOf('{');
-          if (braceIndex === -1) {
-            continue;
-          }
-          text = text.substring(braceIndex + 1);
-          openingBraceStripped = true;
-        }
-        enqueue(text);
+        void chunk;
       }
 
       // The object promise settles from the stream's own finish, which an aborted
       // stream never reaches, so it is raced against the watchdog as well.
       watchdog.touch();
       const object = await watchdog.race(objectPromise);
-      if (!openingBraceStripped) {
-        enqueue(`${JSON.stringify(object).substring(1)}`);
-      }
-      return object;
+      const payload = this.withSourceRefs(object, input);
+      enqueue(JSON.stringify(payload).substring(1));
+      return payload;
     } catch (error) {
       if (watchdog.stalled) {
         this.logger.error(`Husky structured response generation stalled: no chunk for ${watchdog.timeoutMs}ms`);
       } else {
         this.logger.error('Husky structured response generation failed:', error);
       }
-      if (!openingBraceStripped) {
-        enqueue(`${JSON.stringify(EMPTY_RESPONSE_CONTEXT).substring(1)}`);
-      }
-      return EMPTY_RESPONSE_CONTEXT;
+      const payload = this.withSourceRefs(EMPTY_RESPONSE_CONTEXT, input);
+      enqueue(JSON.stringify(payload).substring(1));
+      return payload;
     } finally {
       watchdog.stop();
     }
+  }
+
+  private withSourceRefs(
+    context: HuskyResponseContext,
+    input: { content: string; toolResults: string }
+  ): HuskyStoredContext {
+    const { sourceRefs, mismatches } = buildSourceRefs({
+      content: input.content,
+      toolResults: input.toolResults,
+      llmSources: context.sources,
+    });
+    for (const mismatch of mismatches) {
+      this.logger.info(`Husky source ref: ${mismatch}`);
+    }
+    return sourceRefs.length ? { ...context, sourceRefs } : context;
   }
 
   async updateChatSummaryInMongo(threadId: string, summary: string) {
@@ -425,8 +460,19 @@ export class HuskyAiService {
     response: string | null,
     sources: any[] = [],
     followUpQuestions: any[] = [],
-    actions: any[] = []
+    actions: any[] = [],
+    sourceRefs?: HuskySourceRef[]
   ) {
+    const turn = {
+      questionId: chatId,
+      question,
+      response: response || '',
+      actions,
+      sources,
+      createdAt: Date.now(),
+      followUpQuestions,
+      ...(sourceRefs?.length ? { sourceRefs } : {}),
+    };
     const doc = await this.huskyPersistentDbService.getDocByKeyValue(
       process.env.MONGO_THREADS_COLLECTION || 'threads',
       'threadId',
@@ -437,33 +483,12 @@ export class HuskyAiService {
         threadId,
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        contextual: [
-          {
-            questionId: chatId,
-            question,
-            response: response || '',
-            actions,
-            sources,
-            createdAt: Date.now(),
-            followUpQuestions,
-          },
-        ],
+        contextual: [turn],
       };
       await this.huskyPersistentDbService.create(process.env.MONGO_THREADS_COLLECTION || 'threads', newDoc);
     } else {
       const contextual = doc?.contextual || [];
-      const updatedContextual = [
-        ...contextual,
-        {
-          questionId: chatId,
-          question,
-          response: response || '',
-          actions,
-          sources,
-          createdAt: Date.now(),
-          followUpQuestions,
-        },
-      ];
+      const updatedContextual = [...contextual, turn];
 
       doc.updatedAt = Date.now();
       doc.contextual = updatedContextual;
