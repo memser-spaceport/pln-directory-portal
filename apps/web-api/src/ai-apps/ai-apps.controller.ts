@@ -21,6 +21,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiConsumes } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { ZodValidationPipe } from '@abitia/zod-dto';
 import { Request, Response } from 'express';
 import { NoCache } from '../decorators/no-cache.decorator';
@@ -55,6 +56,8 @@ import {
   AI_APPS_LOG_DEPLOYMENT_ID_PATTERN,
   AI_APPS_MAX_PRD_BYTES,
   AI_APPS_MAX_ZIP_BYTES,
+  AI_APPS_SIDECAR_THROTTLE_LIMIT,
+  AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS,
   AI_APPS_STARTER_KIT_VERSION,
 } from './ai-apps.constants';
 import { AI_APPS_MAX_TAGS_PER_APP, AI_APPS_TAGS } from './ai-apps-tags';
@@ -184,6 +187,7 @@ export class AiAppsController {
    * `:uid` so the literal path wins.
    */
   @NoCache()
+  @Throttle(AI_APPS_SIDECAR_THROTTLE_LIMIT, AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS)
   @Get('me')
   @UseGuards(UserAccessTokenValidateGuard, RbacGuard)
   @RequirePermissions(READ)
@@ -228,6 +232,7 @@ export class AiAppsController {
    * literal path wins.
    */
   @NoCache()
+  @Throttle(AI_APPS_SIDECAR_THROTTLE_LIMIT, AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS)
   @Get('access-check')
   @UsePipes(ZodValidationPipe)
   async checkAccess(@Query() query: AiAppAccessCheckQueryDto, @Req() req: any) {

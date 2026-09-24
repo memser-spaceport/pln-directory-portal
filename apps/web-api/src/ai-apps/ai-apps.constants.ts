@@ -19,6 +19,15 @@ export const AI_APPS_MAX_ALLOWED_MEMBERS = 200;
 /** Max results of the whitelist member search. */
 export const AI_APPS_ACCESS_CANDIDATES_LIMIT = 10;
 
+/**
+ * Per-IP limit for the sidecar hot paths (`GET /access-check`, `GET /me`).
+ * The app-wide limiter is 10/s, and a single navigation (page, API, RSC
+ * prefetch) already exceeds that — the calls come from the pod, so they share
+ * one egress IP. ttl is seconds, matching `@nestjs/throttler` v3.
+ */
+export const AI_APPS_SIDECAR_THROTTLE_LIMIT = 300;
+export const AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS = 1;
+
 /** Header the AI agent sends with its short-lived deploy token. */
 export const AI_APP_TOKEN_HEADER = 'x-app-token';
 
