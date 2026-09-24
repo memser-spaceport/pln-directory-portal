@@ -15,6 +15,7 @@ import axios from 'axios';
 import { AiAppsService } from './ai-apps.service';
 import { AiAppsAccessService } from './ai-apps-access.service';
 import { AiAppsController } from './ai-apps.controller';
+import { DeployAppSchema } from './dto/deploy-app.dto';
 import {
   UpdateAiAppAccessSchema,
   AiAppAccessCandidatesQuerySchema,
@@ -324,7 +325,7 @@ describe('deploys and access', () => {
   const FILE = { buffer: Buffer.from('zip'), mimetype: 'application/zip' } as Express.Multer.File;
   const DTO = { appId: 'brand-new', name: 'Brand new', deploymentId: 'd1' } as any;
 
-  it('the first agent deploy and draft registration create PRIVATE apps; update never touches access', async () => {
+  it('the first agent deploy and draft registration create OPEN apps unless access is sent', async () => {
     const { aiAppsService, prisma } = buildServices(buildPrisma([]));
     mockedAxios.post.mockResolvedValue({ status: 200, data: { port: 31001 } });
 
@@ -332,9 +333,34 @@ describe('deploys and access', () => {
     await aiAppsService.registerDraft(OWNER, { ...DTO, appId: 'drafty', requiredEnvVars: ['API_KEY'] }, FILE);
 
     for (const [call] of prisma.aiApp.upsert.mock.calls) {
-      expect(call.create.access).toBe('PRIVATE');
-      expect(call.update).not.toHaveProperty('access');
+      expect(call.create.access).toBe('OPEN');
+      expect(call.update.access).toBeUndefined();
     }
+  });
+
+  it('an agent upload that sends access sets it on create and replaces it on update', async () => {
+    const { aiAppsService, prisma } = buildServices(buildPrisma([]));
+    mockedAxios.post.mockResolvedValue({ status: 200, data: { port: 31001 } });
+
+    await aiAppsService.deploy(OWNER, { ...DTO, access: 'PRIVATE' }, FILE);
+    await aiAppsService.registerDraft(
+      OWNER,
+      { ...DTO, appId: 'drafty', access: 'PRIVATE', requiredEnvVars: ['API_KEY'] },
+      FILE
+    );
+
+    for (const [call] of prisma.aiApp.upsert.mock.calls) {
+      expect(call.create.access).toBe('PRIVATE');
+      expect(call.update.access).toBe('PRIVATE');
+    }
+  });
+
+  it('parses the multipart access field case-insensitively and treats an empty value as absent', () => {
+    const base = { appId: 'brand-new', name: 'Brand new', deploymentId: 'd1' };
+    expect(DeployAppSchema.parse({ ...base, access: ' private ' }).access).toBe('PRIVATE');
+    expect(DeployAppSchema.parse({ ...base, access: 'OPEN' }).access).toBe('OPEN');
+    expect(DeployAppSchema.parse({ ...base, access: '' }).access).toBeUndefined();
+    expect(DeployAppSchema.safeParse({ ...base, access: 'public' }).success).toBe(false);
   });
 
   it('a successful deploy marks the direct link as gated and keeps an OPEN app OPEN', async () => {

@@ -1495,9 +1495,9 @@ export class AiAppsService {
         tags: dto.tags ?? [],
         database: dto.database ? { enabled: true, type: dto.database.type } : Prisma.DbNull,
         publicPaths: publicPaths ?? [],
-        // New apps start private to their owner; access is changed only from
-        // LabOS, never by a deploy (so `update` leaves it alone).
-        access: 'PRIVATE',
+        // New apps are open to all PL Infra members unless the member chose
+        // PRIVATE at deploy time.
+        access: dto.access ?? 'OPEN',
       },
       update: {
         name: dto.name,
@@ -1510,6 +1510,8 @@ export class AiAppsService {
         host,
         tags: this.tagsForUpload(existing, dto.tags),
         publicPaths,
+        // Absent → kept, so a LabOS access change survives redeploys.
+        access: dto.access,
         // Upload metadata reflects the LAST upload — cleared when a client
         // that sends nothing (older kit) redeploys, so it never goes stale.
         kitVersion: dto.kitVersion ?? null,
@@ -1606,9 +1608,9 @@ export class AiAppsService {
         tags: dto.tags ?? [],
         database: dto.database ? { enabled: true, type: dto.database.type } : Prisma.DbNull,
         publicPaths: publicPaths ?? [],
-        // New apps start private to their owner; access is changed only from
-        // LabOS, never by a deploy (so `update` leaves it alone).
-        access: 'PRIVATE',
+        // New apps are open to all PL Infra members unless the member chose
+        // PRIVATE at deploy time.
+        access: dto.access ?? 'OPEN',
       },
       update: {
         name: dto.name,
@@ -1619,6 +1621,8 @@ export class AiAppsService {
         requiredEnvVars: dto.requiredEnvVars,
         tags: this.tagsForUpload(existing, dto.tags),
         publicPaths,
+        // Absent → kept, so a LabOS access change survives redeploys.
+        access: dto.access,
         kitVersion: dto.kitVersion ?? null,
         agentClient: agentClient ?? null,
         agentModel: dto.agentModel ?? null,
