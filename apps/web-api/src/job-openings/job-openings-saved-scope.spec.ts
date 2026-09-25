@@ -266,11 +266,12 @@ describe('the saved scope on the facet counts', () => {
   const memberFindUnique = jest.fn();
   const jobOpeningGroupBy = jest.fn();
   const jobOpeningFindMany = jest.fn();
+  const jobOpeningCount = jest.fn();
   const teamFocusAreaFindMany = jest.fn();
 
   const service = new JobOpeningsQueryService({
     member: { findUnique: memberFindUnique },
-    jobOpening: { groupBy: jobOpeningGroupBy, findMany: jobOpeningFindMany },
+    jobOpening: { groupBy: jobOpeningGroupBy, findMany: jobOpeningFindMany, count: jobOpeningCount },
     teamFocusArea: { findMany: teamFocusAreaFindMany },
   } as unknown as PrismaService);
 
@@ -279,6 +280,7 @@ describe('the saved scope on the facet counts', () => {
     memberFindUnique.mockResolvedValue({ uid: 'member-1', deletedAt: null });
     jobOpeningGroupBy.mockResolvedValue([]);
     jobOpeningFindMany.mockResolvedValue([]);
+    jobOpeningCount.mockResolvedValue(0);
     teamFocusAreaFindMany.mockResolvedValue([]);
   });
 
@@ -313,6 +315,44 @@ describe('the saved scope on the facet counts', () => {
     const roleCategoryWhere = jobOpeningGroupBy.mock.calls.find((call) => call[0].by?.[0] === 'roleCategory')?.[0]
       .where;
     expect(roleCategoryWhere.AND).toContainEqual({ seniority: { in: ['Senior'] } });
+  });
+
+  it('counts the saves inside what the rail currently describes', async () => {
+    jobOpeningCount.mockResolvedValue(4);
+
+    const result = await filters({ seniority: 'Senior' }, 'me@example.com');
+
+    expect(result.saved).toBe(4);
+    const where = jobOpeningCount.mock.calls[0][0].where;
+    expect(where.AND).toContainEqual(SAVED_BY_MEMBER_1);
+    /* Unlike the seniority facet, this one keeps every other filter — the
+       question is "how many of these would remain", not "what could you pick". */
+    expect(where.AND).toContainEqual({ seniority: { in: ['Senior'] } });
+  });
+
+  it('counts the saves without the box being ticked, which is when it has something to say', async () => {
+    jobOpeningCount.mockResolvedValue(7);
+
+    const result = await filters({}, 'me@example.com');
+
+    expect(result.saved).toBe(7);
+    expect(jobOpeningCount.mock.calls[0][0].where.AND).toContainEqual(SAVED_BY_MEMBER_1);
+  });
+
+  it('offers no count to an anonymous caller rather than claiming zero', async () => {
+    const result = await filters({});
+
+    expect(result.saved).toBeUndefined();
+    expect(jobOpeningCount).not.toHaveBeenCalled();
+  });
+
+  it('offers no count when the session belongs to a member who is gone', async () => {
+    memberFindUnique.mockResolvedValue({ uid: 'member-1', deletedAt: new Date() });
+
+    const result = await filters({}, 'me@example.com');
+
+    expect(result.saved).toBeUndefined();
+    expect(jobOpeningCount).not.toHaveBeenCalled();
   });
 
   it('serves anonymous facets as before when the scope is absent', async () => {

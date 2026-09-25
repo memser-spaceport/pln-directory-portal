@@ -144,6 +144,8 @@ export const JobsFiltersResponseSchema = z.object({
   focus: z.array(JobFacetTreeItemSchema),
   location: z.array(JobFacetItemSchema),
   workMode: z.array(JobFacetItemSchema),
+  // number of jobs saved for member
+  saved: z.number().optional(),
 });
 
 export const JobCrawlIndexItemSchema = z.object({

@@ -535,19 +535,24 @@ export class JobOpeningsQueryService {
 
   async getFilters(query: JobsListQuery, viewerEmail?: string) {
     const savedByMemberUid = query.saved ? await this.resolveSavedScopeViewer(viewerEmail) : undefined;
+
+    const memberUid = savedByMemberUid ?? (await resolveLiveMemberUidByEmail(this.prisma, viewerEmail));
+
     const functionWhere = this.buildWhere(query, { dropFunction: true }, savedByMemberUid);
     const seniorityWhere = this.buildWhere(query, { dropSeniority: true }, savedByMemberUid);
     const locationWhere = this.buildWhere(query, { dropLocation: true }, savedByMemberUid);
     const workModeWhere = this.buildWhere(query, { dropWorkMode: true }, savedByMemberUid);
     const focusWhere = this.buildWhere(query, { dropFocus: true }, savedByMemberUid);
 
-    const [roleCategoryCounts, seniorityCounts, locationCounts, workModeCounts, focusTree] = await Promise.all([
-      this.countByField('roleCategory', functionWhere),
-      this.countByField('seniority', seniorityWhere, (value) => value !== 'Unknown'),
-      this.countByField('location', locationWhere),
-      this.countByField('workMode', workModeWhere),
-      this.buildFocusTree(focusWhere),
-    ]);
+    const [roleCategoryCounts, seniorityCounts, locationCounts, workModeCounts, focusTree, savedCount] =
+      await Promise.all([
+        this.countByField('roleCategory', functionWhere),
+        this.countByField('seniority', seniorityWhere, (value) => value !== 'Unknown'),
+        this.countByField('location', locationWhere),
+        this.countByField('workMode', workModeWhere),
+        this.buildFocusTree(focusWhere),
+        this.countSaved(query, memberUid),
+      ]);
 
     return {
       roleCategory: roleCategoryCounts,
@@ -555,7 +560,16 @@ export class JobOpeningsQueryService {
       location: locationCounts,
       workMode: workModeCounts,
       focus: focusTree,
+      saved: savedCount,
     };
+  }
+
+  private async countSaved(query: JobsListQuery, memberUid?: string): Promise<number | undefined> {
+    if (!memberUid) {
+      return undefined;
+    }
+
+    return this.prisma.jobOpening.count({ where: this.buildWhere(query, {}, memberUid) });
   }
 
   /**
