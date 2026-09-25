@@ -144,14 +144,16 @@ to the Protocol Labs Network sandbox with a single instruction.
      needed to run it there.
 3. When you're happy, say "deploy this app". Before the first deploy your agent
    suggests a name and short description for your app — approve them or ask for
-   changes. The first time you deploy, your agent will also give you a LabOS
+   changes — and asks who should be able to open it: all PL Infra members (the
+   default) or only you plus members you pick. The first time you deploy, your agent will also give you a LabOS
    link to open and approve — sign in and click **Approve** to authorize the
    deploy. Your agent then ships the app to the PL sandbox; the first deploy
    can take a minute or two.
 4. Your app appears on the PL Infra → AI Apps dashboard, where you can open it.
-   New apps are **private** — only you can see and open them. To share yours,
-   open its ⋮ menu on the dashboard → **Manage access**: add specific members,
-   or open it to all PL Infra members. You can change this anytime.
+   New apps are open to **all PL Infra members** unless you asked your agent to
+   make yours private. To limit who can open it, open its ⋮ menu on the
+   dashboard → **Manage access**: make it private to you plus specific members,
+   or open it to all PL Infra members again. You can change this anytime.
    Need a webhook or public API that works without LabOS sign-in? Ask your
    agent for **public endpoints** (e.g. \`/api/*\`) — anyone can call those
    paths, so the app must protect them itself. Manage them anytime in the app's
@@ -491,6 +493,25 @@ In short:
   change the PRD** of an existing app: same propose → approve → save flow, via
   \`metadataEndpoint\` — metadata changes never require a redeploy.
 
+## Who can open the app (access)
+Deployed apps are open to **all PL Infra members** by default. The member can
+instead make an app **private**: then only they, directory admins, and members
+they pick in LabOS can open it.
+- **As soon as you start working with the member on a new app** (the first time
+  you read these instructions in a session for an app with no \`appUid\` in
+  \`pln-app.config.json\`), mention this in a sentence — e.g. *"Heads-up: once
+  deployed, your app will be visible to all PL Infra members. If you'd rather
+  keep it private to you and a few people you choose, just say so."*
+- **Before the first deploy**, ask explicitly and wait for the answer (details in
+  the deploy skill): all PL Infra members, or private. Send the answer as the
+  \`access\` field (\`OPEN\` or \`PRIVATE\`) on that first deploy/draft upload.
+- **On redeploys**, don't send \`access\` and don't re-ask — the member may have
+  changed it in LabOS since, and omitting the field keeps their setting. Send it
+  again only when the member asks you to change it.
+- You cannot choose WHICH members may open a private app. The member adds them in
+  LabOS: the app's ⋮ menu on the AI Apps dashboard → **Manage access** (it's also
+  where they switch between private and open anytime, with no redeploy).
+
 ## Deploying the app
 When the member asks you to deploy, use the **deploy-to-labs** skill in
 \`.claude/skills/deploy-to-labs/SKILL.md\`. If the app needs runtime secrets,
@@ -501,6 +522,8 @@ follow "Apps that need secrets" above instead of deploying directly. In short:
 2. **Settle the display metadata** ("App name, description, tags & one-pager
    PRD" above): first deploy → propose name/description/tags and get the
    member's approval; redeploy → reuse the saved values without re-asking.
+   On the first deploy, also ask who can open the app ("Who can open the app"
+   above) and send the answer as \`access\`.
 3. **Get a deploy token via LabOS (the connect flow).** There is no token in the
    kit. POST to \`connectEndpoint\` to start a connect session, give the member the
    returned \`connectUrl\` + confirmation \`userCode\` to open and approve in LabOS,
@@ -516,10 +539,10 @@ follow "Apps that need secrets" above instead of deploying directly. In short:
    and runs the build — you do not need any cloud credentials.
 6. Save the \`uid\` from the response as \`appUid\` in \`pln-app.config.json\`, then
    tell the member the deploy succeeded and that they can open their app from the
-   PL Infra → AI Apps dashboard. After the FIRST deploy, also tell them the app is
-   **private to them** by default and that they can share it — with specific
-   members or all PL Infra members — from the app's ⋮ menu → **Manage access** in
-   LabOS (you cannot change who has access). **Do NOT reveal the deployment URL, host, or port**
+   PL Infra → AI Apps dashboard. After the FIRST deploy, also confirm who can open
+   it (all PL Infra members, or — if they chose private — only them, directory
+   admins, and the members they add from the app's ⋮ menu → **Manage access** in
+   LabOS). **Do NOT reveal the deployment URL, host, or port**
    (see "Keep the deployment URL private" in the deploy skill). That privacy rule
    covers only the app's own \`<appId>\` address — LabOS links (\`connectUrl\`,
    \`appPageUrl\`) must always be shared with the member.
@@ -1339,6 +1362,19 @@ connection string into the LabOS secrets page, same as an API key.
    overwrites the stored metadata, so anything else would revert what the
    member approved. Only re-run the propose flow when the member explicitly
    asks to change the name, description, or tags.
+
+   **Settle who can open the app (first deploy only).** If \`appUid\` in the
+   config is empty, ask the member and wait for the answer — e.g. *"Who should
+   be able to open this app? By default it's visible to all PL Infra members. Or
+   I can make it private — then only you (and directory admins) can open it, and
+   you can add specific people in LabOS."* Send the answer as the \`access\`
+   field in step 6 (\`OPEN\` for all PL Infra members, \`PRIVATE\` for
+   private); if they have no preference, send \`OPEN\`. Don't save it to
+   \`pln-app.config.json\`. If \`appUid\` is already set, **don't ask and
+   don't send \`access\`** — omitting it keeps whatever the member set in
+   LabOS. Send it on a redeploy only when the member asks you to change it
+   (and tell them it can also be changed in LabOS without a redeploy: the app's
+   ⋮ menu → **Manage access**).
 3. **Get a deploy token via LabOS.** The kit has no token; obtain a short-lived one
    through the connect flow:
 
@@ -1402,6 +1438,7 @@ connection string into the LabOS secrets page, same as an API key.
      -F "deploymentId=<unique id per deploy, e.g. a timestamp>" \\
      -F "kitVersion=<the kitVersion from pln-app.config.json>" \\
      -F "agentModel=<the model you are running on, e.g. claude-sonnet-4-5; omit the field if unknown>" \\
+     -F "access=<OPEN or PRIVATE — first deploy only, see step 2; omit on redeploys>" \\
      -F 'database={"enabled":true,"type":"postgres"}' \\
      -F "file=@app.zip;type=application/zip"
    \`\`\`
@@ -1425,11 +1462,12 @@ connection string into the LabOS secrets page, same as an API key.
    the metadata endpoint later). Use the URL only for the internal checks below —
    **do not reveal it to the member** (see "Keep the deployment URL private").
    On \`READY\`, tell the member the app is live and can be opened from the
-   PL Infra → AI Apps dashboard. On the app's FIRST successful deploy, also tell
-   them it is **private**: only they (and directory admins) can see and open it
-   until they share it from the app's ⋮ menu → **Manage access** in LabOS, where
-   they can add specific members or open it to all PL Infra members. Access is a
-   LabOS setting — there is no deploy field for it, and redeploys never change it.
+   PL Infra → AI Apps dashboard. On the app's FIRST successful deploy, also
+   confirm who can open it (the response's \`access\`): \`OPEN\` → all PL Infra
+   members; \`PRIVATE\` → only them and directory admins until they add
+   specific members from the app's ⋮ menu → **Manage access** in LabOS (you
+   can't add members for them). Either way they can switch it there anytime,
+   without a redeploy.
    If \`status\` is \`ERROR\`, surface \`notes\`
    (never the URL) — and when \`notes\` alone doesn't explain the failure, fetch
    the **build logs** via the app-logs skill (\`.claude/skills/app-logs/SKILL.md\`)
@@ -1493,6 +1531,7 @@ curl -X POST "<draftEndpoint>" \\
   -F "deploymentId=<unique id per upload, e.g. a timestamp>" \\
   -F "kitVersion=<the kitVersion from pln-app.config.json>" \\
   -F "agentModel=<the model you are running on; omit the field if unknown>" \\
+  -F "access=<OPEN or PRIVATE — first upload only, see step 2; omit afterwards>" \\
   -F 'requiredEnvVars=["OPENAI_API_KEY","SUPABASE_URL"]' \\
   -F "file=@app.zip;type=application/zip"
 # → { "uid": "cl…", "status": "DRAFT", "appPageUrl": "https://…/pl-infra/ai-apps/<uid>", "missingEnvVars": [ … ] }

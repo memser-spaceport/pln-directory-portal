@@ -15,6 +15,7 @@ import axios from 'axios';
 import { AiAppsService } from './ai-apps.service';
 import { AiAppsAccessService } from './ai-apps-access.service';
 import { AiAppsController } from './ai-apps.controller';
+import { DeployAppSchema } from './dto/deploy-app.dto';
 import {
   UpdateAiAppAccessSchema,
   AiAppAccessCandidatesQuerySchema,
@@ -23,6 +24,10 @@ import {
 } from './dto/ai-app-access.dto';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { RbacGuard } from '../rbac/rbac.guard';
+import { AI_APPS_SIDECAR_THROTTLE_LIMIT, AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS } from './ai-apps.constants';
+
+const THROTTLER_LIMIT = 'THROTTLER:LIMIT';
+const THROTTLER_TTL = 'THROTTLER:TTL';
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
@@ -324,7 +329,7 @@ describe('deploys and access', () => {
   const FILE = { buffer: Buffer.from('zip'), mimetype: 'application/zip' } as Express.Multer.File;
   const DTO = { appId: 'brand-new', name: 'Brand new', deploymentId: 'd1' } as any;
 
-  it('the first agent deploy and draft registration create PRIVATE apps; update never touches access', async () => {
+  it('the first agent deploy and draft registration create OPEN apps unless access is sent', async () => {
     const { aiAppsService, prisma } = buildServices(buildPrisma([]));
     mockedAxios.post.mockResolvedValue({ status: 200, data: { port: 31001 } });
 
@@ -332,9 +337,34 @@ describe('deploys and access', () => {
     await aiAppsService.registerDraft(OWNER, { ...DTO, appId: 'drafty', requiredEnvVars: ['API_KEY'] }, FILE);
 
     for (const [call] of prisma.aiApp.upsert.mock.calls) {
-      expect(call.create.access).toBe('PRIVATE');
-      expect(call.update).not.toHaveProperty('access');
+      expect(call.create.access).toBe('OPEN');
+      expect(call.update.access).toBeUndefined();
     }
+  });
+
+  it('an agent upload that sends access sets it on create and replaces it on update', async () => {
+    const { aiAppsService, prisma } = buildServices(buildPrisma([]));
+    mockedAxios.post.mockResolvedValue({ status: 200, data: { port: 31001 } });
+
+    await aiAppsService.deploy(OWNER, { ...DTO, access: 'PRIVATE' }, FILE);
+    await aiAppsService.registerDraft(
+      OWNER,
+      { ...DTO, appId: 'drafty', access: 'PRIVATE', requiredEnvVars: ['API_KEY'] },
+      FILE
+    );
+
+    for (const [call] of prisma.aiApp.upsert.mock.calls) {
+      expect(call.create.access).toBe('PRIVATE');
+      expect(call.update.access).toBe('PRIVATE');
+    }
+  });
+
+  it('parses the multipart access field case-insensitively and treats an empty value as absent', () => {
+    const base = { appId: 'brand-new', name: 'Brand new', deploymentId: 'd1' };
+    expect(DeployAppSchema.parse({ ...base, access: ' private ' }).access).toBe('PRIVATE');
+    expect(DeployAppSchema.parse({ ...base, access: 'OPEN' }).access).toBe('OPEN');
+    expect(DeployAppSchema.parse({ ...base, access: '' }).access).toBeUndefined();
+    expect(DeployAppSchema.safeParse({ ...base, access: 'public' }).success).toBe(false);
   });
 
   it('a successful deploy marks the direct link as gated and keeps an OPEN app OPEN', async () => {
@@ -840,6 +870,8 @@ describe('access routes', () => {
     // No guard: public paths are decided before any token is read; the handler
     // validates the session itself for everything else.
     expect(route('checkAccess').guards).toEqual([]);
+    expect(Reflect.getMetadata(THROTTLER_LIMIT, proto.checkAccess)).toBe(AI_APPS_SIDECAR_THROTTLE_LIMIT);
+    expect(Reflect.getMetadata(THROTTLER_TTL, proto.checkAccess)).toBe(AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS);
   });
 
   it('declares access-check before the :uid route so the literal path wins', () => {

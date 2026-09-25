@@ -20,6 +20,10 @@ import { UserAccessTokenValidateGuard } from '../guards/user-access-token-valida
 import { RbacGuard } from '../rbac/rbac.guard';
 import { RBAC_PERMISSIONS_KEY } from '../rbac/rbac.decorator';
 import { AI_APPS_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
+import { AI_APPS_SIDECAR_THROTTLE_LIMIT, AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS } from './ai-apps.constants';
+
+const THROTTLER_LIMIT = 'THROTTLER:LIMIT';
+const THROTTLER_TTL = 'THROTTLER:TTL';
 
 /**
  * Wiring checks for `GET /v1/ai-apps/me` (the member-context endpoint deployed
@@ -49,5 +53,11 @@ describe('AiAppsController GET /me wiring', () => {
     expect(Reflect.getMetadata(RBAC_PERMISSIONS_KEY, handler)).toEqual({
       anyOf: [AI_APPS_PERMISSIONS.READ, AI_APPS_PERMISSIONS.WRITE],
     });
+  });
+
+  it('raises the IP throttle above the global 10/s so a sidecar burst does not 429', () => {
+    expect(Reflect.getMetadata(THROTTLER_LIMIT, handler)).toBe(AI_APPS_SIDECAR_THROTTLE_LIMIT);
+    expect(Reflect.getMetadata(THROTTLER_TTL, handler)).toBe(AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS);
+    expect(AI_APPS_SIDECAR_THROTTLE_LIMIT).toBeGreaterThan(10);
   });
 });

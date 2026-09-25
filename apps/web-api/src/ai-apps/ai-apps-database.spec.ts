@@ -53,6 +53,8 @@ function buildService(initial: Record<string, any> | null = null) {
         row = { ...(row as Record<string, any>), ...data };
         return Promise.resolve({ ...row });
       }),
+      // "New AI App" announcement stamp — not under test here, so nothing is announced.
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
     aiAppEvent: { create: jest.fn().mockResolvedValue({}) },
     aiAppAllowedMember: { findMany: jest.fn().mockResolvedValue([]) },
