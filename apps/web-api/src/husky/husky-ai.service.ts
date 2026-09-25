@@ -76,6 +76,8 @@ const EMPTY_RESPONSE_CONTEXT: HuskyResponseContext = { followUpQuestions: [], so
 
 /** Shown before any directory tool has returned. */
 const UNDERSTANDING_STEP = 'Understanding your question';
+/** Shown once the lookups are done and the answer text is about to start. */
+const WRITING_STEP = 'Writing the answer';
 
 /**
  * How to count a tool's text result. The marker is the row prefix that tool
@@ -94,6 +96,11 @@ const TOOL_STATUS: Record<string, { marker: string; singular: string; plural: st
   getAsks: { marker: 'Ask ID:', singular: 'ask', plural: 'asks' },
   getFocusAreas: { marker: 'Focus Area ID:', singular: 'focus area', plural: 'focus areas' },
 };
+
+function searchingLineForTool(toolName: string): string | null {
+  const spec = TOOL_STATUS[toolName];
+  return spec ? `Searching ${spec.plural}` : null;
+}
 
 function statusLineForTool(toolName: string, result: string): string | null {
   const spec = TOOL_STATUS[toolName];
@@ -218,6 +225,7 @@ export class HuskyAiService {
           const emitText = (fragment: string) => {
             if (!fragment) return;
             if (stepsOpen) {
+              pushStep(WRITING_STEP);
               stepsOpen = false;
               enqueue('], "content": "');
             }
@@ -384,10 +392,30 @@ export class HuskyAiService {
       },
     });
 
+    const announcedTools = new Set<string>();
+    const announceSearch = (toolCallId: string, toolName: string) => {
+      if (announcedTools.has(toolCallId)) return;
+      announcedTools.add(toolCallId);
+      const line = searchingLineForTool(toolName);
+      if (line) pushStep(line);
+    };
+
     try {
-      for await (const chunk of result.textStream) {
+      // fullStream carries the tool-call start, which is the only event that
+      // happens while a lookup is still running. textStream is the fallback
+      // for tests that only stub the answer text.
+      const parts = result.fullStream
+        ? result.fullStream
+        : (async function* () {
+            for await (const textDelta of result.textStream) yield { type: 'text-delta' as const, textDelta };
+          })();
+      for await (const part of parts) {
         watchdog.touch();
-        forward(chunk);
+        if (part.type === 'tool-call-streaming-start' || part.type === 'tool-call') {
+          announceSearch(part.toolCallId, part.toolName);
+        } else if (part.type === 'text-delta') {
+          forward(part.textDelta);
+        }
       }
       release();
       watchdog.touch();

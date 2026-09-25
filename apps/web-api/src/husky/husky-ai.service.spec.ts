@@ -231,18 +231,26 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
   });
 
   it('streams a status line for each finished tool before the answer', async () => {
-    streamTextMock.mockImplementation(({ onStepFinish }) => {
-      onStepFinish({
-        toolResults: [{ toolName: 'getMembers', result: 'Member ID: a\n\nMember ID: b' }],
-      });
-      return answerStream(['Hello']);
-    });
+    streamTextMock.mockImplementation(({ onStepFinish }) => ({
+      fullStream: (async function* () {
+        yield { type: 'tool-call-streaming-start', toolCallId: 'c1', toolName: 'getMembers' };
+        await onStepFinish({
+          toolResults: [{ toolName: 'getMembers', result: 'Member ID: a\n\nMember ID: b' }],
+        });
+        yield { type: 'text-delta', textDelta: 'Hello' };
+      })(),
+      finishReason: Promise.resolve('stop'),
+    }));
     streamObjectMock.mockReturnValue(structuredStream(['{"followUpQuestions":[],"sources":[],"actions":[]}']));
 
     const raw = await readAll(await service.createContextualToolsResponse(chatInfo, false));
 
-    expect(raw).toContain('"Understanding your question"');
-    expect(raw).toContain('"Found 2 members"');
+    const searching = raw.indexOf('"Searching members"');
+    const found = raw.indexOf('"Found 2 members"');
+    const writing = raw.indexOf('"Writing the answer"');
+    expect(searching).toBeGreaterThan(-1);
+    expect(found).toBeGreaterThan(searching);
+    expect(writing).toBeGreaterThan(found);
     expect(HuskyResponseSchema.parse(JSON.parse(raw)).content).toBe('Hello');
   });
 
