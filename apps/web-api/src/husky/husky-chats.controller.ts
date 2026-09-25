@@ -15,6 +15,9 @@ export class HuskyChatsController {
     const stream = await this.huskyAiService.createContextualToolsResponse({ ...body }, !!req.userEmail, req.userEmail);
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Transfer-Encoding', 'chunked');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
     try {
       await stream.pipeTo(
         new WritableStream({
