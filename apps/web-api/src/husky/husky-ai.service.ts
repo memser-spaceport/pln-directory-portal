@@ -74,6 +74,36 @@ type HuskyStoredContext = HuskyResponseContext & { sourceRefs?: HuskySourceRef[]
 
 const EMPTY_RESPONSE_CONTEXT: HuskyResponseContext = { followUpQuestions: [], sources: [], actions: [] };
 
+/** Shown before any directory tool has returned. */
+const UNDERSTANDING_STEP = 'Understanding your question';
+
+/**
+ * How to count a tool's text result. The marker is the row prefix that tool
+ * already writes; a sentence result ("No … found", "unavailable") has none.
+ */
+const TOOL_STATUS: Record<string, { marker: string; singular: string; plural: string }> = {
+  getMembers: { marker: 'Member ID:', singular: 'member', plural: 'members' },
+  getTeams: { marker: 'Team ID:', singular: 'team', plural: 'teams' },
+  getProjects: { marker: 'Project ID:', singular: 'project', plural: 'projects' },
+  getIrlEvents: { marker: 'Event ID:', singular: 'event', plural: 'events' },
+  getForumPosts: { marker: '[ForumLink](', singular: 'forum post', plural: 'forum posts' },
+  getInvestors: { marker: 'Investor:', singular: 'investor', plural: 'investors' },
+  getJobOpenings: { marker: '[JobLink](', singular: 'job opening', plural: 'job openings' },
+  getTeamNews: { marker: '[NewsLink](', singular: 'news item', plural: 'news items' },
+  getDemoDayTeams: { marker: '[TeamLink](', singular: 'team', plural: 'teams' },
+  getAsks: { marker: 'Ask ID:', singular: 'ask', plural: 'asks' },
+  getFocusAreas: { marker: 'Focus Area ID:', singular: 'focus area', plural: 'focus areas' },
+};
+
+function statusLineForTool(toolName: string, result: string): string | null {
+  const spec = TOOL_STATUS[toolName];
+  if (!spec) return null;
+  const count = result.split(spec.marker).length - 1;
+  if (count <= 0) return `No ${spec.plural} found`;
+  if (count === 1) return `Found 1 ${spec.singular}`;
+  return `Found ${count} ${spec.plural}`;
+}
+
 /**
  * Encodes a text chunk so it can be appended inside an already-open JSON string
  * literal (quotes, backslashes, newlines and control characters are escaped).
@@ -175,10 +205,30 @@ export class HuskyAiService {
 
         let content = '';
         try {
-          enqueue('{ "content": "');
+          // Status lines stream as a JSON array ahead of `content`, so the client
+          // can show the latest one during the tool phase. Closed on the first
+          // answer character; a late tool finish must not write into that string.
+          let stepsOpen = true;
+          let stepCount = 0;
+          const pushStep = (label: string) => {
+            if (!stepsOpen) return;
+            enqueue(`${stepCount ? ', ' : ''}${JSON.stringify(label)}`);
+            stepCount += 1;
+          };
+          const emitText = (fragment: string) => {
+            if (!fragment) return;
+            if (stepsOpen) {
+              stepsOpen = false;
+              enqueue('], "content": "');
+            }
+            enqueue(fragment);
+          };
+
+          enqueue('{ "steps": [');
+          pushStep(UNDERSTANDING_STEP);
 
           const input: AnswerInput = { historyPrompt, question, currentDate };
-          const answer = await this.streamAnswer(model, auth, input, { kind: 'initial' }, enqueue);
+          const answer = await this.streamAnswer(model, auth, input, { kind: 'initial' }, emitText, pushStep);
           content = answer.text;
           let toolResults = answer.toolResults;
 
@@ -192,7 +242,7 @@ export class HuskyAiService {
               content || toolResults
                 ? { kind: 'continuation', partialAnswer: content, toolResults }
                 : { kind: 'initial' };
-            const continuation = await this.streamAnswer(model, auth, input, mode, enqueue);
+            const continuation = await this.streamAnswer(model, auth, input, mode, emitText, pushStep);
             content += continuation.text;
             toolResults += continuation.toolResults;
             if (!continuation.complete) {
@@ -200,10 +250,14 @@ export class HuskyAiService {
                 `Husky answer continuation for thread ${threadId}, chat ${chatId} was cut off as well (${continuation.reason})`
               );
               content += HUSKY_SEARCH_STALLED_NOTICE;
-              enqueue(encodeJsonStringFragment(HUSKY_SEARCH_STALLED_NOTICE));
+              emitText(encodeJsonStringFragment(HUSKY_SEARCH_STALLED_NOTICE));
             }
           }
 
+          if (stepsOpen) {
+            stepsOpen = false;
+            enqueue('], "content": "');
+          }
           enqueue('", ');
 
           const responseContext = await this.streamResponseContext(
@@ -254,7 +308,8 @@ export class HuskyAiService {
     auth: HuskyAuthContext,
     input: AnswerInput,
     mode: AnswerMode,
-    enqueue: (text: string) => void
+    enqueue: (text: string) => void,
+    pushStep: (label: string) => void
   ): Promise<AnswerResult> {
     const watchdog = new StallWatchdog(this.getStallTimeoutMs());
     let text = '';
@@ -320,6 +375,11 @@ export class HuskyAiService {
       onStepFinish: async (step) => {
         if (step.toolResults?.length > 0) {
           toolResults += step.toolResults.map((tool: { result: string }) => tool.result).join('\n\n');
+          for (const tool of step.toolResults as { toolName?: string; result?: unknown }[]) {
+            if (!tool.toolName) continue;
+            const line = statusLineForTool(tool.toolName, String(tool.result ?? ''));
+            if (line) pushStep(line);
+          }
         }
       },
     });

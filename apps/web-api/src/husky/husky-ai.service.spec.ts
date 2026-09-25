@@ -230,6 +230,22 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
     });
   });
 
+  it('streams a status line for each finished tool before the answer', async () => {
+    streamTextMock.mockImplementation(({ onStepFinish }) => {
+      onStepFinish({
+        toolResults: [{ toolName: 'getMembers', result: 'Member ID: a\n\nMember ID: b' }],
+      });
+      return answerStream(['Hello']);
+    });
+    streamObjectMock.mockReturnValue(structuredStream(['{"followUpQuestions":[],"sources":[],"actions":[]}']));
+
+    const raw = await readAll(await service.createContextualToolsResponse(chatInfo, false));
+
+    expect(raw).toContain('"Understanding your question"');
+    expect(raw).toContain('"Found 2 members"');
+    expect(HuskyResponseSchema.parse(JSON.parse(raw)).content).toBe('Hello');
+  });
+
   it('streams one valid JSON object even when the answer contains quotes, backslashes and newlines', async () => {
     prisma.member.findUnique.mockResolvedValue({ uid: 'member-1', deletedAt: null });
     const answer = 'Example Team builds "storage" tools.\nSee C:\\path for details.';
