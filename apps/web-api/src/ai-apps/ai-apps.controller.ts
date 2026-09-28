@@ -35,12 +35,14 @@ import { AI_APPS_PERMISSIONS } from '../access-control-v2/access-control-v2.cons
 import { AiAppsService } from './ai-apps.service';
 import { AiAppsAccessService } from './ai-apps-access.service';
 import { AiAppsConnectService } from './ai-apps-connect.service';
+import { AiAppsSessionService } from './ai-apps-session.service';
 import { AiAppsStarterKitService } from './ai-apps-starter-kit.service';
 import { AiAppTokenGuard } from './guards/ai-app-token.guard';
 import { DeployAppDto } from './dto/deploy-app.dto';
 import { RegisterDraftDto } from './dto/register-draft.dto';
 import { CreateAiAppDeployKeyDto, DeployDraftDto } from './dto/deploy-draft.dto';
 import { StartConnectDto } from './dto/start-connect.dto';
+import { AppSessionRequestDto, RedeemAppSessionCodeDto } from './dto/app-session.dto';
 import { PollConnectDto } from './dto/poll-connect.dto';
 import { SubmitFeedbackDto } from './dto/submit-feedback.dto';
 import { UpdateFeedbackStatusDto } from './dto/update-feedback-status.dto';
@@ -73,7 +75,8 @@ export class AiAppsController {
     private readonly connectService: AiAppsConnectService,
     private readonly starterKitService: AiAppsStarterKitService,
     private readonly rbacService: RbacService,
-    private readonly accessService: AiAppsAccessService
+    private readonly accessService: AiAppsAccessService,
+    private readonly sessionService: AiAppsSessionService
   ) {}
 
   /**
@@ -119,6 +122,56 @@ export class AiAppsController {
   async approveConnectSession(@Param('uid') uid: string, @Req() req: any) {
     const memberUid = await this.resolveMemberUid(req);
     return this.connectService.approve(uid, memberUid);
+  }
+
+  /**
+   * One-time code for the app-session sign-in round trip (LabOS authorize route, member JWT). Returns the code and
+   * the app target's origin to send the member back to; the origin comes from appId + target, never from input.
+   */
+  @NoCache()
+  @Post('sessions/code')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  @UsePipes(ZodValidationPipe)
+  async issueAppSessionCode(@Body() body: AppSessionRequestDto, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.sessionService.issueCode(memberUid, body.appId, body.target);
+  }
+
+  /** Redeems a sign-in code for an app session (auth gate; no user auth, the code is the credential). */
+  @NoCache()
+  // Called by every app's auth gate from the cluster's shared egress IPs, like access-check.
+  @Throttle(AI_APPS_SIDECAR_THROTTLE_LIMIT, AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS)
+  @Post('sessions/redeem')
+  @UsePipes(ZodValidationPipe)
+  async redeemAppSessionCode(@Body() body: RedeemAppSessionCodeDto) {
+    return this.sessionService.redeemCode(body.code, body.appId, body.target);
+  }
+
+  /**
+   * App session for a member the auth gate already let in with their LabOS token (member JWT). This is the gate's
+   * silent path while LabOS still shares its token with app hosts.
+   */
+  @NoCache()
+  // Called by every app's auth gate from the cluster's shared egress IPs, like access-check.
+  @Throttle(AI_APPS_SIDECAR_THROTTLE_LIMIT, AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS)
+  @Post('sessions/exchange-token')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  @UsePipes(ZodValidationPipe)
+  async exchangeAppSessionToken(@Body() body: AppSessionRequestDto, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.sessionService.exchangeToken(memberUid, body.appId);
+  }
+
+  /** LabOS sign-out: ends every app session of the member (member JWT). */
+  @NoCache()
+  @Post('sessions/revoke')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(UserTokenCheckGuard)
+  async revokeAppSessions(@Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return { revoked: await this.sessionService.revokeAllForMember(memberUid) };
   }
 
   /**

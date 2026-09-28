@@ -49,6 +49,27 @@ export const AI_APPS_WAU_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
  */
 export const AI_APPS_DEPLOY_TOKEN_TTL_MS = 60 * 60 * 1000;
 
+/**
+ * App-scoped member sessions (LAB-2695). Deployed apps get a signed token bound to their appId instead of the LabOS
+ * token. `AI_APPS_SESSION_SECRET` signs it; without one, sessions are disabled and the auth gate keeps its v1
+ * behavior.
+ */
+export const AI_APPS_SESSION_SECRET = process.env.AI_APPS_SESSION_SECRET || '';
+/** `iss` of an app session token; how every guard tells it apart from a LabOS token. */
+export const AI_APPS_SESSION_ISSUER = 'pln-ai-apps-session';
+const positiveNumberFromEnv = (name: string, fallback: number) => {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+};
+/** A session unused (through the auth gate) for this long expires. */
+export const AI_APPS_SESSION_IDLE_MS = positiveNumberFromEnv('AI_APPS_SESSION_IDLE_HOURS', 24) * 60 * 60 * 1000;
+/** Hard upper bound of a session, whatever its use. */
+export const AI_APPS_SESSION_MAX_MS = positiveNumberFromEnv('AI_APPS_SESSION_MAX_DAYS', 30) * 24 * 60 * 60 * 1000;
+/** Sliding the idle expiry writes at most this often per session. */
+export const AI_APPS_SESSION_TOUCH_MS = 5 * 60 * 1000;
+/** A sign-in code must be redeemed within this window, once. */
+export const AI_APPS_SESSION_CODE_TTL_MS = 60 * 1000;
+
 /** Suggested poll interval (seconds) the agent waits between connect polls. */
 export const AI_APPS_CONNECT_POLL_INTERVAL_SEC = 3;
 
