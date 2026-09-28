@@ -138,6 +138,19 @@ describe('AiAppsStarterKitService buildZip', () => {
     }
   });
 
+  it('kit 1.14: member context comes from same-origin /_pln/me, with the Bearer fallback for older gates', () => {
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.14');
+    const skill = entries.get('.claude/skills/pln-member-context/SKILL.md') as string;
+    expect(skill).toContain("fetch('/_pln/me', { credentials: 'same-origin' })");
+    expect(skill).toContain('res.status === 404');
+    expect(skill).toContain('Authorization: `Bearer ${token}`');
+    expect(skill).not.toContain('scoped to the shared apps');
+    // The snippet is copied into apps verbatim: it must be valid JavaScript as rendered.
+    const snippet = skill.split('```js')[1].split('```')[0];
+    expect(() => new Function(snippet)).not.toThrow();
+    expect(snippet).toContain('(?:^|;\\s*)authToken=');
+  });
+
   it('points the agent at the member-context skill from CLAUDE.md/AGENTS.md', () => {
     for (const path of ['CLAUDE.md', 'AGENTS.md']) {
       const content = entries.get(path) as string;
@@ -417,8 +430,8 @@ describe('AiAppsStarterKitService buildZip', () => {
     }
   });
 
-  it('defaults apps to all PL Infra members and asks about private access before the first deploy (kit 1.13)', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.13');
+  it('defaults apps to all PL Infra members and asks about private access before the first deploy (kit 1.13+)', () => {
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.14');
     const readme = entries.get('README.md') as string;
     expect(readme).toContain('New apps are open to **all PL Infra members**');
     expect(readme).toContain('**Manage access**');
@@ -437,8 +450,8 @@ describe('AiAppsStarterKitService buildZip', () => {
     expect(deploySkill).not.toContain('there is no deploy field for it');
   });
 
-  it('documents public endpoints and that the app must secure them (kit 1.13)', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.13');
+  it('documents public endpoints and that the app must secure them (kit 1.13+)', () => {
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.14');
     const deploySkill = entries.get('.claude/skills/deploy-to-labs/SKILL.md') as string;
     expect(deploySkill).toContain('## Public endpoints (paths without LabOS sign-in)');
     expect(deploySkill).toContain(

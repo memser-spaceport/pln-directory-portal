@@ -599,7 +599,9 @@ export class AiAppsService {
         update: { version, lastError: null },
       });
     } catch (error) {
-      this.logger.warn(`Could not record auth gate v${version} for ${appUid}/${environment}: ${(error as Error).message}`);
+      this.logger.warn(
+        `Could not record auth gate v${version} for ${appUid}/${environment}: ${(error as Error).message}`
+      );
     }
   }
 

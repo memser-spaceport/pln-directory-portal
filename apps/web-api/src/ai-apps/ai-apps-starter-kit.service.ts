@@ -316,13 +316,12 @@ folder. Before any UI work, load the **pl-design-system** skill
 ## Signed-in member context (personalization)
 The app can identify the PLN member using it. Load the **pln-member-context**
 skill (\`.claude/skills/pln-member-context/SKILL.md\`) before writing any code
-that needs the current user. In short: the LabOS session cookie (\`authToken\`,
-shared across the PLN apps domain) reaches the app's own origin, so browser
-code reads it from \`document.cookie\` (URL-decode + strip quotes) and calls the
-\`memberContextEndpoint\` from \`pln-app.config.json\` with
+that needs the current user. In short: browser code calls \`/_pln/me\` on the
+app's own origin (no token to handle); apps behind an older auth gate get a 404
+there and fall back to \`memberContextEndpoint\` with the \`authToken\` cookie as
 \`Authorization: Bearer <token>\` — use the exact snippet from the skill, and do
-NOT rely on \`credentials: 'include'\` alone (the cookie may not reach the API
-host). The response carries the member's public profile (uid, name, image,
+NOT rely on \`credentials: 'include'\` alone for that fallback (the cookie may
+not reach the API host). The response carries the member's public profile (uid, name, image,
 teams + roles, skills — deliberately no email or other contact info). Bake the
 endpoint URL into the app's frontend as a constant — the config file itself is
 not shipped inside \`app/\`.
@@ -994,29 +993,24 @@ description: Get the signed-in PLN (or PL) member's identity (name, teams, role,
 # PLN Member Context — who is using the app
 
 Deployed apps are opened by signed-in PLN members from the PL Infra → AI Apps
-dashboard. The LabOS login cookie (\`authToken\`) is scoped to the shared apps
-domain, so the app's own origin receives it — the app reads it and presents it
-to the PLN API as a Bearer token. No login UI of its own is needed.
+dashboard. The app's auth gate (in front of every deployed app) already knows
+who the member is and answers \`/_pln/me\` on the app's own origin, so the app
+never handles a token and needs no login UI of its own.
 
 ## The endpoint
 
-\`memberContextEndpoint\` in \`pln-app.config.json\`:
-
-\`\`\`
-GET ${AI_APPS_ME_ENDPOINT}
-\`\`\`
-
-Call it from **browser code**, sending the \`authToken\` cookie value as the
-\`Authorization\` header. Do NOT rely on \`credentials: 'include'\` alone — the
-cookie's domain covers the app hosts but not necessarily the API host, so the
-browser may silently omit it (a guaranteed 401). Reading the cookie only needs
-the app's own origin, which always works. The config file is not shipped inside
-\`app/\`, so bake the URL into the frontend as a constant:
+Call **\`GET /_pln/me\`** on the app's own origin from **browser code**. It is a
+same-origin request, so there is no token, no CORS and no Authorization header
+to handle. Apps whose auth gate predates \`/_pln/me\` get a 404 there; for them
+the snippet falls back to \`memberContextEndpoint\` from \`pln-app.config.json\`
+(\`${AI_APPS_ME_ENDPOINT}\`) with the \`authToken\` cookie as a Bearer token. The
+config file is not shipped inside \`app/\`, so bake that URL in as a constant.
+Use the snippet as-is:
 
 \`\`\`js
 const MEMBER_CONTEXT_URL = '${AI_APPS_ME_ENDPOINT}';
 
-// The cookie value is URL-encoded and JSON-quoted (e.g. %22eyJhbGci...%22).
+// Fallback only: the cookie value is URL-encoded and JSON-quoted (e.g. %22eyJhbGci...%22).
 function readAuthToken() {
   const match = document.cookie.match(/(?:^|;\\s*)authToken=([^;]*)/);
   if (!match) return null;
@@ -1026,13 +1020,15 @@ function readAuthToken() {
 
 async function getMemberContext() {
   try {
-    const token = readAuthToken();
-    const res = await fetch(MEMBER_CONTEXT_URL, {
-      // Bearer from the cookie is the reliable path; credentials:'include' is
-      // only a fallback for environments where the cookie reaches the API host.
-      headers: token ? { Authorization: \`Bearer \${token}\` } : undefined,
-      credentials: token ? 'omit' : 'include',
-    });
+    let res = await fetch('/_pln/me', { credentials: 'same-origin' });
+    if (res.status === 404) {
+      // Older auth gate without /_pln/me: ask the PLN API directly.
+      const token = readAuthToken();
+      res = await fetch(MEMBER_CONTEXT_URL, {
+        headers: token ? { Authorization: \`Bearer \${token}\` } : undefined,
+        credentials: token ? 'omit' : 'include',
+      });
+    }
     if (!res.ok) return null; // 401 = not signed in, 403 = no AI Apps access
     const { member } = await res.json();
     return member;
@@ -1067,18 +1063,19 @@ compensate.
 
 - **Always handle the signed-out case.** \`getMemberContext()\` returns \`null\`
   when the visitor is not signed in, lacks AI Apps access, or when the app runs
-  locally (\`npm start\` — no PLN cookie on localhost). Show a friendly note like
+  locally (\`npm start\` — there is no auth gate or PLN cookie on localhost). Show a friendly note like
   *"Open this app from the LabOS → AI Apps dashboard to personalize it"* and keep
   the rest of the app working. Never crash or block on missing identity.
 - **Personalization only, not authentication.** Use the identity to greet the
   member, tag feedback/content with who wrote it, or tailor behavior. Do not
   gate sensitive or destructive actions on it, and don't build your own
   session/auth system on top.
-- Call it client-side. If you must know the member on your server, do the same
-  thing there: the \`authToken\` cookie arrives on every request to the app, so
-  decode it (URL-decode, strip the surrounding double quotes) and forward it to
-  the endpoint as \`Authorization: Bearer <token>\`. Never store or log the
-  token, and never send it — or the member's data — to any third-party service.
+- Call it client-side. If you must know the member on your server, the
+  \`authToken\` cookie arrives on every request to the app: decode it (URL-decode,
+  strip the surrounding double quotes) and forward it to \`memberContextEndpoint\`
+  as \`Authorization: Bearer <token>\`. It is a session for this app only — it
+  works for this endpoint and nothing else. Never store or log the token, and
+  never send it — or the member's data — to any third-party service.
 - Keep the token in memory for the current page only — don't persist it to
   localStorage, files, or your own backend.
 - This is the only PLN member API available to apps. Don't call other internal

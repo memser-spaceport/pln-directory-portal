@@ -11,7 +11,7 @@
  */
 
 /** Starter kit version shown in the README, ZIP filename, and LabOS UI. Bump when the kit contents or flow change. */
-export const AI_APPS_STARTER_KIT_VERSION = '1.13';
+export const AI_APPS_STARTER_KIT_VERSION = '1.14';
 
 /** Max members on one private app's whitelist (the owner and directory admins never count). */
 export const AI_APPS_MAX_ALLOWED_MEMBERS = 200;
