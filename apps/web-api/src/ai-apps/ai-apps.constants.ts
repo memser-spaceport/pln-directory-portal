@@ -224,6 +224,62 @@ export const buildAppS3Key = (appId: string, deploymentId: string): string => `a
  */
 export const AI_APPS_APP_DOMAIN = process.env.AI_APPS_APP_DOMAIN || 'os.pl.xyz';
 
+/**
+ * appIds that would give an app a platform hostname (`<appId>.<AI_APPS_APP_DOMAIN>`). Prod AI Apps share an ALB
+ * ingress group with the Directory API, auth, forum and the orchestrator, so an app holding one of these hosts
+ * could add a competing ALB rule for it. Built from the non-app Ingress hosts in both clusters plus generic
+ * infrastructure names; `AI_APPS_RESERVED_APP_IDS_EXTRA` (comma list) adds more without a release.
+ */
+const AI_APPS_BUILTIN_RESERVED_APP_IDS = [
+  // Platform hosts on os.pl.xyz (prod) and their dev counterparts.
+  'api-directory',
+  'api-events',
+  'api-plaa',
+  'api-data-enrichment',
+  'auth',
+  'forum',
+  'notification-processor',
+  'notification-receiver',
+  'deployment-orchestrator-runner',
+  'dev-directory',
+  'dev-events',
+  'dev-plaa',
+  'dev-data-enrichment',
+  'dev-auth',
+  'dev-forum',
+  'dev-notification-processor',
+  'dev-notification-receiver',
+  'dev-deployment-orchestrator-runner',
+  // LabOS portal labels.
+  'directoryv2',
+  'os',
+  // Generic infrastructure names.
+  'www',
+  'api',
+  'app',
+  'admin',
+  'mail',
+  'status',
+  'docs',
+  'grafana',
+  'static',
+  'cdn',
+  'assets',
+  'login',
+  'sso',
+  'id',
+];
+
+export const AI_APPS_RESERVED_APP_IDS: ReadonlySet<string> = new Set([
+  ...AI_APPS_BUILTIN_RESERVED_APP_IDS,
+  ...(process.env.AI_APPS_RESERVED_APP_IDS_EXTRA ?? '')
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean),
+]);
+
+export const isReservedAppId = (appId: string): boolean => AI_APPS_RESERVED_APP_IDS.has(appId.toLowerCase());
+
 function safeAppLabel(value: string) {
   const name = value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '');
   return name || 'app';

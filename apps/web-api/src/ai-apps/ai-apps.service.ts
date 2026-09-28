@@ -77,6 +77,7 @@ import {
   buildRunnerMetricsUrl,
   buildRunnerSecretsUrl,
   normalizeAiAppEventName,
+  isReservedAppId,
 } from './ai-apps.constants';
 
 /**
@@ -777,6 +778,9 @@ export class AiAppsService {
     if (ownerOnly && app.memberUid !== requesterUid) {
       throw new ForbiddenException('The agent may edit only apps owned by its connected member');
     }
+    if (!ownerOnly) {
+      await this.assertCanEditMetadata(requesterUid, app);
+    }
     this.assertKeyCanAccessApp(scope, app.uid);
 
     const data: { name?: string; description?: string | null; prd?: string | null; tags?: string[] } = {};
@@ -787,6 +791,13 @@ export class AiAppsService {
 
     const updated = await this.prisma.aiApp.update({ where: { uid }, data });
     return this.toApiApp((await this.withMember([updated]))[0], true);
+  }
+
+  /** Dashboard metadata/PRD edits: the app's creator or a directory admin (the LabOS edit UI is gated on canManage). */
+  private async assertCanEditMetadata(requesterUid: string, app: Pick<AiApp, 'memberUid'>): Promise<void> {
+    if (!(await this.isCreatorOrDirectoryAdmin(requesterUid, app))) {
+      throw new ForbiddenException('Only the app creator or a directory admin can edit this app');
+    }
   }
 
   /** Update metadata from JSON or multipart; a PRD file overrides body.prd. */
@@ -826,6 +837,8 @@ export class AiAppsService {
     if (!app || app.status === 'DELETED') {
       throw new NotFoundException(`AI App not found: ${uid}`);
     }
+    // Checked before the upload so a rejected edit stores nothing in S3.
+    await this.assertCanEditMetadata(requesterUid, app);
 
     const key = buildPrdS3Key(app.appId, extension, randomUUID());
     try {
@@ -1664,6 +1677,24 @@ export class AiAppsService {
     }
   }
 
+  /**
+   * Reserved appIds (see AI_APPS_RESERVED_APP_IDS) can't be claimed. The member's own existing, non-DELETED row keeps
+   * working (none existed when the list was introduced), so only a new claim is refused. `existing` skips the lookup
+   * when the caller already holds the row.
+   */
+  private async assertAppIdNotReserved(memberUid: string, appId: string, existing?: Pick<AiApp, 'status'> | null) {
+    if (!isReservedAppId(appId)) return;
+    const own =
+      existing !== undefined
+        ? existing
+        : await this.prisma.aiApp.findUnique({
+            where: { memberUid_appId: { memberUid, appId } },
+            select: { status: true },
+          });
+    if (own && own.status !== 'DELETED') return;
+    throw new BadRequestException(`The appId "${appId}" is reserved for a platform service — pick a different appId`);
+  }
+
   /** Requester-only admin check — computed once and reused per row on list responses. */
   private async isRequesterDirectoryAdmin(requesterUid: string): Promise<boolean> {
     const requester = await this.prisma.member.findUnique({
@@ -1719,6 +1750,7 @@ export class AiAppsService {
     }
 
     const publicPaths = this.publicPathsForUpload(dto.publicPaths);
+    await this.assertAppIdNotReserved(memberUid, dto.appId);
     await this.assertAppIdNotClaimedByAnotherMember(memberUid, dto.appId);
 
     // Block a second concurrent deploy: if a deploy is already in flight for this
@@ -1835,6 +1867,7 @@ export class AiAppsService {
     }
 
     const publicPaths = this.publicPathsForUpload(dto.publicPaths);
+    await this.assertAppIdNotReserved(memberUid, dto.appId);
     await this.assertAppIdNotClaimedByAnotherMember(memberUid, dto.appId);
 
     // Don't clobber an in-flight deploy's bundle/status by re-registering the app
@@ -2138,6 +2171,7 @@ export class AiAppsService {
     // runner deployment — don't let a redeploy clobber the other member's live
     // app. The claim belongs to the app's owner, not the requester (an admin
     // may trigger the deploy on the creator's behalf).
+    await this.assertAppIdNotReserved(app.memberUid, app.appId, app);
     await this.assertAppIdNotClaimedByAnotherMember(app.memberUid, app.appId);
     if (environment === 'dev') {
       return this.deployDevDraft(requesterUid, app, secrets);
