@@ -324,7 +324,12 @@ describe('AiAppsService.deployDraft', () => {
     expect(secretsCall[0]).toContain('/v1/projects/default/secrets');
     expect(secretsCall[1]).toEqual(expect.objectContaining({ appId: 'demo', secrets: SECRETS }));
     expect(deployCall[0]).toContain('/deploy');
-    expect(deployCall[1]).toEqual({ appId: 'demo', deploymentId: 'd1', s3Key: 'apps/demo/d1/app.zip' });
+    expect(deployCall[1]).toEqual({
+      appId: 'demo',
+      deploymentId: 'd1',
+      s3Key: 'apps/demo/d1/app.zip',
+      environment: 'prod',
+    });
     // The legacy /deploy build does not inject secrets — a follow-up deployments
     // call must run the built image with the stored secret names.
     expect(injectCall[0]).toContain('/v1/projects/default/deployments');

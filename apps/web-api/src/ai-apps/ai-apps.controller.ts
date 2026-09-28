@@ -39,7 +39,7 @@ import { AiAppsStarterKitService } from './ai-apps-starter-kit.service';
 import { AiAppTokenGuard } from './guards/ai-app-token.guard';
 import { DeployAppDto } from './dto/deploy-app.dto';
 import { RegisterDraftDto } from './dto/register-draft.dto';
-import { DeployDraftDto } from './dto/deploy-draft.dto';
+import { CreateAiAppDeployKeyDto, DeployDraftDto } from './dto/deploy-draft.dto';
 import { StartConnectDto } from './dto/start-connect.dto';
 import { PollConnectDto } from './dto/poll-connect.dto';
 import { SubmitFeedbackDto } from './dto/submit-feedback.dto';
@@ -294,14 +294,22 @@ export class AiAppsController {
     @Query('limit') limit?: string,
     @Query('sinceMinutes') sinceMinutes?: string,
     @Query('nextToken') nextToken?: string,
-    @Query('deploymentId') deploymentId?: string
+    @Query('deploymentId') deploymentId?: string,
+    @Query('environment') environment?: string
   ) {
-    return this.aiAppsService.getAgentLogs(req.aiAppMemberUid, uid, 'build', {
-      limit: this.parsePositiveInt('limit', limit),
-      sinceMinutes: this.parsePositiveInt('sinceMinutes', sinceMinutes),
-      nextToken,
-      deploymentId: this.parseDeploymentId(deploymentId),
-    });
+    return this.aiAppsService.getAgentLogs(
+      req.aiAppMemberUid,
+      uid,
+      'build',
+      {
+        limit: this.parsePositiveInt('limit', limit),
+        sinceMinutes: this.parsePositiveInt('sinceMinutes', sinceMinutes),
+        nextToken,
+        deploymentId: this.parseDeploymentId(deploymentId),
+        ...this.optionalEnvironment(environment),
+      },
+      req.aiAppKeyScope
+    );
   }
 
   /**
@@ -318,14 +326,22 @@ export class AiAppsController {
     @Query('limit') limit?: string,
     @Query('sinceMinutes') sinceMinutes?: string,
     @Query('nextToken') nextToken?: string,
-    @Query('deploymentId') deploymentId?: string
+    @Query('deploymentId') deploymentId?: string,
+    @Query('environment') environment?: string
   ) {
-    return this.aiAppsService.getAgentLogs(req.aiAppMemberUid, uid, 'runtime', {
-      limit: this.parsePositiveInt('limit', limit),
-      sinceMinutes: this.parsePositiveInt('sinceMinutes', sinceMinutes),
-      nextToken,
-      deploymentId: this.parseDeploymentId(deploymentId),
-    });
+    return this.aiAppsService.getAgentLogs(
+      req.aiAppMemberUid,
+      uid,
+      'runtime',
+      {
+        limit: this.parsePositiveInt('limit', limit),
+        sinceMinutes: this.parsePositiveInt('sinceMinutes', sinceMinutes),
+        nextToken,
+        deploymentId: this.parseDeploymentId(deploymentId),
+        ...this.optionalEnvironment(environment),
+      },
+      req.aiAppKeyScope
+    );
   }
 
   /**
@@ -349,7 +365,8 @@ export class AiAppsController {
     @Query('sinceMinutes') sinceMinutes?: string,
     @Query('nextToken') nextToken?: string,
     @Query('deploymentId') deploymentId?: string,
-    @Query('order') order?: string
+    @Query('order') order?: string,
+    @Query('environment') environment?: string
   ) {
     const memberUid = await this.resolveMemberUid(req);
     const query = {
@@ -357,6 +374,7 @@ export class AiAppsController {
       sinceMinutes: this.parsePositiveInt('sinceMinutes', sinceMinutes),
       nextToken,
       deploymentId: this.parseDeploymentId(deploymentId),
+      ...this.optionalEnvironment(environment),
     };
     return this.parseLogOrder(order) === 'desc'
       ? this.aiAppsService.getMemberLogsDesc(memberUid, uid, 'build', query)
@@ -379,7 +397,8 @@ export class AiAppsController {
     @Query('sinceMinutes') sinceMinutes?: string,
     @Query('nextToken') nextToken?: string,
     @Query('deploymentId') deploymentId?: string,
-    @Query('order') order?: string
+    @Query('order') order?: string,
+    @Query('environment') environment?: string
   ) {
     const memberUid = await this.resolveMemberUid(req);
     const query = {
@@ -387,6 +406,7 @@ export class AiAppsController {
       sinceMinutes: this.parsePositiveInt('sinceMinutes', sinceMinutes),
       nextToken,
       deploymentId: this.parseDeploymentId(deploymentId),
+      ...this.optionalEnvironment(environment),
     };
     return this.parseLogOrder(order) === 'desc'
       ? this.aiAppsService.getMemberLogsDesc(memberUid, uid, 'runtime', query)
@@ -406,7 +426,7 @@ export class AiAppsController {
   @UseGuards(AiAppTokenGuard)
   @UsePipes(ZodValidationPipe)
   async updateAppMetadataFromAgent(@Param('uid') uid: string, @Body() body: UpdateAppMetadataDto, @Req() req: any) {
-    return this.aiAppsService.updateMetadata(req.aiAppMemberUid, uid, body, true);
+    return this.aiAppsService.updateMetadata(req.aiAppMemberUid, uid, body, true, req.aiAppKeyScope);
   }
 
   /** Upload a Markdown or HTML PRD file from the dashboard without redeploying. */
@@ -430,9 +450,9 @@ export class AiAppsController {
   @Get(':uid/live')
   @UseGuards(UserTokenCheckGuard, RbacGuard)
   @RequirePermissions(READ)
-  async checkAppLive(@Param('uid') uid: string, @Req() req: any) {
+  async checkAppLive(@Param('uid') uid: string, @Req() req: any, @Query('environment') environment?: string) {
     const memberUid = await this.resolveMemberUid(req).catch(() => undefined);
-    return this.aiAppsService.checkAppLive(uid, memberUid);
+    return this.aiAppsService.checkAppLive(uid, memberUid, this.parseTargetEnvironment(environment) ?? 'prod');
   }
 
   /**
@@ -600,6 +620,49 @@ export class AiAppsController {
     return this.aiAppsService.deleteApp(memberUid, uid);
   }
 
+  @NoCache()
+  @Delete(':uid/deployments/:environment')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(WRITE)
+  async deleteTarget(
+    @Param('uid') uid: string,
+    @Param('environment') environment: string,
+    @Req() req: any
+  ) {
+    const memberUid = await this.resolveMemberUid(req);
+    const target = this.parseTargetEnvironment(environment);
+    if (!target) throw new BadRequestException('environment must be prod or dev');
+    return this.aiAppsService.deleteTarget(memberUid, uid, target);
+  }
+
+  @NoCache()
+  @Get(':uid/deploy-keys')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async listDeployKeys(@Param('uid') uid: string, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.listDeployKeys(memberUid, uid);
+  }
+
+  @NoCache()
+  @Post(':uid/deploy-keys')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(WRITE)
+  @UsePipes(ZodValidationPipe)
+  async createDeployKey(@Param('uid') uid: string, @Body() body: CreateAiAppDeployKeyDto, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.createDeployKey(memberUid, uid, body.environment);
+  }
+
+  @NoCache()
+  @Post(':uid/deploy-keys/:keyUid/revoke')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(WRITE)
+  async revokeDeployKey(@Param('uid') uid: string, @Param('keyUid') keyUid: string, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.revokeDeployKey(memberUid, uid, keyUid);
+  }
+
   /** Download the starter kit ZIP. Carries no token — the agent obtains a deploy credential at deploy time via the LabOS connect flow. */
   @NoCache()
   @Get('starter-kit/download')
@@ -630,7 +693,7 @@ export class AiAppsController {
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: AI_APPS_MAX_ZIP_BYTES } }))
   @UsePipes(ZodValidationPipe)
   async deploy(@Req() req: any, @Body() body: DeployAppDto, @UploadedFile() file: Express.Multer.File) {
-    return this.aiAppsService.deploy(req.aiAppMemberUid, body, file, req.aiAppClientName);
+    return this.aiAppsService.deploy(req.aiAppMemberUid, body, file, req.aiAppClientName, req.aiAppKeyScope);
   }
 
   /**
@@ -646,7 +709,7 @@ export class AiAppsController {
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: AI_APPS_MAX_ZIP_BYTES } }))
   @UsePipes(ZodValidationPipe)
   async registerDraft(@Req() req: any, @Body() body: RegisterDraftDto, @UploadedFile() file: Express.Multer.File) {
-    return this.aiAppsService.registerDraft(req.aiAppMemberUid, body, file, req.aiAppClientName);
+    return this.aiAppsService.registerDraft(req.aiAppMemberUid, body, file, req.aiAppClientName, req.aiAppKeyScope);
   }
 
   /**
@@ -662,7 +725,18 @@ export class AiAppsController {
   @UsePipes(ZodValidationPipe)
   async deployDraft(@Param('uid') uid: string, @Body() body: DeployDraftDto, @Req() req: any) {
     const memberUid = await this.resolveMemberUid(req);
-    return this.aiAppsService.deployDraft(memberUid, uid, body.secrets);
+    return this.aiAppsService.deployDraft(memberUid, uid, body.secrets, body.environment ?? 'prod');
+  }
+
+  private parseTargetEnvironment(value?: string): 'prod' | 'dev' | undefined {
+    if (value === undefined || value === '') return undefined;
+    if (value === 'prod' || value === 'dev') return value;
+    throw new BadRequestException('environment must be prod or dev');
+  }
+
+  private optionalEnvironment(value?: string): { environment?: 'prod' | 'dev' } {
+    const environment = this.parseTargetEnvironment(value);
+    return environment ? { environment } : {};
   }
 
   /** Parse an optional numeric query param, 400ing on anything but a positive integer. */

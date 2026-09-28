@@ -3,6 +3,10 @@ import { BadRequestException, ForbiddenException, NotFoundException, RequestMeth
 import { GUARDS_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 
 jest.mock('axios', () => ({ isAxiosError: jest.fn(() => false), post: jest.fn(), get: jest.fn() }));
+jest.mock('./ai-apps.constants', () => ({
+  ...jest.requireActual('./ai-apps.constants'),
+  AI_APPS_S3_BUCKET: 'test-bucket',
+}));
 jest.mock('../push-notifications/push-notifications.service', () => ({
   PushNotificationsService: jest.fn().mockImplementation(() => ({ create: jest.fn() })),
 }));
@@ -292,7 +296,7 @@ describe('per-app reads for a non-allowed member', () => {
     await expect(controller.listEvents(req, 'app-private')).rejects.toThrow(ForbiddenException);
     expect(aiAppsService.listEvents).not.toHaveBeenCalled();
     await controller.checkAppLive('app-private', req);
-    expect(aiAppsService.checkAppLive).toHaveBeenCalledWith('app-private', VIEWER);
+    expect(aiAppsService.checkAppLive).toHaveBeenCalledWith('app-private', VIEWER, 'prod');
   });
 });
 

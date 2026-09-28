@@ -11,6 +11,13 @@ import { EnvVarNameSchema } from './register-draft.dto';
  */
 export const DeployDraftSchema = z.object({
   secrets: z.record(EnvVarNameSchema, z.string().min(1).max(10000)).optional(),
+  environment: z.enum(['prod', 'dev']).optional(),
 });
 
 export class DeployDraftDto extends createZodDto(DeployDraftSchema) {}
+
+export const CreateAiAppDeployKeySchema = z.object({
+  environment: z.enum(['prod', 'dev']),
+});
+
+export class CreateAiAppDeployKeyDto extends createZodDto(CreateAiAppDeployKeySchema) {}

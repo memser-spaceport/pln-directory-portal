@@ -151,7 +151,15 @@ export type AiAppLogPhase = 'build' | 'runtime';
  * is returned, so a redeploy never hides the previous pods' output.
  * `deploymentId` narrows the result to one deployment's pods.
  */
-export type AiAppLogsQuery = { limit?: number; sinceMinutes?: number; nextToken?: string; deploymentId?: string };
+export type AiAppTargetEnvironment = 'prod' | 'dev';
+
+export type AiAppLogsQuery = {
+  limit?: number;
+  sinceMinutes?: number;
+  nextToken?: string;
+  deploymentId?: string;
+  environment?: AiAppTargetEnvironment;
+};
 
 /** Shape of a runner deploymentId — the API's ids on `/deploy` and the runner's `deploy-<ts>-<rand>` ids. */
 export const AI_APPS_LOG_DEPLOYMENT_ID_PATTERN = /^[A-Za-z0-9._-]{1,128}$/;
@@ -216,13 +224,36 @@ export const buildAppS3Key = (appId: string, deploymentId: string): string => `a
  */
 export const AI_APPS_APP_DOMAIN = process.env.AI_APPS_APP_DOMAIN || 'os.pl.xyz';
 
+function safeAppLabel(value: string) {
+  const name = value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '');
+  return name || 'app';
+}
+
+/**
+ * Prod release name stays `appId`. Dev is `{appId}-dev`, with the suffix kept
+ * inside Helm's 53-character release-name limit. Must match the orchestrator.
+ */
+export const releaseNameForTarget = (appId: string, environment: AiAppTargetEnvironment = 'prod'): string => {
+  const base = safeAppLabel(appId);
+  if (environment !== 'dev') return base.slice(0, 53).replace(/-+$/g, '');
+  const suffix = '-dev';
+  return `${base.slice(0, 53 - suffix.length).replace(/-+$/g, '')}${suffix}`;
+};
+
 /**
  * The sandbox host/URL for an app is deterministic from its appId, so we can
- * compute it up front (before the runner responds): <appId>.<AI_APPS_APP_DOMAIN>
+ * compute it up front (before the runner responds).
+ * Prod: <appId>.<domain>. Dev: <appId>-dev.<domain>.
  */
-export const buildAppHost = (appId: string): string => `${appId}.${AI_APPS_APP_DOMAIN}`;
-export const buildAppUrl = (appId: string): string => `https://${buildAppHost(appId)}`;
-export const buildAppHttpUrl = (appId: string): string => `http://${buildAppHost(appId)}`;
+export const buildAppHost = (appId: string, environment: AiAppTargetEnvironment = 'prod'): string => {
+  const suffix = environment === 'dev' ? '-dev' : '';
+  const label = `${safeAppLabel(appId)}${suffix}`.slice(0, 63).replace(/-+$/g, '');
+  return `${label}.${AI_APPS_APP_DOMAIN}`;
+};
+export const buildAppUrl = (appId: string, environment: AiAppTargetEnvironment = 'prod'): string =>
+  `https://${buildAppHost(appId, environment)}`;
+export const buildAppHttpUrl = (appId: string, environment: AiAppTargetEnvironment = 'prod'): string =>
+  `http://${buildAppHost(appId, environment)}`;
 
 /**
  * Public base URL of THIS API. The agent-facing endpoint URLs written into the

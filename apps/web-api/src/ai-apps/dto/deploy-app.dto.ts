@@ -75,6 +75,14 @@ export const DeployAppSchema = z.object({
     .max(100)
     .regex(/^[a-zA-Z0-9][a-zA-Z0-9-]*$/, 'deploymentId must be alphanumeric and hyphens'),
   /**
+   * Deploy target. Omitted means prod, so agents that predate dev keep shipping there.
+   * A deployment key still rejects a target that doesn't match the key.
+   */
+  environment: z.preprocess(
+    (value) => (typeof value === 'string' ? value.trim().toLowerCase() || undefined : value),
+    z.enum(['prod', 'dev']).optional()
+  ),
+  /**
    * Starter-kit version the agent deployed with (from `pln-app.config.json`,
    * sent by kits ≥1.4). Optional so older kits keep working; stored on the app
    * for debugging.

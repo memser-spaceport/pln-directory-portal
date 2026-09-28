@@ -87,6 +87,7 @@ describe('AiAppsService.getAgentLogs', () => {
     expect(config?.params).toEqual({
       limit: 100,
       sinceMinutes: 60,
+      environment: 'prod',
       nextToken: 'prev-tok',
       deploymentId: 'deploy-20260909-abc123',
     });
@@ -100,7 +101,7 @@ describe('AiAppsService.getAgentLogs', () => {
 
     const [url, config] = mockedAxios.get.mock.calls[0];
     expect(url).toContain('/v1/apps/demo/runtime/logs');
-    expect(config?.params).toEqual({});
+    expect(config?.params).toEqual({ environment: 'prod' });
   });
 
   it('maps runner failures to 502 without leaking the raw error', async () => {
@@ -129,20 +130,32 @@ describe('AiAppsController log routes wiring', () => {
     const req = { aiAppMemberUid: 'creator-1' };
 
     await controller.getBuildLogs('app-1', req, '100', '60', 'tok', 'deploy-1');
-    expect(service.getAgentLogs).toHaveBeenCalledWith('creator-1', 'app-1', 'build', {
-      limit: 100,
-      sinceMinutes: 60,
-      nextToken: 'tok',
-      deploymentId: 'deploy-1',
-    });
+    expect(service.getAgentLogs).toHaveBeenCalledWith(
+      'creator-1',
+      'app-1',
+      'build',
+      {
+        limit: 100,
+        sinceMinutes: 60,
+        nextToken: 'tok',
+        deploymentId: 'deploy-1',
+      },
+      undefined
+    );
 
     await controller.getRuntimeLogs('app-1', req, undefined, undefined, undefined, undefined);
-    expect(service.getAgentLogs).toHaveBeenLastCalledWith('creator-1', 'app-1', 'runtime', {
-      limit: undefined,
-      sinceMinutes: undefined,
-      nextToken: undefined,
-      deploymentId: undefined,
-    });
+    expect(service.getAgentLogs).toHaveBeenLastCalledWith(
+      'creator-1',
+      'app-1',
+      'runtime',
+      {
+        limit: undefined,
+        sinceMinutes: undefined,
+        nextToken: undefined,
+        deploymentId: undefined,
+      },
+      undefined
+    );
   });
 
   it('400s on a malformed deploymentId before it reaches the runner URL', async () => {

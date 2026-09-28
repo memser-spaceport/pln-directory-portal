@@ -3703,6 +3703,62 @@ model AiApp {
   @@index([status])
 }
 
+enum AiAppTargetEnvironment {
+  prod
+  dev
+}
+
+/// One deploy target of an AiApp. Prod mirrors the historical single deployment.
+/// Dev is a second build, URL, secret set, and database on the same app.
+model AiAppTarget {
+  id                   Int                     @id @default(autoincrement())
+  uid                  String                  @unique @default(cuid())
+  /// AiApp.uid (no FK relation, matching the other AI App tables).
+  appUid               String
+  environment          AiAppTargetEnvironment
+  status               AiAppStatus             @default(IN_DEVELOPMENT)
+  notes                String?
+  url                  String?
+  httpUrl              String?
+  host                 String?
+  port                 Int?
+  deploymentId         String?
+  s3Key                String?
+  requiredEnvVars      String[]                @default([])
+  providedEnvVars      String[]                @default([])
+  kitVersion           String?
+  agentClient          String?
+  agentModel           String?
+  lastDeployedAt       DateTime?
+  failureStream        String?
+  database             Json?
+  directLinkGateReady  Boolean                 @default(false)
+  publicPathsGateReady Boolean                 @default(false)
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+
+  @@unique([appUid, environment])
+  @@index([appUid])
+}
+
+/// Long-lived deploy credential minted in LabOS. The full token is shown once;
+/// only its hash is stored. Scoped to one app and one environment.
+model AiAppDeployKey {
+  id           Int                     @id @default(autoincrement())
+  uid          String                  @unique @default(cuid())
+  appUid       String
+  environment  AiAppTargetEnvironment
+  tokenHash    String                  @unique
+  /// Non-secret prefix shown in the key list (`plndeploy_ab12…`).
+  tokenPrefix  String
+  createdByUid String
+  revokedAt    DateTime?
+  lastUsedAt   DateTime?
+  createdAt    DateTime                @default(now())
+
+  @@index([appUid])
+}
+
 /// Whitelist of a PRIVATE app: members (besides the owner and directory
 /// admins) who may find and open it. Kept while the app is OPEN so switching
 /// back restores it.
