@@ -44,7 +44,13 @@ import { DeployAppDto } from './dto/deploy-app.dto';
 import { RegisterDraftDto } from './dto/register-draft.dto';
 import { CreateAiAppDeployKeyDto, DeployDraftDto } from './dto/deploy-draft.dto';
 import { StartConnectDto } from './dto/start-connect.dto';
-import { AppSessionRequestDto, RedeemAppSessionCodeDto } from './dto/app-session.dto';
+import {
+  AppSessionRequestDto,
+  RedeemAppSessionCodeDto,
+  RefreshAuthGatesDto,
+  RollbackAuthGateDto,
+} from './dto/app-session.dto';
+import { AiAppsAuthGateService } from './ai-apps-auth-gate.service';
 import { PollConnectDto } from './dto/poll-connect.dto';
 import { SubmitFeedbackDto } from './dto/submit-feedback.dto';
 import { UpdateFeedbackStatusDto } from './dto/update-feedback-status.dto';
@@ -79,7 +85,8 @@ export class AiAppsController {
     private readonly starterKitService: AiAppsStarterKitService,
     private readonly rbacService: RbacService,
     private readonly accessService: AiAppsAccessService,
-    private readonly sessionService: AiAppsSessionService
+    private readonly sessionService: AiAppsSessionService,
+    private readonly authGateService: AiAppsAuthGateService
   ) {}
 
   /**
@@ -175,6 +182,40 @@ export class AiAppsController {
   async revokeAppSessions(@Req() req: any) {
     const memberUid = await this.resolveMemberUid(req);
     return { revoked: await this.sessionService.revokeAllForMember(memberUid) };
+  }
+
+  /** Fleet auth-gate state for the silent migration (directory admin). Declared before `:uid` routes. */
+  @NoCache()
+  @Get('admin/auth-gate')
+  @UseGuards(UserTokenCheckGuard)
+  async listAuthGates(@Req() req: any) {
+    await this.assertDirectoryAdmin(req);
+    return { targets: await this.authGateService.listFleet() };
+  }
+
+  /**
+   * Refreshes the auth gate of eligible app targets, one at a time, verifying each and rolling it back on any
+   * mismatch (directory admin). Owners see nothing: no status, event or notification changes.
+   */
+  @NoCache()
+  @Post('admin/auth-gate/refresh')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(UserTokenCheckGuard)
+  @UsePipes(ZodValidationPipe)
+  async refreshAuthGates(@Body() body: RefreshAuthGatesDto, @Req() req: any) {
+    await this.assertDirectoryAdmin(req);
+    return { outcomes: await this.authGateService.refreshBatch(body) };
+  }
+
+  /** Rolls one app target back to its revision before the last gate refresh (directory admin). */
+  @NoCache()
+  @Post('admin/auth-gate/:uid/rollback')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(UserTokenCheckGuard)
+  @UsePipes(ZodValidationPipe)
+  async rollbackAuthGate(@Param('uid') uid: string, @Body() body: RollbackAuthGateDto, @Req() req: any) {
+    await this.assertDirectoryAdmin(req);
+    return this.authGateService.rollbackOne(uid, body.target);
   }
 
   /**
@@ -831,6 +872,13 @@ export class AiAppsController {
       throw new BadRequestException('deploymentId must be 1-128 characters of letters, digits, ".", "_" or "-"');
     }
     return value;
+  }
+
+  private async assertDirectoryAdmin(req: any): Promise<void> {
+    const memberUid = await this.resolveMemberUid(req);
+    if (!(await this.authGateService.isDirectoryAdmin(memberUid))) {
+      throw new ForbiddenException('Only a directory admin can manage the auth gate rollout');
+    }
   }
 
   private async resolveMemberUid(req: any): Promise<string> {

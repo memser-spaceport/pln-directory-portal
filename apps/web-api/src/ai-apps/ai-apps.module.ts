@@ -10,6 +10,7 @@ import { AiAppsService } from './ai-apps.service';
 import { AiAppsAccessService } from './ai-apps-access.service';
 import { AiAppsConnectService } from './ai-apps-connect.service';
 import { AiAppsSessionService } from './ai-apps-session.service';
+import { AiAppsAuthGateService } from './ai-apps-auth-gate.service';
 import { AiAppsStarterKitService } from './ai-apps-starter-kit.service';
 import { AiAppTokenGuard } from './guards/ai-app-token.guard';
 
@@ -21,6 +22,7 @@ import { AiAppTokenGuard } from './guards/ai-app-token.guard';
     AiAppsAccessService,
     AiAppsConnectService,
     AiAppsSessionService,
+    AiAppsAuthGateService,
     AiAppsStarterKitService,
     AiAppTokenGuard,
     AwsService,

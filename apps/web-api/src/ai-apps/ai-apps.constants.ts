@@ -72,6 +72,9 @@ export const AI_APPS_SESSION_TOUCH_MS = 5 * 60 * 1000;
 /** A sign-in code must be redeemed within this window, once. */
 export const AI_APPS_SESSION_CODE_TTL_MS = 60 * 1000;
 
+/** Auth gate (sidecar) version the fleet rollout migrates every app to. */
+export const AI_APPS_AUTH_GATE_CURRENT_VERSION = 2;
+
 /** Suggested poll interval (seconds) the agent waits between connect polls. */
 export const AI_APPS_CONNECT_POLL_INTERVAL_SEC = 3;
 

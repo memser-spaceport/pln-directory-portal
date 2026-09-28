@@ -19,3 +19,18 @@ export const RedeemAppSessionCodeSchema = z.object({
   target: TargetSchema,
 });
 export class RedeemAppSessionCodeDto extends createZodDto(RedeemAppSessionCodeSchema) {}
+
+/** `POST /v1/ai-apps/admin/auth-gate/refresh` (directory admin). */
+export const RefreshAuthGatesSchema = z.object({
+  appUids: z.array(z.string().min(1)).max(200).optional(),
+  target: z.enum(['prod', 'dev']).optional(),
+  batchSize: z.number().int().positive().max(200).optional(),
+  dryRun: z.boolean().default(false),
+  maxFailures: z.number().int().positive().max(50).default(1),
+  gateOverrides: z.record(z.unknown()).optional(),
+});
+export class RefreshAuthGatesDto extends createZodDto(RefreshAuthGatesSchema) {}
+
+/** `POST /v1/ai-apps/admin/auth-gate/:uid/rollback` (directory admin). */
+export const RollbackAuthGateSchema = z.object({ target: TargetSchema });
+export class RollbackAuthGateDto extends createZodDto(RollbackAuthGateSchema) {}

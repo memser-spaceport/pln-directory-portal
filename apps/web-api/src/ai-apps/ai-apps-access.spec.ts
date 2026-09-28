@@ -288,7 +288,15 @@ describe('per-app reads for a non-allowed member', () => {
       checkAppLive: jest.fn().mockResolvedValue({ live: true }),
       listEvents: jest.fn(),
     };
-    const controller = new AiAppsController(aiAppsService as any, {} as any, {} as any, {} as any, {} as any, {} as any);
+    const controller = new AiAppsController(
+      aiAppsService as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
     const req = { memberUid: VIEWER };
 
     await expect(controller.getAppEvents('app-private', req)).rejects.toThrow(ForbiddenException);
@@ -745,7 +753,15 @@ describe('sidecar access check with public paths (controller)', () => {
   function buildController(apps: Row[] = [PUBLIC_PRIVATE_APP, OPEN_APP]) {
     const { accessService, prisma } = buildServices(buildPrisma(apps));
     const rbacService = { findMemberByEmail: jest.fn(async (email: string) => ({ uid: email.split('@')[0] })) };
-    const controller = new AiAppsController({} as any, {} as any, {} as any, rbacService as any, accessService, {} as any);
+    const controller = new AiAppsController(
+      {} as any,
+      {} as any,
+      {} as any,
+      rbacService as any,
+      accessService,
+      {} as any,
+      {} as any
+    );
     return { controller, prisma };
   }
   const anonymous = (): Row => ({ headers: {}, cookies: {} });
@@ -904,7 +920,8 @@ describe('sidecar access check with an app session (controller)', () => {
       {} as any,
       rbacService as any,
       accessService,
-      sessionService as any
+      sessionService as any,
+      {} as any
     );
     return { controller, sessionService };
   }
