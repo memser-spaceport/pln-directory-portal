@@ -16,7 +16,7 @@ import 'reflect-metadata';
 import { PATH_METADATA, METHOD_METADATA, GUARDS_METADATA } from '@nestjs/common/constants';
 import { RequestMethod } from '@nestjs/common';
 import { AiAppsController } from './ai-apps.controller';
-import { UserAccessTokenValidateGuard } from '../guards/user-access-token-validate.guard';
+import { AiAppMemberContextGuard } from './guards/ai-app-member-context.guard';
 import { RbacGuard } from '../rbac/rbac.guard';
 import { RBAC_PERMISSIONS_KEY } from '../rbac/rbac.decorator';
 import { AI_APPS_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
@@ -45,8 +45,8 @@ describe('AiAppsController GET /me wiring', () => {
     expect(methods.indexOf('getMemberContext')).toBeLessThan(methods.indexOf('getApp'));
   });
 
-  it('uses the cookie-or-bearer token guard plus RBAC', () => {
-    expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toEqual([UserAccessTokenValidateGuard, RbacGuard]);
+  it('uses the member-context guard (app session or cookie-or-bearer LabOS token) plus RBAC', () => {
+    expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toEqual([AiAppMemberContextGuard, RbacGuard]);
   });
 
   it('requires AI Apps read (or write) permission', () => {

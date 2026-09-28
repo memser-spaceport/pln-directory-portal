@@ -291,6 +291,8 @@ export class AiAppsService {
   async trackAppEvent(params: {
     origin: string | undefined;
     token: string | undefined;
+    /** Member of a verified app session token (the controller checked it against the request origin). */
+    sessionMemberUid?: string;
     anonId: string | undefined;
     event: string | undefined;
     properties: Record<string, unknown> | undefined;
@@ -310,7 +312,7 @@ export class AiAppsService {
       return;
     }
 
-    const memberUid = await this.resolveOptionalMemberUid(params.token);
+    const memberUid = params.sessionMemberUid ?? (await this.resolveOptionalMemberUid(params.token));
     const distinctId = memberUid ?? (params.anonId && AI_APP_ANON_ID_REGEX.test(params.anonId) ? params.anonId : null);
     if (!distinctId) {
       return;

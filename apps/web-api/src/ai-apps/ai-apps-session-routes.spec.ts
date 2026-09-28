@@ -53,3 +53,40 @@ describe('AiAppsController app-session routes', () => {
     }
   });
 });
+
+describe('POST /track with an app session token', () => {
+  const jwt = jest.requireActual('jsonwebtoken');
+  const appToken = jwt.sign({ iss: 'pln-ai-apps-session', aud: 'foo', uid: 'm-1' }, 'k');
+
+  function build(authenticated: { memberUid: string; appId: string } | null) {
+    const aiAppsService = { trackAppEvent: jest.fn().mockResolvedValue(undefined) };
+    const sessionService = { authenticateAppRequest: jest.fn().mockResolvedValue(authenticated) };
+    const controller = new AiAppsController(
+      aiAppsService as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      sessionService as any
+    );
+    return { controller, aiAppsService, sessionService };
+  }
+  const req = (origin: string) => ({ headers: { authorization: `Bearer ${appToken}`, origin }, cookies: {} } as any);
+
+  it('attributes the event to the session member and never forwards the token for introspection', async () => {
+    const { controller, aiAppsService, sessionService } = build({ memberUid: 'm-1', appId: 'foo' });
+    await controller.trackEvent({ event: 'clicked' } as any, req('https://foo.os.pl.xyz'));
+    expect(sessionService.authenticateAppRequest).toHaveBeenCalledWith(appToken, 'https://foo.os.pl.xyz');
+    expect(aiAppsService.trackAppEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionMemberUid: 'm-1', token: undefined })
+    );
+  });
+
+  it('records the event unattributed when the session does not match the origin', async () => {
+    const { controller, aiAppsService } = build(null);
+    await controller.trackEvent({ event: 'clicked' } as any, req('https://bar.os.pl.xyz'));
+    expect(aiAppsService.trackAppEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionMemberUid: undefined, token: undefined })
+    );
+  });
+});

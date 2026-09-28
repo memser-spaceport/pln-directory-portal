@@ -18,6 +18,7 @@ import {
   UseGuards,
   UseInterceptors,
   UsePipes,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiConsumes } from '@nestjs/swagger';
@@ -26,7 +27,7 @@ import { ZodValidationPipe } from '@abitia/zod-dto';
 import { Request, Response } from 'express';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
-import { UserAccessTokenValidateGuard, validateUserAccessToken } from '../guards/user-access-token-validate.guard';
+import { validateUserAccessToken } from '../guards/user-access-token-validate.guard';
 import { extractTokenFromRequest } from '../utils/auth';
 import { RequirePermissions } from '../rbac/rbac.decorator';
 import { RbacGuard } from '../rbac/rbac.guard';
@@ -35,9 +36,10 @@ import { AI_APPS_PERMISSIONS } from '../access-control-v2/access-control-v2.cons
 import { AiAppsService } from './ai-apps.service';
 import { AiAppsAccessService } from './ai-apps-access.service';
 import { AiAppsConnectService } from './ai-apps-connect.service';
-import { AiAppsSessionService } from './ai-apps-session.service';
+import { AiAppsSessionService, isAiAppSessionToken } from './ai-apps-session.service';
 import { AiAppsStarterKitService } from './ai-apps-starter-kit.service';
 import { AiAppTokenGuard } from './guards/ai-app-token.guard';
+import { AiAppMemberContextGuard } from './guards/ai-app-member-context.guard';
 import { DeployAppDto } from './dto/deploy-app.dto';
 import { RegisterDraftDto } from './dto/register-draft.dto';
 import { CreateAiAppDeployKeyDto, DeployDraftDto } from './dto/deploy-draft.dto';
@@ -55,6 +57,7 @@ import {
   UpdateAiAppPublicPathsDto,
 } from './dto/ai-app-access.dto';
 import {
+  AI_APP_SESSION_HEADER,
   AI_APPS_LOG_DEPLOYMENT_ID_PATTERN,
   AI_APPS_MAX_PRD_BYTES,
   AI_APPS_MAX_ZIP_BYTES,
@@ -242,7 +245,7 @@ export class AiAppsController {
   @NoCache()
   @Throttle(AI_APPS_SIDECAR_THROTTLE_LIMIT, AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS)
   @Get('me')
-  @UseGuards(UserAccessTokenValidateGuard, RbacGuard)
+  @UseGuards(AiAppMemberContextGuard, RbacGuard)
   @RequirePermissions(READ)
   async getMemberContext(@Req() req: any) {
     const memberUid = await this.resolveMemberUid(req);
@@ -263,9 +266,15 @@ export class AiAppsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @UsePipes(ZodValidationPipe)
   async trackEvent(@Body() body: TrackEventDto, @Req() req: Request) {
+    const token = extractTokenFromRequest(req);
+    // An app session token attributes the event to its member only when it is live for the app it came from.
+    const session = isAiAppSessionToken(token)
+      ? await this.sessionService.authenticateAppRequest(token as string, req.headers.origin)
+      : null;
     await this.aiAppsService.trackAppEvent({
       origin: req.headers.origin,
-      token: extractTokenFromRequest(req),
+      token: isAiAppSessionToken(token) ? undefined : token,
+      sessionMemberUid: session?.memberUid,
       anonId: body.anonId,
       event: body.event,
       properties: body.properties as Record<string, unknown> | undefined,
@@ -281,8 +290,9 @@ export class AiAppsController {
    * Otherwise the session is required: 200 = serve; 401 = not signed in; 403 =
    * missing the PL Infra permission (`reason: 'permission'`) or a private app
    * the member may not open (`reason: 'private'`). Accepts the Bearer header
-   * or the LabOS `authToken` cookie, like `/me`. Declared before `:uid` so the
-   * literal path wins.
+   * or the LabOS `authToken` cookie, like `/me`, or the auth gate's app session in
+   * `X-AI-App-Session` (valid only for its own appId; same permission and access
+   * rule as a LabOS token). Declared before `:uid` so the literal path wins.
    */
   @NoCache()
   @Throttle(AI_APPS_SIDECAR_THROTTLE_LIMIT, AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS)
@@ -292,6 +302,14 @@ export class AiAppsController {
     const app = await this.accessService.findAppForAccessCheck(query.appId);
     if (this.accessService.isPublicPath(app, query.path)) {
       return { allowed: true, reason: 'public' };
+    }
+    const appSession = req.headers?.[AI_APP_SESSION_HEADER];
+    if (typeof appSession === 'string' && appSession) {
+      const session = await this.sessionService.validate(query.appId, appSession);
+      if (!session) {
+        throw new UnauthorizedException('Invalid or expired app session');
+      }
+      return this.accessService.checkAccess(session.memberUid, query.appId, query.method, { app });
     }
     await validateUserAccessToken(req);
     const memberUid = await this.resolveMemberUid(req);

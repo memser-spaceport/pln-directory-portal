@@ -288,7 +288,7 @@ describe('per-app reads for a non-allowed member', () => {
       checkAppLive: jest.fn().mockResolvedValue({ live: true }),
       listEvents: jest.fn(),
     };
-    const controller = new AiAppsController(aiAppsService as any, {} as any, {} as any, {} as any, {} as any);
+    const controller = new AiAppsController(aiAppsService as any, {} as any, {} as any, {} as any, {} as any, {} as any);
     const req = { memberUid: VIEWER };
 
     await expect(controller.getAppEvents('app-private', req)).rejects.toThrow(ForbiddenException);
@@ -745,7 +745,7 @@ describe('sidecar access check with public paths (controller)', () => {
   function buildController(apps: Row[] = [PUBLIC_PRIVATE_APP, OPEN_APP]) {
     const { accessService, prisma } = buildServices(buildPrisma(apps));
     const rbacService = { findMemberByEmail: jest.fn(async (email: string) => ({ uid: email.split('@')[0] })) };
-    const controller = new AiAppsController({} as any, {} as any, {} as any, rbacService as any, accessService);
+    const controller = new AiAppsController({} as any, {} as any, {} as any, rbacService as any, accessService, {} as any);
     return { controller, prisma };
   }
   const anonymous = (): Row => ({ headers: {}, cookies: {} });
@@ -882,5 +882,83 @@ describe('access routes', () => {
     const names = Object.getOwnPropertyNames(proto);
     expect(names.indexOf('checkAccess')).toBeGreaterThan(-1);
     expect(names.indexOf('checkAccess')).toBeLessThan(names.indexOf('getApp'));
+  });
+});
+
+describe('sidecar access check with an app session (controller)', () => {
+  const PUBLIC_PRIVATE_APP = { ...PRIVATE_APP, publicPaths: ['/api/*'] };
+
+  /** Sessions are keyed `session:<appId>:<memberUid>` in this fake; anything else is invalid. */
+  function buildController(apps: Row[] = [PUBLIC_PRIVATE_APP, OPEN_APP]) {
+    const { accessService } = buildServices(buildPrisma(apps));
+    const rbacService = { findMemberByEmail: jest.fn(async (email: string) => ({ uid: email.split('@')[0] })) };
+    const sessionService = {
+      validate: jest.fn(async (appId: string, token: string) => {
+        const [kind, tokenAppId, memberUid] = token.split(':');
+        return kind === 'session' && tokenAppId === appId ? { memberUid } : null;
+      }),
+    };
+    const controller = new AiAppsController(
+      {} as any,
+      {} as any,
+      {} as any,
+      rbacService as any,
+      accessService,
+      sessionService as any
+    );
+    return { controller, sessionService };
+  }
+  const withSession = (token: string): Row => ({ headers: { 'x-ai-app-session': token }, cookies: {} });
+  const withLabosToken = (memberUid: string): Row => ({
+    headers: { authorization: `Bearer ${memberUid}` },
+    cookies: {},
+  });
+  const check = (controller: AiAppsController, query: Row, req: Row) =>
+    controller.checkAccess({ method: 'GET', ...query } as any, req);
+  const outcome = (p: Promise<unknown>) =>
+    p.then(
+      (v) => ({ ok: v }),
+      (e) => ({ status: e.status })
+    );
+
+  beforeEach(() => {
+    mockedAxios.post.mockReset();
+    mockedAxios.post.mockImplementation(async (_url: string, body: any) => ({
+      data: { active: true, email: `${body.token}@x.test`, sub: body.token },
+    }));
+  });
+
+  it.each([
+    ['owner on a PRIVATE app', 'secret-tool', OWNER],
+    ['non-whitelisted member on a PRIVATE app', 'secret-tool', VIEWER],
+    ['whitelisted member on a PRIVATE app', 'secret-tool', 'friend-1'],
+    ['any member on an OPEN app', 'open-tool', VIEWER],
+    ['an untracked appId', 'not-ours', VIEWER],
+  ])('decides the same as a LabOS token: %s', async (_label, appId, member) => {
+    const { controller } = buildController();
+    const viaSession = await outcome(
+      check(controller, { appId, path: '/dashboard' }, withSession(`session:${appId}:${member}`))
+    );
+    const viaToken = await outcome(check(controller, { appId, path: '/dashboard' }, withLabosToken(member)));
+    expect(viaSession).toEqual(viaToken);
+  });
+
+  it('401s a session issued for another app, without falling back to anything else', async () => {
+    const { controller } = buildController();
+    await expect(
+      check(controller, { appId: 'open-tool', path: '/x' }, withSession(`session:secret-tool:${OWNER}`))
+    ).rejects.toMatchObject({ status: 401 });
+    expect(mockedAxios.post).not.toHaveBeenCalled();
+  });
+
+  it('still decides public paths before reading the session', async () => {
+    const { controller, sessionService } = buildController();
+    await expect(
+      check(controller, { appId: 'secret-tool', path: '/api/items' }, withSession('garbage'))
+    ).resolves.toEqual({
+      allowed: true,
+      reason: 'public',
+    });
+    expect(sessionService.validate).not.toHaveBeenCalled();
   });
 });

@@ -55,6 +55,8 @@ export const AI_APPS_DEPLOY_TOKEN_TTL_MS = 60 * 60 * 1000;
  * behavior.
  */
 export const AI_APPS_SESSION_SECRET = process.env.AI_APPS_SESSION_SECRET || '';
+/** Header the auth gate uses to present an app session to access-check. */
+export const AI_APP_SESSION_HEADER = 'x-ai-app-session';
 /** `iss` of an app session token; how every guard tells it apart from a LabOS token. */
 export const AI_APPS_SESSION_ISSUER = 'pln-ai-apps-session';
 const positiveNumberFromEnv = (name: string, fallback: number) => {

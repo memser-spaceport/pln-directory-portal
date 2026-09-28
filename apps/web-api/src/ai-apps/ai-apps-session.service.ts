@@ -165,6 +165,26 @@ export class AiAppsSessionService {
     return { memberUid: row.memberUid };
   }
 
+  /** Whether a browser `Origin` belongs to the app (its prod or dev target). A missing origin (server call) passes. */
+  isAppOrigin(appId: string, origin: string | undefined): boolean {
+    if (!origin) return true;
+    return origin === buildAppUrl(appId, 'prod') || origin === buildAppUrl(appId, 'dev');
+  }
+
+  /**
+   * Member behind an app session token presented to an app-facing route (`/me`, `/track`): the token must be live
+   * for the app it names, and a browser `Origin` must be one of that app's own origins. Null otherwise.
+   */
+  async authenticateAppRequest(
+    token: string,
+    origin: string | undefined
+  ): Promise<{ memberUid: string; appId: string } | null> {
+    const appId = aiAppSessionTokenAppId(token);
+    if (!appId || !this.isAppOrigin(appId, origin)) return null;
+    const session = await this.validate(appId, token);
+    return session ? { ...session, appId } : null;
+  }
+
   /** LabOS sign-out: ends every app session of the member. */
   async revokeAllForMember(memberUid: string): Promise<number> {
     const result = await this.prisma.aiAppSession.updateMany({
