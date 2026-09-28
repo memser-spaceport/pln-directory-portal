@@ -21,6 +21,7 @@ import { MembersModule } from './members/members.module';
 import { CommunityAffiliationsModule } from './community-affiliations/community-affiliations.module';
 import { MembershipSourcesModule } from './membership-sources/membership-sources.module';
 import { ContentTypeMiddleware } from './middlewares/content-type.middleware';
+import { AiAppSessionScopeMiddleware } from './ai-apps/ai-app-session-scope.middleware';
 import { ParticipantsRequestModule } from './participants-request/participants-request.module';
 import { SkillsModule } from './skills/skills.module';
 import { TeamsModule } from './teams/teams.module';
@@ -269,6 +270,15 @@ export class AppModule {
         { path: '*', method: RequestMethod.PUT },
         { path: '*', method: RequestMethod.PATCH }
       );
+
+    consumer
+      .apply(AiAppSessionScopeMiddleware)
+      .exclude(
+        { path: 'v1/ai-apps/me', method: RequestMethod.GET },
+        { path: 'v1/ai-apps/track', method: RequestMethod.POST },
+        { path: 'v1/ai-apps/access-check', method: RequestMethod.GET }
+      )
+      .forRoutes({ path: '*', method: RequestMethod.ALL });
 
     consumer
       .apply(MetricsMiddleware)
