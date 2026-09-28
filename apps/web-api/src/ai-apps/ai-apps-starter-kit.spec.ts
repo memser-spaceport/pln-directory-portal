@@ -1,7 +1,7 @@
 import AdmZip from 'adm-zip';
 
 import { AiAppsStarterKitService } from './ai-apps-starter-kit.service';
-import { AI_APPS_PORTAL_ORIGIN, AI_APPS_STARTER_KIT_VERSION, AI_APPS_RESERVED_APP_IDS } from './ai-apps.constants';
+import { AI_APPS_PORTAL_ORIGIN, AI_APPS_STARTER_KIT_VERSION } from './ai-apps.constants';
 
 describe('AiAppsStarterKitService buildZip', () => {
   let entries: Map<string, string>;
@@ -122,13 +122,20 @@ describe('AiAppsStarterKitService buildZip', () => {
     expect(deploySkill).toContain('clientName');
   });
 
-  it('lists every reserved appId in the deploy skill and explains the 400', () => {
+  it('explains reserved appIds without publishing the internal hostname list', () => {
     const deploySkill = entries.get('.claude/skills/deploy-to-labs/SKILL.md') as string;
-    for (const appId of AI_APPS_RESERVED_APP_IDS) {
-      expect(deploySkill).toContain(`\`${appId}\``);
-    }
     expect(deploySkill).toContain('400 Bad Request');
     expect(deploySkill).toContain('reserved for a');
+    // The reserved list stays out of the (public) kit; the API's 400 names the rejected ID. Only names with no
+    // legitimate place in a kit are checked: the API and portal hosts appear in its endpoint URLs.
+    for (const internal of [
+      'deployment-orchestrator-runner',
+      'notification-processor',
+      'notification-receiver',
+      'api-data-enrichment',
+    ]) {
+      expect(deploySkill).not.toContain(internal);
+    }
   });
 
   it('points the agent at the member-context skill from CLAUDE.md/AGENTS.md', () => {
