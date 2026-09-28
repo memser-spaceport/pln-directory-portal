@@ -17,6 +17,7 @@ import {
   AI_APPS_RUNTIME_LOGS_ENDPOINT,
   AI_APPS_STARTER_KIT_VERSION,
   AI_APPS_TAGS_ENDPOINT,
+  AI_APPS_RESERVED_APP_IDS,
 } from './ai-apps.constants';
 import { AI_APPS_MAX_TAGS_PER_APP, AI_APPS_OTHER_TAG, AI_APPS_TAGS } from './ai-apps-tags';
 import { AI_APPS_MAX_PUBLIC_PATHS } from './ai-apps-public-paths';
@@ -32,6 +33,12 @@ const DESIGN_SYSTEM_DIR = 'pl-design-system';
  * private API info. At deploy time the agent runs the LabOS connect flow to obtain
  * a short-lived deploy token.
  */
+/** Reserved appIds as the deploy skill lists them (same set the deploy endpoints enforce). */
+const RESERVED_APP_IDS_LIST = [...AI_APPS_RESERVED_APP_IDS]
+  .sort()
+  .map((appId) => `\`${appId}\``)
+  .join(', ');
+
 @Injectable()
 export class AiAppsStarterKitService {
   private readonly logger = new Logger(AiAppsStarterKitService.name);
@@ -1353,7 +1360,10 @@ connection string into the LabOS secrets page, same as an API key.
    config. \`appId\`s are **global across ALL PLN members** — the app's URL and
    infrastructure are derived from it — so pick something distinctive; a generic
    slug another member already claimed is rejected with \`409 Conflict\` at deploy
-   time (see step 7). Never edit \`kitVersion\` by hand.
+   time (see step 7). Some \`appId\`s are **reserved** because they are PLN platform
+   hostnames and are rejected with \`400 Bad Request\`: ${RESERVED_APP_IDS_LIST}. Never pick one of
+   them (a longer slug that merely contains one, like \`auth-demo\`, is fine). Never
+   edit \`kitVersion\` by hand.
 2. **Settle the display name, description & tags.** If \`appName\` in the config
    is empty (first deploy), load the **app-metadata** skill
    (\`.claude/skills/app-metadata/SKILL.md\`): propose a human-friendly name, a
@@ -1495,6 +1505,11 @@ connection string into the LabOS secrets page, same as an API key.
    - *"deploy is already in progress"* — a previous deploy for this app is still
      running (possibly one the member triggered from LabOS). Wait a minute and
      retry with the SAME \`appId\`.
+
+   **If the upload returns \`400 Bad Request\` saying the \`appId\` "is reserved for a
+   platform service"**, the slug is one of the reserved \`appId\`s from step 1. Pick a
+   different, more specific slug, update \`appId\` in \`pln-app.config.json\`, and
+   deploy again. Retrying the same \`appId\` always fails.
 
    **After the FIRST successful deploy**, offer the optional one-pager PRD —
    see "Offer the one-pager PRD" in the app-metadata skill. If the member wants

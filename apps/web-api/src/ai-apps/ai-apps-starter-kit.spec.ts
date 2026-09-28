@@ -1,7 +1,7 @@
 import AdmZip from 'adm-zip';
 
 import { AiAppsStarterKitService } from './ai-apps-starter-kit.service';
-import { AI_APPS_PORTAL_ORIGIN, AI_APPS_STARTER_KIT_VERSION } from './ai-apps.constants';
+import { AI_APPS_PORTAL_ORIGIN, AI_APPS_STARTER_KIT_VERSION, AI_APPS_RESERVED_APP_IDS } from './ai-apps.constants';
 
 describe('AiAppsStarterKitService buildZip', () => {
   let entries: Map<string, string>;
@@ -120,6 +120,15 @@ describe('AiAppsStarterKitService buildZip', () => {
     expect(deploySkill).toContain('kitVersion=');
     expect(deploySkill).toContain('agentModel=');
     expect(deploySkill).toContain('clientName');
+  });
+
+  it('lists every reserved appId in the deploy skill and explains the 400', () => {
+    const deploySkill = entries.get('.claude/skills/deploy-to-labs/SKILL.md') as string;
+    for (const appId of AI_APPS_RESERVED_APP_IDS) {
+      expect(deploySkill).toContain(`\`${appId}\``);
+    }
+    expect(deploySkill).toContain('400 Bad Request');
+    expect(deploySkill).toContain('reserved for a');
   });
 
   it('points the agent at the member-context skill from CLAUDE.md/AGENTS.md', () => {
