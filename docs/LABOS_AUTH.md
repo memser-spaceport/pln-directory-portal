@@ -85,8 +85,9 @@ The same cookie arrives on every request to the app. Read it from the
 it as `Authorization: Bearer`. Keep the token in memory for that request.
 Do not write it to logs, localStorage, a database, or any other service.
 
-`userInfo` is a separate LabOS cookie. Do not authorize from it. Identity
-comes from `/me`.
+`authToken` is the only LabOS cookie on the shared domain. `refreshToken` and
+`userInfo` are host-only on LabOS and never reach the app. Identity comes from
+`/me`.
 
 ## Response
 
@@ -133,8 +134,8 @@ Localhost has no LabOS cookie. Treat that the same as 401.
 
 - Call any other directory or auth endpoint. `/v1/ai-apps/me` is the only
   member API for this integration.
-- Gate on the raw cookie or on `userInfo`. A present cookie is not proof;
-  `/me` returning 200 is.
+- Gate on the raw cookie. A present cookie is not proof; `/me` returning 200
+  is.
 - Store, log, or forward the token or the member payload outside the app.
 - Assume every LabOS member can pass. Members without `ai_apps.read` or
   `ai_apps.write` get 403.

@@ -1353,7 +1353,9 @@ connection string into the LabOS secrets page, same as an API key.
    config. \`appId\`s are **global across ALL PLN members** — the app's URL and
    infrastructure are derived from it — so pick something distinctive; a generic
    slug another member already claimed is rejected with \`409 Conflict\` at deploy
-   time (see step 7). Never edit \`kitVersion\` by hand.
+   time (see step 7). Names of PLN platform services and generic infrastructure
+   words (e.g. \`www\`, \`api\`) are **reserved** and rejected with \`400 Bad Request\`, so
+   prefer a slug that describes this specific app. Never edit \`kitVersion\` by hand.
 2. **Settle the display name, description & tags.** If \`appName\` in the config
    is empty (first deploy), load the **app-metadata** skill
    (\`.claude/skills/app-metadata/SKILL.md\`): propose a human-friendly name, a
@@ -1495,6 +1497,11 @@ connection string into the LabOS secrets page, same as an API key.
    - *"deploy is already in progress"* — a previous deploy for this app is still
      running (possibly one the member triggered from LabOS). Wait a minute and
      retry with the SAME \`appId\`.
+
+   **If the upload returns \`400 Bad Request\` saying the \`appId\` "is reserved for a
+   platform service"**, the slug matches a reserved name (see step 1). Pick a
+   different, more specific slug, update \`appId\` in \`pln-app.config.json\`, and
+   deploy again. Retrying the same \`appId\` always fails.
 
    **After the FIRST successful deploy**, offer the optional one-pager PRD —
    see "Offer the one-pager PRD" in the app-metadata skill. If the member wants

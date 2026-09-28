@@ -122,6 +122,22 @@ describe('AiAppsStarterKitService buildZip', () => {
     expect(deploySkill).toContain('clientName');
   });
 
+  it('explains reserved appIds without publishing the internal hostname list', () => {
+    const deploySkill = entries.get('.claude/skills/deploy-to-labs/SKILL.md') as string;
+    expect(deploySkill).toContain('400 Bad Request');
+    expect(deploySkill).toContain('reserved for a');
+    // The reserved list stays out of the (public) kit; the API's 400 names the rejected ID. Only names with no
+    // legitimate place in a kit are checked: the API and portal hosts appear in its endpoint URLs.
+    for (const internal of [
+      'deployment-orchestrator-runner',
+      'notification-processor',
+      'notification-receiver',
+      'api-data-enrichment',
+    ]) {
+      expect(deploySkill).not.toContain(internal);
+    }
+  });
+
   it('points the agent at the member-context skill from CLAUDE.md/AGENTS.md', () => {
     for (const path of ['CLAUDE.md', 'AGENTS.md']) {
       const content = entries.get(path) as string;
