@@ -1,7 +1,7 @@
 import AdmZip from 'adm-zip';
 
 import { AiAppsStarterKitService } from './ai-apps-starter-kit.service';
-import { AI_APPS_PORTAL_ORIGIN, AI_APPS_STARTER_KIT_VERSION } from './ai-apps.constants';
+import { AI_APPS_BRIDGE_SCRIPT_URL, AI_APPS_PORTAL_ORIGIN, AI_APPS_STARTER_KIT_VERSION } from './ai-apps.constants';
 
 describe('AiAppsStarterKitService buildZip', () => {
   let entries: Map<string, string>;
@@ -97,6 +97,23 @@ describe('AiAppsStarterKitService buildZip', () => {
     }
   });
 
+  it('requires the LabOS bridge script, loaded from LabOS itself (kit 1.15)', () => {
+    expect(AI_APPS_BRIDGE_SCRIPT_URL).toBe(`${AI_APPS_PORTAL_ORIGIN}/ai-apps/bridge/v1.js`);
+    const tag = `<script src="${AI_APPS_BRIDGE_SCRIPT_URL}" defer></script>`;
+    for (const path of ['CLAUDE.md', 'AGENTS.md']) {
+      const doc = entries.get(path) as string;
+      expect(doc).toContain('LabOS bridge script (required)');
+      expect(doc).toContain(tag);
+      // Loaded, never vendored: fixes must reach apps without a redeploy.
+      expect(doc).toContain("don't download, bundle, or edit it");
+      // A CSP that forgets it silently turns the feature off.
+      expect(doc).toContain(`\`script-src\` must also allow\n    \`${AI_APPS_PORTAL_ORIGIN}\``);
+    }
+    // The placeholder app already carries it, so a first deploy is bridge-enabled.
+    const server = [...entries.entries()].find(([p]) => p.endsWith('server.js'))?.[1] ?? '';
+    expect(server).toContain(tag);
+  });
+
   it('tells the agent this data has no member-facing dashboard yet (no overpromising)', () => {
     const skill = entries.get('.claude/skills/app-analytics/SKILL.md') as string;
     expect(skill).toContain('no usage dashboard for their own app today');
@@ -139,7 +156,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('kit 1.14: member context comes from same-origin /_pln/me, with the Bearer fallback for older gates', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.14');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.15');
     const skill = entries.get('.claude/skills/pln-member-context/SKILL.md') as string;
     expect(skill).toContain("fetch('/_pln/me', { credentials: 'same-origin' })");
     expect(skill).toContain('res.status === 404');
@@ -431,7 +448,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('defaults apps to all PL Infra members and asks about private access before the first deploy (kit 1.13+)', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.14');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.15');
     const readme = entries.get('README.md') as string;
     expect(readme).toContain('New apps are open to **all PL Infra members**');
     expect(readme).toContain('**Manage access**');
@@ -451,7 +468,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('documents public endpoints and that the app must secure them (kit 1.13+)', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.14');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.15');
     const deploySkill = entries.get('.claude/skills/deploy-to-labs/SKILL.md') as string;
     expect(deploySkill).toContain('## Public endpoints (paths without LabOS sign-in)');
     expect(deploySkill).toContain(

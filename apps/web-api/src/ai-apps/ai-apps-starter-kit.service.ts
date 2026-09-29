@@ -8,6 +8,7 @@ import {
   AI_APPS_APP_DOMAIN,
   AI_APPS_PORTAL_ORIGIN,
   AI_APPS_APP_SETTINGS_ENDPOINT,
+  AI_APPS_BRIDGE_SCRIPT_URL,
   AI_APPS_BUILD_LOGS_ENDPOINT,
   AI_APPS_CONNECT_ENDPOINT,
   AI_APPS_DEPLOY_ENDPOINT,
@@ -302,7 +303,8 @@ folder. Before any UI work, load the **pl-design-system** skill
     pass \`frameguard: false\` to turn it off.)
   - If you set a \`Content-Security-Policy\`, its \`frame-ancestors\` MUST include
     \`'self' ${AI_APPS_PORTAL_ORIGIN}\`. Never use
-    \`frame-ancestors 'none'\`.
+    \`frame-ancestors 'none'\`. Its \`script-src\` must also allow
+    \`${AI_APPS_PORTAL_ORIGIN}\` for the LabOS bridge script (below).
   - The default scaffold sends neither header, so it already embeds fine — this
     only matters once you add \`helmet\`, a CSP, or other security headers.
 - **Deep links and tab title.** The dashboard mirrors your current page in its
@@ -312,6 +314,20 @@ folder. Before any UI work, load the **pl-design-system** skill
   the app-analytics snippet must stay in — as shipped: it reports the pathname
   and query string (never the hash) and posts them to the dashboard origin,
   not to \`'*'\`.
+- **LabOS bridge script (required).** Load it once on every page, in \`<head>\`:
+
+  \`\`\`html
+  <script src="${AI_APPS_BRIDGE_SCRIPT_URL}" defer></script>
+  \`\`\`
+
+  Next.js: put it in the root \`app/layout.tsx\` \`<head>\` as a plain
+  \`<script>\` tag (not \`next/script\` with a loading strategy). Plain HTML:
+  in every page's \`<head>\`. It lets members pin feedback to parts of the app
+  from the dashboard, with no screen sharing. It does nothing when the app is
+  opened outside the dashboard, talks only to \`${AI_APPS_PORTAL_ORIGIN}\`, and
+  never reads cookies, storage, or typed values. Load it from that exact URL —
+  don't download, bundle, or edit it — so fixes reach the app without a
+  redeploy. Apps without it still work; members just get the screenshot flow.
 
 ## Signed-in member context (personalization)
 The app can identify the PLN member using it. Load the **pln-member-context**
@@ -2216,7 +2232,7 @@ const port = process.env.PORT || 3000;
 app.get('/', (_req, res) => {
   res.send(\`
     <html>
-      <head><title>My PLN App</title></head>
+      <head><title>My PLN App</title><script src="${AI_APPS_BRIDGE_SCRIPT_URL}" defer></script></head>
       <body style="font-family: sans-serif; padding: 40px;">
         <h1>Hello from my PLN app</h1>
         <p>Edit app/server.js (or ask your AI agent to) and redeploy.</p>
