@@ -217,6 +217,34 @@ describe('AiAppsAuthGateService', () => {
     expect(outcomes.map((o) => o.result)).toEqual(['skipped', 'skipped']);
   });
 
+  it('skipped targets do not use up the batch, so the next target is still refreshed', async () => {
+    const { service } = build();
+    stubApp();
+    const refreshPost = mockedAxios.post.getMockImplementation()!;
+    mockedAxios.post.mockImplementation(async (url: string, ...rest: any[]) => {
+      if (url.includes('/apps/alpha/auth-gate/refresh')) {
+        throw { response: { status: 404, data: { error: 'release_not_found' } } };
+      }
+      return refreshPost(url, ...rest);
+    });
+
+    const outcomes = await service.refreshBatch({ batchSize: 1, maxFailures: 1 });
+
+    expect(outcomes.map((o) => [o.appId, o.result])).toEqual([
+      ['alpha', 'skipped'],
+      ['beta', 'refreshed'],
+    ]);
+  });
+
+  it('batchSize caps the targets actually refreshed', async () => {
+    const { service } = build();
+    stubApp();
+
+    const outcomes = await service.refreshBatch({ batchSize: 1 });
+
+    expect(outcomes.map((o) => [o.appId, o.result])).toEqual([['alpha', 'refreshed']]);
+  });
+
   it('skips an app that started deploying after the list was built', async () => {
     const { service } = build({ statusOverride: { 'app-1': 'DEPLOYING' } });
     stubApp();
