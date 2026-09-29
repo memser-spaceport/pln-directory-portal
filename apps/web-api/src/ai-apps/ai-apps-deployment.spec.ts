@@ -318,6 +318,37 @@ describe('deploy outcome writes', () => {
     expect(errorWrite(prisma)).toMatchObject({ status: 'ERROR', failureStream: null });
   });
 
+  it('a timeout where the app comes up records the gate version the live app reports', async () => {
+    const { service, prisma } = buildService({ ...APP, status: 'ERROR' });
+    const upsert = jest.fn().mockResolvedValue({});
+    (prisma as any).aiAppAuthGate = { upsert };
+    mockedAxios.post.mockRejectedValue({ isAxiosError: true, response: undefined, code: 'ECONNABORTED' });
+    mockedAxios.get.mockImplementation(async (url: string) =>
+      url.endsWith('/_pln/gate') ? { status: 200, data: { version: 2 } } : { status: 401, data: '' }
+    );
+
+    await service.deployDraft('creator-1', 'app-1', undefined);
+
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { appUid_environment: { appUid: 'app-1', environment: 'prod' } },
+        create: expect.objectContaining({ version: 2 }),
+      })
+    );
+  });
+
+  it('a timeout where a gate-v1 app comes up records no gate version', async () => {
+    const { service, prisma } = buildService({ ...APP, status: 'ERROR' });
+    const upsert = jest.fn().mockResolvedValue({});
+    (prisma as any).aiAppAuthGate = { upsert };
+    mockedAxios.post.mockRejectedValue({ isAxiosError: true, response: undefined, code: 'ECONNABORTED' });
+    mockedAxios.get.mockResolvedValue({ status: 401, data: 'Unauthorized' });
+
+    await service.deployDraft('creator-1', 'app-1', undefined);
+
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
   it('a secrets-injection failure is classified as a runtime failure', async () => {
     const { service, prisma } = buildService({
       ...APP,

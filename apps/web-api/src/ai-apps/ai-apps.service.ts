@@ -2540,6 +2540,8 @@ export class AiAppsService {
         throw new BadGatewayException('Failed to deploy app to the sandbox runner');
       }
       this.logger.log(`AI App ${app.appId} is live despite runner timeout — continuing`);
+      // The runner's response (which reports the gate version) never arrived: ask the live gate instead.
+      authGateVersion = await this.gateVersionServed(url);
     }
 
     // The build ran the app WITHOUT its secrets or database — redeploy the
@@ -2821,6 +2823,16 @@ export class AiAppsService {
    * becomes reachable within the verification window (~6 min by default — must
    * cover the pod-up → domain-registration gap, observed at 1–5 minutes).
    */
+  /** Auth gate version a live target reports on `/_pln/gate`; undefined for gate v1 (no such route) or no answer. */
+  private async gateVersionServed(url: string): Promise<number | undefined> {
+    try {
+      const res = await axios.get(`${url}/_pln/gate`, { timeout: 10000, validateStatus: () => true, maxRedirects: 0 });
+      return res.status === 200 && typeof res.data?.version === 'number' ? res.data.version : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
   private async verifyAppLive(url: string): Promise<boolean> {
     for (let attempt = 1; attempt <= AI_APPS_VERIFY_ATTEMPTS; attempt++) {
       try {
