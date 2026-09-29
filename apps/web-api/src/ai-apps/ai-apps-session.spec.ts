@@ -66,14 +66,14 @@ describe('AiAppsSessionService', () => {
 
   it('issues a code with the target origin and redeems it once for the same app and target', async () => {
     const { service } = build();
-    const { code, callbackOrigin } = await service.issueCode('m-1', 'foo', 'dev');
-    expect(callbackOrigin).toBe(buildAppUrl('foo', 'dev'));
-    expect(callbackOrigin).toMatch(/^https:\/\/foo-dev\./);
+    const { code, callbackOrigin } = await service.issueCode('m-1', 'foo', 'preview');
+    expect(callbackOrigin).toBe(buildAppUrl('foo', 'preview'));
+    expect(callbackOrigin).toMatch(/^https:\/\/foo-preview\./);
 
-    const grant = await service.redeemCode(code, 'foo', 'dev');
+    const grant = await service.redeemCode(code, 'foo', 'preview');
     expect(await service.validate('foo', grant.token)).toEqual({ memberUid: 'm-1' });
 
-    await expect(service.redeemCode(code, 'foo', 'dev')).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.redeemCode(code, 'foo', 'preview')).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('rejects a code redeemed for another app or target, and burns it', async () => {
@@ -83,7 +83,7 @@ describe('AiAppsSessionService', () => {
     await expect(service.redeemCode(a.code, 'foo', 'prod')).rejects.toBeInstanceOf(BadRequestException);
 
     const b = await service.issueCode('m-1', 'foo', 'prod');
-    await expect(service.redeemCode(b.code, 'foo', 'dev')).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.redeemCode(b.code, 'foo', 'preview')).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('rejects an expired code', async () => {

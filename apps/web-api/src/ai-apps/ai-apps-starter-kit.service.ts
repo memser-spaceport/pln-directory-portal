@@ -531,7 +531,7 @@ follow "Apps that need secrets" above instead of deploying directly. In short:
    \`pln-app.config.json\` or any file. Alternatively the member can generate a
    long-lived **deployment key** in LabOS (Deployment settings) and give it to
    you; send that key the same way, as \`${AI_APP_TOKEN_HEADER}\`. A key works
-   only for the app and environment it was created for (\`prod\` or \`dev\`).
+   only for the app and environment it was created for (\`prod\` or \`preview\`).
 4. Choose a stable, lowercase \`appId\` (e.g. \`my-leaderboard\`) and a fresh
    \`deploymentId\` for each deploy.
 5. Zip the **contents** of \`app/\` (so the \`Dockerfile\` sits at the root of the ZIP),
@@ -1438,7 +1438,7 @@ connection string into the LabOS secrets page, same as an API key.
      -F "description=<the approved appDescription from pln-app.config.json>" \\
      -F 'tags=<the approved appTags from pln-app.config.json as a JSON array, e.g. ["planning","network"]>' \\
      -F "deploymentId=<unique id per deploy, e.g. a timestamp>" \\
-     -F "environment=<prod or dev; omit to deploy prod>" \\
+     -F "environment=<prod or preview; omit to deploy prod>" \\
      -F "kitVersion=<the kitVersion from pln-app.config.json>" \\
      -F "agentModel=<the model you are running on, e.g. claude-sonnet-4-5; omit the field if unknown>" \\
      -F "access=<OPEN or PRIVATE — first deploy only, see step 2; omit on redeploys>" \\
@@ -1537,7 +1537,7 @@ curl -X POST "<draftEndpoint>" \\
   -F "description=<the approved appDescription from pln-app.config.json>" \\
   -F 'tags=<the approved appTags as a JSON array, e.g. ["planning","network"]>' \\
   -F "deploymentId=<unique id per upload, e.g. a timestamp>" \\
-  -F "environment=<prod or dev; omit to register the prod draft>" \\
+  -F "environment=<prod or preview; omit to register the prod draft>" \\
   -F "kitVersion=<the kitVersion from pln-app.config.json>" \\
   -F "agentModel=<the model you are running on; omit the field if unknown>" \\
   -F "access=<OPEN or PRIVATE — first upload only, see step 2; omit afterwards>" \\
@@ -1761,9 +1761,9 @@ errors or misbehaves. Log lines may include the app's URL/host — the
   key** is an alternative: the member generates it in Deployment settings, it does
   not expire until they revoke it, and it authorizes only that app and the
   environment printed next to it. Send it as \`${AI_APP_TOKEN_HEADER}\` exactly like
-  a connect token. Omit \`environment\` to target prod; send \`environment=dev\` to
-  target the persistent dev deployment (\`<appId>-dev.<domain>\`). Prod and dev
-  keep separate builds, secrets, and databases. A dev key rejects a prod deploy.
+  a connect token. Omit \`environment\` to target prod; send \`environment=preview\` to
+  target the persistent preview deployment (\`<appId>-preview.<domain>\`). Prod and preview
+  keep separate builds, secrets, and databases. A preview key rejects a prod deploy.
 - Runtime secrets are supported only through the draft flow above — the sandbox
   injects exactly the env vars the member provided in LabOS. Non-secret config
   should ship sensible defaults — see the migration checklist in \`AGENTS.md\`.

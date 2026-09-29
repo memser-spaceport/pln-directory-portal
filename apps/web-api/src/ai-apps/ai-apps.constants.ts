@@ -177,7 +177,19 @@ export type AiAppLogPhase = 'build' | 'runtime';
  * is returned, so a redeploy never hides the previous pods' output.
  * `deploymentId` narrows the result to one deployment's pods.
  */
-export type AiAppTargetEnvironment = 'prod' | 'dev';
+export type AiAppTargetEnvironment = 'prod' | 'preview';
+
+/** Maps the agent field onto a target. `dev` is the old name for preview. */
+export function coerceAppTarget(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  const raw = value.trim().toLowerCase();
+  if (!raw) return undefined;
+  return raw === 'dev' ? 'preview' : raw;
+}
+
+export function normalizeAppTarget(value: string | undefined | null): AiAppTargetEnvironment {
+  return coerceAppTarget(value) === 'preview' ? 'preview' : 'prod';
+}
 
 export type AiAppLogsQuery = {
   limit?: number;
@@ -312,23 +324,23 @@ function safeAppLabel(value: string) {
 }
 
 /**
- * Prod release name stays `appId`. Dev is `{appId}-dev`, with the suffix kept
+ * Prod release name stays `appId`. Preview is `{appId}-preview`, with the suffix kept
  * inside Helm's 53-character release-name limit. Must match the orchestrator.
  */
 export const releaseNameForTarget = (appId: string, environment: AiAppTargetEnvironment = 'prod'): string => {
   const base = safeAppLabel(appId);
-  if (environment !== 'dev') return base.slice(0, 53).replace(/-+$/g, '');
-  const suffix = '-dev';
+  if (environment !== 'preview') return base.slice(0, 53).replace(/-+$/g, '');
+  const suffix = '-preview';
   return `${base.slice(0, 53 - suffix.length).replace(/-+$/g, '')}${suffix}`;
 };
 
 /**
  * The sandbox host/URL for an app is deterministic from its appId, so we can
  * compute it up front (before the runner responds).
- * Prod: <appId>.<domain>. Dev: <appId>-dev.<domain>.
+ * Prod: <appId>.<domain>. Preview: <appId>-preview.<domain>.
  */
 export const buildAppHost = (appId: string, environment: AiAppTargetEnvironment = 'prod'): string => {
-  const suffix = environment === 'dev' ? '-dev' : '';
+  const suffix = environment === 'preview' ? '-preview' : '';
   const label = `${safeAppLabel(appId)}${suffix}`.slice(0, 63).replace(/-+$/g, '');
   return `${label}.${AI_APPS_APP_DOMAIN}`;
 };

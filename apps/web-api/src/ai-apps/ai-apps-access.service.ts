@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { AiApp, AiAppAccess } from '@prisma/client';
+import { AiAppTargetEnvironment } from './ai-apps.constants';
 import { PrismaService } from '../shared/prisma.service';
 import { RbacService } from '../rbac/rbac.service';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
@@ -23,6 +24,8 @@ export interface AiAppAccessSettings {
   /** False while the app still runs a sidecar that predates per-app decisions (see `AiApp.directLinkGateReady`). */
   directLinkGateReady: boolean;
   members: AiAppAllowedMemberInfo[];
+  /** Present on the top-level response only. Preview does not follow production access. */
+  preview?: Omit<AiAppAccessSettings, 'preview'>;
 }
 
 export interface AiAppAccessCandidate {
@@ -44,7 +47,7 @@ export interface AiAppPublicPathsSettings {
 export type AiAppAccessCheckResult = { allowed: true; reason?: 'untracked' | 'public' };
 
 /** The app row the sidecar decision needs, fetched once per `access-check` request. */
-export type AiAppAccessCheckApp = Pick<AiApp, 'uid' | 'memberUid' | 'access' | 'publicPaths'>;
+export type AiAppAccessCheckApp = Pick<AiApp, 'uid' | 'memberUid' | 'access' | 'publicPaths' | 'previewAccess'>;
 
 /** Either permission grants AI Apps visibility — the same `anyOf` the dashboard routes use. */
 const READ_PERMISSIONS = [AI_APPS_PERMISSIONS.READ, AI_APPS_PERMISSIONS.WRITE];
@@ -68,7 +71,8 @@ export class AiAppsAccessService {
 
   async getAccess(requesterUid: string, uid: string): Promise<AiAppAccessSettings> {
     const app = await this.findManageableApp(requesterUid, uid);
-    return this.toSettings(app);
+    const [prod, preview] = await Promise.all([this.toSettings(app, 'prod'), this.toSettings(app, 'preview')]);
+    return { ...prod, preview };
   }
 
   /**
@@ -81,11 +85,12 @@ export class AiAppsAccessService {
    */
   async updateAccess(requesterUid: string, uid: string, dto: UpdateAiAppAccessDto): Promise<AiAppAccessSettings> {
     const app = await this.findManageableApp(requesterUid, uid);
+    const environment: AiAppTargetEnvironment = dto.environment === 'preview' ? 'preview' : 'prod';
     const memberUids = Array.from(new Set(dto.memberUids)).filter((memberUid) => memberUid !== app.memberUid);
     await this.assertWhitelistable(memberUids);
 
     const existing = await this.prisma.aiAppAllowedMember.findMany({
-      where: { appUid: app.uid },
+      where: { appUid: app.uid, environment },
       select: { memberUid: true },
     });
     const existingUids = new Set(existing.map((row) => row.memberUid));
@@ -94,11 +99,17 @@ export class AiAppsAccessService {
     const added = memberUids.filter((memberUid) => !existingUids.has(memberUid));
 
     const [updated] = await this.prisma.$transaction([
-      this.prisma.aiApp.update({ where: { uid: app.uid }, data: { access: dto.access } }),
-      this.prisma.aiAppAllowedMember.deleteMany({ where: { appUid: app.uid, memberUid: { in: removed } } }),
+      this.prisma.aiApp.update({
+        where: { uid: app.uid },
+        data: environment === 'preview' ? { previewAccess: dto.access } : { access: dto.access },
+      }),
+      this.prisma.aiAppAllowedMember.deleteMany({
+        where: { appUid: app.uid, environment, memberUid: { in: removed } },
+      }),
       this.prisma.aiAppAllowedMember.createMany({
         data: added.map((memberUid) => ({
           appUid: app.uid,
+          environment,
           memberUid,
           addedByUid: requesterUid,
           // Saved while OPEN: the open broadcast covers them, so a later
@@ -109,13 +120,20 @@ export class AiAppsAccessService {
       }),
     ]);
 
-    await this.aiAppsService.announceIfEligible(updated);
-    await this.aiAppsService.notifyAllowedMembers(updated);
-    return this.toSettings(updated);
+    if (environment === 'prod') {
+      await this.aiAppsService.announceIfEligible(updated);
+    }
+    await this.aiAppsService.notifyAllowedMembers(updated, environment);
+    return this.getAccess(requesterUid, uid);
   }
 
   /** Member name search for the whitelist picker, flagged with AI Apps access and current membership. */
-  async searchCandidates(requesterUid: string, uid: string, search: string): Promise<AiAppAccessCandidate[]> {
+  async searchCandidates(
+    requesterUid: string,
+    uid: string,
+    search: string,
+    environment: AiAppTargetEnvironment = 'prod'
+  ): Promise<AiAppAccessCandidate[]> {
     const app = await this.findManageableApp(requesterUid, uid);
     const members = await this.prisma.member.findMany({
       where: {
@@ -140,7 +158,7 @@ export class AiAppsAccessService {
       return [];
     }
     const added = await this.prisma.aiAppAllowedMember.findMany({
-      where: { appUid: app.uid, memberUid: { in: members.map((member) => member.uid) } },
+      where: { appUid: app.uid, environment, memberUid: { in: members.map((member) => member.uid) } },
       select: { memberUid: true },
     });
     const addedUids = new Set(added.map((row) => row.memberUid));
@@ -190,7 +208,7 @@ export class AiAppsAccessService {
   findAppForAccessCheck(appId: string): Promise<AiAppAccessCheckApp | null> {
     return this.prisma.aiApp.findFirst({
       where: { appId, status: { not: 'DELETED' } },
-      select: { uid: true, memberUid: true, access: true, publicPaths: true },
+      select: { uid: true, memberUid: true, access: true, publicPaths: true, previewAccess: true },
     });
   }
 
@@ -203,7 +221,8 @@ export class AiAppsAccessService {
     requesterUid: string,
     appId: string,
     method: string,
-    prefetched?: { app: AiAppAccessCheckApp | null }
+    prefetched?: { app: AiAppAccessCheckApp | null },
+    target: AiAppTargetEnvironment = 'prod'
   ): Promise<AiAppAccessCheckResult> {
     const readOnly = ['GET', 'HEAD'].includes(method.toUpperCase());
     const hasPermission = await memberHasAnyPermission(
@@ -219,7 +238,11 @@ export class AiAppsAccessService {
     if (!app) {
       return { allowed: true, reason: 'untracked' };
     }
-    if (!(await this.aiAppsService.canViewApp(requesterUid, app))) {
+    const allowed =
+      target === 'preview'
+        ? await this.aiAppsService.canViewPreview(requesterUid, app)
+        : await this.aiAppsService.canViewApp(requesterUid, app);
+    if (!allowed) {
       throw new ForbiddenException({ allowed: false, reason: 'private' });
     }
     return { allowed: true };
@@ -258,13 +281,23 @@ export class AiAppsAccessService {
     }
   }
 
+  private async previewGateReady(appUid: string): Promise<boolean> {
+    const table = (this.prisma as any).aiAppTarget;
+    if (!table?.findUnique) return false;
+    const row = await table.findUnique({
+      where: { appUid_environment: { appUid, environment: 'preview' } },
+      select: { directLinkGateReady: true },
+    });
+    return !!row?.directLinkGateReady;
+  }
+
   private hasAiAppsAccess(memberUid: string): Promise<boolean> {
     return memberHasAnyPermission(this.rbacService, this.accessControlV2Service, memberUid, READ_PERMISSIONS);
   }
 
-  private async toSettings(app: AiApp): Promise<AiAppAccessSettings> {
+  private async toSettings(app: AiApp, environment: AiAppTargetEnvironment): Promise<AiAppAccessSettings> {
     const rows = await this.prisma.aiAppAllowedMember.findMany({
-      where: { appUid: app.uid },
+      where: { appUid: app.uid, environment },
       orderBy: { createdAt: 'asc' },
     });
     const members = rows.length
@@ -274,9 +307,11 @@ export class AiAppsAccessService {
         })
       : [];
     const byUid = new Map(members.map((member) => [member.uid, member]));
+    const directLinkGateReady =
+      environment === 'preview' ? await this.previewGateReady(app.uid) : app.directLinkGateReady;
     return {
-      access: app.access,
-      directLinkGateReady: app.directLinkGateReady,
+      access: environment === 'preview' ? (app.previewAccess ?? 'PRIVATE') : app.access,
+      directLinkGateReady,
       members: rows.flatMap((row) => {
         const member = byUid.get(row.memberUid);
         return member

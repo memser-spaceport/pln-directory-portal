@@ -83,19 +83,19 @@ describe('AiAppsAuthGateService', () => {
       data: { release: 'alpha', previousRevision: 1, revision: 2, authGateVersion: 2 },
     });
 
-    await service.refreshAuthGate('alpha', 'dev');
-    await service.rollbackAuthGate('alpha', 'dev', 1);
+    await service.refreshAuthGate('alpha', 'preview');
+    await service.rollbackAuthGate('alpha', 'preview', 1);
 
     expect(mockedAxios.post).toHaveBeenNthCalledWith(
       1,
       'https://runner.test/v1/apps/alpha/auth-gate/refresh',
-      { target: 'dev' },
+      { target: 'preview' },
       expect.objectContaining({ headers: expect.objectContaining({ 'x-runner-token': 'runner-secret' }) })
     );
     expect(mockedAxios.post).toHaveBeenNthCalledWith(
       2,
       'https://runner.test/v1/apps/alpha/auth-gate/rollback',
-      { target: 'dev', toRevision: 1 },
+      { target: 'preview', toRevision: 1 },
       expect.anything()
     );
   });

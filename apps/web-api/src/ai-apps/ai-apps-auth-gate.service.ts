@@ -108,7 +108,7 @@ export class AiAppsAuthGateService {
     const [targets, gates] = await Promise.all([
       (this.prisma as any).aiAppTarget?.findMany
         ? (this.prisma as any).aiAppTarget.findMany({
-            where: { appUid: { in: uids }, environment: 'dev' },
+            where: { appUid: { in: uids }, environment: 'preview' },
             select: { appUid: true, status: true, lastDeployedAt: true },
           })
         : [],
@@ -139,7 +139,7 @@ export class AiAppsAuthGateService {
     const fleet: AuthGateTarget[] = apps.map((app) => row(app, 'prod', app.status, app.lastDeployedAt));
     for (const t of targets as Array<{ appUid: string; status: string; lastDeployedAt: Date | null }>) {
       const app = apps.find((a) => a.uid === t.appUid);
-      if (app) fleet.push(row(app, 'dev', t.status, t.lastDeployedAt));
+      if (app) fleet.push(row(app, 'preview', t.status, t.lastDeployedAt));
     }
     return fleet;
   }
@@ -186,7 +186,7 @@ export class AiAppsAuthGateService {
     }
     const table = (this.prisma as any).aiAppTarget;
     const row = await table?.findUnique({
-      where: { appUid_environment: { appUid: t.appUid, environment: 'dev' } },
+      where: { appUid_environment: { appUid: t.appUid, environment: 'preview' } },
       select: { status: true },
     });
     return row?.status ?? null;
@@ -293,7 +293,7 @@ export class AiAppsAuthGateService {
         .$executeRaw`UPDATE "AiApp" SET "directLinkGateReady" = true, "publicPathsGateReady" = true WHERE "uid" = ${t.appUid}`;
     } else {
       await this.prisma
-        .$executeRaw`UPDATE "AiAppTarget" SET "directLinkGateReady" = true, "publicPathsGateReady" = true WHERE "appUid" = ${t.appUid} AND "environment" = 'dev'`;
+        .$executeRaw`UPDATE "AiAppTarget" SET "directLinkGateReady" = true, "publicPathsGateReady" = true WHERE "appUid" = ${t.appUid} AND "environment" = 'preview'`;
     }
   }
 

@@ -63,7 +63,7 @@ describe('AiAppSessionScopeMiddleware', () => {
 
   it('maps app origins to appIds', () => {
     expect(appIdFromOrigin(buildAppUrl('foo', 'prod'))).toBe('foo');
-    expect(appIdFromOrigin(buildAppUrl('foo', 'dev'))).toBe('foo-dev');
+    expect(appIdFromOrigin(buildAppUrl('foo', 'preview'))).toBe('foo-preview');
     expect(appIdFromOrigin(buildAppUrl('forum', 'prod'))).toBeNull();
     expect(appIdFromOrigin('not a url')).toBeNull();
   });

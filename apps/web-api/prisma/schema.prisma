@@ -3676,6 +3676,8 @@ model AiApp {
   /// admin) can restrict them from LabOS, or the agent on deploy when the
   /// member chooses. A deploy that doesn't send `access` keeps it.
   access          AiAppAccess @default(OPEN)
+  /// Preview starts private to the owner. Independent of `access`.
+  previewAccess   AiAppAccess @default(PRIVATE)
   /// True once the app has shipped with an auth sidecar that asks the
   /// Directory for a per-app decision. Apps last deployed before that keep a
   /// sidecar that only checks the PL Infra permission, so a PRIVATE setting
@@ -3705,11 +3707,11 @@ model AiApp {
 
 enum AiAppTargetEnvironment {
   prod
-  dev
+  preview
 }
 
 /// One deploy target of an AiApp. Prod mirrors the historical single deployment.
-/// Dev is a second build, URL, secret set, and database on the same app.
+/// Preview is a second build, URL, secret set, and database on the same app.
 model AiAppTarget {
   id                   Int                     @id @default(autoincrement())
   uid                  String                  @unique @default(cuid())
@@ -3815,8 +3817,10 @@ model AiAppAuthGate {
 /// back restores it.
 model AiAppAllowedMember {
   /// AiApp.uid (no FK relation, matching the other POC tables).
-  appUid     String
-  memberUid  String
+  appUid      String
+  /// Which target this whitelist entry opens. Prod rows are the catalog rule.
+  environment AiAppTargetEnvironment @default(prod)
+  memberUid   String
   /// Who added this member (owner or directory admin).
   addedByUid String
   /// When the member got their "shared with you" notification. Set once the
@@ -3825,7 +3829,7 @@ model AiAppAllowedMember {
   notifiedAt DateTime?
   createdAt  DateTime @default(now())
 
-  @@id([appUid, memberUid])
+  @@id([appUid, environment, memberUid])
   @@index([memberUid])
 }
 

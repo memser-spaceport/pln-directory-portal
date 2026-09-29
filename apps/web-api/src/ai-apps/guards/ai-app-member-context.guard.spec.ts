@@ -13,7 +13,7 @@ const context = (req: any) => ({ switchToHttp: () => ({ getRequest: () => req })
 function build(live = true) {
   const sessionService = {
     authenticateAppRequest: jest.fn(async (_token: string, origin?: string) => {
-      const ok = live && (!origin || origin === buildAppUrl('foo', 'prod') || origin === buildAppUrl('foo', 'dev'));
+      const ok = live && (!origin || origin === buildAppUrl('foo', 'prod') || origin === buildAppUrl('foo', 'preview'));
       return ok ? { memberUid: 'm-1', appId: 'foo' } : null;
     }),
   };
@@ -25,7 +25,7 @@ describe('AiAppMemberContextGuard', () => {
 
   it.each([
     ['prod origin', buildAppUrl('foo', 'prod')],
-    ['dev target origin', buildAppUrl('foo', 'dev')],
+    ['preview target origin', buildAppUrl('foo', 'preview')],
     ['no origin (server call)', undefined],
   ])('accepts a live app session from the %s and sets memberUid for RBAC', async (_label, origin) => {
     const { guard } = build();

@@ -116,16 +116,24 @@ function buildPrisma(apps: Row[] = [PRIVATE_APP, OPEN_APP], allowed: Row[] = [],
       }),
     },
     aiAppAllowedMember: {
-      findUnique: jest.fn(
-        async ({ where }) =>
+      findUnique: jest.fn(async ({ where }) => {
+        const key = where.appUid_environment_memberUid ?? where.appUid_memberUid;
+        return (
           state.allowed.find(
-            (row) => row.appUid === where.appUid_memberUid.appUid && row.memberUid === where.appUid_memberUid.memberUid
+            (row) =>
+              row.appUid === key.appUid &&
+              row.memberUid === key.memberUid &&
+              (key.environment === undefined || (row.environment ?? 'prod') === key.environment)
           ) ?? null
-      ),
+        );
+      }),
       findMany: jest.fn(async ({ where }) =>
         state.allowed.filter(
           (row) =>
-            (where.appUid === undefined || row.appUid === where.appUid) &&
+            (where.appUid === undefined ||
+              row.appUid === where.appUid ||
+              (where.appUid?.in && where.appUid.in.includes(row.appUid))) &&
+            (where.environment === undefined || (row.environment ?? 'prod') === where.environment) &&
             (where.memberUid === undefined ||
               (typeof where.memberUid === 'string'
                 ? row.memberUid === where.memberUid
@@ -138,6 +146,7 @@ function buildPrisma(apps: Row[] = [PRIVATE_APP, OPEN_APP], allowed: Row[] = [],
           (row) =>
             row.appUid === where.appUid &&
             row.memberUid === where.memberUid &&
+            (where.environment === undefined || (row.environment ?? 'prod') === where.environment) &&
             (where.notifiedAt === undefined || (row.notifiedAt ?? null) === where.notifiedAt)
         );
         rows.forEach((row) => Object.assign(row, data));
@@ -145,7 +154,12 @@ function buildPrisma(apps: Row[] = [PRIVATE_APP, OPEN_APP], allowed: Row[] = [],
       }),
       deleteMany: jest.fn(async ({ where }) => {
         state.allowed = state.allowed.filter(
-          (row) => !(row.appUid === where.appUid && where.memberUid.in.includes(row.memberUid))
+          (row) =>
+            !(
+              row.appUid === where.appUid &&
+              (where.environment === undefined || (row.environment ?? 'prod') === where.environment) &&
+              where.memberUid.in.includes(row.memberUid)
+            )
         );
         return { count: 0 };
       }),
@@ -213,6 +227,17 @@ describe('canViewApp (the visibility rule)', () => {
     ['a PRIVATE app, unresolved requester', PRIVATE_APP, undefined, false],
   ] as const)('%s → %s', async (_label, app, requester, expected) => {
     await expect(aiAppsService.canViewApp(requester, app as any)).resolves.toBe(expected);
+  });
+
+  it('a preview whitelist does not grant production access', async () => {
+    const { aiAppsService } = buildServices(
+      buildPrisma([PRIVATE_APP], [{ appUid: 'app-private', memberUid: 'friend-1', environment: 'preview' }])
+    );
+    const previewApp = { ...PRIVATE_APP, previewAccess: 'PRIVATE' };
+    await expect(aiAppsService.canViewApp('friend-1', previewApp as any)).resolves.toBe(false);
+    await expect(aiAppsService.canViewPreview('friend-1', previewApp as any)).resolves.toBe(true);
+    await expect(aiAppsService.canViewPreview(VIEWER, previewApp as any)).resolves.toBe(false);
+    await expect(aiAppsService.canViewPreview(OWNER, previewApp as any)).resolves.toBe(true);
   });
 });
 

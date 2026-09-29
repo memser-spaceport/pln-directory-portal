@@ -350,11 +350,11 @@ export class AiAppsController {
       if (!session) {
         throw new UnauthorizedException('Invalid or expired app session');
       }
-      return this.accessService.checkAccess(session.memberUid, query.appId, query.method, { app });
+      return this.accessService.checkAccess(session.memberUid, query.appId, query.method, { app }, query.target ?? 'prod');
     }
     await validateUserAccessToken(req);
     const memberUid = await this.resolveMemberUid(req);
-    return this.accessService.checkAccess(memberUid, query.appId, query.method, { app });
+    return this.accessService.checkAccess(memberUid, query.appId, query.method, { app }, query.target ?? 'prod');
   }
 
   /** Single AI App detail (includes `canManage` for the requesting member). */
@@ -643,7 +643,7 @@ export class AiAppsController {
     @Req() req: any
   ) {
     const memberUid = await this.resolveMemberUid(req);
-    return this.accessService.searchCandidates(memberUid, uid, query.search);
+    return this.accessService.searchCandidates(memberUid, uid, query.search, query.environment ?? 'prod');
   }
 
   /** Full event/status history for a single app, newest first. */
@@ -743,7 +743,7 @@ export class AiAppsController {
   ) {
     const memberUid = await this.resolveMemberUid(req);
     const target = this.parseTargetEnvironment(environment);
-    if (!target) throw new BadRequestException('environment must be prod or dev');
+    if (!target) throw new BadRequestException('environment must be prod or preview');
     return this.aiAppsService.deleteTarget(memberUid, uid, target);
   }
 
@@ -840,13 +840,15 @@ export class AiAppsController {
     return this.aiAppsService.deployDraft(memberUid, uid, body.secrets, body.environment ?? 'prod');
   }
 
-  private parseTargetEnvironment(value?: string): 'prod' | 'dev' | undefined {
+  private parseTargetEnvironment(value?: string): 'prod' | 'preview' | undefined {
     if (value === undefined || value === '') return undefined;
-    if (value === 'prod' || value === 'dev') return value;
-    throw new BadRequestException('environment must be prod or dev');
+    const raw = value.trim().toLowerCase();
+    if (raw === 'prod') return 'prod';
+    if (raw === 'preview' || raw === 'dev') return 'preview';
+    throw new BadRequestException('environment must be prod or preview');
   }
 
-  private optionalEnvironment(value?: string): { environment?: 'prod' | 'dev' } {
+  private optionalEnvironment(value?: string): { environment?: 'prod' | 'preview' } {
     const environment = this.parseTargetEnvironment(value);
     return environment ? { environment } : {};
   }

@@ -165,10 +165,10 @@ export class AiAppsSessionService {
     return { memberUid: row.memberUid };
   }
 
-  /** Whether a browser `Origin` belongs to the app (its prod or dev target). A missing origin (server call) passes. */
+  /** Whether a browser `Origin` belongs to the app (its prod or preview target). A missing origin (server call) passes. */
   isAppOrigin(appId: string, origin: string | undefined): boolean {
     if (!origin) return true;
-    return origin === buildAppUrl(appId, 'prod') || origin === buildAppUrl(appId, 'dev');
+    return origin === buildAppUrl(appId, 'prod') || origin === buildAppUrl(appId, 'preview');
   }
 
   /**
