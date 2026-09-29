@@ -50,12 +50,18 @@ function build({ statusOverride }: { statusOverride?: Record<string, string> } =
     $executeRaw: jest.fn().mockResolvedValue(1),
   };
   const aiAppsService = { isRequesterAdmin: jest.fn().mockResolvedValue(true) };
-  return { service: new AiAppsAuthGateService(prisma, aiAppsService as any), prisma, aiAppsService };
+  const service = new AiAppsAuthGateService(prisma, aiAppsService as any);
+  service.verifySettle = { timeoutMs: 0, intervalMs: 0 };
+  return { service, prisma, aiAppsService };
 }
 
-/** Probes answer like a healthy app; `after` overrides what the app answers once the gate is refreshed. */
-function stubApp(opts: { gateVersion?: number | null; rootAfter?: number } = {}) {
+/**
+ * Probes answer like a healthy app; `after` overrides what the app answers once the gate is refreshed.
+ * `switchOverProbes` answers that many probes with 502 right after the refresh, like the load balancer switch-over.
+ */
+function stubApp(opts: { gateVersion?: number | null; rootAfter?: number; switchOverProbes?: number } = {}) {
   let refreshed = false;
+  let switchOver = opts.switchOverProbes ?? 0;
   mockedAxios.post.mockImplementation(async (url: string) => {
     if (url.endsWith('/auth-gate/refresh')) {
       refreshed = true;
@@ -64,6 +70,10 @@ function stubApp(opts: { gateVersion?: number | null; rootAfter?: number } = {})
     return { data: {} };
   });
   mockedAxios.get.mockImplementation(async (url: string) => {
+    if (refreshed && switchOver > 0) {
+      switchOver -= 1;
+      return { status: 502, data: '<html>502 Bad Gateway</html>' };
+    }
     if (url.endsWith('/_pln/gate')) {
       return refreshed && opts.gateVersion !== null
         ? { status: 200, data: { version: opts.gateVersion ?? 2 } }
@@ -154,6 +164,36 @@ describe('AiAppsAuthGateService', () => {
       expect.objectContaining({
         update: expect.objectContaining({ lastError: expect.stringContaining('rolled back') }),
       })
+    );
+  });
+
+  it('waits through the load-balancer switch-over before judging the refresh', async () => {
+    const { service, prisma } = build();
+    service.verifySettle = { timeoutMs: 5_000, intervalMs: 1 };
+    stubApp({ switchOverProbes: 4 });
+
+    const [outcome] = await service.refreshBatch({ appUids: ['app-1'] });
+
+    expect(outcome.result).toBe('refreshed');
+    expect(mockedAxios.post).not.toHaveBeenCalledWith(
+      expect.stringContaining('/auth-gate/rollback'),
+      expect.anything(),
+      expect.anything()
+    );
+    expect(prisma.aiAppAuthGate.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ update: expect.objectContaining({ version: 2, lastError: null }) })
+    );
+  });
+
+  it('rolls back when the target is still failing after the settle window', async () => {
+    const { service } = build();
+    service.verifySettle = { timeoutMs: 20, intervalMs: 5 };
+    stubApp({ switchOverProbes: 10_000 });
+
+    const [outcome] = await service.refreshBatch({ appUids: ['app-1'] });
+
+    expect(outcome).toEqual(
+      expect.objectContaining({ result: 'rolled_back', detail: expect.stringContaining('/_health 502') })
     );
   });
 

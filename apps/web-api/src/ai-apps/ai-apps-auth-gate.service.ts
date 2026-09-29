@@ -13,6 +13,12 @@ import { AiAppsService } from './ai-apps.service';
 /** Helm upgrades wait for rollout (`--wait --atomic`, up to the orchestrator's 15 min timeout). */
 const RUNNER_GATE_TIMEOUT_MS = 20 * 60 * 1000;
 const PROBE_TIMEOUT_MS = 10 * 1000;
+/**
+ * `helm --wait` returns once the new pod is Ready, before the load balancer routes to it: the app answers 502 for a
+ * few seconds. Verification re-probes until the target settles and only judges it after this window.
+ */
+const VERIFY_SETTLE_TIMEOUT_MS = 90 * 1000;
+const VERIFY_SETTLE_INTERVAL_MS = 3 * 1000;
 
 export type AuthGateRefreshResult = {
   release: string;
@@ -51,6 +57,8 @@ const REFRESHABLE_STATUSES = new Set(['READY', 'ERROR']);
 @Injectable()
 export class AiAppsAuthGateService {
   private readonly logger = new Logger(AiAppsAuthGateService.name);
+  /** Verification settle window; specs shorten it. */
+  verifySettle = { timeoutMs: VERIFY_SETTLE_TIMEOUT_MS, intervalMs: VERIFY_SETTLE_INTERVAL_MS };
 
   constructor(private readonly prisma: PrismaService, private readonly aiAppsService: AiAppsService) {}
 
@@ -86,6 +94,23 @@ export class AiAppsAuthGateService {
       return res.status;
     } catch {
       return 0;
+    }
+  }
+
+  /** What is still wrong with a refreshed target once it has settled (empty = verified). */
+  private async settledProblems(baseUrl: string, rootBefore: number, gateVersion: number): Promise<string[]> {
+    const deadline = Date.now() + this.verifySettle.timeoutMs;
+    for (;;) {
+      const gate = await this.gateVersionServed(baseUrl);
+      const health = await this.probe(`${baseUrl}/_health`);
+      const root = await this.probe(`${baseUrl}/`);
+      const problems = [
+        gate !== gateVersion ? `gate reports ${gate ?? 'nothing'}` : null,
+        health !== 200 ? `/_health ${health}` : null,
+        root !== rootBefore ? `/ ${rootBefore} -> ${root}` : null,
+      ].filter((p): p is string => p !== null);
+      if (!problems.length || Date.now() >= deadline) return problems;
+      await new Promise((resolve) => setTimeout(resolve, this.verifySettle.intervalMs));
     }
   }
 
@@ -213,16 +238,7 @@ export class AiAppsAuthGateService {
       return { ...this.ids(t), result: 'failed', detail };
     }
 
-    const after = {
-      root: await this.probe(`${baseUrl}/`),
-      health: await this.probe(`${baseUrl}/_health`),
-      gate: await this.gateVersionServed(baseUrl),
-    };
-    const problems = [
-      after.gate !== refreshed.authGateVersion ? `gate reports ${after.gate ?? 'nothing'}` : null,
-      after.health !== 200 ? `/_health ${after.health}` : null,
-      after.root !== before.root ? `/ ${before.root} -> ${after.root}` : null,
-    ].filter(Boolean);
+    const problems = await this.settledProblems(baseUrl, before.root, refreshed.authGateVersion);
 
     if (problems.length) {
       const detail = problems.join('; ');
