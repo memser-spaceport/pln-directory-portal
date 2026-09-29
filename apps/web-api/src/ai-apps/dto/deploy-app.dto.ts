@@ -75,6 +75,16 @@ export const DeployAppSchema = z.object({
     .max(100)
     .regex(/^[a-zA-Z0-9][a-zA-Z0-9-]*$/, 'deploymentId must be alphanumeric and hyphens'),
   /**
+   * Deploy target. Omitted means prod. `dev` is accepted as the old name for preview.
+   * A deployment key still rejects a target that doesn't match the key.
+   */
+  environment: z.preprocess((value) => {
+    if (typeof value !== 'string') return value;
+    const raw = value.trim().toLowerCase();
+    if (!raw) return undefined;
+    return raw === 'dev' ? 'preview' : raw;
+  }, z.enum(['prod', 'preview']).optional()),
+  /**
    * Starter-kit version the agent deployed with (from `pln-app.config.json`,
    * sent by kits ≥1.4). Optional so older kits keep working; stored on the app
    * for debugging.

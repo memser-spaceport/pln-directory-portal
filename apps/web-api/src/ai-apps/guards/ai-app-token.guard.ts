@@ -1,4 +1,5 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { PrismaService } from '../../shared/prisma.service';
 import { AI_APP_TOKEN_HEADER } from '../ai-apps.constants';
 
@@ -23,20 +24,36 @@ export class AiAppTokenGuard implements CanActivate {
     }
 
     const session = await this.prisma.aiAppConnectSession.findUnique({ where: { deployToken: token } });
-    if (!session || session.status !== 'APPROVED' || !session.memberUid) {
+    if (session?.status === 'APPROVED' && session.memberUid) {
+      if (!session.deployTokenExpiresAt || session.deployTokenExpiresAt.getTime() <= Date.now()) {
+        throw new UnauthorizedException('Expired AI Apps deploy token — reconnect via LabOS to get a new one');
+      }
+      req.aiAppMemberUid = session.memberUid;
+      req.aiAppClientName = session.clientName;
+      await this.prisma.aiAppConnectSession.update({
+        where: { uid: session.uid },
+        data: { lastUsedAt: new Date() },
+      });
+      return true;
+    }
+
+    const keys = (this.prisma as any).aiAppDeployKey;
+    if (!keys?.findUnique) {
       throw new UnauthorizedException('Invalid AI Apps deploy token');
     }
-    if (!session.deployTokenExpiresAt || session.deployTokenExpiresAt.getTime() <= Date.now()) {
-      throw new UnauthorizedException('Expired AI Apps deploy token — reconnect via LabOS to get a new one');
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const key = await keys.findUnique({ where: { tokenHash } });
+    if (!key || key.revokedAt) {
+      throw new UnauthorizedException('Invalid AI Apps deploy token');
     }
-
-    req.aiAppMemberUid = session.memberUid;
-    req.aiAppClientName = session.clientName;
-    await this.prisma.aiAppConnectSession.update({
-      where: { uid: session.uid },
-      data: { lastUsedAt: new Date() },
-    });
-
+    const app = await this.prisma.aiApp.findUnique({ where: { uid: key.appUid } });
+    if (!app || app.status === 'DELETED') {
+      throw new UnauthorizedException('Invalid AI Apps deploy token');
+    }
+    req.aiAppMemberUid = app.memberUid;
+    req.aiAppClientName = null;
+    req.aiAppKeyScope = { appUid: app.uid, environment: key.environment };
+    await keys.update({ where: { uid: key.uid }, data: { lastUsedAt: new Date() } });
     return true;
   }
 }

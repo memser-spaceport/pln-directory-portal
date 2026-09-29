@@ -1,6 +1,6 @@
 import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
-import { AI_APPS_MAX_ALLOWED_MEMBERS } from '../ai-apps.constants';
+import { AI_APPS_MAX_ALLOWED_MEMBERS, coerceAppTarget } from '../ai-apps.constants';
 import { AI_APPS_MAX_REQUEST_PATH_LENGTH } from '../ai-apps-public-paths';
 
 /**
@@ -11,6 +11,7 @@ import { AI_APPS_MAX_REQUEST_PATH_LENGTH } from '../ai-apps-public-paths';
 export const UpdateAiAppAccessSchema = z.object({
   access: z.enum(['OPEN', 'PRIVATE']),
   memberUids: z.array(z.string().trim().min(1).max(64)).max(AI_APPS_MAX_ALLOWED_MEMBERS).default([]),
+  environment: z.preprocess(coerceAppTarget, z.enum(['prod', 'preview']).optional()),
 });
 
 export class UpdateAiAppAccessDto extends createZodDto(UpdateAiAppAccessSchema) {}
@@ -18,6 +19,7 @@ export class UpdateAiAppAccessDto extends createZodDto(UpdateAiAppAccessSchema) 
 /** Query of `GET /v1/ai-apps/:uid/access/candidates` — member name search for the whitelist picker. */
 export const AiAppAccessCandidatesQuerySchema = z.object({
   search: z.string().trim().min(1).max(100),
+  environment: z.preprocess(coerceAppTarget, z.enum(['prod', 'preview']).optional()),
 });
 
 export class AiAppAccessCandidatesQueryDto extends createZodDto(AiAppAccessCandidatesQuerySchema) {}
@@ -28,6 +30,8 @@ export const AiAppAccessCheckQuerySchema = z.object({
   method: z.string().trim().min(1).max(16).default('GET'),
   /** Original request path (query optional) — sent by sidecars that support public paths. */
   path: z.string().max(AI_APPS_MAX_REQUEST_PATH_LENGTH).optional(),
+  /** Which target the sidecar is protecting. Omitted means prod. `dev` is the old name for preview. */
+  target: z.preprocess(coerceAppTarget, z.enum(['prod', 'preview']).optional()),
 });
 
 export class AiAppAccessCheckQueryDto extends createZodDto(AiAppAccessCheckQuerySchema) {}

@@ -148,6 +148,8 @@ The backend uploads the ZIP to `s3://<AI_APPS_S3_BUCKET>/apps/<appId>/<deploymen
 
 **appId is a global claim:** although `AiApp` rows are unique per `(memberUid, appId)`, the sandbox runner namespaces everything by `appId` alone (helm release `<environment>-<appId>`, the app host, the secret store, the provisioned database) — two members holding the same `appId` would share one physical deployment. Both `POST /v1/ai-apps/deploy` and `POST /v1/ai-apps/draft` therefore `409` when the `appId` is held by **another member's non-`DELETED` app** (`assertAppIdNotClaimedByAnotherMember`); a `DELETED` row releases the claim since its runner deployment is already torn down.
 
+**Reserved appIds:** an `appId` that would give the app a platform hostname (`<appId>.<AI_APPS_APP_DOMAIN>`) is rejected with `400` on agent deploy, agent draft and member deploy (`assertAppIdNotReserved`, list `AI_APPS_RESERVED_APP_IDS` in `ai-apps.constants.ts`). Prod AI Apps share the `prod-pln-internal` ALB ingress group with `api-directory`, `auth`, `forum`, `os.pl.xyz` and the orchestrator, so an app holding one of those hosts could add a competing ALB rule. The list covers every non-app Ingress host in both clusters plus generic names (`www`, `api`, `admin`, …); `AI_APPS_RESERVED_APP_IDS_EXTRA` (comma list) adds entries without a release. A member's own existing non-`DELETED` row keeps working (none existed when the list was added). The kit's `deploy-to-labs` skill says platform-service and generic infrastructure names (e.g. `www`, `api`) are reserved and tells agents to pick another slug on that `400`. It deliberately does not publish the list: the kit is shared outside the core team, and the `400` message already names the rejected ID. The kit version was not bumped.
+
 **Deterministic URL:** the sandbox host is always `<appId>.<AI_APPS_APP_DOMAIN>` (env-configurable; `os.pl.xyz` on Prod, matching the runner's `DEFAULT_DOMAIN_SUFFIX`), so `url`/`httpUrl`/`host` are computed from `appId` and stored on the record **at deploy start** (status `DEPLOYING`) — the link exists before the runner finishes. For `appId` `test-hello-01` on Prod the URL is `https://test-hello-01.os.pl.xyz`.
 
 **No concurrent deploys:** while a **fresh** (non-stuck) deploy is in flight for an app, every deploy entry point rejects a second one with `409` (`"A deploy is already in progress for this app — wait for it to finish, then try again."`): the agent `POST /v1/ai-apps/deploy` and `POST /v1/ai-apps/draft` (checked before the S3 upload / upsert, so the in-flight deploy's bundle and status are never clobbered), and the member `POST /v1/ai-apps/:uid/deploy`. Once the deploy settles to `READY`/`ERROR` — or ages past the stuck window (see below), which makes it retryable — a new deploy is allowed again. The LabOS UI mirrors this: the detail page shows the in-progress status card (not the deploy panel) and Deployment settings disables its Redeploy button with "A deploy is already in progress for this app" while another deploy runs.
@@ -242,9 +244,11 @@ Flow: set status `DELETING` + log `DELETE_STARTED` → call the runner → on su
 
 An app's display metadata — `name`, `description`, and an optional **one-pager PRD** (`prd`) — is editable **independently of deploys**: none of these endpoints upload a ZIP, invoke the sandbox runner, or change the app's status. Three routes (migration `20260715120000_ai_apps_editable_metadata` added the `prd` column):
 
-- **`PATCH /v1/ai-apps/:uid`** (member JWT, `ai_apps.write`) — accepts `application/json` (`{ name?, description?, prd? }`) **or** `multipart/form-data` where an optional `file` carries a Markdown/HTML PRD (then `prd` must not also be sent in the body). Used by the LabOS edit UI.
-- **`POST /v1/ai-apps/:uid/prd`** (member JWT, `ai_apps.write`) — file-only PRD upload for the dashboard.
-- **`PATCH /v1/ai-apps/:uid/agent`** (`AiAppTokenGuard`, `x-app-token` deploy token) — JSON-only agent variant used by starter kits ≥1.5; unlike the member routes it is restricted to apps **owned by the connected member** (403 otherwise).
+- **`PATCH /v1/ai-apps/:uid`** (member JWT, `ai_apps.write`, **creator or directory admin**) — accepts `application/json` (`{ name?, description?, prd? }`) **or** `multipart/form-data` where an optional `file` carries a Markdown/HTML PRD (then `prd` must not also be sent in the body). Used by the LabOS edit UI.
+- **`POST /v1/ai-apps/:uid/prd`** (member JWT, `ai_apps.write`, **creator or directory admin**) — file-only PRD upload for the dashboard.
+- **`PATCH /v1/ai-apps/:uid/agent`** (`AiAppTokenGuard`, `x-app-token` deploy token) — JSON-only agent variant used by starter kits ≥1.5; restricted to apps **owned by the connected member** (403 otherwise; no admin override).
+
+Any other member gets `403` on the two member routes (`assertCanEditMetadata`, the same `isCreatorOrDirectoryAdmin` rule as delete/logs/access), checked before a PRD file is uploaded to S3. LabOS only offers these actions when the record's `canManage` is true.
 
 Validation: at least one field must be present; `name` 1–200 chars, `description` ≤4000 (nullable — `null` clears), `prd` ≤100,000 chars (nullable). PRD **files** must be `.md`/`.markdown`/`.html`/`.htm`, UTF-8 text (a NUL byte rejects), ≤1 MB (`AI_APPS_MAX_PRD_BYTES`). Both multipart routes are excluded from `ContentTypeMiddleware` in `app.module.ts`.
 
@@ -614,6 +618,54 @@ How it works — no app-side login and no new token flow:
   and `.claude/skills/pln-member-context/SKILL.md` tells the agent how to use it
   (client-side fetch, handle 401/403/local-dev gracefully, personalization only —
   never auth for sensitive actions, never store/log tokens).
+
+## App-scoped sessions (LAB-2695)
+
+Deployed apps are moving off the visitor's LabOS token onto a **session bound to one app**, so a token taken from
+one app works nowhere else. The pieces:
+
+- **Session token.** An HS256 JWT signed with `AI_APPS_SESSION_SECRET` (`iss: pln-ai-apps-session`, `aud: <appId>`,
+  `uid`, `email`, `jti`, `exp`). It carries the same `email` claim apps read from the LabOS token today, because one
+  prod app (`pl-capital-command-center`) decodes it for an email allowlist. Only its sha256 is stored
+  (`AiAppSession`); every use checks the signature and the stored row (idle timeout `AI_APPS_SESSION_IDLE_HOURS`,
+  default 24; absolute `AI_APPS_SESSION_MAX_DAYS`, default 30; revocation). Without a secret, sessions are disabled
+  and the auth gate keeps its previous behavior.
+- **Getting one.** `POST /v1/ai-apps/sessions/exchange-token` `{ appId, target }` (member JWT; the gate's silent path
+  while LabOS still shares its token), or the sign-in round trip: `POST sessions/code` (LabOS server, member JWT)
+  returns a 60 s single-use code bound to `appId` + `target` and the target's callback origin, then the gate calls
+  `POST sessions/redeem` `{ code, appId, target }`. `POST sessions/revoke` (member JWT) ends all of a member's app
+  sessions; LabOS calls it on sign-out.
+- **Using one.** Only on `GET /v1/ai-apps/me` (`AiAppMemberContextGuard`: live for the app it names, and `Origin`, if
+  sent, must be one of that app's prod/dev origins), `POST /v1/ai-apps/track` (attributed only when the session
+  matches the origin), and `GET /v1/ai-apps/access-check` via the gate's `X-AI-App-Session` header (same permission
+  and per-app access rule as a LabOS token). `AiAppSessionScopeMiddleware` 401s the token on every other route before
+  any guard or auth-service call.
+- **Fleet migration.** `GET /v1/ai-apps/admin/auth-gate` lists each app target's gate version; `POST
+  admin/auth-gate/refresh` (`dryRun`, `batchSize`, `appUids`, `target`, `maxFailures`) upgrades gates in place via
+  the orchestrator (same image and values), verifies each one (`/_pln/gate`, `/_health`, unchanged unauthenticated
+  `/`) and rolls back on mismatch; `POST admin/auth-gate/:uid/rollback` `{ target }` undoes one. Directory admins
+  only. Gate state lives in `AiAppAuthGate` and the gate-ready flags are set with a plain SQL update, so owners see
+  no status, event, notification or "Last updated" change. Deploys record the `authGateVersion` the orchestrator
+  reports.
+- **Kit 1.14.** `pln-member-context` calls same-origin `/_pln/me` and falls back to `memberContextEndpoint` + the
+  `authToken` cookie on a 404 (older gates). Analytics keeps the cookie + Bearer call, which works with both gates.
+
+### Soak telemetry
+
+Before LabOS stops sharing `authToken` with app hosts, these must stay at zero (CloudWatch Logs Insights on the
+web-api log group):
+
+```
+fields @timestamp, @message
+| filter @message like /ai_app_origin_labos_token|ai_app_session_disallowed_route/
+| parse @message /"event":"(?<ev>[a-z_]+)","appId":"(?<appId>[^"]*)","route":"(?<route>[^"]*)"/
+| stats count(*) as n by ev, appId, route
+| sort n desc
+```
+
+`ai_app_origin_labos_token` = an app's page called a Directory route other than `/me`/`/track` with the visitor's
+LabOS token (it would break once apps only hold app sessions). `ai_app_session_disallowed_route` = an app session
+token was sent to such a route (already rejected).
 
 ## Product analytics for deployed apps
 

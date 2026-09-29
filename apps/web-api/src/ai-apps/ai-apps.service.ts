@@ -9,7 +9,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import axios from 'axios';
-import { randomUUID } from 'crypto';
+import { createHash, randomBytes, randomUUID } from 'crypto';
 import DOMPurify from 'isomorphic-dompurify';
 import {
   AiApp,
@@ -32,6 +32,7 @@ import { UpdateAppMetadataDto } from './dto/update-app-metadata.dto';
 import { assertValidPublicPaths, samePublicPaths } from './ai-apps-public-paths';
 import {
   AiAppLogPhase,
+  AiAppTargetEnvironment,
   AI_APP_ANON_ID_REGEX,
   AI_APPS_APP_DOMAIN,
   AI_APPS_DEPLOY_STUCK_MINUTES,
@@ -50,7 +51,6 @@ import {
   AI_APPS_LOGS_DESC_TIME_BUDGET_MS,
   AI_APPS_NOTIFICATION_MESSAGES,
   AI_APPS_NOTIFICATION_TRIGGERS,
-  AI_APPS_RUNNER_ENVIRONMENT,
   AI_APPS_RUNNER_TOKEN,
   AI_APPS_RUNNER_URL,
   AI_APPS_S3_BUCKET,
@@ -67,6 +67,7 @@ import {
   buildAppPageUrl,
   buildAppS3Key,
   buildAppUrl,
+  releaseNameForTarget,
   buildPrdPublicUrl,
   buildPrdS3Key,
   buildRunnerDeploymentsUrl,
@@ -76,6 +77,8 @@ import {
   buildRunnerMetricsUrl,
   buildRunnerSecretsUrl,
   normalizeAiAppEventName,
+  isReservedAppId,
+  normalizeAppTarget,
 } from './ai-apps.constants';
 
 /**
@@ -110,6 +113,8 @@ interface RunnerDeployResponse {
   httpUrl?: string;
   port?: number;
   database?: RunnerDeployDatabaseInfo;
+  /** Auth gate (sidecar) version the runner deployed; reported by orchestrators with gate v2 and later. */
+  authGateVersion?: number;
 }
 
 type AiAppMember = { uid: string; name: string; image: string | null };
@@ -130,6 +135,28 @@ interface AiAppDeploymentInfo {
   failureReason?: string;
   failureStream?: 'build' | 'runtime';
 }
+
+/** One environment on the app response. `preview` is null until that target exists. */
+interface AiAppTargetView {
+  environment: AiAppTargetEnvironment;
+  status: string;
+  url: string | null;
+  httpUrl: string | null;
+  host: string | null;
+  lastDeployedAt: Date | null;
+  serving: AiAppServing;
+  requiredEnvVars: string[];
+  providedEnvVars: string[];
+  hasBuild: boolean;
+  kitVersion?: string | null;
+  agentClient?: string | null;
+  database: AiAppDatabaseInfo;
+  failureReason?: string;
+  failureStream?: 'build' | 'runtime';
+}
+
+/** Set by AiAppTokenGuard when the caller presented a LabOS deployment key. */
+export type AiAppKeyScope = { appUid: string; environment: AiAppTargetEnvironment };
 
 /**
  * Database block on app responses: everyone sees whether a database was
@@ -155,9 +182,11 @@ interface AiAppDatabaseInfo {
  */
 type ApiAiApp<T extends { memberUid: string }> = Omit<
   WithMember<T>,
-  'failureStream' | 'database' | 'announcedAt' | 'directLinkGateReady' | 'publicPaths' | 'publicPathsGateReady'
+  'failureStream' | 'database' | 'announcedAt' | 'directLinkGateReady' | 'publicPaths' | 'publicPathsGateReady' | 'previewAccess'
 > & {
+  canViewPreview?: boolean;
   deployment: AiAppDeploymentInfo;
+  deployments: { prod: AiAppTargetView; preview: AiAppTargetView | null };
   database: AiAppDatabaseInfo;
   weeklyActiveUsers: number;
   directLinkGateReady?: boolean;
@@ -268,6 +297,8 @@ export class AiAppsService {
   async trackAppEvent(params: {
     origin: string | undefined;
     token: string | undefined;
+    /** Member of a verified app session token (the controller checked it against the request origin). */
+    sessionMemberUid?: string;
     anonId: string | undefined;
     event: string | undefined;
     properties: Record<string, unknown> | undefined;
@@ -287,7 +318,7 @@ export class AiAppsService {
       return;
     }
 
-    const memberUid = await this.resolveOptionalMemberUid(params.token);
+    const memberUid = params.sessionMemberUid ?? (await this.resolveOptionalMemberUid(params.token));
     const distinctId = memberUid ?? (params.anonId && AI_APP_ANON_ID_REGEX.test(params.anonId) ? params.anonId : null);
     if (!distinctId) {
       return;
@@ -421,7 +452,12 @@ export class AiAppsService {
    * serving through a failed rollout; 'none' = never shipped (strict — the
    * only writer of `lastDeployedAt` is markReady).
    */
-  private toApiApp<T extends AiApp>(app: WithMember<T>, isManager: boolean, weeklyActiveUsers = 0): ApiAiApp<T> {
+  private toApiApp<T extends AiApp>(
+    app: WithMember<T>,
+    isManager: boolean,
+    weeklyActiveUsers = 0,
+    targetRows: Array<Record<string, any>> = []
+  ): ApiAiApp<T> {
     const {
       failureStream,
       database: storedDatabase,
@@ -430,9 +466,11 @@ export class AiAppsService {
       directLinkGateReady,
       publicPaths,
       publicPathsGateReady,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      previewAccess,
       ...rest
     } = app;
-    const serving: AiAppServing = app.status === 'READY' ? 'latest' : app.lastDeployedAt ? 'previous' : 'none';
+    const serving: AiAppServing = this.servingOf(app.status, app.lastDeployedAt);
     const deployment: AiAppDeploymentInfo = { serving };
     if (isManager) {
       if (app.notes) {
@@ -448,10 +486,215 @@ export class AiAppsService {
       ...rest,
       notes: isManager ? app.notes : null,
       deployment,
+      deployments: {
+        prod: this.targetViewFromApp(app, isManager),
+        preview: this.previewTargetView(targetRows, isManager),
+      },
       database,
       viewCount: app.viewCount ?? 0,
       weeklyActiveUsers,
       ...(isManager ? { directLinkGateReady, publicPaths: publicPaths ?? [], publicPathsGateReady } : {}),
+    };
+  }
+
+  private servingOf(status: string, lastDeployedAt: Date | null | undefined): AiAppServing {
+    return status === 'READY' ? 'latest' : lastDeployedAt ? 'previous' : 'none';
+  }
+
+  private databaseView(stored: unknown): AiAppDatabaseInfo {
+    const parsed = stored as AiAppDatabaseInfo | null;
+    return parsed?.enabled ? parsed : { enabled: false };
+  }
+
+  private targetViewFromApp(
+    app: Pick<
+      AiApp,
+      | 'status'
+      | 'url'
+      | 'httpUrl'
+      | 'host'
+      | 'lastDeployedAt'
+      | 'requiredEnvVars'
+      | 'providedEnvVars'
+      | 's3Key'
+      | 'database'
+      | 'notes'
+      | 'failureStream'
+      | 'kitVersion'
+      | 'agentClient'
+    >,
+    isManager: boolean
+  ): AiAppTargetView {
+    return this.targetView(
+      'prod',
+      app.status,
+      app.url,
+      app.httpUrl,
+      app.host,
+      app.lastDeployedAt,
+      app.requiredEnvVars,
+      app.providedEnvVars,
+      app.s3Key,
+      app.database,
+      isManager ? app.notes : null,
+      isManager ? app.failureStream : null,
+      app.kitVersion,
+      app.agentClient
+    );
+  }
+
+  private previewTargetView(rows: Array<Record<string, any>>, isManager: boolean): AiAppTargetView | null {
+    const row = rows.find((entry) => entry.environment === 'preview');
+    if (!row) return null;
+    return this.targetView(
+      'preview',
+      row.status,
+      row.url ?? null,
+      row.httpUrl ?? null,
+      row.host ?? null,
+      row.lastDeployedAt ?? null,
+      row.requiredEnvVars ?? [],
+      row.providedEnvVars ?? [],
+      row.s3Key ?? null,
+      row.database,
+      isManager ? row.notes ?? null : null,
+      isManager ? row.failureStream ?? null : null,
+      row.kitVersion ?? null,
+      row.agentClient ?? null
+    );
+  }
+
+  private targetView(
+    environment: AiAppTargetEnvironment,
+    status: string,
+    url: string | null,
+    httpUrl: string | null,
+    host: string | null,
+    lastDeployedAt: Date | null,
+    requiredEnvVars: string[],
+    providedEnvVars: string[],
+    s3Key: string | null,
+    database: unknown,
+    notes: string | null,
+    failureStream: string | null,
+    kitVersion: string | null = null,
+    agentClient: string | null = null
+  ): AiAppTargetView {
+    const view: AiAppTargetView = {
+      environment,
+      status,
+      url,
+      httpUrl,
+      host,
+      lastDeployedAt,
+      serving: this.servingOf(status, lastDeployedAt),
+      requiredEnvVars,
+      providedEnvVars,
+      hasBuild: !!s3Key,
+      kitVersion,
+      agentClient,
+      database: this.databaseView(database),
+    };
+    if (notes) view.failureReason = notes;
+    if (failureStream === 'build' || failureStream === 'runtime') view.failureStream = failureStream;
+    return view;
+  }
+
+  /**
+   * Records the auth gate version a deploy (or gate refresh) reported for one target of an app. Kept in its own table
+   * so it never bumps the app's `updatedAt`. No-op when the runner reports none (orchestrators before gate v2) or
+   * the table isn't generated (specs that stub Prisma); never fails the deploy.
+   */
+  async recordAuthGateVersion(appUid: string, environment: AiAppTargetEnvironment, version: number | undefined) {
+    const table = (this.prisma as any).aiAppAuthGate;
+    if (version === undefined || !table?.upsert) return;
+    try {
+      await table.upsert({
+        where: { appUid_environment: { appUid, environment } },
+        create: { appUid, environment, version },
+        update: { version, lastError: null },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Could not record auth gate v${version} for ${appUid}/${environment}: ${(error as Error).message}`
+      );
+    }
+  }
+
+  /** Present only after `prisma generate`. Specs that stub Prisma omit it. */
+  private targetTable(): {
+    findMany: (args: any) => Promise<any[]>;
+    findUnique: (args: any) => Promise<any | null>;
+    upsert: (args: any) => Promise<any>;
+    update: (args: any) => Promise<any>;
+    deleteMany: (args: any) => Promise<{ count: number }>;
+  } | null {
+    const table = (this.prisma as any).aiAppTarget;
+    return table?.findMany ? table : null;
+  }
+
+  private async loadTargetRows(appUids: string[]): Promise<Map<string, any[]>> {
+    const grouped = new Map<string, any[]>();
+    const table = this.targetTable();
+    if (!appUids.length || !table) return grouped;
+    const rows = await table.findMany({ where: { appUid: { in: appUids } } });
+    for (const row of rows) {
+      const list = grouped.get(row.appUid) ?? [];
+      list.push(row);
+      grouped.set(row.appUid, list);
+    }
+    return grouped;
+  }
+
+  private resolveTargetEnvironment(
+    requested: string | undefined,
+    scope?: AiAppKeyScope
+  ): AiAppTargetEnvironment {
+    const environment = normalizeAppTarget(requested);
+    if (scope && scope.environment !== environment) {
+      throw new ForbiddenException('This deployment key is not valid for that environment');
+    }
+    return environment;
+  }
+
+  private assertKeyCanAccessApp(scope: AiAppKeyScope | undefined, appUid: string): void {
+    if (scope && scope.appUid !== appUid) {
+      throw new ForbiddenException('This deployment key cannot access that app');
+    }
+  }
+
+  private async mirrorProdTarget(app: AiApp): Promise<void> {
+    const table = this.targetTable();
+    if (!table) return;
+    await table.upsert({
+      where: { appUid_environment: { appUid: app.uid, environment: 'prod' } },
+      create: this.prodTargetData(app),
+      update: this.prodTargetData(app),
+    });
+  }
+
+  private prodTargetData(app: AiApp) {
+    return {
+      appUid: app.uid,
+      environment: 'prod' as const,
+      status: app.status,
+      notes: app.notes,
+      url: app.url,
+      httpUrl: app.httpUrl,
+      host: app.host,
+      port: app.port,
+      deploymentId: app.deploymentId,
+      s3Key: app.s3Key,
+      requiredEnvVars: app.requiredEnvVars ?? [],
+      providedEnvVars: app.providedEnvVars ?? [],
+      kitVersion: app.kitVersion,
+      agentClient: app.agentClient,
+      agentModel: app.agentModel,
+      lastDeployedAt: app.lastDeployedAt,
+      failureStream: app.failureStream,
+      database: app.database ?? Prisma.DbNull,
+      directLinkGateReady: app.directLinkGateReady,
+      publicPathsGateReady: app.publicPathsGateReady,
     };
   }
 
@@ -517,15 +760,20 @@ export class AiAppsService {
       orderBy: { updatedAt: 'desc' },
     });
     const settled = await Promise.all(apps.map((app) => this.settleStuckDeploy(app)));
+    await Promise.all(settled.map((app) => this.settleStuckDevTarget(app)));
     const withMembers = await this.withMember(settled);
     const wau = await this.weeklyActiveUsersByApp(settled.map((app) => app.uid));
-    return withMembers.map((app, index) =>
-      this.toApiApp(
+    const targets = await this.loadTargetRows(settled.map((app) => app.uid));
+    const previewVisible = await this.previewVisibleUids(requesterUid, settled, isAdmin);
+    return withMembers.map((app, index) => ({
+      ...this.toApiApp(
         app,
         isAdmin || (!!requesterUid && settled[index].memberUid === requesterUid),
-        wau.get(settled[index].uid) ?? 0
-      )
-    );
+        wau.get(settled[index].uid) ?? 0,
+        targets.get(settled[index].uid) ?? []
+      ),
+      canViewPreview: previewVisible.has(settled[index].uid),
+    }));
   }
 
   /**
@@ -542,14 +790,17 @@ export class AiAppsService {
     }
     await this.assertCanViewApp(requesterUid, app);
     app = await this.settleStuckDeploy(app);
+    await this.settleStuckDevTarget(app);
     const result = (await this.withMember([app]))[0];
     const wau = await this.weeklyActiveUsersByApp([app.uid]);
     const weeklyActiveUsers = wau.get(app.uid) ?? 0;
+    const targets = (await this.loadTargetRows([app.uid])).get(app.uid) ?? [];
+    const canViewPreview = await this.canViewPreview(requesterUid, app);
     if (!requesterUid) {
-      return this.toApiApp(result, false, weeklyActiveUsers);
+      return { ...this.toApiApp(result, false, weeklyActiveUsers, targets), canViewPreview };
     }
     const canManage = await this.isCreatorOrDirectoryAdmin(requesterUid, app);
-    return { ...this.toApiApp(result, canManage, weeklyActiveUsers), canManage };
+    return { ...this.toApiApp(result, canManage, weeklyActiveUsers, targets), canManage, canViewPreview };
   }
 
   /** Updates dashboard metadata only; this never invokes the sandbox runner or starts a deploy. */
@@ -557,7 +808,8 @@ export class AiAppsService {
     requesterUid: string,
     uid: string,
     dto: UpdateAppMetadataDto,
-    ownerOnly = false
+    ownerOnly = false,
+    scope?: AiAppKeyScope
   ): Promise<ApiAiApp<AiApp>> {
     if (dto.name === undefined && dto.description === undefined && dto.prd === undefined && dto.tags === undefined) {
       throw new BadRequestException('At least one of name, description, prd, or tags must be provided');
@@ -570,6 +822,10 @@ export class AiAppsService {
     if (ownerOnly && app.memberUid !== requesterUid) {
       throw new ForbiddenException('The agent may edit only apps owned by its connected member');
     }
+    if (!ownerOnly) {
+      await this.assertCanEditMetadata(requesterUid, app);
+    }
+    this.assertKeyCanAccessApp(scope, app.uid);
 
     const data: { name?: string; description?: string | null; prd?: string | null; tags?: string[] } = {};
     if (dto.name !== undefined) data.name = dto.name.trim();
@@ -579,6 +835,13 @@ export class AiAppsService {
 
     const updated = await this.prisma.aiApp.update({ where: { uid }, data });
     return this.toApiApp((await this.withMember([updated]))[0], true);
+  }
+
+  /** Dashboard metadata/PRD edits: the app's creator or a directory admin (the LabOS edit UI is gated on canManage). */
+  private async assertCanEditMetadata(requesterUid: string, app: Pick<AiApp, 'memberUid'>): Promise<void> {
+    if (!(await this.isCreatorOrDirectoryAdmin(requesterUid, app))) {
+      throw new ForbiddenException('Only the app creator or a directory admin can edit this app');
+    }
   }
 
   /** Update metadata from JSON or multipart; a PRD file overrides body.prd. */
@@ -618,6 +881,8 @@ export class AiAppsService {
     if (!app || app.status === 'DELETED') {
       throw new NotFoundException(`AI App not found: ${uid}`);
     }
+    // Checked before the upload so a rejected edit stores nothing in S3.
+    await this.assertCanEditMetadata(requesterUid, app);
 
     const key = buildPrdS3Key(app.appId, extension, randomUUID());
     try {
@@ -672,17 +937,26 @@ export class AiAppsService {
    * the polling cadence belongs to the client (unlike `verifyAppLive`, which
    * does its own retry loop inside the deploy flow).
    */
-  async checkAppLive(uid: string, requesterUid?: string): Promise<{ live: boolean }> {
+  async checkAppLive(
+    uid: string,
+    requesterUid?: string,
+    environment: AiAppTargetEnvironment = 'prod'
+  ): Promise<{ live: boolean }> {
     const app = await this.prisma.aiApp.findUnique({ where: { uid } });
     if (!app) {
       throw new NotFoundException(`AI App not found: ${uid}`);
     }
     await this.assertCanViewApp(requesterUid, app);
-    if (!app.url) {
+    let url = app.url;
+    if (environment === 'preview') {
+      const row = ((await this.loadTargetRows([uid])).get(uid) ?? []).find((entry) => entry.environment === 'preview');
+      url = row?.url ?? null;
+    }
+    if (!url) {
       return { live: false };
     }
     try {
-      const res = await axios.get(app.url, { timeout: 8000, validateStatus: () => true, maxRedirects: 0 });
+      const res = await axios.get(url, { timeout: 8000, validateStatus: () => true, maxRedirects: 0 });
       // 404 counts as DOWN here: right after a first deploy the ingress serves
       // 404 until the app's route/pod is ready, and the kit contract requires a
       // usable `GET /` anyway — reporting live on 404 makes the detail page
@@ -701,7 +975,13 @@ export class AiAppsService {
    * like the agent metadata route. Delegates the runner proxy to
    * `fetchRunnerLogs`.
    */
-  async getAgentLogs(requesterUid: string, uid: string, phase: AiAppLogPhase, query: AiAppLogsQuery): Promise<unknown> {
+  async getAgentLogs(
+    requesterUid: string,
+    uid: string,
+    phase: AiAppLogPhase,
+    query: AiAppLogsQuery,
+    scope?: AiAppKeyScope
+  ): Promise<unknown> {
     const app = await this.prisma.aiApp.findUnique({ where: { uid } });
     if (!app || app.status === 'DELETED') {
       throw new NotFoundException(`AI App not found: ${uid}`);
@@ -709,7 +989,9 @@ export class AiAppsService {
     if (app.memberUid !== requesterUid) {
       throw new ForbiddenException('The agent may read logs only for apps owned by its connected member');
     }
-    return this.fetchRunnerLogs(app, phase, query);
+    this.assertKeyCanAccessApp(scope, app.uid);
+    const environment = this.resolveTargetEnvironment(query.environment, scope);
+    return this.fetchRunnerLogs(app, phase, { ...query, environment });
   }
 
   /**
@@ -770,14 +1052,15 @@ export class AiAppsService {
     let windowMinutes = cursor ? cursor.w : query.sinceMinutes;
     const deploymentId = cursor ? cursor.d : query.deploymentId;
 
-    let walk = await this.walkRunnerLogsTail(app, phase, windowMinutes, deploymentId);
+    const environment = query.environment ?? 'prod';
+    let walk = await this.walkRunnerLogsTail(app, phase, windowMinutes, deploymentId, environment);
     if (!walk.complete && !cursor && query.sinceMinutes !== undefined) {
       // The window is too chatty to walk in one budget. Narrowing keeps the
       // tail — it's the end of any window that reaches "now" — so retry with
       // progressively smaller windows before giving up.
       for (const divisor of AI_APPS_LOGS_DESC_NARROWINGS) {
         windowMinutes = Math.max(1, Math.floor(query.sinceMinutes / divisor));
-        walk = await this.walkRunnerLogsTail(app, phase, windowMinutes, deploymentId);
+        walk = await this.walkRunnerLogsTail(app, phase, windowMinutes, deploymentId, environment);
         if (walk.complete) break;
       }
     }
@@ -821,9 +1104,10 @@ export class AiAppsService {
     app: Pick<AiApp, 'appId'>,
     phase: AiAppLogPhase,
     sinceMinutes: number | undefined,
-    deploymentId: string | undefined
+    deploymentId: string | undefined,
+    environment: AiAppTargetEnvironment = 'prod'
   ): Promise<{ events: DescLogEvent[]; complete: boolean }> {
-    const cacheKey = `${app.appId}:${phase}:${sinceMinutes ?? 'all'}:${deploymentId ?? 'all'}`;
+    const cacheKey = `${app.appId}:${environment}:${phase}:${sinceMinutes ?? 'all'}:${deploymentId ?? 'all'}`;
     const entry = this.logsTailCache.get(cacheKey);
     const now = Date.now();
     if (entry && entry.evictAt <= now) {
@@ -832,7 +1116,7 @@ export class AiAppsService {
       if (entry.staleAt <= now) {
         // Revalidation failure only logs — the stale copy stays valid until
         // evictAt, and the read after that pays the cold walk (and its error).
-        this.startLogsTailWalk(app, phase, sinceMinutes, deploymentId, cacheKey).catch((error) => {
+        this.startLogsTailWalk(app, phase, sinceMinutes, deploymentId, environment, cacheKey).catch((error) => {
           this.logger.warn(
             `Background ${phase}-logs revalidation failed for ${app.appId}: ${(error as Error).message}`
           );
@@ -840,7 +1124,7 @@ export class AiAppsService {
       }
       return Promise.resolve({ events: entry.events, complete: true });
     }
-    return this.startLogsTailWalk(app, phase, sinceMinutes, deploymentId, cacheKey);
+    return this.startLogsTailWalk(app, phase, sinceMinutes, deploymentId, environment, cacheKey);
   }
 
   /** One walk per key at a time: concurrent identical requests await the same promise. */
@@ -849,11 +1133,12 @@ export class AiAppsService {
     phase: AiAppLogPhase,
     sinceMinutes: number | undefined,
     deploymentId: string | undefined,
+    environment: AiAppTargetEnvironment,
     cacheKey: string
   ): Promise<{ events: DescLogEvent[]; complete: boolean }> {
     const inFlight = this.logsTailWalks.get(cacheKey);
     if (inFlight) return inFlight;
-    const walk = this.runLogsTailWalk(app, phase, sinceMinutes, deploymentId, cacheKey).finally(() => {
+    const walk = this.runLogsTailWalk(app, phase, sinceMinutes, deploymentId, environment, cacheKey).finally(() => {
       this.logsTailWalks.delete(cacheKey);
     });
     this.logsTailWalks.set(cacheKey, walk);
@@ -865,6 +1150,7 @@ export class AiAppsService {
     phase: AiAppLogPhase,
     sinceMinutes: number | undefined,
     deploymentId: string | undefined,
+    environment: AiAppTargetEnvironment,
     cacheKey: string
   ): Promise<{ events: DescLogEvent[]; complete: boolean }> {
     const startedAt = Date.now();
@@ -877,6 +1163,7 @@ export class AiAppsService {
         sinceMinutes,
         nextToken: token,
         deploymentId,
+        environment,
       })) as { events?: unknown; nextToken?: unknown } | null;
 
       const pageEvents = Array.isArray(body?.events) ? body!.events : [];
@@ -901,7 +1188,7 @@ export class AiAppsService {
       if (!next || next === token) {
         buffer.sort((a, b) => a.timestamp - b.timestamp);
         const events = buffer.slice(-AI_APPS_LOGS_DESC_RETAIN);
-        this.writeLogsTailCache(cacheKey, app.appId, startedAt, events);
+        this.writeLogsTailCache(cacheKey, app.appId, environment, startedAt, events);
         return { events, complete: true };
       }
       token = next;
@@ -959,11 +1246,17 @@ export class AiAppsService {
   /** When each app's walks were last invalidated by a deploy — see writeLogsTailCache. */
   private readonly logsTailDroppedAt = new Map<string, number>();
 
-  private writeLogsTailCache(key: string, appId: string, walkStartedAt: number, events: DescLogEvent[]): void {
+  private writeLogsTailCache(
+    key: string,
+    appId: string,
+    environment: AiAppTargetEnvironment,
+    walkStartedAt: number,
+    events: DescLogEvent[]
+  ): void {
     // A walk that began before the app's last deploy predates the new pods'
     // output — never cache it (returning it once is fine; the next read
     // re-walks fresh and picks the new lines up).
-    if ((this.logsTailDroppedAt.get(appId) ?? 0) > walkStartedAt) return;
+    if ((this.logsTailDroppedAt.get(`${appId}:${environment}`) ?? 0) > walkStartedAt) return;
     if (!this.logsTailCache.has(key) && this.logsTailCache.size >= AI_APPS_LOGS_DESC_CACHE_MAX_ENTRIES) {
       // Maps iterate in insertion order — dropping the first key is a cheap FIFO.
       const oldest = this.logsTailCache.keys().next().value;
@@ -982,9 +1275,9 @@ export class AiAppsService {
    * watching sees the new deployment's lines as soon as they land instead of a
    * stale tail (earlier deployments' lines stay in the window regardless).
    */
-  private dropLogsTailCache(appId: string): void {
-    this.logsTailDroppedAt.set(appId, Date.now());
-    const prefix = `${appId}:`;
+  private dropLogsTailCache(appId: string, environment: AiAppTargetEnvironment = 'prod'): void {
+    this.logsTailDroppedAt.set(`${appId}:${environment}`, Date.now());
+    const prefix = `${appId}:${environment}:`;
     for (const key of this.logsTailCache.keys()) {
       if (key.startsWith(prefix)) this.logsTailCache.delete(key);
     }
@@ -1007,6 +1300,7 @@ export class AiAppsService {
     if (query.sinceMinutes !== undefined) params.sinceMinutes = query.sinceMinutes;
     if (query.nextToken !== undefined) params.nextToken = query.nextToken;
     if (query.deploymentId !== undefined) params.deploymentId = query.deploymentId;
+    params.environment = query.environment ?? 'prod';
 
     try {
       const response = await axios.get(buildRunnerLogsUrl(app.appId, phase), {
@@ -1109,7 +1403,30 @@ export class AiAppsService {
       });
       await this.notifyDeployFailed(app);
     }
-    return (await this.prisma.aiApp.findUnique({ where: { uid: app.uid } })) ?? app;
+    const settled = (await this.prisma.aiApp.findUnique({ where: { uid: app.uid } })) ?? app;
+    await this.mirrorProdTarget(settled);
+    return settled;
+  }
+
+  private async settleStuckDevTarget(app: AiApp): Promise<void> {
+    const table = this.targetTable();
+    if (!table) return;
+    const rows = await table.findMany({ where: { appUid: app.uid, environment: 'preview', status: 'DEPLOYING' } });
+    const stuck = rows.find((row) => this.isDeployStuck(row));
+    if (!stuck) return;
+    const message =
+      `Deploy timed out: no result after ${AI_APPS_DEPLOY_STUCK_MINUTES} minutes — the deploy was interrupted ` +
+      'or the sandbox runner is unavailable. Retry the deploy once the runner is healthy.';
+    await table.update({
+      where: { uid: stuck.uid },
+      data: { status: 'ERROR', notes: message, failureStream: null },
+    });
+    await this.recordEvent('DEPLOY_FAILED', app.memberUid, {
+      appUid: app.uid,
+      appId: app.appId,
+      deploymentId: stuck.deploymentId ?? undefined,
+      message: `preview: ${message}`,
+    });
   }
 
   /**
@@ -1289,7 +1606,62 @@ export class AiAppsService {
       return true;
     }
     const allowed = await this.prisma.aiAppAllowedMember.findUnique({
-      where: { appUid_memberUid: { appUid: app.uid, memberUid: requesterUid } },
+      where: { appUid_environment_memberUid: { appUid: app.uid, environment: 'prod', memberUid: requesterUid } },
+      select: { memberUid: true },
+    });
+    return !!allowed;
+  }
+
+  private async previewLastDeployedAt(appUid: string): Promise<Date | null> {
+    const table = this.targetTable();
+    if (!table) return null;
+    const row = await table.findUnique({
+      where: { appUid_environment: { appUid, environment: 'preview' } },
+    });
+    return row?.lastDeployedAt ?? null;
+  }
+
+  private async previewVisibleUids(
+    requesterUid: string | undefined,
+    apps: Array<Pick<AiApp, 'uid' | 'memberUid' | 'previewAccess'>>,
+    isAdmin: boolean
+  ): Promise<Set<string>> {
+    const visible = new Set<string>();
+    for (const app of apps) {
+      if (isAdmin || (!!requesterUid && app.memberUid === requesterUid) || app.previewAccess === 'OPEN') {
+        visible.add(app.uid);
+      }
+    }
+    const rest = apps.filter((app) => !visible.has(app.uid)).map((app) => app.uid);
+    const table = this.prisma.aiAppAllowedMember;
+    if (requesterUid && rest.length && table?.findMany) {
+      const rows = await table.findMany({
+        where: { memberUid: requesterUid, environment: 'preview', appUid: { in: rest } },
+        select: { appUid: true },
+      });
+      for (const row of rows) visible.add(row.appUid);
+    }
+    return visible;
+  }
+
+  /** Preview is private unless opened. The owner and directory admins can always open it. */
+  async canViewPreview(
+    requesterUid: string | undefined,
+    app: Pick<AiApp, 'uid' | 'memberUid' | 'previewAccess'>
+  ): Promise<boolean> {
+    if (app.previewAccess === 'OPEN') {
+      return true;
+    }
+    if (!requesterUid) {
+      return false;
+    }
+    if (await this.isCreatorOrDirectoryAdmin(requesterUid, app)) {
+      return true;
+    }
+    const table = this.prisma.aiAppAllowedMember;
+    if (!table?.findUnique) return false;
+    const allowed = await table.findUnique({
+      where: { appUid_environment_memberUid: { appUid: app.uid, environment: 'preview', memberUid: requesterUid } },
       select: { memberUid: true },
     });
     return !!allowed;
@@ -1319,7 +1691,7 @@ export class AiAppsService {
       return { access: 'OPEN' };
     }
     const allowed = await this.prisma.aiAppAllowedMember.findMany({
-      where: { memberUid: requesterUid },
+      where: { memberUid: requesterUid, environment: 'prod' },
       select: { appUid: true },
     });
     return {
@@ -1338,13 +1710,17 @@ export class AiAppsService {
    * so a deploy finishing while the owner saves can't double-send.
    */
   async notifyAllowedMembers(
-    app: Pick<AiApp, 'uid' | 'name' | 'memberUid' | 'access' | 'lastDeployedAt'>
+    app: Pick<AiApp, 'uid' | 'name' | 'memberUid' | 'access' | 'lastDeployedAt' | 'previewAccess'>,
+    environment: AiAppTargetEnvironment = 'prod'
   ): Promise<void> {
-    if (app.access !== 'PRIVATE' || !app.lastDeployedAt) {
+    const access = environment === 'preview' ? app.previewAccess : app.access;
+    const shipped =
+      environment === 'preview' ? await this.previewLastDeployedAt(app.uid) : app.lastDeployedAt;
+    if (access !== 'PRIVATE' || !shipped) {
       return;
     }
     const pending = await this.prisma.aiAppAllowedMember.findMany({
-      where: { appUid: app.uid, notifiedAt: null },
+      where: { appUid: app.uid, environment, notifiedAt: null },
       select: { memberUid: true },
     });
     if (!pending.length) {
@@ -1353,7 +1729,7 @@ export class AiAppsService {
     const owner = await this.prisma.member.findUnique({ where: { uid: app.memberUid }, select: { name: true } });
     for (const { memberUid } of pending) {
       const { count } = await this.prisma.aiAppAllowedMember.updateMany({
-        where: { appUid: app.uid, memberUid, notifiedAt: null },
+        where: { appUid: app.uid, environment, memberUid, notifiedAt: null },
         data: { notifiedAt: new Date() },
       });
       if (count === 1) {
@@ -1404,6 +1780,29 @@ export class AiAppsService {
     }
   }
 
+  /**
+   * Reserved appIds (see AI_APPS_RESERVED_APP_IDS) can't be claimed. The member's own existing, non-DELETED row keeps
+   * working (none existed when the list was introduced), so only a new claim is refused. `existing` skips the lookup
+   * when the caller already holds the row.
+   */
+  private async assertAppIdNotReserved(memberUid: string, appId: string, existing?: Pick<AiApp, 'status'> | null) {
+    if (!isReservedAppId(appId)) return;
+    const own =
+      existing !== undefined
+        ? existing
+        : await this.prisma.aiApp.findUnique({
+            where: { memberUid_appId: { memberUid, appId } },
+            select: { status: true },
+          });
+    if (own && own.status !== 'DELETED') return;
+    throw new BadRequestException(`The appId "${appId}" is reserved for a platform service — pick a different appId`);
+  }
+
+  /** Directory-admin check for admin-only AI Apps routes. */
+  isRequesterAdmin(requesterUid: string): Promise<boolean> {
+    return this.isRequesterDirectoryAdmin(requesterUid);
+  }
+
   /** Requester-only admin check — computed once and reused per row on list responses. */
   private async isRequesterDirectoryAdmin(requesterUid: string): Promise<boolean> {
     const requester = await this.prisma.member.findUnique({
@@ -1448,7 +1847,8 @@ export class AiAppsService {
     memberUid: string,
     dto: DeployAppDto,
     file: Express.Multer.File,
-    agentClient?: string | null
+    agentClient?: string | null,
+    scope?: AiAppKeyScope
   ): Promise<ApiAiApp<AiApp>> {
     if (!file?.buffer?.length) {
       throw new BadGatewayException('Missing app ZIP file');
@@ -1458,6 +1858,7 @@ export class AiAppsService {
     }
 
     const publicPaths = this.publicPathsForUpload(dto.publicPaths);
+    await this.assertAppIdNotReserved(memberUid, dto.appId);
     await this.assertAppIdNotClaimedByAnotherMember(memberUid, dto.appId);
 
     // Block a second concurrent deploy: if a deploy is already in flight for this
@@ -1466,6 +1867,13 @@ export class AiAppsService {
     const existing = await this.prisma.aiApp.findUnique({
       where: { memberUid_appId: { memberUid, appId: dto.appId } },
     });
+    const environment = this.resolveTargetEnvironment(dto.environment, scope);
+    if (scope && (!existing || existing.uid !== scope.appUid)) {
+      throw new ForbiddenException('This deployment key cannot access that app');
+    }
+    if (environment === 'preview') {
+      return this.deployDev(memberUid, dto, file, agentClient, existing);
+    }
     if (existing) {
       this.assertNoDeployInProgress(existing);
     }
@@ -1556,7 +1964,8 @@ export class AiAppsService {
     memberUid: string,
     dto: RegisterDraftDto,
     file: Express.Multer.File,
-    agentClient?: string | null
+    agentClient?: string | null,
+    scope?: AiAppKeyScope
   ): Promise<ApiAiApp<AiApp> & { appPageUrl: string; missingEnvVars: string[] }> {
     if (!file?.buffer?.length) {
       throw new BadRequestException('Missing app ZIP file');
@@ -1566,6 +1975,7 @@ export class AiAppsService {
     }
 
     const publicPaths = this.publicPathsForUpload(dto.publicPaths);
+    await this.assertAppIdNotReserved(memberUid, dto.appId);
     await this.assertAppIdNotClaimedByAnotherMember(memberUid, dto.appId);
 
     // Don't clobber an in-flight deploy's bundle/status by re-registering the app
@@ -1573,6 +1983,13 @@ export class AiAppsService {
     const existing = await this.prisma.aiApp.findUnique({
       where: { memberUid_appId: { memberUid, appId: dto.appId } },
     });
+    const environment = this.resolveTargetEnvironment(dto.environment, scope);
+    if (scope && (!existing || existing.uid !== scope.appUid)) {
+      throw new ForbiddenException('This deployment key cannot access that app');
+    }
+    if (environment === 'preview') {
+      return this.registerDevDraft(memberUid, dto, file, agentClient, existing);
+    }
     if (existing) {
       this.assertNoDeployInProgress(existing);
     }
@@ -1653,7 +2070,201 @@ export class AiAppsService {
    * (merge/upsert — values never touch our DB), validates every required env
    * var has a value, then redeploys the stored bundle.
    */
-  async deployDraft(requesterUid: string, uid: string, secrets?: Record<string, string>): Promise<ApiAiApp<AiApp>> {
+  private async ensureAppShell(
+    memberUid: string,
+    dto: DeployAppDto,
+    fileFields: { publicPaths?: string[] },
+    agentClient: string | null | undefined,
+    existing: AiApp | null
+  ): Promise<AiApp> {
+    if (existing) {
+      return this.prisma.aiApp.update({
+        where: { uid: existing.uid },
+        data: {
+          name: dto.name,
+          description: dto.description,
+          tags: this.tagsForUpload(existing, dto.tags),
+          publicPaths: fileFields.publicPaths,
+          access: dto.access,
+        },
+      });
+    }
+    return this.prisma.aiApp.create({
+      data: {
+        memberUid,
+        appId: dto.appId,
+        name: dto.name,
+        description: dto.description,
+        status: 'IN_DEVELOPMENT',
+        tags: dto.tags ?? [],
+        publicPaths: fileFields.publicPaths ?? [],
+        access: dto.access ?? 'OPEN',
+        kitVersion: dto.kitVersion ?? null,
+        agentClient: agentClient ?? null,
+        agentModel: dto.agentModel ?? null,
+      },
+    });
+  }
+
+  private async deployDev(
+    memberUid: string,
+    dto: DeployAppDto,
+    file: Express.Multer.File,
+    agentClient: string | null | undefined,
+    existing: AiApp | null
+  ): Promise<ApiAiApp<AiApp>> {
+    const table = this.targetTable();
+    if (!table) throw new InternalServerErrorException('AI App targets are not available');
+    const publicPaths = this.publicPathsForUpload(dto.publicPaths);
+    if (existing) {
+      const current = await table.findUnique({
+        where: { appUid_environment: { appUid: existing.uid, environment: 'preview' } },
+      });
+      if (current) this.assertNoDeployInProgress(current);
+    }
+    const app = await this.ensureAppShell(memberUid, dto, { publicPaths }, agentClient, existing);
+    await this.auditUploadedPublicPaths(memberUid, existing, app);
+    const s3Key = buildAppS3Key(dto.appId, dto.deploymentId);
+    const target = await table.upsert({
+      where: { appUid_environment: { appUid: app.uid, environment: 'preview' } },
+      create: {
+        appUid: app.uid,
+        environment: 'preview',
+        status: 'DEPLOYING',
+        deploymentId: dto.deploymentId,
+        s3Key,
+        url: buildAppUrl(dto.appId, 'preview'),
+        httpUrl: buildAppHttpUrl(dto.appId, 'preview'),
+        host: buildAppHost(dto.appId, 'preview'),
+        kitVersion: dto.kitVersion ?? null,
+        agentClient: agentClient ?? null,
+        agentModel: dto.agentModel ?? null,
+        database: dto.database ? { enabled: true, type: dto.database.type } : Prisma.DbNull,
+        requiredEnvVars: [],
+        providedEnvVars: [],
+      },
+      update: {
+        status: 'DEPLOYING',
+        deploymentId: dto.deploymentId,
+        s3Key,
+        url: buildAppUrl(dto.appId, 'preview'),
+        httpUrl: buildAppHttpUrl(dto.appId, 'preview'),
+        host: buildAppHost(dto.appId, 'preview'),
+        kitVersion: dto.kitVersion ?? null,
+        agentClient: agentClient ?? null,
+        agentModel: dto.agentModel ?? null,
+        database: dto.database ? { enabled: true, type: dto.database.type } : Prisma.DbNull,
+        notes: null,
+        failureStream: null,
+      },
+    });
+    try {
+      await this.awsService.uploadFileToS3(
+        { buffer: file.buffer, mimetype: 'application/zip' },
+        AI_APPS_S3_BUCKET,
+        s3Key
+      );
+    } catch (error) {
+      const message = `Deploy failed: ${(error as Error).message}`;
+      await this.failDeploy(app, memberUid, { appUid: app.uid, appId: dto.appId, deploymentId: dto.deploymentId }, message, 'build', 'preview');
+      throw new BadGatewayException('Failed to store the app bundle');
+    }
+    await this.recordEvent('DEPLOY_STARTED', memberUid, {
+      appUid: app.uid,
+      appId: dto.appId,
+      deploymentId: dto.deploymentId,
+      message: 'environment=preview',
+    });
+    return this.proxyDeploy(
+      memberUid,
+      { ...app, database: target.database },
+      dto.deploymentId,
+      s3Key,
+      target.providedEnvVars ?? [],
+      'preview'
+    );
+  }
+
+  private async registerDevDraft(
+    memberUid: string,
+    dto: RegisterDraftDto,
+    file: Express.Multer.File,
+    agentClient: string | null | undefined,
+    existing: AiApp | null
+  ): Promise<ApiAiApp<AiApp> & { appPageUrl: string; missingEnvVars: string[] }> {
+    const table = this.targetTable();
+    if (!table) throw new InternalServerErrorException('AI App targets are not available');
+    const publicPaths = this.publicPathsForUpload(dto.publicPaths);
+    if (existing) {
+      const current = await table.findUnique({
+        where: { appUid_environment: { appUid: existing.uid, environment: 'preview' } },
+      });
+      if (current) this.assertNoDeployInProgress(current);
+    }
+    const s3Key = buildAppS3Key(dto.appId, dto.deploymentId);
+    try {
+      await this.awsService.uploadFileToS3(
+        { buffer: file.buffer, mimetype: 'application/zip' },
+        AI_APPS_S3_BUCKET,
+        s3Key
+      );
+    } catch (error) {
+      this.logger.error(`AI App draft upload failed for ${dto.appId}: ${(error as Error).message}`);
+      throw new BadGatewayException('Failed to store the app bundle');
+    }
+    const app = await this.ensureAppShell(memberUid, dto, { publicPaths }, agentClient, existing);
+    await this.auditUploadedPublicPaths(memberUid, existing, app);
+    const previous = await table.findUnique({
+      where: { appUid_environment: { appUid: app.uid, environment: 'preview' } },
+    });
+    const target = await table.upsert({
+      where: { appUid_environment: { appUid: app.uid, environment: 'preview' } },
+      create: {
+        appUid: app.uid,
+        environment: 'preview',
+        status: 'DRAFT',
+        deploymentId: dto.deploymentId,
+        s3Key,
+        requiredEnvVars: dto.requiredEnvVars,
+        providedEnvVars: [],
+        kitVersion: dto.kitVersion ?? null,
+        agentClient: agentClient ?? null,
+        agentModel: dto.agentModel ?? null,
+        database: dto.database ? { enabled: true, type: dto.database.type } : Prisma.DbNull,
+      },
+      update: {
+        status: 'DRAFT',
+        deploymentId: dto.deploymentId,
+        s3Key,
+        requiredEnvVars: dto.requiredEnvVars,
+        kitVersion: dto.kitVersion ?? null,
+        agentClient: agentClient ?? null,
+        agentModel: dto.agentModel ?? null,
+        database: dto.database ? { enabled: true, type: dto.database.type } : Prisma.DbNull,
+        notes: null,
+      },
+    });
+    await this.recordEvent('DRAFT_CREATED', memberUid, {
+      appUid: app.uid,
+      appId: dto.appId,
+      deploymentId: dto.deploymentId,
+      message: `preview required env vars: ${dto.requiredEnvVars.join(', ')}`,
+    });
+    const provided = new Set<string>(target.providedEnvVars ?? previous?.providedEnvVars ?? []);
+    const targets = (await this.loadTargetRows([app.uid])).get(app.uid) ?? [target];
+    return {
+      ...this.toApiApp((await this.withMember([app]))[0], true, 0, targets),
+      appPageUrl: buildAppPageUrl(app.uid),
+      missingEnvVars: dto.requiredEnvVars.filter((name) => !provided.has(name)),
+    };
+  }
+
+  async deployDraft(
+    requesterUid: string,
+    uid: string,
+    secrets?: Record<string, string>,
+    environment: AiAppTargetEnvironment = 'prod'
+  ): Promise<ApiAiApp<AiApp>> {
     const app = await this.prisma.aiApp.findUnique({ where: { uid } });
     if (!app) {
       throw new NotFoundException(`AI App not found: ${uid}`);
@@ -1668,7 +2279,11 @@ export class AiAppsService {
     // runner deployment — don't let a redeploy clobber the other member's live
     // app. The claim belongs to the app's owner, not the requester (an admin
     // may trigger the deploy on the creator's behalf).
+    await this.assertAppIdNotReserved(app.memberUid, app.appId, app);
     await this.assertAppIdNotClaimedByAnotherMember(app.memberUid, app.appId);
+    if (environment === 'preview') {
+      return this.deployDevDraft(requesterUid, app, secrets);
+    }
     this.assertNoDeployInProgress(app);
     if (!app.s3Key || !app.deploymentId) {
       throw new BadRequestException('This app has no uploaded bundle yet — ask your AI agent to register it first');
@@ -1682,7 +2297,7 @@ export class AiAppsService {
     }
 
     if (secrets && submittedNames.length) {
-      await this.saveSecrets(requesterUid, app, secrets);
+      await this.saveSecrets(requesterUid, app, secrets, 'prod');
     }
 
     await this.recordEvent('DEPLOY_STARTED', requesterUid, {
@@ -1690,7 +2305,42 @@ export class AiAppsService {
       appId: app.appId,
       deploymentId: app.deploymentId,
     });
-    return this.proxyDeploy(requesterUid, app, app.deploymentId, app.s3Key, Array.from(provided));
+    return this.proxyDeploy(requesterUid, app, app.deploymentId, app.s3Key, Array.from(provided), 'prod');
+  }
+
+  private async deployDevDraft(requesterUid: string, app: AiApp, secrets?: Record<string, string>): Promise<ApiAiApp<AiApp>> {
+    const table = this.targetTable();
+    if (!table) throw new InternalServerErrorException('AI App targets are not available');
+    const target = await table.findUnique({
+      where: { appUid_environment: { appUid: app.uid, environment: 'preview' } },
+    });
+    if (!target?.s3Key || !target.deploymentId) {
+      throw new BadRequestException('This environment has no uploaded bundle yet — ask your AI agent to register it first');
+    }
+    this.assertNoDeployInProgress(target);
+    const submittedNames = Object.keys(secrets ?? {});
+    const provided = new Set([...(target.providedEnvVars ?? []), ...submittedNames]);
+    const missing = (target.requiredEnvVars ?? []).filter((name: string) => !provided.has(name));
+    if (missing.length) {
+      throw new BadRequestException(`Missing values for required environment variables: ${missing.join(', ')}`);
+    }
+    if (secrets && submittedNames.length) {
+      await this.saveSecrets(requesterUid, app, secrets, 'preview');
+    }
+    await this.recordEvent('DEPLOY_STARTED', requesterUid, {
+      appUid: app.uid,
+      appId: app.appId,
+      deploymentId: target.deploymentId,
+      message: 'environment=preview',
+    });
+    return this.proxyDeploy(
+      requesterUid,
+      { ...app, database: target.database },
+      target.deploymentId,
+      target.s3Key,
+      Array.from(provided),
+      'preview'
+    );
   }
 
   /**
@@ -1698,13 +2348,18 @@ export class AiAppsService {
    * the runner's `/v1/projects/<project>/secrets` contract) and remembers only
    * the NAMES on the app record. Never log or persist the values.
    */
-  private async saveSecrets(memberUid: string, app: AiApp, secrets: Record<string, string>): Promise<void> {
+  private async saveSecrets(
+    memberUid: string,
+    app: AiApp,
+    secrets: Record<string, string>,
+    environment: AiAppTargetEnvironment = 'prod'
+  ): Promise<void> {
     const names = Object.keys(secrets);
     try {
       this.logger.log(`Runner secrets request for ${app.appId}: POST ${buildRunnerSecretsUrl()} (${names.join(', ')})`);
       const response = await axios.post(
         buildRunnerSecretsUrl(),
-        { appId: app.appId, environment: AI_APPS_RUNNER_ENVIRONMENT, secrets },
+        { appId: app.appId, environment, secrets },
         { headers: { 'Content-Type': 'application/json', 'x-runner-token': AI_APPS_RUNNER_TOKEN } }
       );
       // Log only the status — the request/response may echo secret values.
@@ -1715,14 +2370,26 @@ export class AiAppsService {
       throw new BadGatewayException('Failed to store secrets on the sandbox runner');
     }
 
-    await this.prisma.aiApp.update({
-      where: { uid: app.uid },
-      data: { providedEnvVars: Array.from(new Set([...app.providedEnvVars, ...names])) },
-    });
+    if (environment === 'preview') {
+      const table = this.targetTable();
+      const current = table
+        ? await table.findUnique({ where: { appUid_environment: { appUid: app.uid, environment: 'preview' } } })
+        : null;
+      await table?.update({
+        where: { appUid_environment: { appUid: app.uid, environment: 'preview' } },
+        data: { providedEnvVars: Array.from(new Set([...(current?.providedEnvVars ?? []), ...names])) },
+      });
+    } else {
+      const updated = await this.prisma.aiApp.update({
+        where: { uid: app.uid },
+        data: { providedEnvVars: Array.from(new Set([...app.providedEnvVars, ...names])) },
+      });
+      await this.mirrorProdTarget(updated);
+    }
     await this.recordEvent('SECRETS_UPDATED', memberUid, {
       appUid: app.uid,
       appId: app.appId,
-      message: `Updated: ${names.join(', ')}`,
+      message: `${environment}: ${names.join(', ')}`,
     });
   }
 
@@ -1738,67 +2405,81 @@ export class AiAppsService {
     app: Pick<AiApp, 'uid' | 'appId' | 'name' | 'memberUid' | 'database' | 'lastDeployedAt'>,
     deploymentId: string,
     s3Key: string,
-    secretNames: string[] = []
+    secretNames: string[] = [],
+    environment: AiAppTargetEnvironment = 'prod'
   ): Promise<ApiAiApp<AiApp>> {
-    const host = buildAppHost(app.appId);
-    const url = buildAppUrl(app.appId);
-    const httpUrl = buildAppHttpUrl(app.appId);
+    const host = buildAppHost(app.appId, environment);
+    const url = buildAppUrl(app.appId, environment);
+    const httpUrl = buildAppHttpUrl(app.appId, environment);
     const requestedDatabase = app.database as AiAppDatabaseInfo | null;
-    await this.prisma.aiApp.update({
-      where: { uid: app.uid },
-      data: { status: 'DEPLOYING', deploymentId, s3Key, url, httpUrl, host, notes: null, failureStream: null },
-    });
-    this.dropLogsTailCache(app.appId);
+    if (environment === 'prod') {
+      const updated = await this.prisma.aiApp.update({
+        where: { uid: app.uid },
+        data: { status: 'DEPLOYING', deploymentId, s3Key, url, httpUrl, host, notes: null, failureStream: null },
+      });
+      await this.mirrorProdTarget(updated);
+    } else {
+      await this.targetTable()?.update({
+        where: { appUid_environment: { appUid: app.uid, environment: 'preview' } },
+        data: { status: 'DEPLOYING', deploymentId, s3Key, url, httpUrl, host, notes: null, failureStream: null },
+      });
+    }
+    this.dropLogsTailCache(app.appId, environment);
 
     const eventContext = { appUid: app.uid, appId: app.appId, deploymentId };
 
     const markReady = async (port: number | null, databaseInfo?: RunnerDeployDatabaseInfo) => {
+      const readyData = {
+        status: 'READY' as const,
+        url,
+        httpUrl,
+        host,
+        port,
+        notes: null,
+        failureStream: null,
+        lastDeployedAt: new Date(),
+        directLinkGateReady: true,
+        publicPathsGateReady: true,
+        ...(databaseInfo && requestedDatabase?.enabled
+          ? {
+              database: {
+                enabled: true,
+                type: requestedDatabase.type ?? null,
+                host: databaseInfo.host ?? null,
+                port: databaseInfo.port ?? null,
+                name: databaseInfo.name ?? null,
+                user: databaseInfo.user ?? null,
+                credentialsInjected: databaseInfo.credentialsInjected ?? null,
+              },
+            }
+          : {}),
+      };
+      if (environment === 'preview') {
+        await this.targetTable()?.update({
+          where: { appUid_environment: { appUid: app.uid, environment: 'preview' } },
+          data: readyData,
+        });
+        await this.recordEvent('DEPLOY_SUCCEEDED', memberUid, { ...eventContext, message: url });
+        const fresh = (await this.prisma.aiApp.findUnique({ where: { uid: app.uid } })) ?? (app as AiApp);
+        const targets = (await this.loadTargetRows([app.uid])).get(app.uid) ?? [];
+        return this.toApiApp((await this.withMember([fresh]))[0], true, 0, targets);
+      }
       const updated = await this.prisma.aiApp.update({
         where: { uid: app.uid },
-        // The ONLY writer of lastDeployedAt — it must strictly mean "last
-        // successful ship" (deployment.serving derives 'none' from its absence).
-        data: {
-          status: 'READY',
-          url,
-          httpUrl,
-          host,
-          port,
-          notes: null,
-          failureStream: null,
-          lastDeployedAt: new Date(),
-          // Every deploy ships the current auth sidecar, which asks the
-          // Directory for a per-app decision — so a PRIVATE setting now also
-          // covers the app's direct URL.
-          directLinkGateReady: true,
-          // …and forwards the request path, so public path patterns apply.
-          publicPathsGateReady: true,
-          // Non-sensitive connection metadata the orchestrator reports once it
-          // provisions the database, merged into the same JSON blob we asked
-          // it to provision from. Never the password — that lives only in the
-          // app's injected runtime env vars.
-          ...(databaseInfo && requestedDatabase?.enabled
-            ? {
-                database: {
-                  enabled: true,
-                  type: requestedDatabase.type ?? null,
-                  host: databaseInfo.host ?? null,
-                  port: databaseInfo.port ?? null,
-                  name: databaseInfo.name ?? null,
-                  user: databaseInfo.user ?? null,
-                  credentialsInjected: databaseInfo.credentialsInjected ?? null,
-                },
-              }
-            : {}),
-        },
+        // The ONLY writer of lastDeployedAt on the app row — prod's "last successful ship".
+        data: readyData,
       });
+      await this.mirrorProdTarget(updated);
       await this.recordEvent('DEPLOY_SUCCEEDED', memberUid, { ...eventContext, message: url });
       await this.announceIfEligible(updated);
       await this.notifyAllowedMembers(updated);
-      return this.toApiApp((await this.withMember([updated]))[0], true);
+      const targets = (await this.loadTargetRows([app.uid])).get(app.uid) ?? [];
+      return this.toApiApp((await this.withMember([updated]))[0], true, 0, targets);
     };
 
     let port: number | null = null;
     let databaseInfo: RunnerDeployDatabaseInfo | undefined;
+    let authGateVersion: number | undefined;
     try {
       this.logger.log(
         `Runner deploy request for ${app.appId}: POST ${AI_APPS_RUNNER_URL}/deploy ` +
@@ -1808,7 +2489,7 @@ export class AiAppsService {
       );
       const response = await axios.post<RunnerDeployResponse>(
         `${AI_APPS_RUNNER_URL}/deploy`,
-        { appId: app.appId, deploymentId, s3Key },
+        { appId: app.appId, deploymentId, s3Key, environment },
         { headers: { 'Content-Type': 'application/json', 'x-runner-token': AI_APPS_RUNNER_TOKEN } }
       );
       this.logRunnerResponse('deploy', app.appId, response.status, response.data);
@@ -1818,10 +2499,11 @@ export class AiAppsService {
       if (typeof response.data?.status === 'string' && response.data.status.toLowerCase() === 'failed') {
         const message = `Runner reported failure: ${this.safeStringify(response.data)}`;
         this.logger.error(`AI App deploy failed for ${app.appId}: ${message}`);
-        await this.failDeploy(app, memberUid, eventContext, message, 'build');
+        await this.failDeploy(app, memberUid, eventContext, message, 'build', environment);
         throw new BadGatewayException('Failed to deploy app to the sandbox runner');
       }
       port = response.data.port ?? null;
+      authGateVersion = typeof response.data.authGateVersion === 'number' ? response.data.authGateVersion : undefined;
     } catch (error) {
       if (error instanceof BadGatewayException) {
         throw error;
@@ -1854,10 +2536,12 @@ export class AiAppsService {
         // A hard runner error is a build-phase failure; a timeout with the app
         // never becoming reachable is genuinely unknown (build may have hung OR
         // the pod may have crashed) — leave the stream unclassified.
-        await this.failDeploy(app, memberUid, eventContext, message, uncertain ? null : 'build');
+        await this.failDeploy(app, memberUid, eventContext, message, uncertain ? null : 'build', environment);
         throw new BadGatewayException('Failed to deploy app to the sandbox runner');
       }
       this.logger.log(`AI App ${app.appId} is live despite runner timeout — continuing`);
+      // The runner's response (which reports the gate version) never arrived: ask the live gate instead.
+      authGateVersion = await this.gateVersionServed(url);
     }
 
     // The build ran the app WITHOUT its secrets or database — redeploy the
@@ -1868,16 +2552,17 @@ export class AiAppsService {
     // than go READY in a broken state.
     if (secretNames.length || requestedDatabase?.enabled) {
       try {
-        databaseInfo = await this.deployImageWithRuntimeConfig(app.appId, secretNames, url, requestedDatabase);
+        databaseInfo = await this.deployImageWithRuntimeConfig(app.appId, secretNames, url, requestedDatabase, environment);
       } catch (error) {
         const message = `Runtime config injection failed: ${(error as Error).message}`;
         this.logger.error(`AI App deploy failed for ${app.appId}: ${message}`);
         // The image already built — injecting/starting it is a runtime story.
-        await this.failDeploy(app, memberUid, eventContext, message, 'runtime');
+        await this.failDeploy(app, memberUid, eventContext, message, 'runtime', environment);
         throw new BadGatewayException('Failed to inject secrets/database on the sandbox runner');
       }
     }
 
+    await this.recordAuthGateVersion(app.uid, environment, authGateVersion);
     return markReady(port, databaseInfo);
   }
 
@@ -1893,15 +2578,22 @@ export class AiAppsService {
     appId: string,
     secretNames: string[],
     appUrl: string,
-    database?: Pick<AiAppDatabaseInfo, 'enabled' | 'type'> | null
+    database?: Pick<AiAppDatabaseInfo, 'enabled' | 'type'> | null,
+    environment: AiAppTargetEnvironment = 'prod'
   ): Promise<RunnerDeployDatabaseInfo | undefined> {
     const headers = { 'Content-Type': 'application/json', 'x-runner-token': AI_APPS_RUNNER_TOKEN };
 
-    const registry = await axios.get<{ apps?: Array<{ app_id?: string; image?: string }> }>(
+    const registry = await axios.get<{ apps?: Array<{ app_id?: string; image?: string; release_name?: string }> }>(
       `${AI_APPS_RUNNER_URL}/apps`,
       { headers: { 'x-runner-token': AI_APPS_RUNNER_TOKEN } }
     );
-    const image = registry.data?.apps?.find((entry) => entry.app_id === appId)?.image;
+    const releaseName = releaseNameForTarget(appId, environment);
+    const apps = registry.data?.apps ?? [];
+    const image =
+      apps.find((entry) => entry.app_id === appId && entry.release_name === releaseName)?.image ??
+      (environment === 'prod'
+        ? apps.find((entry) => entry.app_id === appId && (!entry.release_name || entry.release_name === appId))?.image
+        : undefined);
     if (!image) {
       throw new Error(`runner /apps has no image for ${appId}`);
     }
@@ -1918,7 +2610,7 @@ export class AiAppsService {
           buildRunnerDeploymentsUrl(),
           {
             appId,
-            environment: AI_APPS_RUNNER_ENVIRONMENT,
+            environment,
             image,
             secretNames,
             ...(database?.enabled ? { database: { enabled: true, type: database.type } } : {}),
@@ -1981,13 +2673,26 @@ export class AiAppsService {
     actorUid: string,
     eventContext: { appUid: string; appId: string; deploymentId: string },
     message: string,
-    failureStream: 'build' | 'runtime' | null = null
+    failureStream: 'build' | 'runtime' | null = null,
+    environment: AiAppTargetEnvironment = 'prod'
   ): Promise<void> {
-    await this.prisma.aiApp.update({
-      where: { uid: app.uid },
-      data: { status: 'ERROR', notes: message.slice(0, 2000), failureStream },
+    const notes = message.slice(0, 2000);
+    if (environment === 'preview') {
+      await this.targetTable()?.update({
+        where: { appUid_environment: { appUid: app.uid, environment: 'preview' } },
+        data: { status: 'ERROR', notes, failureStream },
+      });
+    } else {
+      const updated = await this.prisma.aiApp.update({
+        where: { uid: app.uid },
+        data: { status: 'ERROR', notes, failureStream },
+      });
+      await this.mirrorProdTarget(updated);
+    }
+    await this.recordEvent('DEPLOY_FAILED', actorUid, {
+      ...eventContext,
+      message: environment === 'preview' ? `preview: ${notes}` : notes,
     });
-    await this.recordEvent('DEPLOY_FAILED', actorUid, { ...eventContext, message: message.slice(0, 2000) });
     await this.notifyDeployFailed(app);
   }
 
@@ -2118,6 +2823,16 @@ export class AiAppsService {
    * becomes reachable within the verification window (~6 min by default — must
    * cover the pod-up → domain-registration gap, observed at 1–5 minutes).
    */
+  /** Auth gate version a live target reports on `/_pln/gate`; undefined for gate v1 (no such route) or no answer. */
+  private async gateVersionServed(url: string): Promise<number | undefined> {
+    try {
+      const res = await axios.get(`${url}/_pln/gate`, { timeout: 10000, validateStatus: () => true, maxRedirects: 0 });
+      return res.status === 200 && typeof res.data?.version === 'number' ? res.data.version : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
   private async verifyAppLive(url: string): Promise<boolean> {
     for (let attempt = 1; attempt <= AI_APPS_VERIFY_ATTEMPTS; attempt++) {
       try {
@@ -2143,6 +2858,148 @@ export class AiAppsService {
    * removed on the runner side). `memberUid` is the member performing the
    * deletion.
    */
+  private deployKeyTable(): {
+    findMany: (args: any) => Promise<any[]>;
+    findUnique: (args: any) => Promise<any | null>;
+    create: (args: any) => Promise<any>;
+    update: (args: any) => Promise<any>;
+  } | null {
+    const table = (this.prisma as any).aiAppDeployKey;
+    return table?.create ? table : null;
+  }
+
+  async createDeployKey(memberUid: string, uid: string, environment: AiAppTargetEnvironment) {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid } });
+    if (!app || app.status === 'DELETED') throw new NotFoundException(`AI App not found: ${uid}`);
+    if (!(await this.isCreatorOrDirectoryAdmin(memberUid, app))) {
+      throw new ForbiddenException('Only the app creator or a directory admin can create a deployment key');
+    }
+    const table = this.deployKeyTable();
+    if (!table) throw new InternalServerErrorException('Deployment keys are not available');
+    const token = `plndeploy_${randomBytes(24).toString('hex')}`;
+    const created = await table.create({
+      data: {
+        appUid: app.uid,
+        environment,
+        tokenHash: createHash('sha256').update(token).digest('hex'),
+        tokenPrefix: token.slice(0, 16),
+        createdByUid: memberUid,
+      },
+    });
+    return {
+      uid: created.uid,
+      environment,
+      tokenPrefix: created.tokenPrefix,
+      token,
+      createdAt: created.createdAt,
+    };
+  }
+
+  async listDeployKeys(memberUid: string, uid: string) {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid } });
+    if (!app || app.status === 'DELETED') throw new NotFoundException(`AI App not found: ${uid}`);
+    if (!(await this.isCreatorOrDirectoryAdmin(memberUid, app))) {
+      throw new ForbiddenException('Only the app creator or a directory admin can list deployment keys');
+    }
+    const rows = (await this.deployKeyTable()?.findMany({
+      where: { appUid: app.uid, revokedAt: null },
+      orderBy: { createdAt: 'desc' },
+    })) ?? [];
+    return {
+      keys: rows.map((row) => ({
+        uid: row.uid,
+        environment: row.environment,
+        tokenPrefix: row.tokenPrefix,
+        createdAt: row.createdAt,
+        lastUsedAt: row.lastUsedAt,
+      })),
+    };
+  }
+
+  async revokeDeployKey(memberUid: string, uid: string, keyUid: string) {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid } });
+    if (!app || app.status === 'DELETED') throw new NotFoundException(`AI App not found: ${uid}`);
+    if (!(await this.isCreatorOrDirectoryAdmin(memberUid, app))) {
+      throw new ForbiddenException('Only the app creator or a directory admin can revoke a deployment key');
+    }
+    const table = this.deployKeyTable();
+    const key = table ? await table.findUnique({ where: { uid: keyUid } }) : null;
+    if (!key || key.appUid !== app.uid || key.revokedAt) {
+      throw new NotFoundException('Deployment key not found');
+    }
+    await table!.update({ where: { uid: keyUid }, data: { revokedAt: new Date() } });
+    return { uid: keyUid, revoked: true };
+  }
+
+  async deleteTarget(memberUid: string, uid: string, environment: AiAppTargetEnvironment): Promise<ApiAiApp<AiApp>> {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid } });
+    if (!app || app.status === 'DELETED') {
+      throw new NotFoundException(`AI App not found: ${uid}`);
+    }
+    if (!(await this.isCreatorOrDirectoryAdmin(memberUid, app))) {
+      throw new ForbiddenException('Only the app creator or a directory admin can tear down a deployment');
+    }
+    const table = this.targetTable();
+    if (environment === 'preview') {
+      const target = table
+        ? await table.findUnique({ where: { appUid_environment: { appUid: app.uid, environment: 'preview' } } })
+        : null;
+      if (!target?.url && !target?.s3Key && !target?.lastDeployedAt) {
+        throw new NotFoundException('This environment is not deployed');
+      }
+    } else if (!app.url && !app.s3Key && !app.lastDeployedAt) {
+      throw new NotFoundException('This environment is not deployed');
+    }
+
+    const eventContext = { appUid: app.uid, appId: app.appId, message: `environment=${environment}` };
+    await this.recordEvent('DELETE_STARTED', memberUid, eventContext);
+    try {
+      const response = await axios.delete(`${AI_APPS_RUNNER_URL}/apps/${encodeURIComponent(app.appId)}`, {
+        headers: { 'x-runner-token': AI_APPS_RUNNER_TOKEN },
+        params: { environment },
+        validateStatus: (status) => status < 500,
+      });
+      if (response.status >= 400 && response.status !== 404) {
+        throw new BadGatewayException('Failed to tear down the deployment');
+      }
+    } catch (error) {
+      if (!(error instanceof BadGatewayException)) {
+        this.logRunnerError('delete-target', app.appId, error);
+      }
+      await this.recordEvent('DELETE_FAILED', memberUid, eventContext);
+      if (error instanceof BadGatewayException) throw error;
+      throw new BadGatewayException('Failed to tear down the deployment');
+    }
+
+    if (environment === 'preview') {
+      await table?.deleteMany({ where: { appUid: app.uid, environment: 'preview' } });
+    } else {
+      const cleared = await this.prisma.aiApp.update({
+        where: { uid: app.uid },
+        data: {
+          status: 'IN_DEVELOPMENT',
+          notes: null,
+          url: null,
+          httpUrl: null,
+          host: null,
+          port: null,
+          deploymentId: null,
+          s3Key: null,
+          requiredEnvVars: [],
+          providedEnvVars: [],
+          lastDeployedAt: null,
+          failureStream: null,
+          database: Prisma.DbNull,
+          directLinkGateReady: false,
+          publicPathsGateReady: false,
+        },
+      });
+      await this.mirrorProdTarget(cleared);
+    }
+    await this.recordEvent('DELETE_SUCCEEDED', memberUid, eventContext);
+    return this.getApp(uid, memberUid);
+  }
+
   async deleteApp(memberUid: string, uid: string): Promise<ApiAiApp<AiApp>> {
     const app = await this.prisma.aiApp.findUnique({ where: { uid } });
     if (!app) {
@@ -2192,6 +3049,7 @@ export class AiAppsService {
       where: { uid },
       data: { status: 'DELETED', url: null, httpUrl: null, host: null, port: null, notes: null },
     });
+    await this.targetTable()?.deleteMany({ where: { appUid: uid } });
     await this.recordEvent('DELETE_SUCCEEDED', memberUid, eventContext);
     return this.toApiApp((await this.withMember([updated]))[0], true);
   }

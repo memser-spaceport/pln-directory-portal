@@ -18,6 +18,7 @@ import {
   UseGuards,
   UseInterceptors,
   UsePipes,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiConsumes } from '@nestjs/swagger';
@@ -26,7 +27,7 @@ import { ZodValidationPipe } from '@abitia/zod-dto';
 import { Request, Response } from 'express';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
-import { UserAccessTokenValidateGuard, validateUserAccessToken } from '../guards/user-access-token-validate.guard';
+import { validateUserAccessToken } from '../guards/user-access-token-validate.guard';
 import { extractTokenFromRequest } from '../utils/auth';
 import { RequirePermissions } from '../rbac/rbac.decorator';
 import { RbacGuard } from '../rbac/rbac.guard';
@@ -35,12 +36,21 @@ import { AI_APPS_PERMISSIONS } from '../access-control-v2/access-control-v2.cons
 import { AiAppsService } from './ai-apps.service';
 import { AiAppsAccessService } from './ai-apps-access.service';
 import { AiAppsConnectService } from './ai-apps-connect.service';
+import { AiAppsSessionService, isAiAppSessionToken } from './ai-apps-session.service';
 import { AiAppsStarterKitService } from './ai-apps-starter-kit.service';
 import { AiAppTokenGuard } from './guards/ai-app-token.guard';
+import { AiAppMemberContextGuard } from './guards/ai-app-member-context.guard';
 import { DeployAppDto } from './dto/deploy-app.dto';
 import { RegisterDraftDto } from './dto/register-draft.dto';
-import { DeployDraftDto } from './dto/deploy-draft.dto';
+import { CreateAiAppDeployKeyDto, DeployDraftDto } from './dto/deploy-draft.dto';
 import { StartConnectDto } from './dto/start-connect.dto';
+import {
+  AppSessionRequestDto,
+  RedeemAppSessionCodeDto,
+  RefreshAuthGatesDto,
+  RollbackAuthGateDto,
+} from './dto/app-session.dto';
+import { AiAppsAuthGateService } from './ai-apps-auth-gate.service';
 import { PollConnectDto } from './dto/poll-connect.dto';
 import { SubmitFeedbackDto } from './dto/submit-feedback.dto';
 import { UpdateFeedbackStatusDto } from './dto/update-feedback-status.dto';
@@ -53,6 +63,7 @@ import {
   UpdateAiAppPublicPathsDto,
 } from './dto/ai-app-access.dto';
 import {
+  AI_APP_SESSION_HEADER,
   AI_APPS_LOG_DEPLOYMENT_ID_PATTERN,
   AI_APPS_MAX_PRD_BYTES,
   AI_APPS_MAX_ZIP_BYTES,
@@ -73,7 +84,9 @@ export class AiAppsController {
     private readonly connectService: AiAppsConnectService,
     private readonly starterKitService: AiAppsStarterKitService,
     private readonly rbacService: RbacService,
-    private readonly accessService: AiAppsAccessService
+    private readonly accessService: AiAppsAccessService,
+    private readonly sessionService: AiAppsSessionService,
+    private readonly authGateService: AiAppsAuthGateService
   ) {}
 
   /**
@@ -119,6 +132,90 @@ export class AiAppsController {
   async approveConnectSession(@Param('uid') uid: string, @Req() req: any) {
     const memberUid = await this.resolveMemberUid(req);
     return this.connectService.approve(uid, memberUid);
+  }
+
+  /**
+   * One-time code for the app-session sign-in round trip (LabOS authorize route, member JWT). Returns the code and
+   * the app target's origin to send the member back to; the origin comes from appId + target, never from input.
+   */
+  @NoCache()
+  @Post('sessions/code')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  @UsePipes(ZodValidationPipe)
+  async issueAppSessionCode(@Body() body: AppSessionRequestDto, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.sessionService.issueCode(memberUid, body.appId, body.target);
+  }
+
+  /** Redeems a sign-in code for an app session (auth gate; no user auth, the code is the credential). */
+  @NoCache()
+  // Called by every app's auth gate from the cluster's shared egress IPs, like access-check.
+  @Throttle(AI_APPS_SIDECAR_THROTTLE_LIMIT, AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS)
+  @Post('sessions/redeem')
+  @UsePipes(ZodValidationPipe)
+  async redeemAppSessionCode(@Body() body: RedeemAppSessionCodeDto) {
+    return this.sessionService.redeemCode(body.code, body.appId, body.target);
+  }
+
+  /**
+   * App session for a member the auth gate already let in with their LabOS token (member JWT). This is the gate's
+   * silent path while LabOS still shares its token with app hosts.
+   */
+  @NoCache()
+  // Called by every app's auth gate from the cluster's shared egress IPs, like access-check.
+  @Throttle(AI_APPS_SIDECAR_THROTTLE_LIMIT, AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS)
+  @Post('sessions/exchange-token')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  @UsePipes(ZodValidationPipe)
+  async exchangeAppSessionToken(@Body() body: AppSessionRequestDto, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.sessionService.exchangeToken(memberUid, body.appId);
+  }
+
+  /** LabOS sign-out: ends every app session of the member (member JWT). */
+  @NoCache()
+  @Post('sessions/revoke')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(UserTokenCheckGuard)
+  async revokeAppSessions(@Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return { revoked: await this.sessionService.revokeAllForMember(memberUid) };
+  }
+
+  /** Fleet auth-gate state for the silent migration (directory admin). Declared before `:uid` routes. */
+  @NoCache()
+  @Get('admin/auth-gate')
+  @UseGuards(UserTokenCheckGuard)
+  async listAuthGates(@Req() req: any) {
+    await this.assertDirectoryAdmin(req);
+    return { targets: await this.authGateService.listFleet() };
+  }
+
+  /**
+   * Refreshes the auth gate of eligible app targets, one at a time, verifying each and rolling it back on any
+   * mismatch (directory admin). Owners see nothing: no status, event or notification changes.
+   */
+  @NoCache()
+  @Post('admin/auth-gate/refresh')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(UserTokenCheckGuard)
+  @UsePipes(ZodValidationPipe)
+  async refreshAuthGates(@Body() body: RefreshAuthGatesDto, @Req() req: any) {
+    await this.assertDirectoryAdmin(req);
+    return { outcomes: await this.authGateService.refreshBatch(body) };
+  }
+
+  /** Rolls one app target back to its revision before the last gate refresh (directory admin). */
+  @NoCache()
+  @Post('admin/auth-gate/:uid/rollback')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(UserTokenCheckGuard)
+  @UsePipes(ZodValidationPipe)
+  async rollbackAuthGate(@Param('uid') uid: string, @Body() body: RollbackAuthGateDto, @Req() req: any) {
+    await this.assertDirectoryAdmin(req);
+    return this.authGateService.rollbackOne(uid, body.target);
   }
 
   /**
@@ -189,7 +286,7 @@ export class AiAppsController {
   @NoCache()
   @Throttle(AI_APPS_SIDECAR_THROTTLE_LIMIT, AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS)
   @Get('me')
-  @UseGuards(UserAccessTokenValidateGuard, RbacGuard)
+  @UseGuards(AiAppMemberContextGuard, RbacGuard)
   @RequirePermissions(READ)
   async getMemberContext(@Req() req: any) {
     const memberUid = await this.resolveMemberUid(req);
@@ -210,9 +307,15 @@ export class AiAppsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @UsePipes(ZodValidationPipe)
   async trackEvent(@Body() body: TrackEventDto, @Req() req: Request) {
+    const token = extractTokenFromRequest(req);
+    // An app session token attributes the event to its member only when it is live for the app it came from.
+    const session = isAiAppSessionToken(token)
+      ? await this.sessionService.authenticateAppRequest(token as string, req.headers.origin)
+      : null;
     await this.aiAppsService.trackAppEvent({
       origin: req.headers.origin,
-      token: extractTokenFromRequest(req),
+      token: isAiAppSessionToken(token) ? undefined : token,
+      sessionMemberUid: session?.memberUid,
       anonId: body.anonId,
       event: body.event,
       properties: body.properties as Record<string, unknown> | undefined,
@@ -228,8 +331,9 @@ export class AiAppsController {
    * Otherwise the session is required: 200 = serve; 401 = not signed in; 403 =
    * missing the PL Infra permission (`reason: 'permission'`) or a private app
    * the member may not open (`reason: 'private'`). Accepts the Bearer header
-   * or the LabOS `authToken` cookie, like `/me`. Declared before `:uid` so the
-   * literal path wins.
+   * or the LabOS `authToken` cookie, like `/me`, or the auth gate's app session in
+   * `X-AI-App-Session` (valid only for its own appId; same permission and access
+   * rule as a LabOS token). Declared before `:uid` so the literal path wins.
    */
   @NoCache()
   @Throttle(AI_APPS_SIDECAR_THROTTLE_LIMIT, AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS)
@@ -240,9 +344,17 @@ export class AiAppsController {
     if (this.accessService.isPublicPath(app, query.path)) {
       return { allowed: true, reason: 'public' };
     }
+    const appSession = req.headers?.[AI_APP_SESSION_HEADER];
+    if (typeof appSession === 'string' && appSession) {
+      const session = await this.sessionService.validate(query.appId, appSession);
+      if (!session) {
+        throw new UnauthorizedException('Invalid or expired app session');
+      }
+      return this.accessService.checkAccess(session.memberUid, query.appId, query.method, { app }, query.target ?? 'prod');
+    }
     await validateUserAccessToken(req);
     const memberUid = await this.resolveMemberUid(req);
-    return this.accessService.checkAccess(memberUid, query.appId, query.method, { app });
+    return this.accessService.checkAccess(memberUid, query.appId, query.method, { app }, query.target ?? 'prod');
   }
 
   /** Single AI App detail (includes `canManage` for the requesting member). */
@@ -294,14 +406,22 @@ export class AiAppsController {
     @Query('limit') limit?: string,
     @Query('sinceMinutes') sinceMinutes?: string,
     @Query('nextToken') nextToken?: string,
-    @Query('deploymentId') deploymentId?: string
+    @Query('deploymentId') deploymentId?: string,
+    @Query('environment') environment?: string
   ) {
-    return this.aiAppsService.getAgentLogs(req.aiAppMemberUid, uid, 'build', {
-      limit: this.parsePositiveInt('limit', limit),
-      sinceMinutes: this.parsePositiveInt('sinceMinutes', sinceMinutes),
-      nextToken,
-      deploymentId: this.parseDeploymentId(deploymentId),
-    });
+    return this.aiAppsService.getAgentLogs(
+      req.aiAppMemberUid,
+      uid,
+      'build',
+      {
+        limit: this.parsePositiveInt('limit', limit),
+        sinceMinutes: this.parsePositiveInt('sinceMinutes', sinceMinutes),
+        nextToken,
+        deploymentId: this.parseDeploymentId(deploymentId),
+        ...this.optionalEnvironment(environment),
+      },
+      req.aiAppKeyScope
+    );
   }
 
   /**
@@ -318,14 +438,22 @@ export class AiAppsController {
     @Query('limit') limit?: string,
     @Query('sinceMinutes') sinceMinutes?: string,
     @Query('nextToken') nextToken?: string,
-    @Query('deploymentId') deploymentId?: string
+    @Query('deploymentId') deploymentId?: string,
+    @Query('environment') environment?: string
   ) {
-    return this.aiAppsService.getAgentLogs(req.aiAppMemberUid, uid, 'runtime', {
-      limit: this.parsePositiveInt('limit', limit),
-      sinceMinutes: this.parsePositiveInt('sinceMinutes', sinceMinutes),
-      nextToken,
-      deploymentId: this.parseDeploymentId(deploymentId),
-    });
+    return this.aiAppsService.getAgentLogs(
+      req.aiAppMemberUid,
+      uid,
+      'runtime',
+      {
+        limit: this.parsePositiveInt('limit', limit),
+        sinceMinutes: this.parsePositiveInt('sinceMinutes', sinceMinutes),
+        nextToken,
+        deploymentId: this.parseDeploymentId(deploymentId),
+        ...this.optionalEnvironment(environment),
+      },
+      req.aiAppKeyScope
+    );
   }
 
   /**
@@ -349,7 +477,8 @@ export class AiAppsController {
     @Query('sinceMinutes') sinceMinutes?: string,
     @Query('nextToken') nextToken?: string,
     @Query('deploymentId') deploymentId?: string,
-    @Query('order') order?: string
+    @Query('order') order?: string,
+    @Query('environment') environment?: string
   ) {
     const memberUid = await this.resolveMemberUid(req);
     const query = {
@@ -357,6 +486,7 @@ export class AiAppsController {
       sinceMinutes: this.parsePositiveInt('sinceMinutes', sinceMinutes),
       nextToken,
       deploymentId: this.parseDeploymentId(deploymentId),
+      ...this.optionalEnvironment(environment),
     };
     return this.parseLogOrder(order) === 'desc'
       ? this.aiAppsService.getMemberLogsDesc(memberUid, uid, 'build', query)
@@ -379,7 +509,8 @@ export class AiAppsController {
     @Query('sinceMinutes') sinceMinutes?: string,
     @Query('nextToken') nextToken?: string,
     @Query('deploymentId') deploymentId?: string,
-    @Query('order') order?: string
+    @Query('order') order?: string,
+    @Query('environment') environment?: string
   ) {
     const memberUid = await this.resolveMemberUid(req);
     const query = {
@@ -387,6 +518,7 @@ export class AiAppsController {
       sinceMinutes: this.parsePositiveInt('sinceMinutes', sinceMinutes),
       nextToken,
       deploymentId: this.parseDeploymentId(deploymentId),
+      ...this.optionalEnvironment(environment),
     };
     return this.parseLogOrder(order) === 'desc'
       ? this.aiAppsService.getMemberLogsDesc(memberUid, uid, 'runtime', query)
@@ -406,7 +538,7 @@ export class AiAppsController {
   @UseGuards(AiAppTokenGuard)
   @UsePipes(ZodValidationPipe)
   async updateAppMetadataFromAgent(@Param('uid') uid: string, @Body() body: UpdateAppMetadataDto, @Req() req: any) {
-    return this.aiAppsService.updateMetadata(req.aiAppMemberUid, uid, body, true);
+    return this.aiAppsService.updateMetadata(req.aiAppMemberUid, uid, body, true, req.aiAppKeyScope);
   }
 
   /** Upload a Markdown or HTML PRD file from the dashboard without redeploying. */
@@ -430,9 +562,9 @@ export class AiAppsController {
   @Get(':uid/live')
   @UseGuards(UserTokenCheckGuard, RbacGuard)
   @RequirePermissions(READ)
-  async checkAppLive(@Param('uid') uid: string, @Req() req: any) {
+  async checkAppLive(@Param('uid') uid: string, @Req() req: any, @Query('environment') environment?: string) {
     const memberUid = await this.resolveMemberUid(req).catch(() => undefined);
-    return this.aiAppsService.checkAppLive(uid, memberUid);
+    return this.aiAppsService.checkAppLive(uid, memberUid, this.parseTargetEnvironment(environment) ?? 'prod');
   }
 
   /**
@@ -511,7 +643,7 @@ export class AiAppsController {
     @Req() req: any
   ) {
     const memberUid = await this.resolveMemberUid(req);
-    return this.accessService.searchCandidates(memberUid, uid, query.search);
+    return this.accessService.searchCandidates(memberUid, uid, query.search, query.environment ?? 'prod');
   }
 
   /** Full event/status history for a single app, newest first. */
@@ -600,6 +732,49 @@ export class AiAppsController {
     return this.aiAppsService.deleteApp(memberUid, uid);
   }
 
+  @NoCache()
+  @Delete(':uid/deployments/:environment')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(WRITE)
+  async deleteTarget(
+    @Param('uid') uid: string,
+    @Param('environment') environment: string,
+    @Req() req: any
+  ) {
+    const memberUid = await this.resolveMemberUid(req);
+    const target = this.parseTargetEnvironment(environment);
+    if (!target) throw new BadRequestException('environment must be prod or preview');
+    return this.aiAppsService.deleteTarget(memberUid, uid, target);
+  }
+
+  @NoCache()
+  @Get(':uid/deploy-keys')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async listDeployKeys(@Param('uid') uid: string, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.listDeployKeys(memberUid, uid);
+  }
+
+  @NoCache()
+  @Post(':uid/deploy-keys')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(WRITE)
+  @UsePipes(ZodValidationPipe)
+  async createDeployKey(@Param('uid') uid: string, @Body() body: CreateAiAppDeployKeyDto, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.createDeployKey(memberUid, uid, body.environment);
+  }
+
+  @NoCache()
+  @Post(':uid/deploy-keys/:keyUid/revoke')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(WRITE)
+  async revokeDeployKey(@Param('uid') uid: string, @Param('keyUid') keyUid: string, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.revokeDeployKey(memberUid, uid, keyUid);
+  }
+
   /** Download the starter kit ZIP. Carries no token — the agent obtains a deploy credential at deploy time via the LabOS connect flow. */
   @NoCache()
   @Get('starter-kit/download')
@@ -630,7 +805,7 @@ export class AiAppsController {
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: AI_APPS_MAX_ZIP_BYTES } }))
   @UsePipes(ZodValidationPipe)
   async deploy(@Req() req: any, @Body() body: DeployAppDto, @UploadedFile() file: Express.Multer.File) {
-    return this.aiAppsService.deploy(req.aiAppMemberUid, body, file, req.aiAppClientName);
+    return this.aiAppsService.deploy(req.aiAppMemberUid, body, file, req.aiAppClientName, req.aiAppKeyScope);
   }
 
   /**
@@ -646,7 +821,7 @@ export class AiAppsController {
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: AI_APPS_MAX_ZIP_BYTES } }))
   @UsePipes(ZodValidationPipe)
   async registerDraft(@Req() req: any, @Body() body: RegisterDraftDto, @UploadedFile() file: Express.Multer.File) {
-    return this.aiAppsService.registerDraft(req.aiAppMemberUid, body, file, req.aiAppClientName);
+    return this.aiAppsService.registerDraft(req.aiAppMemberUid, body, file, req.aiAppClientName, req.aiAppKeyScope);
   }
 
   /**
@@ -662,7 +837,20 @@ export class AiAppsController {
   @UsePipes(ZodValidationPipe)
   async deployDraft(@Param('uid') uid: string, @Body() body: DeployDraftDto, @Req() req: any) {
     const memberUid = await this.resolveMemberUid(req);
-    return this.aiAppsService.deployDraft(memberUid, uid, body.secrets);
+    return this.aiAppsService.deployDraft(memberUid, uid, body.secrets, body.environment ?? 'prod');
+  }
+
+  private parseTargetEnvironment(value?: string): 'prod' | 'preview' | undefined {
+    if (value === undefined || value === '') return undefined;
+    const raw = value.trim().toLowerCase();
+    if (raw === 'prod') return 'prod';
+    if (raw === 'preview' || raw === 'dev') return 'preview';
+    throw new BadRequestException('environment must be prod or preview');
+  }
+
+  private optionalEnvironment(value?: string): { environment?: 'prod' | 'preview' } {
+    const environment = this.parseTargetEnvironment(value);
+    return environment ? { environment } : {};
   }
 
   /** Parse an optional numeric query param, 400ing on anything but a positive integer. */
@@ -686,6 +874,13 @@ export class AiAppsController {
       throw new BadRequestException('deploymentId must be 1-128 characters of letters, digits, ".", "_" or "-"');
     }
     return value;
+  }
+
+  private async assertDirectoryAdmin(req: any): Promise<void> {
+    const memberUid = await this.resolveMemberUid(req);
+    if (!(await this.authGateService.isDirectoryAdmin(memberUid))) {
+      throw new ForbiddenException('Only a directory admin can manage the auth gate rollout');
+    }
   }
 
   private async resolveMemberUid(req: any): Promise<string> {

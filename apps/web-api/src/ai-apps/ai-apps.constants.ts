@@ -11,7 +11,7 @@
  */
 
 /** Starter kit version shown in the README, ZIP filename, and LabOS UI. Bump when the kit contents or flow change. */
-export const AI_APPS_STARTER_KIT_VERSION = '1.13';
+export const AI_APPS_STARTER_KIT_VERSION = '1.14';
 
 /** Max members on one private app's whitelist (the owner and directory admins never count). */
 export const AI_APPS_MAX_ALLOWED_MEMBERS = 200;
@@ -48,6 +48,32 @@ export const AI_APPS_WAU_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
  * deploy repeatedly within this window; after it the member must reconnect.
  */
 export const AI_APPS_DEPLOY_TOKEN_TTL_MS = 60 * 60 * 1000;
+
+/**
+ * App-scoped member sessions (LAB-2695). Deployed apps get a signed token bound to their appId instead of the LabOS
+ * token. `AI_APPS_SESSION_SECRET` signs it; without one, sessions are disabled and the auth gate keeps its v1
+ * behavior.
+ */
+export const AI_APPS_SESSION_SECRET = process.env.AI_APPS_SESSION_SECRET || '';
+/** Header the auth gate uses to present an app session to access-check. */
+export const AI_APP_SESSION_HEADER = 'x-ai-app-session';
+/** `iss` of an app session token; how every guard tells it apart from a LabOS token. */
+export const AI_APPS_SESSION_ISSUER = 'pln-ai-apps-session';
+const positiveNumberFromEnv = (name: string, fallback: number) => {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+};
+/** A session unused (through the auth gate) for this long expires. */
+export const AI_APPS_SESSION_IDLE_MS = positiveNumberFromEnv('AI_APPS_SESSION_IDLE_HOURS', 24) * 60 * 60 * 1000;
+/** Hard upper bound of a session, whatever its use. */
+export const AI_APPS_SESSION_MAX_MS = positiveNumberFromEnv('AI_APPS_SESSION_MAX_DAYS', 30) * 24 * 60 * 60 * 1000;
+/** Sliding the idle expiry writes at most this often per session. */
+export const AI_APPS_SESSION_TOUCH_MS = 5 * 60 * 1000;
+/** A sign-in code must be redeemed within this window, once. */
+export const AI_APPS_SESSION_CODE_TTL_MS = 60 * 1000;
+
+/** Auth gate (sidecar) version the fleet rollout migrates every app to. */
+export const AI_APPS_AUTH_GATE_CURRENT_VERSION = 2;
 
 /** Suggested poll interval (seconds) the agent waits between connect polls. */
 export const AI_APPS_CONNECT_POLL_INTERVAL_SEC = 3;
@@ -151,7 +177,27 @@ export type AiAppLogPhase = 'build' | 'runtime';
  * is returned, so a redeploy never hides the previous pods' output.
  * `deploymentId` narrows the result to one deployment's pods.
  */
-export type AiAppLogsQuery = { limit?: number; sinceMinutes?: number; nextToken?: string; deploymentId?: string };
+export type AiAppTargetEnvironment = 'prod' | 'preview';
+
+/** Maps the agent field onto a target. `dev` is the old name for preview. */
+export function coerceAppTarget(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  const raw = value.trim().toLowerCase();
+  if (!raw) return undefined;
+  return raw === 'dev' ? 'preview' : raw;
+}
+
+export function normalizeAppTarget(value: string | undefined | null): AiAppTargetEnvironment {
+  return coerceAppTarget(value) === 'preview' ? 'preview' : 'prod';
+}
+
+export type AiAppLogsQuery = {
+  limit?: number;
+  sinceMinutes?: number;
+  nextToken?: string;
+  deploymentId?: string;
+  environment?: AiAppTargetEnvironment;
+};
 
 /** Shape of a runner deploymentId — the API's ids on `/deploy` and the runner's `deploy-<ts>-<rand>` ids. */
 export const AI_APPS_LOG_DEPLOYMENT_ID_PATTERN = /^[A-Za-z0-9._-]{1,128}$/;
@@ -217,12 +263,91 @@ export const buildAppS3Key = (appId: string, deploymentId: string): string => `a
 export const AI_APPS_APP_DOMAIN = process.env.AI_APPS_APP_DOMAIN || 'os.pl.xyz';
 
 /**
- * The sandbox host/URL for an app is deterministic from its appId, so we can
- * compute it up front (before the runner responds): <appId>.<AI_APPS_APP_DOMAIN>
+ * appIds that would give an app a platform hostname (`<appId>.<AI_APPS_APP_DOMAIN>`). Prod AI Apps share an ALB
+ * ingress group with the Directory API, auth, forum and the orchestrator, so an app holding one of these hosts
+ * could add a competing ALB rule for it. Built from the non-app Ingress hosts in both clusters plus generic
+ * infrastructure names; `AI_APPS_RESERVED_APP_IDS_EXTRA` (comma list) adds more without a release.
  */
-export const buildAppHost = (appId: string): string => `${appId}.${AI_APPS_APP_DOMAIN}`;
-export const buildAppUrl = (appId: string): string => `https://${buildAppHost(appId)}`;
-export const buildAppHttpUrl = (appId: string): string => `http://${buildAppHost(appId)}`;
+const AI_APPS_BUILTIN_RESERVED_APP_IDS = [
+  // Platform hosts on os.pl.xyz (prod) and their dev counterparts.
+  'api-directory',
+  'api-events',
+  'api-plaa',
+  'api-data-enrichment',
+  'auth',
+  'forum',
+  'notification-processor',
+  'notification-receiver',
+  'deployment-orchestrator-runner',
+  'dev-directory',
+  'dev-events',
+  'dev-plaa',
+  'dev-data-enrichment',
+  'dev-auth',
+  'dev-forum',
+  'dev-notification-processor',
+  'dev-notification-receiver',
+  'dev-deployment-orchestrator-runner',
+  // LabOS portal labels.
+  'directoryv2',
+  'os',
+  // Generic infrastructure names.
+  'www',
+  'api',
+  'app',
+  'admin',
+  'mail',
+  'status',
+  'docs',
+  'grafana',
+  'static',
+  'cdn',
+  'assets',
+  'login',
+  'sso',
+  'id',
+];
+
+export const AI_APPS_RESERVED_APP_IDS: ReadonlySet<string> = new Set([
+  ...AI_APPS_BUILTIN_RESERVED_APP_IDS,
+  ...(process.env.AI_APPS_RESERVED_APP_IDS_EXTRA ?? '')
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean),
+]);
+
+export const isReservedAppId = (appId: string): boolean => AI_APPS_RESERVED_APP_IDS.has(appId.toLowerCase());
+
+function safeAppLabel(value: string) {
+  const name = value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '');
+  return name || 'app';
+}
+
+/**
+ * Prod release name stays `appId`. Preview is `{appId}-preview`, with the suffix kept
+ * inside Helm's 53-character release-name limit. Must match the orchestrator.
+ */
+export const releaseNameForTarget = (appId: string, environment: AiAppTargetEnvironment = 'prod'): string => {
+  const base = safeAppLabel(appId);
+  if (environment !== 'preview') return base.slice(0, 53).replace(/-+$/g, '');
+  const suffix = '-preview';
+  return `${base.slice(0, 53 - suffix.length).replace(/-+$/g, '')}${suffix}`;
+};
+
+/**
+ * The sandbox host/URL for an app is deterministic from its appId, so we can
+ * compute it up front (before the runner responds).
+ * Prod: <appId>.<domain>. Preview: <appId>-preview.<domain>.
+ */
+export const buildAppHost = (appId: string, environment: AiAppTargetEnvironment = 'prod'): string => {
+  const suffix = environment === 'preview' ? '-preview' : '';
+  const label = `${safeAppLabel(appId)}${suffix}`.slice(0, 63).replace(/-+$/g, '');
+  return `${label}.${AI_APPS_APP_DOMAIN}`;
+};
+export const buildAppUrl = (appId: string, environment: AiAppTargetEnvironment = 'prod'): string =>
+  `https://${buildAppHost(appId, environment)}`;
+export const buildAppHttpUrl = (appId: string, environment: AiAppTargetEnvironment = 'prod'): string =>
+  `http://${buildAppHost(appId, environment)}`;
 
 /**
  * Public base URL of THIS API. The agent-facing endpoint URLs written into the

@@ -316,13 +316,12 @@ folder. Before any UI work, load the **pl-design-system** skill
 ## Signed-in member context (personalization)
 The app can identify the PLN member using it. Load the **pln-member-context**
 skill (\`.claude/skills/pln-member-context/SKILL.md\`) before writing any code
-that needs the current user. In short: the LabOS session cookie (\`authToken\`,
-shared across the PLN apps domain) reaches the app's own origin, so browser
-code reads it from \`document.cookie\` (URL-decode + strip quotes) and calls the
-\`memberContextEndpoint\` from \`pln-app.config.json\` with
+that needs the current user. In short: browser code calls \`/_pln/me\` on the
+app's own origin (no token to handle); apps behind an older auth gate get a 404
+there and fall back to \`memberContextEndpoint\` with the \`authToken\` cookie as
 \`Authorization: Bearer <token>\` — use the exact snippet from the skill, and do
-NOT rely on \`credentials: 'include'\` alone (the cookie may not reach the API
-host). The response carries the member's public profile (uid, name, image,
+NOT rely on \`credentials: 'include'\` alone for that fallback (the cookie may
+not reach the API host). The response carries the member's public profile (uid, name, image,
 teams + roles, skills — deliberately no email or other contact info). Bake the
 endpoint URL into the app's frontend as a constant — the config file itself is
 not shipped inside \`app/\`.
@@ -529,7 +528,10 @@ follow "Apps that need secrets" above instead of deploying directly. In short:
    returned \`connectUrl\` + confirmation \`userCode\` to open and approve in LabOS,
    then poll until you receive a short-lived \`deployToken\`. Full steps are in the
    deploy skill. Keep the token **in memory only** — never write it to
-   \`pln-app.config.json\` or any file.
+   \`pln-app.config.json\` or any file. Alternatively the member can generate a
+   long-lived **deployment key** in LabOS (Deployment settings) and give it to
+   you; send that key the same way, as \`${AI_APP_TOKEN_HEADER}\`. A key works
+   only for the app and environment it was created for (\`prod\` or \`preview\`).
 4. Choose a stable, lowercase \`appId\` (e.g. \`my-leaderboard\`) and a fresh
    \`deploymentId\` for each deploy.
 5. Zip the **contents** of \`app/\` (so the \`Dockerfile\` sits at the root of the ZIP),
@@ -991,29 +993,24 @@ description: Get the signed-in PLN (or PL) member's identity (name, teams, role,
 # PLN Member Context — who is using the app
 
 Deployed apps are opened by signed-in PLN members from the PL Infra → AI Apps
-dashboard. The LabOS login cookie (\`authToken\`) is scoped to the shared apps
-domain, so the app's own origin receives it — the app reads it and presents it
-to the PLN API as a Bearer token. No login UI of its own is needed.
+dashboard. The app's auth gate (in front of every deployed app) already knows
+who the member is and answers \`/_pln/me\` on the app's own origin, so the app
+never handles a token and needs no login UI of its own.
 
 ## The endpoint
 
-\`memberContextEndpoint\` in \`pln-app.config.json\`:
-
-\`\`\`
-GET ${AI_APPS_ME_ENDPOINT}
-\`\`\`
-
-Call it from **browser code**, sending the \`authToken\` cookie value as the
-\`Authorization\` header. Do NOT rely on \`credentials: 'include'\` alone — the
-cookie's domain covers the app hosts but not necessarily the API host, so the
-browser may silently omit it (a guaranteed 401). Reading the cookie only needs
-the app's own origin, which always works. The config file is not shipped inside
-\`app/\`, so bake the URL into the frontend as a constant:
+Call **\`GET /_pln/me\`** on the app's own origin from **browser code**. It is a
+same-origin request, so there is no token, no CORS and no Authorization header
+to handle. Apps whose auth gate predates \`/_pln/me\` get a 404 there; for them
+the snippet falls back to \`memberContextEndpoint\` from \`pln-app.config.json\`
+(\`${AI_APPS_ME_ENDPOINT}\`) with the \`authToken\` cookie as a Bearer token. The
+config file is not shipped inside \`app/\`, so bake that URL in as a constant.
+Use the snippet as-is:
 
 \`\`\`js
 const MEMBER_CONTEXT_URL = '${AI_APPS_ME_ENDPOINT}';
 
-// The cookie value is URL-encoded and JSON-quoted (e.g. %22eyJhbGci...%22).
+// Fallback only: the cookie value is URL-encoded and JSON-quoted (e.g. %22eyJhbGci...%22).
 function readAuthToken() {
   const match = document.cookie.match(/(?:^|;\\s*)authToken=([^;]*)/);
   if (!match) return null;
@@ -1023,13 +1020,15 @@ function readAuthToken() {
 
 async function getMemberContext() {
   try {
-    const token = readAuthToken();
-    const res = await fetch(MEMBER_CONTEXT_URL, {
-      // Bearer from the cookie is the reliable path; credentials:'include' is
-      // only a fallback for environments where the cookie reaches the API host.
-      headers: token ? { Authorization: \`Bearer \${token}\` } : undefined,
-      credentials: token ? 'omit' : 'include',
-    });
+    let res = await fetch('/_pln/me', { credentials: 'same-origin' });
+    if (res.status === 404) {
+      // Older auth gate without /_pln/me: ask the PLN API directly.
+      const token = readAuthToken();
+      res = await fetch(MEMBER_CONTEXT_URL, {
+        headers: token ? { Authorization: \`Bearer \${token}\` } : undefined,
+        credentials: token ? 'omit' : 'include',
+      });
+    }
     if (!res.ok) return null; // 401 = not signed in, 403 = no AI Apps access
     const { member } = await res.json();
     return member;
@@ -1064,18 +1063,19 @@ compensate.
 
 - **Always handle the signed-out case.** \`getMemberContext()\` returns \`null\`
   when the visitor is not signed in, lacks AI Apps access, or when the app runs
-  locally (\`npm start\` — no PLN cookie on localhost). Show a friendly note like
+  locally (\`npm start\` — there is no auth gate or PLN cookie on localhost). Show a friendly note like
   *"Open this app from the LabOS → AI Apps dashboard to personalize it"* and keep
   the rest of the app working. Never crash or block on missing identity.
 - **Personalization only, not authentication.** Use the identity to greet the
   member, tag feedback/content with who wrote it, or tailor behavior. Do not
   gate sensitive or destructive actions on it, and don't build your own
   session/auth system on top.
-- Call it client-side. If you must know the member on your server, do the same
-  thing there: the \`authToken\` cookie arrives on every request to the app, so
-  decode it (URL-decode, strip the surrounding double quotes) and forward it to
-  the endpoint as \`Authorization: Bearer <token>\`. Never store or log the
-  token, and never send it — or the member's data — to any third-party service.
+- Call it client-side. If you must know the member on your server, the
+  \`authToken\` cookie arrives on every request to the app: decode it (URL-decode,
+  strip the surrounding double quotes) and forward it to \`memberContextEndpoint\`
+  as \`Authorization: Bearer <token>\`. It is a session for this app only — it
+  works for this endpoint and nothing else. Never store or log the token, and
+  never send it — or the member's data — to any third-party service.
 - Keep the token in memory for the current page only — don't persist it to
   localStorage, files, or your own backend.
 - This is the only PLN member API available to apps. Don't call other internal
@@ -1350,7 +1350,9 @@ connection string into the LabOS secrets page, same as an API key.
    config. \`appId\`s are **global across ALL PLN members** — the app's URL and
    infrastructure are derived from it — so pick something distinctive; a generic
    slug another member already claimed is rejected with \`409 Conflict\` at deploy
-   time (see step 7). Never edit \`kitVersion\` by hand.
+   time (see step 7). Names of PLN platform services and generic infrastructure
+   words (e.g. \`www\`, \`api\`) are **reserved** and rejected with \`400 Bad Request\`, so
+   prefer a slug that describes this specific app. Never edit \`kitVersion\` by hand.
 2. **Settle the display name, description & tags.** If \`appName\` in the config
    is empty (first deploy), load the **app-metadata** skill
    (\`.claude/skills/app-metadata/SKILL.md\`): propose a human-friendly name, a
@@ -1436,6 +1438,7 @@ connection string into the LabOS secrets page, same as an API key.
      -F "description=<the approved appDescription from pln-app.config.json>" \\
      -F 'tags=<the approved appTags from pln-app.config.json as a JSON array, e.g. ["planning","network"]>' \\
      -F "deploymentId=<unique id per deploy, e.g. a timestamp>" \\
+     -F "environment=<prod or preview; omit to deploy prod>" \\
      -F "kitVersion=<the kitVersion from pln-app.config.json>" \\
      -F "agentModel=<the model you are running on, e.g. claude-sonnet-4-5; omit the field if unknown>" \\
      -F "access=<OPEN or PRIVATE — first deploy only, see step 2; omit on redeploys>" \\
@@ -1492,6 +1495,11 @@ connection string into the LabOS secrets page, same as an API key.
      running (possibly one the member triggered from LabOS). Wait a minute and
      retry with the SAME \`appId\`.
 
+   **If the upload returns \`400 Bad Request\` saying the \`appId\` "is reserved for a
+   platform service"**, the slug matches a reserved name (see step 1). Pick a
+   different, more specific slug, update \`appId\` in \`pln-app.config.json\`, and
+   deploy again. Retrying the same \`appId\` always fails.
+
    **After the FIRST successful deploy**, offer the optional one-pager PRD —
    see "Offer the one-pager PRD" in the app-metadata skill. If the member wants
    one, generate it, get approval, and save it via \`metadataEndpoint\` — no
@@ -1529,6 +1537,7 @@ curl -X POST "<draftEndpoint>" \\
   -F "description=<the approved appDescription from pln-app.config.json>" \\
   -F 'tags=<the approved appTags as a JSON array, e.g. ["planning","network"]>' \\
   -F "deploymentId=<unique id per upload, e.g. a timestamp>" \\
+  -F "environment=<prod or preview; omit to register the prod draft>" \\
   -F "kitVersion=<the kitVersion from pln-app.config.json>" \\
   -F "agentModel=<the model you are running on; omit the field if unknown>" \\
   -F "access=<OPEN or PRIVATE — first upload only, see step 2; omit afterwards>" \\
@@ -1748,7 +1757,13 @@ errors or misbehaves. Log lines may include the app's URL/host — the
 - The deploy token is short-lived (≈1 hour) and tied to the member who approved the
   connect link. Keep it in memory only — never save it to a file or print it. Within
   the window you can redeploy without reconnecting; once it expires (deploy returns
-  \`401\`), run the connect flow again to get a fresh token.
+  \`401\`), run the connect flow again to get a fresh token. A LabOS **deployment
+  key** is an alternative: the member generates it in Deployment settings, it does
+  not expire until they revoke it, and it authorizes only that app and the
+  environment printed next to it. Send it as \`${AI_APP_TOKEN_HEADER}\` exactly like
+  a connect token. Omit \`environment\` to target prod; send \`environment=preview\` to
+  target the persistent preview deployment (\`<appId>-preview.<domain>\`). Prod and preview
+  keep separate builds, secrets, and databases. A preview key rejects a prod deploy.
 - Runtime secrets are supported only through the draft flow above — the sandbox
   injects exactly the env vars the member provided in LabOS. Non-secret config
   should ship sensible defaults — see the migration checklist in \`AGENTS.md\`.

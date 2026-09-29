@@ -3676,6 +3676,8 @@ model AiApp {
   /// admin) can restrict them from LabOS, or the agent on deploy when the
   /// member chooses. A deploy that doesn't send `access` keeps it.
   access          AiAppAccess @default(OPEN)
+  /// Preview starts private to the owner. Independent of `access`.
+  previewAccess   AiAppAccess @default(PRIVATE)
   /// True once the app has shipped with an auth sidecar that asks the
   /// Directory for a per-app decision. Apps last deployed before that keep a
   /// sidecar that only checks the PL Infra permission, so a PRIVATE setting
@@ -3703,13 +3705,122 @@ model AiApp {
   @@index([status])
 }
 
+enum AiAppTargetEnvironment {
+  prod
+  preview
+}
+
+/// One deploy target of an AiApp. Prod mirrors the historical single deployment.
+/// Preview is a second build, URL, secret set, and database on the same app.
+model AiAppTarget {
+  id                   Int                     @id @default(autoincrement())
+  uid                  String                  @unique @default(cuid())
+  /// AiApp.uid (no FK relation, matching the other AI App tables).
+  appUid               String
+  environment          AiAppTargetEnvironment
+  status               AiAppStatus             @default(IN_DEVELOPMENT)
+  notes                String?
+  url                  String?
+  httpUrl              String?
+  host                 String?
+  port                 Int?
+  deploymentId         String?
+  s3Key                String?
+  requiredEnvVars      String[]                @default([])
+  providedEnvVars      String[]                @default([])
+  kitVersion           String?
+  agentClient          String?
+  agentModel           String?
+  lastDeployedAt       DateTime?
+  failureStream        String?
+  database             Json?
+  directLinkGateReady  Boolean                 @default(false)
+  publicPathsGateReady Boolean                 @default(false)
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+
+  @@unique([appUid, environment])
+  @@index([appUid])
+}
+
+/// Long-lived deploy credential minted in LabOS. The full token is shown once;
+/// only its hash is stored. Scoped to one app and one environment.
+model AiAppDeployKey {
+  id           Int                     @id @default(autoincrement())
+  uid          String                  @unique @default(cuid())
+  appUid       String
+  environment  AiAppTargetEnvironment
+  tokenHash    String                  @unique
+  /// Non-secret prefix shown in the key list (`plndeploy_ab12…`).
+  tokenPrefix  String
+  createdByUid String
+  revokedAt    DateTime?
+  lastUsedAt   DateTime?
+  createdAt    DateTime                @default(now())
+
+  @@index([appUid])
+}
+
+/// App-scoped member session for one deployed AI App (LAB-2695). The token handed to the app is a signed JWT bound to
+/// `appId`; only its sha256 is stored, and every use is validated here (idle timeout, absolute expiry, revocation).
+model AiAppSession {
+  id            Int       @id @default(autoincrement())
+  uid           String    @unique @default(cuid())
+  appId         String
+  memberUid     String
+  tokenHash     String    @unique
+  createdAt     DateTime  @default(now())
+  lastUsedAt    DateTime  @default(now())
+  idleExpiresAt DateTime
+  expiresAt     DateTime
+  revokedAt     DateTime?
+
+  @@index([memberUid, revokedAt])
+  @@index([expiresAt])
+}
+
+/// One-time code LabOS mints for the app-session sign-in round trip; redeemable once, for the same appId + target,
+/// within 60 seconds. Only its sha256 is stored.
+model AiAppSessionCode {
+  id          Int                    @id @default(autoincrement())
+  uid         String                 @unique @default(cuid())
+  codeHash    String                 @unique
+  appId       String
+  environment AiAppTargetEnvironment
+  memberUid   String
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime               @default(now())
+
+  @@index([expiresAt])
+}
+
+/// Auth gate (sidecar) version running for one target of an app. Kept outside AiApp/AiAppTarget so a platform
+/// refresh never bumps their updatedAt ("Last updated" in LabOS) or reaches API responses.
+model AiAppAuthGate {
+  id               Int                    @id @default(autoincrement())
+  appUid           String
+  environment      AiAppTargetEnvironment
+  version          Int                    @default(1)
+  refreshedAt      DateTime?
+  lastError        String?
+  /// Helm revision before the last gate refresh; the only revision a gate rollback may restore.
+  previousRevision Int?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@unique([appUid, environment])
+}
+
 /// Whitelist of a PRIVATE app: members (besides the owner and directory
 /// admins) who may find and open it. Kept while the app is OPEN so switching
 /// back restores it.
 model AiAppAllowedMember {
   /// AiApp.uid (no FK relation, matching the other POC tables).
-  appUid     String
-  memberUid  String
+  appUid      String
+  /// Which target this whitelist entry opens. Prod rows are the catalog rule.
+  environment AiAppTargetEnvironment @default(prod)
+  memberUid   String
   /// Who added this member (owner or directory admin).
   addedByUid String
   /// When the member got their "shared with you" notification. Set once the
@@ -3718,7 +3829,7 @@ model AiAppAllowedMember {
   notifiedAt DateTime?
   createdAt  DateTime @default(now())
 
-  @@id([appUid, memberUid])
+  @@id([appUid, environment, memberUid])
   @@index([memberUid])
 }
 

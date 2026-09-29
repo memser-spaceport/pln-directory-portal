@@ -3,6 +3,10 @@ import { BadRequestException, ForbiddenException, NotFoundException, RequestMeth
 import { GUARDS_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 
 jest.mock('axios', () => ({ isAxiosError: jest.fn(() => false), post: jest.fn(), get: jest.fn() }));
+jest.mock('./ai-apps.constants', () => ({
+  ...jest.requireActual('./ai-apps.constants'),
+  AI_APPS_S3_BUCKET: 'test-bucket',
+}));
 jest.mock('../push-notifications/push-notifications.service', () => ({
   PushNotificationsService: jest.fn().mockImplementation(() => ({ create: jest.fn() })),
 }));
@@ -112,16 +116,24 @@ function buildPrisma(apps: Row[] = [PRIVATE_APP, OPEN_APP], allowed: Row[] = [],
       }),
     },
     aiAppAllowedMember: {
-      findUnique: jest.fn(
-        async ({ where }) =>
+      findUnique: jest.fn(async ({ where }) => {
+        const key = where.appUid_environment_memberUid ?? where.appUid_memberUid;
+        return (
           state.allowed.find(
-            (row) => row.appUid === where.appUid_memberUid.appUid && row.memberUid === where.appUid_memberUid.memberUid
+            (row) =>
+              row.appUid === key.appUid &&
+              row.memberUid === key.memberUid &&
+              (key.environment === undefined || (row.environment ?? 'prod') === key.environment)
           ) ?? null
-      ),
+        );
+      }),
       findMany: jest.fn(async ({ where }) =>
         state.allowed.filter(
           (row) =>
-            (where.appUid === undefined || row.appUid === where.appUid) &&
+            (where.appUid === undefined ||
+              row.appUid === where.appUid ||
+              (where.appUid?.in && where.appUid.in.includes(row.appUid))) &&
+            (where.environment === undefined || (row.environment ?? 'prod') === where.environment) &&
             (where.memberUid === undefined ||
               (typeof where.memberUid === 'string'
                 ? row.memberUid === where.memberUid
@@ -134,6 +146,7 @@ function buildPrisma(apps: Row[] = [PRIVATE_APP, OPEN_APP], allowed: Row[] = [],
           (row) =>
             row.appUid === where.appUid &&
             row.memberUid === where.memberUid &&
+            (where.environment === undefined || (row.environment ?? 'prod') === where.environment) &&
             (where.notifiedAt === undefined || (row.notifiedAt ?? null) === where.notifiedAt)
         );
         rows.forEach((row) => Object.assign(row, data));
@@ -141,7 +154,12 @@ function buildPrisma(apps: Row[] = [PRIVATE_APP, OPEN_APP], allowed: Row[] = [],
       }),
       deleteMany: jest.fn(async ({ where }) => {
         state.allowed = state.allowed.filter(
-          (row) => !(row.appUid === where.appUid && where.memberUid.in.includes(row.memberUid))
+          (row) =>
+            !(
+              row.appUid === where.appUid &&
+              (where.environment === undefined || (row.environment ?? 'prod') === where.environment) &&
+              where.memberUid.in.includes(row.memberUid)
+            )
         );
         return { count: 0 };
       }),
@@ -209,6 +227,17 @@ describe('canViewApp (the visibility rule)', () => {
     ['a PRIVATE app, unresolved requester', PRIVATE_APP, undefined, false],
   ] as const)('%s → %s', async (_label, app, requester, expected) => {
     await expect(aiAppsService.canViewApp(requester, app as any)).resolves.toBe(expected);
+  });
+
+  it('a preview whitelist does not grant production access', async () => {
+    const { aiAppsService } = buildServices(
+      buildPrisma([PRIVATE_APP], [{ appUid: 'app-private', memberUid: 'friend-1', environment: 'preview' }])
+    );
+    const previewApp = { ...PRIVATE_APP, previewAccess: 'PRIVATE' };
+    await expect(aiAppsService.canViewApp('friend-1', previewApp as any)).resolves.toBe(false);
+    await expect(aiAppsService.canViewPreview('friend-1', previewApp as any)).resolves.toBe(true);
+    await expect(aiAppsService.canViewPreview(VIEWER, previewApp as any)).resolves.toBe(false);
+    await expect(aiAppsService.canViewPreview(OWNER, previewApp as any)).resolves.toBe(true);
   });
 });
 
@@ -284,7 +313,15 @@ describe('per-app reads for a non-allowed member', () => {
       checkAppLive: jest.fn().mockResolvedValue({ live: true }),
       listEvents: jest.fn(),
     };
-    const controller = new AiAppsController(aiAppsService as any, {} as any, {} as any, {} as any, {} as any);
+    const controller = new AiAppsController(
+      aiAppsService as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
     const req = { memberUid: VIEWER };
 
     await expect(controller.getAppEvents('app-private', req)).rejects.toThrow(ForbiddenException);
@@ -292,7 +329,7 @@ describe('per-app reads for a non-allowed member', () => {
     await expect(controller.listEvents(req, 'app-private')).rejects.toThrow(ForbiddenException);
     expect(aiAppsService.listEvents).not.toHaveBeenCalled();
     await controller.checkAppLive('app-private', req);
-    expect(aiAppsService.checkAppLive).toHaveBeenCalledWith('app-private', VIEWER);
+    expect(aiAppsService.checkAppLive).toHaveBeenCalledWith('app-private', VIEWER, 'prod');
   });
 });
 
@@ -741,7 +778,15 @@ describe('sidecar access check with public paths (controller)', () => {
   function buildController(apps: Row[] = [PUBLIC_PRIVATE_APP, OPEN_APP]) {
     const { accessService, prisma } = buildServices(buildPrisma(apps));
     const rbacService = { findMemberByEmail: jest.fn(async (email: string) => ({ uid: email.split('@')[0] })) };
-    const controller = new AiAppsController({} as any, {} as any, {} as any, rbacService as any, accessService);
+    const controller = new AiAppsController(
+      {} as any,
+      {} as any,
+      {} as any,
+      rbacService as any,
+      accessService,
+      {} as any,
+      {} as any
+    );
     return { controller, prisma };
   }
   const anonymous = (): Row => ({ headers: {}, cookies: {} });
@@ -878,5 +923,84 @@ describe('access routes', () => {
     const names = Object.getOwnPropertyNames(proto);
     expect(names.indexOf('checkAccess')).toBeGreaterThan(-1);
     expect(names.indexOf('checkAccess')).toBeLessThan(names.indexOf('getApp'));
+  });
+});
+
+describe('sidecar access check with an app session (controller)', () => {
+  const PUBLIC_PRIVATE_APP = { ...PRIVATE_APP, publicPaths: ['/api/*'] };
+
+  /** Sessions are keyed `session:<appId>:<memberUid>` in this fake; anything else is invalid. */
+  function buildController(apps: Row[] = [PUBLIC_PRIVATE_APP, OPEN_APP]) {
+    const { accessService } = buildServices(buildPrisma(apps));
+    const rbacService = { findMemberByEmail: jest.fn(async (email: string) => ({ uid: email.split('@')[0] })) };
+    const sessionService = {
+      validate: jest.fn(async (appId: string, token: string) => {
+        const [kind, tokenAppId, memberUid] = token.split(':');
+        return kind === 'session' && tokenAppId === appId ? { memberUid } : null;
+      }),
+    };
+    const controller = new AiAppsController(
+      {} as any,
+      {} as any,
+      {} as any,
+      rbacService as any,
+      accessService,
+      sessionService as any,
+      {} as any
+    );
+    return { controller, sessionService };
+  }
+  const withSession = (token: string): Row => ({ headers: { 'x-ai-app-session': token }, cookies: {} });
+  const withLabosToken = (memberUid: string): Row => ({
+    headers: { authorization: `Bearer ${memberUid}` },
+    cookies: {},
+  });
+  const check = (controller: AiAppsController, query: Row, req: Row) =>
+    controller.checkAccess({ method: 'GET', ...query } as any, req);
+  const outcome = (p: Promise<unknown>) =>
+    p.then(
+      (v) => ({ ok: v }),
+      (e) => ({ status: e.status })
+    );
+
+  beforeEach(() => {
+    mockedAxios.post.mockReset();
+    mockedAxios.post.mockImplementation(async (_url: string, body: any) => ({
+      data: { active: true, email: `${body.token}@x.test`, sub: body.token },
+    }));
+  });
+
+  it.each([
+    ['owner on a PRIVATE app', 'secret-tool', OWNER],
+    ['non-whitelisted member on a PRIVATE app', 'secret-tool', VIEWER],
+    ['whitelisted member on a PRIVATE app', 'secret-tool', 'friend-1'],
+    ['any member on an OPEN app', 'open-tool', VIEWER],
+    ['an untracked appId', 'not-ours', VIEWER],
+  ])('decides the same as a LabOS token: %s', async (_label, appId, member) => {
+    const { controller } = buildController();
+    const viaSession = await outcome(
+      check(controller, { appId, path: '/dashboard' }, withSession(`session:${appId}:${member}`))
+    );
+    const viaToken = await outcome(check(controller, { appId, path: '/dashboard' }, withLabosToken(member)));
+    expect(viaSession).toEqual(viaToken);
+  });
+
+  it('401s a session issued for another app, without falling back to anything else', async () => {
+    const { controller } = buildController();
+    await expect(
+      check(controller, { appId: 'open-tool', path: '/x' }, withSession(`session:secret-tool:${OWNER}`))
+    ).rejects.toMatchObject({ status: 401 });
+    expect(mockedAxios.post).not.toHaveBeenCalled();
+  });
+
+  it('still decides public paths before reading the session', async () => {
+    const { controller, sessionService } = buildController();
+    await expect(
+      check(controller, { appId: 'secret-tool', path: '/api/items' }, withSession('garbage'))
+    ).resolves.toEqual({
+      allowed: true,
+      reason: 'public',
+    });
+    expect(sessionService.validate).not.toHaveBeenCalled();
   });
 });

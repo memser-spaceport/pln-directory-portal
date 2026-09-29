@@ -1,5 +1,6 @@
 import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
+import { coerceAppTarget } from '../ai-apps.constants';
 import { EnvVarNameSchema } from './register-draft.dto';
 
 /**
@@ -11,6 +12,13 @@ import { EnvVarNameSchema } from './register-draft.dto';
  */
 export const DeployDraftSchema = z.object({
   secrets: z.record(EnvVarNameSchema, z.string().min(1).max(10000)).optional(),
+  environment: z.preprocess(coerceAppTarget, z.enum(['prod', 'preview']).optional()),
 });
 
 export class DeployDraftDto extends createZodDto(DeployDraftSchema) {}
+
+export const CreateAiAppDeployKeySchema = z.object({
+  environment: z.preprocess(coerceAppTarget, z.enum(['prod', 'preview'])),
+});
+
+export class CreateAiAppDeployKeyDto extends createZodDto(CreateAiAppDeployKeySchema) {}
