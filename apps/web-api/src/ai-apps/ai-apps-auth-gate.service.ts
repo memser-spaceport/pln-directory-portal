@@ -169,7 +169,11 @@ export class AiAppsAuthGateService {
     return fleet;
   }
 
-  /** Refreshes the chosen (or the next `batchSize` eligible) targets one at a time, stopping at `maxFailures`. */
+  /**
+   * Refreshes the chosen eligible targets one at a time, stopping at `maxFailures`. `batchSize` caps the targets
+   * actually refreshed; skipped ones (no live release, mid-deploy) are reported but don't take a slot, so repeated
+   * batches always reach the rest of the fleet.
+   */
   async refreshBatch(options: {
     appUids?: string[];
     target?: AiAppTargetEnvironment;
@@ -182,18 +186,21 @@ export class AiAppsAuthGateService {
     let candidates = (await this.listFleet()).filter((t) => t.eligible);
     if (options.appUids?.length) candidates = candidates.filter((t) => options.appUids!.includes(t.appUid));
     if (options.target) candidates = candidates.filter((t) => t.target === options.target);
-    candidates = candidates.slice(0, options.batchSize ?? candidates.length);
+    const batchSize = options.batchSize ?? candidates.length;
 
     const outcomes: AuthGateOutcome[] = [];
     let failures = 0;
+    let attempted = 0;
     for (const candidate of candidates) {
-      if (failures >= maxFailures) break;
+      if (failures >= maxFailures || attempted >= batchSize) break;
       if (options.dryRun) {
         outcomes.push({ ...this.ids(candidate), result: 'dry_run' });
+        attempted += 1;
         continue;
       }
       const outcome = await this.refreshOne(candidate, options.gateOverrides);
       outcomes.push(outcome);
+      if (outcome.result !== 'skipped') attempted += 1;
       if (outcome.result === 'failed' || outcome.result === 'rolled_back') failures += 1;
     }
     return outcomes;
