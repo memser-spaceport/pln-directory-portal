@@ -18,6 +18,7 @@ import {
   UseGuards,
   UseInterceptors,
   UsePipes,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiConsumes } from '@nestjs/swagger';
@@ -26,7 +27,7 @@ import { ZodValidationPipe } from '@abitia/zod-dto';
 import { Request, Response } from 'express';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
-import { UserAccessTokenValidateGuard, validateUserAccessToken } from '../guards/user-access-token-validate.guard';
+import { validateUserAccessToken } from '../guards/user-access-token-validate.guard';
 import { extractTokenFromRequest } from '../utils/auth';
 import { RequirePermissions } from '../rbac/rbac.decorator';
 import { RbacGuard } from '../rbac/rbac.guard';
@@ -35,12 +36,21 @@ import { AI_APPS_PERMISSIONS } from '../access-control-v2/access-control-v2.cons
 import { AiAppsService } from './ai-apps.service';
 import { AiAppsAccessService } from './ai-apps-access.service';
 import { AiAppsConnectService } from './ai-apps-connect.service';
+import { AiAppsSessionService, isAiAppSessionToken } from './ai-apps-session.service';
 import { AiAppsStarterKitService } from './ai-apps-starter-kit.service';
 import { AiAppTokenGuard } from './guards/ai-app-token.guard';
+import { AiAppMemberContextGuard } from './guards/ai-app-member-context.guard';
 import { DeployAppDto } from './dto/deploy-app.dto';
 import { RegisterDraftDto } from './dto/register-draft.dto';
 import { CreateAiAppDeployKeyDto, DeployDraftDto } from './dto/deploy-draft.dto';
 import { StartConnectDto } from './dto/start-connect.dto';
+import {
+  AppSessionRequestDto,
+  RedeemAppSessionCodeDto,
+  RefreshAuthGatesDto,
+  RollbackAuthGateDto,
+} from './dto/app-session.dto';
+import { AiAppsAuthGateService } from './ai-apps-auth-gate.service';
 import { PollConnectDto } from './dto/poll-connect.dto';
 import { SubmitFeedbackDto } from './dto/submit-feedback.dto';
 import { UpdateFeedbackStatusDto } from './dto/update-feedback-status.dto';
@@ -53,6 +63,7 @@ import {
   UpdateAiAppPublicPathsDto,
 } from './dto/ai-app-access.dto';
 import {
+  AI_APP_SESSION_HEADER,
   AI_APPS_LOG_DEPLOYMENT_ID_PATTERN,
   AI_APPS_MAX_PRD_BYTES,
   AI_APPS_MAX_ZIP_BYTES,
@@ -73,7 +84,9 @@ export class AiAppsController {
     private readonly connectService: AiAppsConnectService,
     private readonly starterKitService: AiAppsStarterKitService,
     private readonly rbacService: RbacService,
-    private readonly accessService: AiAppsAccessService
+    private readonly accessService: AiAppsAccessService,
+    private readonly sessionService: AiAppsSessionService,
+    private readonly authGateService: AiAppsAuthGateService
   ) {}
 
   /**
@@ -119,6 +132,90 @@ export class AiAppsController {
   async approveConnectSession(@Param('uid') uid: string, @Req() req: any) {
     const memberUid = await this.resolveMemberUid(req);
     return this.connectService.approve(uid, memberUid);
+  }
+
+  /**
+   * One-time code for the app-session sign-in round trip (LabOS authorize route, member JWT). Returns the code and
+   * the app target's origin to send the member back to; the origin comes from appId + target, never from input.
+   */
+  @NoCache()
+  @Post('sessions/code')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  @UsePipes(ZodValidationPipe)
+  async issueAppSessionCode(@Body() body: AppSessionRequestDto, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.sessionService.issueCode(memberUid, body.appId, body.target);
+  }
+
+  /** Redeems a sign-in code for an app session (auth gate; no user auth, the code is the credential). */
+  @NoCache()
+  // Called by every app's auth gate from the cluster's shared egress IPs, like access-check.
+  @Throttle(AI_APPS_SIDECAR_THROTTLE_LIMIT, AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS)
+  @Post('sessions/redeem')
+  @UsePipes(ZodValidationPipe)
+  async redeemAppSessionCode(@Body() body: RedeemAppSessionCodeDto) {
+    return this.sessionService.redeemCode(body.code, body.appId, body.target);
+  }
+
+  /**
+   * App session for a member the auth gate already let in with their LabOS token (member JWT). This is the gate's
+   * silent path while LabOS still shares its token with app hosts.
+   */
+  @NoCache()
+  // Called by every app's auth gate from the cluster's shared egress IPs, like access-check.
+  @Throttle(AI_APPS_SIDECAR_THROTTLE_LIMIT, AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS)
+  @Post('sessions/exchange-token')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  @UsePipes(ZodValidationPipe)
+  async exchangeAppSessionToken(@Body() body: AppSessionRequestDto, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.sessionService.exchangeToken(memberUid, body.appId);
+  }
+
+  /** LabOS sign-out: ends every app session of the member (member JWT). */
+  @NoCache()
+  @Post('sessions/revoke')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(UserTokenCheckGuard)
+  async revokeAppSessions(@Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return { revoked: await this.sessionService.revokeAllForMember(memberUid) };
+  }
+
+  /** Fleet auth-gate state for the silent migration (directory admin). Declared before `:uid` routes. */
+  @NoCache()
+  @Get('admin/auth-gate')
+  @UseGuards(UserTokenCheckGuard)
+  async listAuthGates(@Req() req: any) {
+    await this.assertDirectoryAdmin(req);
+    return { targets: await this.authGateService.listFleet() };
+  }
+
+  /**
+   * Refreshes the auth gate of eligible app targets, one at a time, verifying each and rolling it back on any
+   * mismatch (directory admin). Owners see nothing: no status, event or notification changes.
+   */
+  @NoCache()
+  @Post('admin/auth-gate/refresh')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(UserTokenCheckGuard)
+  @UsePipes(ZodValidationPipe)
+  async refreshAuthGates(@Body() body: RefreshAuthGatesDto, @Req() req: any) {
+    await this.assertDirectoryAdmin(req);
+    return { outcomes: await this.authGateService.refreshBatch(body) };
+  }
+
+  /** Rolls one app target back to its revision before the last gate refresh (directory admin). */
+  @NoCache()
+  @Post('admin/auth-gate/:uid/rollback')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(UserTokenCheckGuard)
+  @UsePipes(ZodValidationPipe)
+  async rollbackAuthGate(@Param('uid') uid: string, @Body() body: RollbackAuthGateDto, @Req() req: any) {
+    await this.assertDirectoryAdmin(req);
+    return this.authGateService.rollbackOne(uid, body.target);
   }
 
   /**
@@ -189,7 +286,7 @@ export class AiAppsController {
   @NoCache()
   @Throttle(AI_APPS_SIDECAR_THROTTLE_LIMIT, AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS)
   @Get('me')
-  @UseGuards(UserAccessTokenValidateGuard, RbacGuard)
+  @UseGuards(AiAppMemberContextGuard, RbacGuard)
   @RequirePermissions(READ)
   async getMemberContext(@Req() req: any) {
     const memberUid = await this.resolveMemberUid(req);
@@ -210,9 +307,15 @@ export class AiAppsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @UsePipes(ZodValidationPipe)
   async trackEvent(@Body() body: TrackEventDto, @Req() req: Request) {
+    const token = extractTokenFromRequest(req);
+    // An app session token attributes the event to its member only when it is live for the app it came from.
+    const session = isAiAppSessionToken(token)
+      ? await this.sessionService.authenticateAppRequest(token as string, req.headers.origin)
+      : null;
     await this.aiAppsService.trackAppEvent({
       origin: req.headers.origin,
-      token: extractTokenFromRequest(req),
+      token: isAiAppSessionToken(token) ? undefined : token,
+      sessionMemberUid: session?.memberUid,
       anonId: body.anonId,
       event: body.event,
       properties: body.properties as Record<string, unknown> | undefined,
@@ -228,8 +331,9 @@ export class AiAppsController {
    * Otherwise the session is required: 200 = serve; 401 = not signed in; 403 =
    * missing the PL Infra permission (`reason: 'permission'`) or a private app
    * the member may not open (`reason: 'private'`). Accepts the Bearer header
-   * or the LabOS `authToken` cookie, like `/me`. Declared before `:uid` so the
-   * literal path wins.
+   * or the LabOS `authToken` cookie, like `/me`, or the auth gate's app session in
+   * `X-AI-App-Session` (valid only for its own appId; same permission and access
+   * rule as a LabOS token). Declared before `:uid` so the literal path wins.
    */
   @NoCache()
   @Throttle(AI_APPS_SIDECAR_THROTTLE_LIMIT, AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS)
@@ -239,6 +343,14 @@ export class AiAppsController {
     const app = await this.accessService.findAppForAccessCheck(query.appId);
     if (this.accessService.isPublicPath(app, query.path)) {
       return { allowed: true, reason: 'public' };
+    }
+    const appSession = req.headers?.[AI_APP_SESSION_HEADER];
+    if (typeof appSession === 'string' && appSession) {
+      const session = await this.sessionService.validate(query.appId, appSession);
+      if (!session) {
+        throw new UnauthorizedException('Invalid or expired app session');
+      }
+      return this.accessService.checkAccess(session.memberUid, query.appId, query.method, { app });
     }
     await validateUserAccessToken(req);
     const memberUid = await this.resolveMemberUid(req);
@@ -760,6 +872,13 @@ export class AiAppsController {
       throw new BadRequestException('deploymentId must be 1-128 characters of letters, digits, ".", "_" or "-"');
     }
     return value;
+  }
+
+  private async assertDirectoryAdmin(req: any): Promise<void> {
+    const memberUid = await this.resolveMemberUid(req);
+    if (!(await this.authGateService.isDirectoryAdmin(memberUid))) {
+      throw new ForbiddenException('Only a directory admin can manage the auth gate rollout');
+    }
   }
 
   private async resolveMemberUid(req: any): Promise<string> {

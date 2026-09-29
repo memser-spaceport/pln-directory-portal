@@ -112,6 +112,8 @@ interface RunnerDeployResponse {
   httpUrl?: string;
   port?: number;
   database?: RunnerDeployDatabaseInfo;
+  /** Auth gate (sidecar) version the runner deployed; reported by orchestrators with gate v2 and later. */
+  authGateVersion?: number;
 }
 
 type AiAppMember = { uid: string; name: string; image: string | null };
@@ -291,6 +293,8 @@ export class AiAppsService {
   async trackAppEvent(params: {
     origin: string | undefined;
     token: string | undefined;
+    /** Member of a verified app session token (the controller checked it against the request origin). */
+    sessionMemberUid?: string;
     anonId: string | undefined;
     event: string | undefined;
     properties: Record<string, unknown> | undefined;
@@ -310,7 +314,7 @@ export class AiAppsService {
       return;
     }
 
-    const memberUid = await this.resolveOptionalMemberUid(params.token);
+    const memberUid = params.sessionMemberUid ?? (await this.resolveOptionalMemberUid(params.token));
     const distinctId = memberUid ?? (params.anonId && AI_APP_ANON_ID_REGEX.test(params.anonId) ? params.anonId : null);
     if (!distinctId) {
       return;
@@ -578,6 +582,27 @@ export class AiAppsService {
     if (notes) view.failureReason = notes;
     if (failureStream === 'build' || failureStream === 'runtime') view.failureStream = failureStream;
     return view;
+  }
+
+  /**
+   * Records the auth gate version a deploy (or gate refresh) reported for one target of an app. Kept in its own table
+   * so it never bumps the app's `updatedAt`. No-op when the runner reports none (orchestrators before gate v2) or
+   * the table isn't generated (specs that stub Prisma); never fails the deploy.
+   */
+  async recordAuthGateVersion(appUid: string, environment: AiAppTargetEnvironment, version: number | undefined) {
+    const table = (this.prisma as any).aiAppAuthGate;
+    if (version === undefined || !table?.upsert) return;
+    try {
+      await table.upsert({
+        where: { appUid_environment: { appUid, environment } },
+        create: { appUid, environment, version },
+        update: { version, lastError: null },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Could not record auth gate v${version} for ${appUid}/${environment}: ${(error as Error).message}`
+      );
+    }
   }
 
   /** Present only after `prisma generate`. Specs that stub Prisma omit it. */
@@ -1695,6 +1720,11 @@ export class AiAppsService {
     throw new BadRequestException(`The appId "${appId}" is reserved for a platform service — pick a different appId`);
   }
 
+  /** Directory-admin check for admin-only AI Apps routes. */
+  isRequesterAdmin(requesterUid: string): Promise<boolean> {
+    return this.isRequesterDirectoryAdmin(requesterUid);
+  }
+
   /** Requester-only admin check — computed once and reused per row on list responses. */
   private async isRequesterDirectoryAdmin(requesterUid: string): Promise<boolean> {
     const requester = await this.prisma.member.findUnique({
@@ -2371,6 +2401,7 @@ export class AiAppsService {
 
     let port: number | null = null;
     let databaseInfo: RunnerDeployDatabaseInfo | undefined;
+    let authGateVersion: number | undefined;
     try {
       this.logger.log(
         `Runner deploy request for ${app.appId}: POST ${AI_APPS_RUNNER_URL}/deploy ` +
@@ -2394,6 +2425,7 @@ export class AiAppsService {
         throw new BadGatewayException('Failed to deploy app to the sandbox runner');
       }
       port = response.data.port ?? null;
+      authGateVersion = typeof response.data.authGateVersion === 'number' ? response.data.authGateVersion : undefined;
     } catch (error) {
       if (error instanceof BadGatewayException) {
         throw error;
@@ -2450,6 +2482,7 @@ export class AiAppsService {
       }
     }
 
+    await this.recordAuthGateVersion(app.uid, environment, authGateVersion);
     return markReady(port, databaseInfo);
   }
 

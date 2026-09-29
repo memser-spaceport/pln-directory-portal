@@ -3759,6 +3759,57 @@ model AiAppDeployKey {
   @@index([appUid])
 }
 
+/// App-scoped member session for one deployed AI App (LAB-2695). The token handed to the app is a signed JWT bound to
+/// `appId`; only its sha256 is stored, and every use is validated here (idle timeout, absolute expiry, revocation).
+model AiAppSession {
+  id            Int       @id @default(autoincrement())
+  uid           String    @unique @default(cuid())
+  appId         String
+  memberUid     String
+  tokenHash     String    @unique
+  createdAt     DateTime  @default(now())
+  lastUsedAt    DateTime  @default(now())
+  idleExpiresAt DateTime
+  expiresAt     DateTime
+  revokedAt     DateTime?
+
+  @@index([memberUid, revokedAt])
+  @@index([expiresAt])
+}
+
+/// One-time code LabOS mints for the app-session sign-in round trip; redeemable once, for the same appId + target,
+/// within 60 seconds. Only its sha256 is stored.
+model AiAppSessionCode {
+  id          Int                    @id @default(autoincrement())
+  uid         String                 @unique @default(cuid())
+  codeHash    String                 @unique
+  appId       String
+  environment AiAppTargetEnvironment
+  memberUid   String
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime               @default(now())
+
+  @@index([expiresAt])
+}
+
+/// Auth gate (sidecar) version running for one target of an app. Kept outside AiApp/AiAppTarget so a platform
+/// refresh never bumps their updatedAt ("Last updated" in LabOS) or reaches API responses.
+model AiAppAuthGate {
+  id               Int                    @id @default(autoincrement())
+  appUid           String
+  environment      AiAppTargetEnvironment
+  version          Int                    @default(1)
+  refreshedAt      DateTime?
+  lastError        String?
+  /// Helm revision before the last gate refresh; the only revision a gate rollback may restore.
+  previousRevision Int?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@unique([appUid, environment])
+}
+
 /// Whitelist of a PRIVATE app: members (besides the owner and directory
 /// admins) who may find and open it. Kept while the app is OPEN so switching
 /// back restores it.

@@ -1,0 +1,208 @@
+import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
+import { createHash, randomBytes } from 'crypto';
+import * as jwt from 'jsonwebtoken';
+import { PrismaService } from '../shared/prisma.service';
+import {
+  AI_APPS_SESSION_CODE_TTL_MS,
+  AI_APPS_SESSION_IDLE_MS,
+  AI_APPS_SESSION_ISSUER,
+  AI_APPS_SESSION_MAX_MS,
+  AI_APPS_SESSION_SECRET,
+  AI_APPS_SESSION_TOUCH_MS,
+  AiAppTargetEnvironment,
+  buildAppUrl,
+} from './ai-apps.constants';
+
+const sha256 = (value: string) => createHash('sha256').update(value).digest('hex');
+
+export type AiAppSessionGrant = { token: string; expiresAt: Date };
+
+/** The claims a deployed app sees when it decodes its session token. */
+type AiAppSessionClaims = { iss: string; aud: string; uid: string; email: string | null; jti: string; exp: number };
+
+/** A JWT's payload without verifying it (the installed jsonwebtoken build ships no `decode`). */
+function unverifiedClaims(token: string): Record<string, unknown> | null {
+  const payload = token.split('.')[1];
+  if (!payload) return null;
+  try {
+    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    return claims && typeof claims === 'object' ? claims : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Unverified check used by guards to route app session tokens away from LabOS token introspection. */
+export function isAiAppSessionToken(token: string | undefined | null): boolean {
+  return !!token && unverifiedClaims(token)?.iss === AI_APPS_SESSION_ISSUER;
+}
+
+/** The appId an app session token claims to be for (unverified; for logging only). */
+export function aiAppSessionTokenAppId(token: string): string | null {
+  const aud = unverifiedClaims(token)?.aud;
+  return typeof aud === 'string' ? aud : null;
+}
+
+/**
+ * App-scoped member sessions for deployed AI Apps (LAB-2695). A session is bound to one appId and one member; its
+ * token is a signed JWT carrying the same `email` claim apps read from the LabOS token today, but it is only valid
+ * for that app and only while its stored record says so (idle timeout, absolute expiry, revocation).
+ */
+@Injectable()
+export class AiAppsSessionService {
+  private readonly logger = new Logger(AiAppsSessionService.name);
+
+  constructor(private readonly prisma: PrismaService) {}
+
+  get enabled(): boolean {
+    return AI_APPS_SESSION_SECRET.length >= 32;
+  }
+
+  private assertEnabled() {
+    if (!this.enabled) {
+      throw new ServiceUnavailableException('AI App sessions are not configured');
+    }
+  }
+
+  /** One-time code for the LabOS sign-in round trip, plus the target's origin the member is sent back to. */
+  async issueCode(memberUid: string, appId: string, environment: AiAppTargetEnvironment) {
+    this.assertEnabled();
+    const code = randomBytes(32).toString('base64url');
+    const expiresAt = new Date(Date.now() + AI_APPS_SESSION_CODE_TTL_MS);
+    await this.prisma.aiAppSessionCode.create({
+      data: { codeHash: sha256(code), appId, environment, memberUid, expiresAt },
+    });
+    return { code, callbackOrigin: buildAppUrl(appId, environment), expiresAt };
+  }
+
+  /** Redeems a code once, for the same appId + target it was issued for, and opens a session. */
+  async redeemCode(code: string, appId: string, environment: AiAppTargetEnvironment): Promise<AiAppSessionGrant> {
+    this.assertEnabled();
+    const codeHash = sha256(code);
+    const now = new Date();
+    // Marks the code used in the same statement that checks it, so two concurrent redeems can't both succeed.
+    const claimed = await this.prisma.aiAppSessionCode.updateMany({
+      where: { codeHash, usedAt: null, expiresAt: { gt: now } },
+      data: { usedAt: now },
+    });
+    const row = claimed.count ? await this.prisma.aiAppSessionCode.findUnique({ where: { codeHash } }) : null;
+    if (!row || row.appId !== appId || row.environment !== environment) {
+      throw new BadRequestException('Invalid or expired sign-in code');
+    }
+    return this.openSession(row.memberUid, appId);
+  }
+
+  /** Opens a session for a member already authenticated with a LabOS token (the gate's silent path). */
+  async exchangeToken(memberUid: string, appId: string): Promise<AiAppSessionGrant> {
+    this.assertEnabled();
+    return this.openSession(memberUid, appId);
+  }
+
+  private async openSession(memberUid: string, appId: string): Promise<AiAppSessionGrant> {
+    const member = await this.prisma.member.findUnique({ where: { uid: memberUid }, select: { email: true } });
+    const now = Date.now();
+    const expiresAt = new Date(now + AI_APPS_SESSION_MAX_MS);
+    const jti = randomBytes(16).toString('hex');
+    const claims: Omit<AiAppSessionClaims, 'exp'> = {
+      iss: AI_APPS_SESSION_ISSUER,
+      aud: appId,
+      uid: memberUid,
+      email: member?.email ?? null,
+      jti,
+    };
+    const token = jwt.sign({ ...claims, exp: Math.floor(expiresAt.getTime() / 1000) }, AI_APPS_SESSION_SECRET, {
+      algorithm: 'HS256',
+    });
+    await this.prisma.aiAppSession.create({
+      data: {
+        uid: jti,
+        appId,
+        memberUid,
+        tokenHash: sha256(token),
+        idleExpiresAt: new Date(Math.min(now + AI_APPS_SESSION_IDLE_MS, expiresAt.getTime())),
+        expiresAt,
+      },
+    });
+    return { token, expiresAt };
+  }
+
+  /**
+   * The member of a live session for this app, or null. Checks the signature, the stored record (revocation, idle
+   * and absolute expiry) and the binding to `appId`; slides the idle expiry, writing at most every few minutes.
+   */
+  async validate(appId: string, token: string): Promise<{ memberUid: string } | null> {
+    if (!this.enabled || !token) return null;
+    try {
+      jwt.verify(token, AI_APPS_SESSION_SECRET, {
+        algorithms: ['HS256'],
+        issuer: AI_APPS_SESSION_ISSUER,
+        audience: appId,
+      });
+    } catch {
+      return null;
+    }
+    const row = await this.prisma.aiAppSession.findUnique({ where: { tokenHash: sha256(token) } });
+    const now = Date.now();
+    if (
+      !row ||
+      row.appId !== appId ||
+      row.revokedAt ||
+      row.expiresAt.getTime() <= now ||
+      row.idleExpiresAt.getTime() <= now
+    ) {
+      return null;
+    }
+    if (now - row.lastUsedAt.getTime() >= AI_APPS_SESSION_TOUCH_MS) {
+      await this.prisma.aiAppSession.update({
+        where: { uid: row.uid },
+        data: {
+          lastUsedAt: new Date(now),
+          idleExpiresAt: new Date(Math.min(now + AI_APPS_SESSION_IDLE_MS, row.expiresAt.getTime())),
+        },
+      });
+    }
+    return { memberUid: row.memberUid };
+  }
+
+  /** Whether a browser `Origin` belongs to the app (its prod or dev target). A missing origin (server call) passes. */
+  isAppOrigin(appId: string, origin: string | undefined): boolean {
+    if (!origin) return true;
+    return origin === buildAppUrl(appId, 'prod') || origin === buildAppUrl(appId, 'dev');
+  }
+
+  /**
+   * Member behind an app session token presented to an app-facing route (`/me`, `/track`): the token must be live
+   * for the app it names, and a browser `Origin` must be one of that app's own origins. Null otherwise.
+   */
+  async authenticateAppRequest(
+    token: string,
+    origin: string | undefined
+  ): Promise<{ memberUid: string; appId: string } | null> {
+    const appId = aiAppSessionTokenAppId(token);
+    if (!appId || !this.isAppOrigin(appId, origin)) return null;
+    const session = await this.validate(appId, token);
+    return session ? { ...session, appId } : null;
+  }
+
+  /** LabOS sign-out: ends every app session of the member. */
+  async revokeAllForMember(memberUid: string): Promise<number> {
+    const result = await this.prisma.aiAppSession.updateMany({
+      where: { memberUid, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    return result.count;
+  }
+
+  @Cron(process.env.AI_APPS_SESSION_CLEANUP_CRON || '30 3 * * *', { name: 'ai-app-session-cleanup' })
+  async cleanup(): Promise<void> {
+    const now = new Date();
+    try {
+      const sessions = await this.prisma.aiAppSession.deleteMany({ where: { expiresAt: { lt: now } } });
+      const codes = await this.prisma.aiAppSessionCode.deleteMany({ where: { expiresAt: { lt: now } } });
+      this.logger.log(`AI App session cleanup: ${sessions.count} sessions, ${codes.count} codes removed`);
+    } catch (error) {
+      this.logger.error(`AI App session cleanup failed: ${(error as Error).message}`);
+    }
+  }
+}
