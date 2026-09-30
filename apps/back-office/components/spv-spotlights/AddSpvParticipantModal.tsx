@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { useCookie } from 'react-use';
+import { toast } from 'react-toastify';
 import Modal from '../modal/modal';
 import { useMembersList } from '../../hooks/members/useMembersList';
 import api from '../../utils/api';
@@ -95,7 +96,7 @@ export const AddSpvParticipantModal: React.FC<AddSpvParticipantModalProps> = ({
       onClose();
     } catch (error: unknown) {
       const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      alert(typeof message === 'string' ? message : 'Failed to add participant. Please try again.');
+      toast.error(typeof message === 'string' ? message : 'Failed to add participant. Please try again.');
     } finally {
       setSubmitting(false);
     }

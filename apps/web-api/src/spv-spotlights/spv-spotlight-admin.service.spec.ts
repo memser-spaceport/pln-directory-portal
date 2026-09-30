@@ -132,3 +132,33 @@ describe('attach or create organization team', () => {
     });
   });
 });
+
+describe('approve access request', () => {
+  it('adds the applicant to the investors list', async () => {
+    const upsert = jest.fn().mockResolvedValue({});
+    const prisma = {
+      spvAccessRequest: {
+        findFirst: jest.fn().mockResolvedValue({
+          uid: 'req_1',
+          spvSpotlightUid: 'spv_1',
+          status: 'PENDING',
+          role: 'Partner',
+          organization: 'Fund',
+          member: { uid: 'mem_1', name: 'Ada', email: 'ada@example.com' },
+          spvSpotlight: { uid: 'spv_1', title: 'SPV', slug: 'spv', emailTemplates: null, team: { name: 'Netholabs' } },
+        }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      spvSpotlightParticipant: { upsert },
+    };
+    const service = new SpvSpotlightAdminService(prisma as never, { send: jest.fn(), loginLink: jest.fn() } as never);
+
+    await service.approveAccessRequest('spv_1', 'req_1');
+
+    expect(upsert).toHaveBeenCalledWith({
+      where: { spvSpotlightUid_memberUid: { spvSpotlightUid: 'spv_1', memberUid: 'mem_1' } },
+      create: { spvSpotlightUid: 'spv_1', memberUid: 'mem_1', type: 'INVESTOR', access: 'VIEW' },
+      update: {},
+    });
+  });
+});

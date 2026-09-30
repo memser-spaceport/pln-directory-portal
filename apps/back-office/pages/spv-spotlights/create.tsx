@@ -4,6 +4,7 @@ import Image from 'next/image';
 import clsx from 'clsx';
 import { useRouter } from 'next/router';
 import { useCookie } from 'react-use';
+import { toast } from 'react-toastify';
 import { ApprovalLayout } from '../../layout/approval-layout';
 import { useAuth } from '../../context/auth-context';
 import api from '../../utils/api';
@@ -101,7 +102,7 @@ const CreateSpvSpotlightPage = () => {
       router.push(`/spv-spotlights/${data.uid}`);
     } catch (error: unknown) {
       const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      alert(typeof message === 'string' ? message : 'This team may already have an SPV spotlight.');
+      toast.error(typeof message === 'string' ? message : 'This team may already have an SPV spotlight.');
     } finally {
       setSubmitting(false);
     }

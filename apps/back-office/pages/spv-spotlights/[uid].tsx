@@ -3,10 +3,14 @@ import dynamic from 'next/dynamic';
 import clsx from 'clsx';
 import { useRouter } from 'next/router';
 import { useCookie } from 'react-use';
+import { useDropzone } from 'react-dropzone';
+import { toast } from 'react-toastify';
 import { ApprovalLayout } from '../../layout/approval-layout';
 import { useAuth } from '../../context/auth-context';
 import { RichText } from '../../components/common/rich-text';
 import { AddSpvParticipantModal } from '../../components/spv-spotlights/AddSpvParticipantModal';
+import { EditSpvTemplateVariablesModal } from '../../components/spv-spotlights/EditSpvTemplateVariablesModal';
+import { TeamPitchConfirmModal } from '../../components/team-pitches/TeamPitchConfirmModal';
 import api from '../../utils/api';
 import { API_ROUTE, WEB_UI_BASE_URL } from '../../utils/constants';
 
@@ -30,6 +34,50 @@ const TEMPLATE_LABELS: { key: TemplateKey; label: string }[] = [
   { key: 'approved', label: 'Application approved' },
   { key: 'opened', label: 'Spotlight is open' },
 ];
+
+const ACCESS_OPTIONS = ['VIEW', 'VIEW_ADMIN', 'EDIT', 'RESTRICTED'] as const;
+
+const ACCESS_LABELS: Record<typeof ACCESS_OPTIONS[number], string> = {
+  VIEW: 'View Open Spotlight',
+  VIEW_ADMIN: 'View Draft + Open Spotlight',
+  EDIT: 'Admin (View/Edit)',
+  RESTRICTED: 'No Access',
+};
+
+const getParticipantTypeSelectClass = (type: string) => {
+  switch (type) {
+    case 'INVESTOR':
+      return 'bg-purple-100 text-purple-800';
+    case 'FOUNDER':
+      return 'bg-blue-100 text-blue-800';
+    default:
+      return 'bg-gray-100 text-gray-600';
+  }
+};
+
+const getAccessSelectClass = (access: string) => {
+  switch (access) {
+    case 'EDIT':
+      return 'bg-green-100 text-green-800';
+    case 'VIEW':
+      return 'bg-blue-100 text-blue-800';
+    case 'VIEW_ADMIN':
+      return 'bg-indigo-100 text-indigo-800';
+    case 'RESTRICTED':
+      return 'bg-red-100 text-red-800';
+    default:
+      return 'bg-gray-100 text-gray-600';
+  }
+};
+
+type PendingConfirm = {
+  title: string;
+  message: string;
+  details?: string;
+  confirmLabel?: string;
+  participant?: Participant;
+  run: () => Promise<void>;
+};
 
 type MediaItem = { imageUid: string; alt: string; fit: 'cover' | 'contain'; url?: string };
 type Participant = {
@@ -78,7 +126,9 @@ const SpvSpotlightDetailPage = () => {
   const [requests, setRequests] = useState<AccessRequest[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [templates, setTemplates] = useState<Record<TemplateKey, { subject: string; body: string }> | null>(null);
-  const [variablesDraft, setVariablesDraft] = useState<Record<string, string>>({});
+  const [editingTemplateVars, setEditingTemplateVars] = useState<Participant | null>(null);
+  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
+  const [isConfirmRunning, setIsConfirmRunning] = useState(false);
 
   const authHeaders = { authorization: `Bearer ${authToken}` };
   const base = `${API_ROUTE.ADMIN_SPV_SPOTLIGHTS}/${uid}`;
@@ -120,11 +170,6 @@ const SpvSpotlightDetailPage = () => {
     if (!authToken || !uid) return;
     const { data } = await api.get(`${base}/participants`, { headers: authHeaders });
     setParticipants(data);
-    const drafts: Record<string, string> = {};
-    for (const participant of data as Participant[]) {
-      drafts[participant.uid] = JSON.stringify(participant.emailTemplateVariables ?? {}, null, 2);
-    }
-    setVariablesDraft(drafts);
   }, [authToken, uid]);
 
   useEffect(() => {
@@ -136,7 +181,7 @@ const SpvSpotlightDetailPage = () => {
   }, [authToken, canViewTeamPitches, isLoading, router]);
 
   useEffect(() => {
-    load().catch(() => alert('Failed to load spotlight'));
+    load().catch(() => toast.error('Failed to load spotlight'));
   }, [load]);
 
   useEffect(() => {
@@ -166,16 +211,31 @@ const SpvSpotlightDetailPage = () => {
     );
     await load();
     setIsEditing(false);
-    alert('Saved');
+    toast.success('Saved');
   };
 
-  const uploadImage = async (file: File) => {
-    const body = new FormData();
-    body.append('file', file);
-    const response = await api.post('/v1/images', body, { headers: { 'content-type': 'multipart/form-data' } });
-    const image = response.data.image ?? response.data;
-    setMedia((current) => [...current, { imageUid: image.uid, alt: file.name, fit: 'cover', url: image.url }]);
+  const uploadImages = async (files: File[]) => {
+    const uploaded = await Promise.all(
+      files.map(async (file): Promise<MediaItem> => {
+        const body = new FormData();
+        body.append('file', file);
+        const response = await api.post('/v1/images', body, { headers: { 'content-type': 'multipart/form-data' } });
+        const image = response.data.image ?? response.data;
+        return { imageUid: image.uid, alt: file.name, fit: 'cover', url: image.url };
+      })
+    );
+    setMedia((current) => [...current, ...uploaded]);
   };
+
+  const mediaDropzone = useDropzone({
+    accept: { 'image/png': [], 'image/jpeg': [], 'image/webp': [], 'image/gif': [] },
+    multiple: true,
+    noClick: true,
+    onDrop: (accepted, rejected) => {
+      if (rejected.length) toast.error('Only PNG, JPG, WebP and GIF files are supported.');
+      if (accepted.length) uploadImages(accepted).catch(() => toast.error('Upload failed'));
+    },
+  });
 
   const parseCsv = (text: string) => {
     const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
@@ -202,62 +262,129 @@ const SpvSpotlightDetailPage = () => {
   const uploadCohort = async (cohort: 'PRE_APPROVED' | 'OUTREACH', file: File) => {
     const participants = parseCsv(await file.text());
     if (!participants.length) {
-      alert('No rows with an email column were found.');
+      toast.error('No rows with an email column were found.');
       return;
     }
     await api.post(`${base}/participants-bulk`, { cohort, participants }, { headers: authHeaders });
     await loadParticipants();
-    alert(`Uploaded ${participants.length} ${cohort === 'PRE_APPROVED' ? 'pre-approved' : 'outreach'} investors.`);
+    toast.success(`Uploaded ${participants.length} ${cohort === 'PRE_APPROVED' ? 'pre-approved' : 'outreach'} investors.`);
   };
 
-  const sendBulk = async (kind: 'invites' | 'follow-ups', includeAlready: boolean) => {
-    if (statusWarning && !confirm(statusWarning + ' Send anyway?')) return;
-    const investors = participants.filter((participant) => participant.type === 'INVESTOR');
-    const cohorts = new Set(investors.map((participant) => participant.cohort));
-    if (cohorts.size > 1) {
-      alert('This selection includes both cohorts. Each person gets their own template.');
+  const runConfirmed = async (run: () => Promise<void>) => {
+    setIsConfirmRunning(true);
+    try {
+      await run();
+      setPendingConfirm(null);
+    } catch {
+      toast.error('Something went wrong. Please try again.');
+    } finally {
+      setIsConfirmRunning(false);
     }
-    const path = kind === 'invites' ? 'send-invites-bulk' : 'send-follow-ups-bulk';
-    const body = kind === 'invites' ? { includeAlreadyInvited: includeAlready } : { includeAlreadyFollowedUp: includeAlready };
-    const { data } = await api.post(`${base}/participants/${path}`, body, { headers: authHeaders });
-    alert(`Sent ${data.summary.sent}, skipped ${data.summary.skipped}, errors ${data.summary.errors}`);
-    await loadParticipants();
   };
 
-  const exportLinks = async () => {
-    if (statusWarning && !confirm(statusWarning + ' Export anyway?')) return;
-    const { data } = await api.get(`${base}/login-links`, { headers: authHeaders });
-    const lines = ['email,name,cohort,url', ...data.rows.map((row: { email: string; name: string; cohort: string; url: string }) =>
-      [row.email, row.name, row.cohort, row.url].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')
-    )];
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
-    const href = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = href;
-    anchor.download = 'spv-login-links.csv';
-    anchor.click();
-    URL.revokeObjectURL(href);
+  const confirmIfNotOpen = (title: string, confirmLabel: string, run: () => Promise<void>) => {
+    if (!statusWarning) return runConfirmed(run);
+    setPendingConfirm({ title, message: statusWarning, confirmLabel, run });
   };
 
-  const sendOpenNotice = async () => {
-    const preview = await api.get(`${base}/open-notice`, { headers: authHeaders });
-    if (!confirm(
-      `${preview.data.willReceive} approved investors will receive this now. ${preview.data.alreadySent} already received it.`
-    )) {
+  const sendBulk = (kind: 'invites' | 'follow-ups', includeAlready: boolean) =>
+    confirmIfNotOpen(kind === 'invites' ? 'Send invites' : 'Send follow-ups', 'Send anyway', async () => {
+      const investors = participants.filter((participant) => participant.type === 'INVESTOR');
+      const cohorts = new Set(investors.map((participant) => participant.cohort));
+      if (cohorts.size > 1) {
+        toast.info('This selection includes both cohorts. Each person gets their own template.');
+      }
+      const path = kind === 'invites' ? 'send-invites-bulk' : 'send-follow-ups-bulk';
+      const body = kind === 'invites' ? { includeAlreadyInvited: includeAlready } : { includeAlreadyFollowedUp: includeAlready };
+      const { data } = await api.post(`${base}/participants/${path}`, body, { headers: authHeaders });
+      toast.success(`Sent ${data.summary.sent}, skipped ${data.summary.skipped}, errors ${data.summary.errors}`);
+      await loadParticipants();
+    });
+
+  const exportLinks = () =>
+    confirmIfNotOpen('Export login links', 'Export anyway', async () => {
+      const { data } = await api.get(`${base}/login-links`, { headers: authHeaders });
+      const lines = ['email,name,cohort,url', ...data.rows.map((row: { email: string; name: string; cohort: string; url: string }) =>
+        [row.email, row.name, row.cohort, row.url].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')
+      )];
+      const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+      const href = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = href;
+      anchor.download = 'spv-login-links.csv';
+      anchor.click();
+      URL.revokeObjectURL(href);
+    });
+
+  const openNotice = async (includeAlreadySent: boolean) => {
+    const preview = await api.get(`${base}/open-notice`, { headers: authHeaders }).catch(() => null);
+    if (!preview) {
+      toast.error('Failed to load open notice recipients');
       return;
     }
-    if (statusWarning && !confirm(statusWarning)) return;
-    const { data } = await api.post(`${base}/open-notice`, { includeAlreadySent: false }, { headers: authHeaders });
-    alert(`Sent ${data.summary.sent}`);
+    setPendingConfirm({
+      title: includeAlreadySent ? 'Resend open notice' : 'Email that spotlight is open',
+      message: includeAlreadySent
+        ? `Resend to everyone, including ${preview.data.alreadySent} who already received it?`
+        : `${preview.data.willReceive} approved investors will receive this now. ${preview.data.alreadySent} already received it.`,
+      details: statusWarning || undefined,
+      confirmLabel: 'Send',
+      run: async () => {
+        const { data } = await api.post(`${base}/open-notice`, { includeAlreadySent }, { headers: authHeaders });
+        toast.success(`Sent ${data.summary.sent}`);
+      },
+    });
   };
 
-  const resendOpenNotice = async () => {
-    const preview = await api.get(`${base}/open-notice`, { headers: authHeaders });
-    if (!confirm(`Resend to everyone, including ${preview.data.alreadySent} who already received it?`)) return;
-    if (statusWarning && !confirm(statusWarning)) return;
-    const { data } = await api.post(`${base}/open-notice`, { includeAlreadySent: true }, { headers: authHeaders });
-    alert(`Sent ${data.summary.sent}`);
+  const updateParticipantField = (participant: Participant, field: 'type' | 'access', value: string) => {
+    const label = field === 'type' ? value.charAt(0) + value.slice(1).toLowerCase() : ACCESS_LABELS[value as typeof ACCESS_OPTIONS[number]];
+    setPendingConfirm({
+      title: field === 'type' ? 'Change participant type' : 'Change participant access',
+      message: `Change this participant's ${field} to ${label}?`,
+      participant,
+      run: async () => {
+        await api.patch(`${base}/participants/${participant.uid}`, { [field]: value }, { headers: authHeaders });
+        toast.success('Participant updated');
+        await loadParticipants();
+      },
+    });
   };
+
+  const participantSelects = (participant: Participant) => (
+    <>
+      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 130 }}>
+        <select
+          value={participant.type}
+          disabled={!canMutateTeamPitches}
+          onChange={(e) => updateParticipantField(participant, 'type', e.target.value)}
+          className={clsx(
+            'inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold disabled:opacity-50',
+            getParticipantTypeSelectClass(participant.type)
+          )}
+        >
+          <option value="INVESTOR">Investor</option>
+          <option value="FOUNDER">Founder</option>
+        </select>
+      </div>
+      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 220 }}>
+        <select
+          value={participant.access}
+          disabled={!canMutateTeamPitches}
+          onChange={(e) => updateParticipantField(participant, 'access', e.target.value)}
+          className={clsx(
+            'inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold disabled:opacity-50',
+            getAccessSelectClass(participant.access)
+          )}
+        >
+          {ACCESS_OPTIONS.map((access) => (
+            <option key={access} value={access}>
+              {ACCESS_LABELS[access]}
+            </option>
+          ))}
+        </select>
+      </div>
+    </>
+  );
 
   if (!authToken || isLoading) return null;
 
@@ -480,19 +607,20 @@ const SpvSpotlightDetailPage = () => {
                   ))}
                   {media.length === 0 && !isEditing && <div className={s.fieldValue}>—</div>}
                   {isEditing && canMutateTeamPitches && (
-                    <label className="cursor-pointer rounded-lg bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-700">
-                      Upload image
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) uploadImage(file).catch(() => alert('Upload failed'));
-                          e.target.value = '';
-                        }}
-                      />
-                    </label>
+                    <div
+                      {...mediaDropzone.getRootProps()}
+                      className={clsx(
+                        'flex flex-col items-center gap-3 rounded-lg border-2 border-dashed p-6 text-center transition-colors',
+                        mediaDropzone.isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-gray-50'
+                      )}
+                    >
+                      <input {...mediaDropzone.getInputProps()} />
+                      <div className="text-sm text-gray-600">Drag and drop images here</div>
+                      <div className="text-xs text-gray-400">PNG, JPG, WebP or GIF. Multiple files allowed.</div>
+                      <button type="button" className={s.editButton} onClick={mediaDropzone.open}>
+                        Choose files
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -533,7 +661,7 @@ const SpvSpotlightDetailPage = () => {
                               className="hidden"
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
-                                if (file) uploadCohort('PRE_APPROVED', file).catch(() => alert('Upload failed'));
+                                if (file) uploadCohort('PRE_APPROVED', file).catch(() => toast.error('Upload failed'));
                                 e.target.value = '';
                               }}
                             />
@@ -546,7 +674,7 @@ const SpvSpotlightDetailPage = () => {
                               className="hidden"
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
-                                if (file) uploadCohort('OUTREACH', file).catch(() => alert('Upload failed'));
+                                if (file) uploadCohort('OUTREACH', file).catch(() => toast.error('Upload failed'));
                                 e.target.value = '';
                               }}
                             />
@@ -571,10 +699,10 @@ const SpvSpotlightDetailPage = () => {
                         <button type="button" onClick={() => sendBulk('follow-ups', true)} className="rounded-lg bg-violet-600 px-4 py-2 text-white hover:bg-violet-700">
                           Resend Follow-ups
                         </button>
-                        <button type="button" onClick={() => sendOpenNotice()} className={s.editButton}>
+                        <button type="button" onClick={() => openNotice(false)} className={s.editButton}>
                           Email that spotlight is open
                         </button>
-                        <button type="button" onClick={() => resendOpenNotice()} className={s.editButton}>
+                        <button type="button" onClick={() => openNotice(true)} className={s.editButton}>
                           Resend open notice
                         </button>
                       </div>
@@ -654,7 +782,7 @@ const SpvSpotlightDetailPage = () => {
                             onClick={() =>
                               api
                                 .post(`${base}/access-requests/${request.uid}/approve`, {}, { headers: authHeaders })
-                                .then(loadRequests)
+                                .then(() => Promise.all([loadRequests(), loadParticipants()]))
                             }
                           >
                             Approve
@@ -690,7 +818,8 @@ const SpvSpotlightDetailPage = () => {
                   <div className={clsx(s.tableRow, s.tableHeader)}>
                     <div className={clsx(s.headerCell, s.first, s.flexible)}>Member</div>
                     <div className={clsx(s.headerCell, s.fixed)} style={{ width: 140 }}>Cohort</div>
-                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 120 }}>Access</div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 130 }}>Type</div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 220 }}>Access</div>
                     <div className={clsx(s.headerCell, s.fixed)} style={{ width: 90 }}>Invites</div>
                     <div className={clsx(s.headerCell, s.fixed)} style={{ width: 110 }}>Follow-up</div>
                     <div className={clsx(s.headerCell, s.fixed)} style={{ width: 220 }}>Template vars</div>
@@ -705,33 +834,33 @@ const SpvSpotlightDetailPage = () => {
                         </div>
                       </div>
                       <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 140 }}>{participant.cohort || '—'}</div>
-                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 120 }}>{participant.access}</div>
+                      {participantSelects(participant)}
                       <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 90 }}>{participant.inviteSentCount}</div>
                       <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 110 }}>{participant.followUpSentCount}</div>
                       <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 220 }}>
-                        <textarea
-                          className={s.fieldTextarea}
-                          rows={3}
-                          value={variablesDraft[participant.uid] ?? ''}
-                          onChange={(e) => setVariablesDraft({ ...variablesDraft, [participant.uid]: e.target.value })}
-                        />
+                        {(() => {
+                          const vars = participant.emailTemplateVariables;
+                          const preview = vars && Object.keys(vars).length > 0 ? JSON.stringify(vars) : null;
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => setEditingTemplateVars(participant)}
+                              className={
+                                preview
+                                  ? 'block w-full truncate text-left text-sm text-blue-600 hover:text-blue-800'
+                                  : 'text-sm text-gray-400 hover:text-blue-600'
+                              }
+                              title={preview ?? undefined}
+                            >
+                              {preview ?? 'no data'}
+                            </button>
+                          );
+                        })()}
                       </div>
                       <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 110 }}>
                         <button
                           type="button"
-                          className="text-sm text-blue-600 hover:text-blue-800"
-                          onClick={() => {
-                            const emailTemplateVariables = JSON.parse(variablesDraft[participant.uid] || '{}');
-                            api
-                              .patch(`${base}/participants/${participant.uid}`, { emailTemplateVariables }, { headers: authHeaders })
-                              .then(loadParticipants);
-                          }}
-                        >
-                          Save
-                        </button>
-                        <button
-                          type="button"
-                          className="ml-3 text-sm text-red-600 hover:text-red-800"
+                          className="text-sm text-red-600 hover:text-red-800"
                           onClick={() =>
                             api.delete(`${base}/participants/${participant.uid}`, { headers: authHeaders }).then(loadParticipants)
                           }
@@ -754,7 +883,8 @@ const SpvSpotlightDetailPage = () => {
                 <div className={s.table}>
                   <div className={clsx(s.tableRow, s.tableHeader)}>
                     <div className={clsx(s.headerCell, s.first, s.flexible)}>Member</div>
-                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 160 }}>Access</div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 130 }}>Type</div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 220 }}>Access</div>
                   </div>
                   {visibleFounders.map((founder) => (
                     <div key={founder.uid} className={s.tableRow}>
@@ -764,7 +894,7 @@ const SpvSpotlightDetailPage = () => {
                           <div className="text-sm text-gray-500">{founder.member.email}</div>
                         </div>
                       </div>
-                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 160 }}>{founder.access}</div>
+                      {participantSelects(founder)}
                     </div>
                   ))}
                 </div>
@@ -778,7 +908,7 @@ const SpvSpotlightDetailPage = () => {
               onSubmit={async (event) => {
                 event.preventDefault();
                 await api.patch(`${base}/email-templates`, { templates }, { headers: authHeaders });
-                alert('Templates saved');
+                toast.success('Templates saved');
               }}
             >
               <div className={s.overviewHeader}>
@@ -821,6 +951,34 @@ const SpvSpotlightDetailPage = () => {
         spotlightUid={uid}
         defaultType={tab === 'founders' ? 'FOUNDER' : 'INVESTOR'}
         onAdded={() => loadParticipants()}
+      />
+      <EditSpvTemplateVariablesModal
+        isOpen={!!editingTemplateVars}
+        onClose={() => setEditingTemplateVars(null)}
+        onSave={async (emailTemplateVariables) => {
+          await api.patch(
+            `${base}/participants/${editingTemplateVars?.uid}`,
+            { emailTemplateVariables },
+            { headers: authHeaders }
+          );
+          await loadParticipants();
+        }}
+        participantName={editingTemplateVars?.member.name}
+        participantEmail={editingTemplateVars?.member.email}
+        emailTemplateVariables={editingTemplateVars?.emailTemplateVariables}
+        canEdit={canMutateTeamPitches}
+      />
+      <TeamPitchConfirmModal
+        isOpen={!!pendingConfirm}
+        title={pendingConfirm?.title ?? ''}
+        message={pendingConfirm?.message ?? ''}
+        details={pendingConfirm?.details && <p className="text-sm text-amber-700">{pendingConfirm.details}</p>}
+        participantName={pendingConfirm?.participant?.member.name ?? undefined}
+        participantEmail={pendingConfirm?.participant?.member.email ?? undefined}
+        confirmLabel={pendingConfirm?.confirmLabel}
+        isPending={isConfirmRunning}
+        onClose={() => setPendingConfirm(null)}
+        onConfirm={() => pendingConfirm && runConfirmed(pendingConfirm.run)}
       />
     </ApprovalLayout>
   );

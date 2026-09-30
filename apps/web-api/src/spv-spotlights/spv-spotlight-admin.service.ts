@@ -404,6 +404,16 @@ export class SpvSpotlightAdminService {
       where: { uid: request.uid },
       data: { status: 'APPROVED' },
     });
+    await this.prisma.spvSpotlightParticipant.upsert({
+      where: { spvSpotlightUid_memberUid: { spvSpotlightUid: request.spvSpotlightUid, memberUid: request.member.uid } },
+      create: {
+        spvSpotlightUid: request.spvSpotlightUid,
+        memberUid: request.member.uid,
+        type: 'INVESTOR',
+        access: 'VIEW',
+      },
+      update: {},
+    });
     const templates = asEmailTemplates(request.spvSpotlight.emailTemplates, request.spvSpotlight.title);
     await this.mailer.send({
       spotlight: this.mailContext(request.spvSpotlight),
