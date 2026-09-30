@@ -194,11 +194,22 @@ export class SpvSpotlightAdminService {
 
   async listParticipants(uid: string, type?: TeamPitchParticipantType) {
     await this.requireSpotlight(uid);
-    return this.prisma.spvSpotlightParticipant.findMany({
-      where: { spvSpotlightUid: uid, ...(type ? { type } : {}) },
-      orderBy: { createdAt: 'asc' },
-      include: { member: { select: { uid: true, name: true, email: true } } },
-    });
+    const [participants, requests] = await Promise.all([
+      this.prisma.spvSpotlightParticipant.findMany({
+        where: { spvSpotlightUid: uid, ...(type ? { type } : {}) },
+        orderBy: { createdAt: 'asc' },
+        include: { member: { select: { uid: true, name: true, email: true } } },
+      }),
+      this.prisma.spvAccessRequest.findMany({
+        where: { spvSpotlightUid: uid },
+        select: { memberUid: true, status: true },
+      }),
+    ]);
+    const statusByMember = new Map(requests.map((request) => [request.memberUid, request.status]));
+    return participants.map((participant) => ({
+      ...participant,
+      accessRequestStatus: statusByMember.get(participant.memberUid) ?? null,
+    }));
   }
 
   async updateParticipant(
@@ -216,6 +227,11 @@ export class SpvSpotlightAdminService {
     });
     if (!participant) {
       throw new NotFoundException('Participant not found');
+    }
+    if (data.cohort === 'PRE_APPROVED') {
+      await this.prisma.spvAccessRequest.deleteMany({
+        where: { spvSpotlightUid: spotlightUid, memberUid: participant.memberUid, status: 'REJECTED' },
+      });
     }
     return this.prisma.spvSpotlightParticipant.update({
       where: { uid: participantUid },

@@ -162,3 +162,58 @@ describe('approve access request', () => {
     });
   });
 });
+
+describe('investor lists', () => {
+  function serviceWith(prisma: Record<string, unknown>) {
+    return new SpvSpotlightAdminService(prisma as never, { send: jest.fn(), loginLink: jest.fn() } as never);
+  }
+
+  it('returns each participant with their application status', async () => {
+    const prisma = {
+      spvSpotlight: { findUnique: jest.fn().mockResolvedValue({ uid: 'spv_1' }) },
+      spvSpotlightParticipant: {
+        findMany: jest.fn().mockResolvedValue([
+          { uid: 'p_1', memberUid: 'mem_1' },
+          { uid: 'p_2', memberUid: 'mem_2' },
+        ]),
+      },
+      spvAccessRequest: { findMany: jest.fn().mockResolvedValue([{ memberUid: 'mem_1', status: 'PENDING' }]) },
+    };
+
+    const participants = await serviceWith(prisma).listParticipants('spv_1');
+
+    expect(participants.map((participant) => participant.accessRequestStatus)).toEqual(['PENDING', null]);
+  });
+
+  it('clears a rejected application when an investor is granted access', async () => {
+    const deleteMany = jest.fn().mockResolvedValue({ count: 1 });
+    const prisma = {
+      spvSpotlightParticipant: {
+        findFirst: jest.fn().mockResolvedValue({ uid: 'p_1', memberUid: 'mem_1' }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      spvAccessRequest: { deleteMany },
+    };
+
+    await serviceWith(prisma).updateParticipant('spv_1', 'p_1', { cohort: 'PRE_APPROVED' });
+
+    expect(deleteMany).toHaveBeenCalledWith({
+      where: { spvSpotlightUid: 'spv_1', memberUid: 'mem_1', status: 'REJECTED' },
+    });
+  });
+
+  it('keeps the application when an investor is moved to outreach', async () => {
+    const deleteMany = jest.fn();
+    const prisma = {
+      spvSpotlightParticipant: {
+        findFirst: jest.fn().mockResolvedValue({ uid: 'p_1', memberUid: 'mem_1' }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      spvAccessRequest: { deleteMany },
+    };
+
+    await serviceWith(prisma).updateParticipant('spv_1', 'p_1', { cohort: 'OUTREACH' });
+
+    expect(deleteMany).not.toHaveBeenCalled();
+  });
+});
