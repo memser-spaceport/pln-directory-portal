@@ -160,6 +160,10 @@ function writes(prisma: any): Record<string, any>[] {
   return prisma.aiApp.update.mock.calls.map(([{ data }]: any) => data);
 }
 
+function restoredRows(prisma: any): Record<string, any>[] {
+  return prisma.aiApp.updateMany.mock.calls.map(([{ data }]: any) => data);
+}
+
 function eventTypes(prisma: any): string[] {
   return prisma.aiAppEvent.create.mock.calls.map(([{ data }]: any) => data.type);
 }
@@ -289,7 +293,7 @@ describe('uncertain /deploy settled from the orchestrator deployment record', ()
 });
 
 describe('concurrent deploy conflict', () => {
-  it('/deploy 409 helm_release_locked → in-progress ERROR, stream unset, no record wait', async () => {
+  it('/deploy 409 helm_release_locked restores the previous row and does not wait on a record', async () => {
     const { service, prisma } = buildService();
     scriptRunner({
       deploy: {
@@ -308,10 +312,34 @@ describe('concurrent deploy conflict', () => {
 
     await expect(service.deployDraft('creator-1', 'app-1', undefined)).rejects.toThrow(/still in progress/);
 
-    const error = writes(prisma).find((d) => d.status === 'ERROR');
-    expect(error?.notes).toMatch(/^Another deploy of this app is still in progress/);
-    expect(error?.failureStream).toBeNull();
+    expect(restoredRows(prisma)[0]).toMatchObject({ status: 'READY', deploymentId: 'd1', failureStream: null });
+    expect(eventTypes(prisma)).not.toContain('DEPLOY_FAILED');
+    expect(writes(prisma).some((data) => data.status === 'ERROR')).toBe(false);
     expect(mockedAxios.get).not.toHaveBeenCalled();
+  });
+
+  it('a lock conflict leaves a row another attempt already settled', async () => {
+    const { service, prisma } = buildService();
+    prisma.aiApp.updateMany.mockResolvedValue({ count: 0 });
+    scriptRunner({
+      deploy: {
+        reject: {
+          isAxiosError: true,
+          response: {
+            status: 409,
+            data: {
+              error: 'helm_release_locked',
+              message: 'Helm release "demo" in namespace "deployment-system-prod" is already being modified',
+            },
+          },
+        },
+      },
+    });
+
+    await expect(service.deployDraft('creator-1', 'app-1', undefined)).rejects.toThrow(/still in progress/);
+
+    expect(eventTypes(prisma)).not.toContain('DEPLOY_FAILED');
+    expect(writes(prisma).some((data) => data.status === 'ERROR')).toBe(false);
   });
 
   it('an orchestrator that still answers 500 with the lock text is also a conflict', async () => {
@@ -328,9 +356,10 @@ describe('concurrent deploy conflict', () => {
       },
     });
 
-    await expect(service.deployDraft('creator-1', 'app-1', undefined)).rejects.toThrow();
+    await expect(service.deployDraft('creator-1', 'app-1', undefined)).rejects.toThrow(/still in progress/);
 
-    expect(writes(prisma).find((d) => d.status === 'ERROR')).toMatchObject({ failureStream: null });
+    expect(restoredRows(prisma)[0]).toMatchObject({ status: 'READY', deploymentId: 'd1' });
+    expect(eventTypes(prisma)).not.toContain('DEPLOY_FAILED');
   });
 
   it('a polled record failed on the release lock is a conflict, not a build failure', async () => {
@@ -347,11 +376,11 @@ describe('concurrent deploy conflict', () => {
       ],
     });
 
-    await expect(service.deployDraft('creator-1', 'app-1', undefined)).rejects.toThrow();
+    await expect(service.deployDraft('creator-1', 'app-1', undefined)).rejects.toThrow(/still in progress/);
 
-    const error = writes(prisma).find((d) => d.status === 'ERROR');
-    expect(error?.notes).toMatch(/^Another deploy of this app is still in progress/);
-    expect(error?.failureStream).toBeNull();
+    expect(restoredRows(prisma)[0]).toMatchObject({ status: 'READY', deploymentId: 'd1' });
+    expect(eventTypes(prisma)).not.toContain('DEPLOY_FAILED');
+    expect(writes(prisma).find((data) => data.status === 'ERROR')).toBeUndefined();
   });
 
   it('other /deploy errors stay build failures', async () => {

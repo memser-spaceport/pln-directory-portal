@@ -2465,7 +2465,23 @@ export class AiAppsService {
    */
   private async proxyDeploy(
     memberUid: string,
-    app: Pick<AiApp, 'uid' | 'appId' | 'name' | 'memberUid' | 'database' | 'lastDeployedAt'>,
+    app: Pick<
+      AiApp,
+      | 'uid'
+      | 'appId'
+      | 'name'
+      | 'memberUid'
+      | 'database'
+      | 'lastDeployedAt'
+      | 'status'
+      | 'deploymentId'
+      | 's3Key'
+      | 'url'
+      | 'httpUrl'
+      | 'host'
+      | 'notes'
+      | 'failureStream'
+    >,
     deploymentId: string,
     s3Key: string,
     secretNames: string[] = [],
@@ -2590,10 +2606,15 @@ export class AiAppsService {
         : `Deploy failed: ${(error as Error).message}`;
 
       // Another operation (typically an earlier deploy's build) holds the release:
-      // this attempt never started — not a build failure.
+      // this attempt never started — not a build failure. Don't stamp ERROR if a
+      // concurrent attempt already moved the row off DEPLOYING.
       if (this.isHelmReleaseLocked(error) || message.includes(HELM_RELEASE_LOCKED_TEXT)) {
         this.logger.warn(`AI App deploy rejected for ${app.appId}: release locked by another deploy (${message})`);
-        await this.failDeploy(app, memberUid, eventContext, DEPLOY_IN_PROGRESS_MESSAGE, null, environment);
+        if (environment === 'prod') {
+          await this.releaseLockedDeploy(app, deploymentId);
+        } else {
+          await this.failDeployIfCurrent(app, memberUid, eventContext, DEPLOY_IN_PROGRESS_MESSAGE, null, environment);
+        }
         throw new BadGatewayException('Another deploy of this app is still in progress');
       }
 
@@ -2615,11 +2636,24 @@ export class AiAppsService {
         let failureStream: 'build' | 'runtime' | null = null;
         if (result.outcome === 'failed') {
           const failure = await this.classifyOrchestratorFailure(app.appId, result.record);
-          failureMessage =
-            failure === 'conflict'
-              ? DEPLOY_IN_PROGRESS_MESSAGE
-              : `Runner error: ${result.record.error ?? 'deployment failed'}`;
-          failureStream = failure === 'conflict' ? null : failure;
+          if (failure === 'conflict') {
+            this.logger.warn(`AI App deploy for ${app.appId} lost the Helm lock to another operation`);
+            if (environment === 'prod') {
+              await this.releaseLockedDeploy(app, deploymentId);
+            } else {
+              await this.failDeployIfCurrent(
+                app,
+                memberUid,
+                eventContext,
+                DEPLOY_IN_PROGRESS_MESSAGE,
+                null,
+                environment
+              );
+            }
+            throw new BadGatewayException('Another deploy of this app is still in progress');
+          }
+          failureMessage = `Runner error: ${result.record.error ?? 'deployment failed'}`;
+          failureStream = failure;
         } else {
           // The build may have hung, or the request never reached the build — genuinely unknown.
           failureMessage =
@@ -2638,12 +2672,11 @@ export class AiAppsService {
       authGateVersion = await this.gateVersionServed(url);
     }
 
-    // The build re-attaches only the secret keys an earlier secret-aware
-    // deployment recorded. Anything it did not attach (first secret-aware
-    // deploy, a newly added secret, a newly enabled database) needs the
-    // runner's secret-aware redeploy of the built image — started only now,
-    // after the build released the release lock. A secrets/database app that
-    // can't get its values must fail loudly rather than go READY in a broken state.
+    // The build mounts every secret currently in SSM, including keys saved
+    // after the last secret-aware deploy. A follow-up upgrade runs only for
+    // something that build did not attach (a database that still has to be
+    // provisioned). A secrets/database app that can't get its values must
+    // fail loudly rather than go READY in a broken state.
     const needsRuntimeConfig = secretNames.length > 0 || !!requestedDatabase?.enabled;
     if (needsRuntimeConfig && runtimeConfigAlreadyAttached(secretNames, requestedDatabase, attachedKeys)) {
       this.logger.log(
@@ -2660,6 +2693,13 @@ export class AiAppsService {
       try {
         databaseInfo = await this.deployImageWithRuntimeConfig(app.appId, secretNames, url, requestedDatabase, environment);
       } catch (error) {
+        if ((error as Error).message?.includes(HELM_RELEASE_LOCKED_TEXT)) {
+          this.logger.warn(
+            `Runtime config for ${app.appId} stayed locked after retries; not overwriting a settled deploy`
+          );
+          await this.failDeployIfCurrent(app, memberUid, eventContext, DEPLOY_IN_PROGRESS_MESSAGE, null, environment);
+          throw new BadGatewayException('Another deploy of this app is still in progress');
+        }
         const message = `Runtime config injection failed: ${(error as Error).message}`;
         this.logger.error(`AI App deploy failed for ${app.appId}: ${message}`);
         // The image already built — injecting/starting it is a runtime story.
@@ -2738,6 +2778,9 @@ export class AiAppsService {
           await new Promise((resolve) => setTimeout(resolve, AI_APPS_HELM_LOCK_RETRY_INTERVAL_MS));
           continue;
         }
+        if (this.isHelmReleaseLocked(error)) {
+          throw new Error(HELM_RELEASE_LOCKED_TEXT);
+        }
         // Same edge-timeout caveat as the build: verify before declaring failure.
         if (this.isUncertainRunnerError(error) && (await this.verifyAppLive(appUrl))) {
           this.logger.warn(`Secrets deploy timed out for ${appId} but the app is reachable — continuing`);
@@ -2757,10 +2800,11 @@ export class AiAppsService {
 
   /** True when the runner refused the deployment because the Helm release is mid-modification. */
   private isHelmReleaseLocked(error: unknown): boolean {
-    if (!axios.isAxiosError(error) || error.response?.status !== 409) {
+    if (!axios.isAxiosError(error) || error.response == null) {
       return false;
     }
-    return this.safeStringify(error.response.data).includes('helm_release_locked');
+    const body = this.safeStringify(error.response.data);
+    return body.includes('helm_release_locked') || body.includes(HELM_RELEASE_LOCKED_TEXT);
   }
 
   /**
@@ -2842,6 +2886,91 @@ export class AiAppsService {
       this.logRunnerError('deployment-events', appId, error);
       return 'build';
     }
+  }
+
+  /**
+   * This attempt never took the Helm lock, so put the row back to what it was
+   * before the DEPLOYING write. The where-clause gives up when a concurrent
+   * attempt already settled the row.
+   */
+  private async releaseLockedDeploy(
+    app: Pick<
+      AiApp,
+      'uid' | 'status' | 'deploymentId' | 's3Key' | 'url' | 'httpUrl' | 'host' | 'notes' | 'failureStream'
+    >,
+    deploymentId: string
+  ): Promise<void> {
+    const claimed = await this.prisma.aiApp.updateMany({
+      where: { uid: app.uid, deploymentId, status: 'DEPLOYING' },
+      data: {
+        status: app.status,
+        deploymentId: app.deploymentId,
+        s3Key: app.s3Key,
+        url: app.url,
+        httpUrl: app.httpUrl,
+        host: app.host,
+        notes: app.notes,
+        failureStream: app.failureStream,
+      },
+    });
+    if (!claimed.count) return;
+    const updated = await this.prisma.aiApp.findUnique({ where: { uid: app.uid } });
+    if (updated) await this.mirrorProdTarget(updated);
+  }
+
+  /**
+   * Records a lock conflict only while this attempt still owns the DEPLOYING row.
+   * A holder that already reached READY (or a newer attempt) keeps its status.
+   * Returns false when the row was left untouched.
+   */
+  private async failDeployIfCurrent(
+    app: Pick<AiApp, 'uid' | 'name' | 'memberUid'>,
+    actorUid: string,
+    eventContext: { appUid: string; appId: string; deploymentId: string },
+    message: string,
+    failureStream: 'build' | 'runtime' | null,
+    environment: AiAppTargetEnvironment
+  ): Promise<boolean> {
+    const notes = message.slice(0, 2000);
+    if (environment === 'preview') {
+      const table = this.targetTable() as { updateMany?: (args: any) => Promise<{ count: number }> } | null;
+      if (!table?.updateMany) {
+        await this.failDeploy(app, actorUid, eventContext, message, failureStream, environment);
+        return true;
+      }
+      const claimed = await table.updateMany({
+        where: {
+          appUid: app.uid,
+          environment: 'preview',
+          deploymentId: eventContext.deploymentId,
+          status: 'DEPLOYING',
+        },
+        data: { status: 'ERROR', notes, failureStream },
+      });
+      if (!claimed.count) {
+        this.logger.warn(`AI App ${eventContext.appId} lock conflict ignored; preview attempt no longer owns the row`);
+        return false;
+      }
+    } else {
+      const claimed = await this.prisma.aiApp.updateMany({
+        where: { uid: app.uid, deploymentId: eventContext.deploymentId, status: 'DEPLOYING' },
+        data: { status: 'ERROR', notes, failureStream },
+      });
+      if (!claimed.count) {
+        this.logger.warn(
+          `AI App ${eventContext.appId} lock conflict ignored; attempt ${eventContext.deploymentId} no longer owns the row`
+        );
+        return false;
+      }
+      const updated = await this.prisma.aiApp.findUnique({ where: { uid: app.uid } });
+      if (updated) await this.mirrorProdTarget(updated);
+    }
+    await this.recordEvent('DEPLOY_FAILED', actorUid, {
+      ...eventContext,
+      message: environment === 'preview' ? `preview: ${notes}` : notes,
+    });
+    await this.notifyDeployFailed(app);
+    return true;
   }
 
   /**
