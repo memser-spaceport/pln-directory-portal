@@ -69,7 +69,7 @@ export class AdminSpvSpotlightController {
   @UsePipes(ZodValidationPipe)
   @NoCache()
   async sendOpenNotice(@Param('uid') uid: string, @Body() body: SendSpvOpenNoticeDto) {
-    return this.adminService.sendOpenNotice(uid, body.includeAlreadySent ?? false);
+    return this.adminService.sendOpenNotice(uid, body.includeAlreadySent ?? false, body.participantUids);
   }
 
   @Get(':uid/login-links')

@@ -21,6 +21,7 @@ import {
   EmailTemplateKey,
   normalizeEmail,
   openNoticeCounts,
+  replaceNbsp,
   sanitizeEmailHtml,
 } from './spv-spotlight.utils';
 import { SpvSpotlightMailer } from './spv-spotlight-mailer';
@@ -98,14 +99,14 @@ export class SpvSpotlightAdminService {
         teamUid: team.uid,
         slug,
         title,
-        description: input.description,
+        description: replaceNbsp(input.description),
         status: input.status ?? 'DRAFT',
         supportEmail: resolveTeamPitchSupportEmail(input.supportEmail),
         senderEmail: normalizeOptionalTrimmed(input.senderEmail) ?? null,
         senderName: normalizeOptionalTrimmed(input.senderName) ?? null,
         replyToEmail: normalizeOptionalTrimmed(input.replyToEmail) ?? null,
         docSendUrl: normalizeOptionalTrimmed(input.docSendUrl) ?? null,
-        summary: normalizeOptionalTrimmed(input.summary) ?? null,
+        summary: normalizeOptionalTrimmed(input.summary && replaceNbsp(input.summary)) ?? null,
         emailTemplates: asEmailTemplates(null, title),
       },
     });
@@ -149,7 +150,7 @@ export class SpvSpotlightAdminService {
       where: { uid },
       data: {
         ...(input.title !== undefined ? { title: input.title.trim() } : {}),
-        ...(input.description !== undefined ? { description: input.description } : {}),
+        ...(input.description !== undefined ? { description: replaceNbsp(input.description) } : {}),
         ...(slug ? { slug } : {}),
         ...(input.status !== undefined ? { status: input.status } : {}),
         ...(input.supportEmail !== undefined ? { supportEmail: resolveTeamPitchSupportEmail(input.supportEmail) } : {}),
@@ -161,7 +162,9 @@ export class SpvSpotlightAdminService {
           ? { replyToEmail: normalizeOptionalTrimmed(input.replyToEmail) ?? null }
           : {}),
         ...(input.docSendUrl !== undefined ? { docSendUrl: normalizeOptionalTrimmed(input.docSendUrl) ?? null } : {}),
-        ...(input.summary !== undefined ? { summary: normalizeOptionalTrimmed(input.summary) ?? null } : {}),
+        ...(input.summary !== undefined
+          ? { summary: normalizeOptionalTrimmed(input.summary && replaceNbsp(input.summary)) ?? null }
+          : {}),
       },
     });
     if (input.media) {
@@ -222,6 +225,7 @@ export class SpvSpotlightAdminService {
       emailTemplateVariables?: Record<string, string> | null;
     }
   ) {
+    const spotlight = await this.requireSpotlight(spotlightUid);
     const participant = await this.prisma.spvSpotlightParticipant.findFirst({
       where: { uid: participantUid, spvSpotlightUid: spotlightUid },
     });
@@ -229,13 +233,19 @@ export class SpvSpotlightAdminService {
       throw new NotFoundException('Participant not found');
     }
     if (data.cohort === 'PRE_APPROVED') {
-      await this.prisma.spvAccessRequest.deleteMany({
-        where: { spvSpotlightUid: spotlightUid, memberUid: participant.memberUid, status: 'REJECTED' },
-      });
+      await this.clearOpenApplications(spotlightUid, participant.memberUid);
+      await this.enableApproveOnLogin(participant.memberUid);
     }
+    const typeDefaults =
+      data.type === undefined || data.type === participant.type
+        ? {}
+        : data.type === 'FOUNDER'
+        ? { cohort: null, access: defaultAccessForParticipantType('FOUNDER'), teamUid: spotlight.teamUid }
+        : { cohort: SpvInvestorCohort.OUTREACH, access: defaultAccessForParticipantType('INVESTOR'), teamUid: null };
     return this.prisma.spvSpotlightParticipant.update({
       where: { uid: participantUid },
       data: {
+        ...typeDefaults,
         ...(data.type !== undefined ? { type: data.type } : {}),
         ...(data.access !== undefined ? { access: data.access } : {}),
         ...(data.cohort !== undefined ? { cohort: data.cohort } : {}),
@@ -258,14 +268,23 @@ export class SpvSpotlightAdminService {
       throw new NotFoundException('Participant not found');
     }
     await this.prisma.spvSpotlightParticipant.delete({ where: { uid: participantUid } });
+    await this.revokeApprovedApplications(spotlightUid, [participant.memberUid]);
     return { success: true };
   }
 
   async removeParticipantsBulk(spotlightUid: string, participantUids: string[]) {
     await this.requireSpotlight(spotlightUid);
+    const participants = await this.prisma.spvSpotlightParticipant.findMany({
+      where: { spvSpotlightUid: spotlightUid, uid: { in: participantUids } },
+      select: { memberUid: true },
+    });
     const result = await this.prisma.spvSpotlightParticipant.deleteMany({
       where: { spvSpotlightUid: spotlightUid, uid: { in: participantUids } },
     });
+    await this.revokeApprovedApplications(
+      spotlightUid,
+      participants.map((participant) => participant.memberUid)
+    );
     return { removed: result.count };
   }
 
@@ -280,6 +299,7 @@ export class SpvSpotlightAdminService {
     }
   ) {
     const spotlight = await this.requireSpotlight(spotlightUid);
+    const cohort = data.type === 'INVESTOR' ? data.cohort ?? 'PRE_APPROVED' : null;
     let member: { uid: string };
 
     if (data.memberUid) {
@@ -291,7 +311,11 @@ export class SpvSpotlightAdminService {
         if (!found.email) {
           throw new BadRequestException('Member has no email');
         }
-        member = await this.upsertInvestorMember(normalizeEmail(found.email), found.name || found.email);
+        member = await this.upsertInvestorMember(
+          normalizeEmail(found.email),
+          found.name || found.email,
+          cohort === 'PRE_APPROVED'
+        );
       } else {
         member = found;
       }
@@ -299,7 +323,7 @@ export class SpvSpotlightAdminService {
       const email = normalizeEmail(data.email);
       const name = data.name?.trim() || email;
       if (data.type === 'INVESTOR') {
-        member = await this.upsertInvestorMember(email, name);
+        member = await this.upsertInvestorMember(email, name, cohort === 'PRE_APPROVED');
       } else {
         const existing = await this.prisma.member.findFirst({
           where: { email: { equals: email, mode: 'insensitive' } },
@@ -328,13 +352,16 @@ export class SpvSpotlightAdminService {
       throw new ConflictException('Participant already exists for this spotlight');
     }
 
+    if (cohort === 'PRE_APPROVED') {
+      await this.clearOpenApplications(spotlight.uid, member.uid);
+    }
     return this.prisma.spvSpotlightParticipant.create({
       data: {
         spvSpotlightUid: spotlight.uid,
         memberUid: member.uid,
         type: data.type,
         access: defaultAccessForParticipantType(data.type),
-        cohort: data.type === 'INVESTOR' ? data.cohort ?? 'PRE_APPROVED' : null,
+        cohort,
         teamUid: data.type === 'FOUNDER' ? spotlight.teamUid : null,
       },
       include: { member: { select: { uid: true, name: true, email: true } } },
@@ -349,12 +376,17 @@ export class SpvSpotlightAdminService {
     const spotlight = await this.requireSpotlight(spotlightUid);
     let created = 0;
     let updated = 0;
+    let skipped = 0;
     for (const row of participants) {
       const email = normalizeEmail(row.email);
-      const member = await this.upsertInvestorMember(email, row.name?.trim() || email);
+      const member = await this.upsertInvestorMember(email, row.name?.trim() || email, cohort === 'PRE_APPROVED');
       const existing = await this.prisma.spvSpotlightParticipant.findUnique({
         where: { spvSpotlightUid_memberUid: { spvSpotlightUid: spotlight.uid, memberUid: member.uid } },
       });
+      if (existing?.type === 'INVESTOR' && existing.cohort === 'PRE_APPROVED' && cohort === 'OUTREACH') {
+        skipped += 1;
+        continue;
+      }
       const variables = row.emailTemplateVariables ?? null;
       if (existing) {
         await this.prisma.spvSpotlightParticipant.update({
@@ -382,12 +414,10 @@ export class SpvSpotlightAdminService {
         created += 1;
       }
       if (cohort === 'PRE_APPROVED') {
-        await this.prisma.spvAccessRequest.deleteMany({
-          where: { spvSpotlightUid: spotlight.uid, memberUid: member.uid, status: 'REJECTED' },
-        });
+        await this.clearOpenApplications(spotlight.uid, member.uid);
       }
     }
-    return { created, updated };
+    return { created, updated, skipped };
   }
 
   async listAccessRequests(uid: string) {
@@ -420,7 +450,7 @@ export class SpvSpotlightAdminService {
       where: { uid: request.uid },
       data: { status: 'APPROVED' },
     });
-    await this.prisma.spvSpotlightParticipant.upsert({
+    const participant = await this.prisma.spvSpotlightParticipant.upsert({
       where: { spvSpotlightUid_memberUid: { spvSpotlightUid: request.spvSpotlightUid, memberUid: request.member.uid } },
       create: {
         spvSpotlightUid: request.spvSpotlightUid,
@@ -430,6 +460,7 @@ export class SpvSpotlightAdminService {
       },
       update: {},
     });
+    await this.enableApproveOnLogin(request.member.uid);
     const templates = asEmailTemplates(request.spvSpotlight.emailTemplates, request.spvSpotlight.title);
     await this.mailer.send({
       spotlight: this.mailContext(request.spvSpotlight),
@@ -437,7 +468,11 @@ export class SpvSpotlightAdminService {
       to: request.member.email,
       memberUid: request.member.uid,
       memberName: request.member.name || '',
-      extra: { role: request.role, organization: request.organization },
+      extra: {
+        ...asStringRecord(participant.emailTemplateVariables),
+        role: request.role,
+        organization: request.organization,
+      },
     });
     return { success: true };
   }
@@ -464,7 +499,7 @@ export class SpvSpotlightAdminService {
     return openNoticeCounts(recipients);
   }
 
-  async sendOpenNotice(uid: string, includeAlreadySent: boolean) {
+  async sendOpenNotice(uid: string, includeAlreadySent: boolean, participantUids?: string[]) {
     const spotlight = await this.prisma.spvSpotlight.findUnique({
       where: { uid },
       include: { team: { select: { name: true } } },
@@ -473,7 +508,7 @@ export class SpvSpotlightAdminService {
       throw new NotFoundException('SPV spotlight not found');
     }
     const templates = asEmailTemplates(spotlight.emailTemplates, spotlight.title);
-    const recipients = await this.openNoticeRecipients(uid);
+    const recipients = await this.openNoticeRecipients(uid, participantUids);
     const targets = recipients.filter((recipient) => includeAlreadySent || !recipient.sent);
     let sent = 0;
     let errors = 0;
@@ -515,13 +550,20 @@ export class SpvSpotlightAdminService {
     if (!spotlight) {
       throw new NotFoundException('SPV spotlight not found');
     }
-    const participants = await this.prisma.spvSpotlightParticipant.findMany({
-      where: { spvSpotlightUid: uid, type: 'INVESTOR', access: { not: 'RESTRICTED' }, cohort: { not: null } },
-      include: { member: { select: { uid: true, name: true, email: true } } },
-    });
+    const [participants, rejected] = await Promise.all([
+      this.prisma.spvSpotlightParticipant.findMany({
+        where: { spvSpotlightUid: uid, type: 'INVESTOR', access: { not: 'RESTRICTED' }, cohort: { not: null } },
+        include: { member: { select: { uid: true, name: true, email: true } } },
+      }),
+      this.prisma.spvAccessRequest.findMany({
+        where: { spvSpotlightUid: uid, status: 'REJECTED' },
+        select: { memberUid: true },
+      }),
+    ]);
+    const rejectedMembers = new Set(rejected.map((request) => request.memberUid));
     const rows: { email: string; name: string; cohort: string; url: string }[] = [];
     for (const participant of participants) {
-      if (!participant.member.email || !participant.cohort) {
+      if (!participant.member.email || !participant.cohort || rejectedMembers.has(participant.memberUid)) {
         continue;
       }
       try {
@@ -631,65 +673,46 @@ export class SpvSpotlightAdminService {
     return { summary: { totalEligible: participants.length, sent, skipped, errors }, rows };
   }
 
-  private async openNoticeRecipients(uid: string) {
+  private async openNoticeRecipients(uid: string, participantUids?: string[]) {
     await this.requireSpotlight(uid);
     const [participants, requests] = await Promise.all([
       this.prisma.spvSpotlightParticipant.findMany({
-        where: { spvSpotlightUid: uid, cohort: 'PRE_APPROVED', access: { not: 'RESTRICTED' } },
+        where: {
+          spvSpotlightUid: uid,
+          type: 'INVESTOR',
+          access: { not: 'RESTRICTED' },
+          ...(participantUids ? { uid: { in: participantUids } } : {}),
+        },
         include: { member: { select: { uid: true, name: true, email: true } } },
       }),
       this.prisma.spvAccessRequest.findMany({
-        where: { spvSpotlightUid: uid, status: 'APPROVED' },
-        include: { member: { select: { uid: true, name: true, email: true } } },
+        where: { spvSpotlightUid: uid },
+        select: { uid: true, memberUid: true, status: true, openNoticeSentCount: true },
       }),
     ]);
-    const byMember = new Map<
-      string,
-      {
-        memberUid: string;
-        email: string;
-        name: string;
-        sent: boolean;
-        participantUid?: string;
-        requestUid?: string;
-        variables?: Record<string, string>;
+    const requestByMember = new Map(requests.map((request) => [request.memberUid, request]));
+    return participants.flatMap((participant) => {
+      const request = requestByMember.get(participant.memberUid);
+      const hasAccess =
+        request?.status === 'APPROVED' || (participant.cohort === 'PRE_APPROVED' && request?.status !== 'REJECTED');
+      if (!hasAccess || !participant.member.email) {
+        return [];
       }
-    >();
-    for (const participant of participants) {
-      if (!participant.member.email) {
-        continue;
-      }
-      byMember.set(participant.member.uid, {
-        memberUid: participant.member.uid,
-        email: participant.member.email,
-        name: participant.member.name || '',
-        sent: participant.openNoticeSentCount > 0,
-        participantUid: participant.uid,
-        variables: asStringRecord(participant.emailTemplateVariables),
-      });
-    }
-    for (const request of requests) {
-      if (!request.member.email) {
-        continue;
-      }
-      const existing = byMember.get(request.member.uid);
-      if (existing) {
-        existing.requestUid = request.uid;
-        existing.sent = existing.sent || request.openNoticeSentCount > 0;
-      } else {
-        byMember.set(request.member.uid, {
-          memberUid: request.member.uid,
-          email: request.member.email,
-          name: request.member.name || '',
-          sent: request.openNoticeSentCount > 0,
-          requestUid: request.uid,
-        });
-      }
-    }
-    return [...byMember.values()];
+      return [
+        {
+          memberUid: participant.member.uid,
+          email: participant.member.email,
+          name: participant.member.name || '',
+          sent: participant.openNoticeSentCount > 0 || (request?.openNoticeSentCount ?? 0) > 0,
+          participantUid: participant.uid,
+          requestUid: request?.status === 'APPROVED' ? request.uid : undefined,
+          variables: asStringRecord(participant.emailTemplateVariables),
+        },
+      ];
+    });
   }
 
-  private async upsertInvestorMember(email: string, name: string) {
+  private async upsertInvestorMember(email: string, name: string, approveOnLogin: boolean) {
     const existing = await this.prisma.member.findFirst({
       where: { email: { equals: email, mode: 'insensitive' } },
       include: { memberApproval: { select: { state: true } } },
@@ -699,7 +722,7 @@ export class SpvSpotlightAdminService {
         data: {
           email,
           name,
-          approveOnLogin: true,
+          approveOnLogin,
           memberApproval: {
             create: { state: 'PENDING', reason: 'Auto-created for SPV Spotlight participant' },
           },
@@ -710,10 +733,12 @@ export class SpvSpotlightAdminService {
     }
     const state = existing.memberApproval?.state;
     if (state !== MemberApprovalState.APPROVED && state !== MemberApprovalState.VERIFIED) {
-      await this.prisma.member.update({
-        where: { uid: existing.uid },
-        data: { approveOnLogin: true },
-      });
+      if (approveOnLogin) {
+        await this.prisma.member.update({
+          where: { uid: existing.uid },
+          data: { approveOnLogin: true },
+        });
+      }
       if (!existing.memberApproval) {
         await this.prisma.memberApproval.create({
           data: { memberUid: existing.uid, state: 'PENDING', reason: 'SPV Spotlight investor participant added' },
@@ -722,6 +747,34 @@ export class SpvSpotlightAdminService {
     }
     await upsertPolicyAssignmentByCode(this.prisma, existing.uid, 'investor_pl');
     return existing;
+  }
+
+  private async enableApproveOnLogin(memberUid: string) {
+    const member = await this.prisma.member.findUnique({
+      where: { uid: memberUid },
+      select: { memberApproval: { select: { state: true } } },
+    });
+    const state = member?.memberApproval?.state;
+    if (state === MemberApprovalState.APPROVED || state === MemberApprovalState.VERIFIED) {
+      return;
+    }
+    await this.prisma.member.update({ where: { uid: memberUid }, data: { approveOnLogin: true } });
+  }
+
+  private async clearOpenApplications(spotlightUid: string, memberUid: string) {
+    await this.prisma.spvAccessRequest.deleteMany({
+      where: { spvSpotlightUid: spotlightUid, memberUid, status: { in: ['PENDING', 'REJECTED'] } },
+    });
+  }
+
+  private async revokeApprovedApplications(spotlightUid: string, memberUids: string[]) {
+    if (!memberUids.length) {
+      return;
+    }
+    await this.prisma.spvAccessRequest.updateMany({
+      where: { spvSpotlightUid: spotlightUid, memberUid: { in: memberUids }, status: 'APPROVED' },
+      data: { status: 'REJECTED' },
+    });
   }
 
   private async addTeamLeads(spotlightUid: string, teamUid: string) {

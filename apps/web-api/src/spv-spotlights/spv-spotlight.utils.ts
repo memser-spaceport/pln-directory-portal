@@ -91,7 +91,14 @@ export function accessRequestConflict(input: {
 }
 
 export function mergeTemplate(template: string, vars: Record<string, string>): string {
-  return template.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_match, key: string) => vars[key] ?? '');
+  return template.replace(
+    /\{\{\s*([a-zA-Z0-9_]+)\s*(?:\|([^}]*))?\}\}/g,
+    (_match, key: string, fallback?: string) => vars[key] || fallback?.trim() || ''
+  );
+}
+
+export function replaceNbsp(value: string): string {
+  return value.replace(/&nbsp;| /g, ' ');
 }
 
 export function sanitizeEmailHtml(html: string): string {

@@ -1,7 +1,7 @@
 import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
 
-const emailField = z.string().email();
+const emailField = z.string().trim().email();
 
 export const SpvAccessRequestSchema = z.object({
   email: emailField.refine((value) => {
@@ -86,7 +86,7 @@ export class AddSpvParticipantsBulkDto extends createZodDto(AddSpvParticipantsBu
 export const AddSpvParticipantSchema = z
   .object({
     memberUid: z.string().min(1).optional(),
-    email: z.string().email().optional(),
+    email: emailField.optional(),
     name: z.string().trim().min(1).optional(),
     type: z.enum(['INVESTOR', 'FOUNDER']),
     cohort: z.enum(['PRE_APPROVED', 'OUTREACH']).optional(),
@@ -116,6 +116,7 @@ export class SendSpvBulkDto extends createZodDto(SendSpvBulkSchema) {}
 
 export const SendSpvOpenNoticeSchema = z.object({
   includeAlreadySent: z.boolean().optional().default(false),
+  participantUids: z.array(z.string().min(1)).min(1).optional(),
 });
 
 export class SendSpvOpenNoticeDto extends createZodDto(SendSpvOpenNoticeSchema) {}

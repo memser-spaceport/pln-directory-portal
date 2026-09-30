@@ -76,7 +76,7 @@ export class SpvSpotlightsService {
             select: { status: true },
           }),
           this.prisma.spvSpotlightParticipant.findFirst({
-            where: { spvSpotlightUid: spotlight.uid, memberUid: member.uid, cohort: 'PRE_APPROVED' },
+            where: { spvSpotlightUid: spotlight.uid, memberUid: member.uid, type: 'INVESTOR', cohort: 'PRE_APPROVED' },
             select: { uid: true },
           }),
         ])
@@ -151,7 +151,7 @@ export class SpvSpotlightsService {
         select: { status: true },
       }),
       this.prisma.spvSpotlightParticipant.findFirst({
-        where: { spvSpotlightUid: spotlight.uid, memberUid: member.uid, cohort: 'PRE_APPROVED' },
+        where: { spvSpotlightUid: spotlight.uid, memberUid: member.uid, type: 'INVESTOR', cohort: 'PRE_APPROVED' },
         select: { uid: true },
       }),
     ]);
