@@ -4,7 +4,7 @@ import { z } from 'zod';
  * What a team-scoped integration key may do. A key holds one or more of these;
  * integration routes declare which they need.
  */
-export const INTEGRATION_KEY_SCOPES = ['jobs:write', 'candidates:read'] as const;
+export const INTEGRATION_KEY_SCOPES = ['jobs:write', 'candidates:read', 'members:sign-in'] as const;
 export const IntegrationKeyScopeSchema = z.enum(INTEGRATION_KEY_SCOPES);
 export type IntegrationKeyScope = z.infer<typeof IntegrationKeyScopeSchema>;
 

@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import { NoCache } from '../decorators/no-cache.decorator';
@@ -6,6 +6,7 @@ import { RequireIntegrationScopes } from '../decorators/require-integration-scop
 import { IntegrationKeyGuard } from '../guards/integration-key.guard';
 import { IntegrationCandidatesService } from './integration-candidates.service';
 import { IntegrationKeysService, IntegrationKeyRequestContext } from './integration-keys.service';
+import { MemberSignInService } from './member-sign-in.service';
 
 /**
  * Routes for an integrated third-party server (for example a team's ATS),
@@ -21,7 +22,8 @@ import { IntegrationKeysService, IntegrationKeyRequestContext } from './integrat
 export class IntegrationsController {
   constructor(
     private readonly integrationKeys: IntegrationKeysService,
-    private readonly candidates: IntegrationCandidatesService
+    private readonly candidates: IntegrationCandidatesService,
+    private readonly signIn: MemberSignInService
   ) {}
 
   /** The calling key describing itself, so an integrator can verify its configuration. */
@@ -55,5 +57,20 @@ export class IntegrationsController {
   @RequireIntegrationScopes('candidates:read')
   async applicationCv(@Req() req: { integrationKey: IntegrationKeyRequestContext }, @Param('uid') uid: string) {
     return this.candidates.applicationCvUrl(req.integrationKey.teamUid, uid);
+  }
+
+  /** Redeems a one-time LabOS sign-in code for the member it was issued to. */
+  @Post('sign-in/redeem')
+  @HttpCode(HttpStatus.OK)
+  @RequireIntegrationScopes('members:sign-in')
+  async redeemSignIn(@Body() body: { code?: string }) {
+    return this.signIn.redeem(typeof body?.code === 'string' ? body.code : '');
+  }
+
+  /** A signed-in member's current profile and effective permissions, for re-checking a session the app issued. */
+  @Get('members/:uid/access')
+  @RequireIntegrationScopes('members:sign-in')
+  async memberAccess(@Param('uid') uid: string) {
+    return this.signIn.member(uid);
   }
 }
