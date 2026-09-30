@@ -38,7 +38,7 @@ import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { AdminAuthGuard } from '../guards/admin-auth.guard';
 import { ParticipantsReqValidationPipe } from '../pipes/participant-request-validation.pipe';
 import { MembersService } from '../members/members.service';
-import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { OptionalUserTokenCheckGuard, UserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { TeamMembershipSourceReadAuthGuard } from '../guards/admin-auth.guard';
 import { QueryCache } from '../decorators/query-cache.decorator';
 import { UpdateTeamAccessLevelDto } from './dto/teams.dto';
@@ -293,7 +293,7 @@ export class TeamsController {
   @ApiQueryFromZod(TeamFilterQueryParams.optional())
   @QueryCache()
   @CacheTTL(60)
-  @UseGuards(UserTokenCheckGuard)
+  @UseGuards(OptionalUserTokenCheckGuard)
   async searchTeams(@Req() request: Request) {
     const params = request.query as unknown as z.infer<typeof TeamFilterQueryParams>;
     const followingOnly = params?.followingOnly === true || (params as any)?.followingOnly === 'true';

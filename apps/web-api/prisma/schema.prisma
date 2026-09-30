@@ -38,6 +38,9 @@ model Team {
   blueskyHandler               String?
   crunchbaseHandler            String?
   dateFounded                  Int?
+  portfolioIsland              String?
+  portfolioStartYear           Int?
+  portfolioEndYear             Int?
   teamSize                     String?
   location                     String?
   status                       TeamStatus                    @default(ACTIVE)
@@ -108,6 +111,9 @@ model Team {
   portfolioMeta         PlPortfolioTeamMeta?
   teamPitches           TeamPitch[]
   teamPitchParticipants TeamPitchParticipant[]
+  spvSpotlights         SpvSpotlight[]
+  spvSpotlightParticipants SpvSpotlightParticipant[]
+  spvAccessRequestTeams SpvAccessRequest[]
 
   /// Read-only Affinity CRM sidecar (task 02). Optional 1:1 when linked.
   affinityCompany AffinityCompany?
@@ -234,6 +240,8 @@ model Member {
   demoDayParticipants                DemoDayParticipant[]
   teamPitchParticipants              TeamPitchParticipant[]
   teamPitchExpressInterestStatistics TeamPitchExpressInterest[]
+  spvSpotlightParticipants           SpvSpotlightParticipant[]
+  spvAccessRequests                  SpvAccessRequest[]
   demoDayEngagements                 DemoDayEngagement[]
   demoDayExpressInterestStatistics   DemoDayExpressInterestStatistic[]
   demoDayFeedbacks                   DemoDayFeedback[]
@@ -567,6 +575,7 @@ model Image {
   demoDayBrandingHeaders  DemoDayBranding[]            @relation("HeaderImage")
   teamPitchLogos          TeamPitch[]                  @relation("TeamPitchLogo")
   teamPitchHeaderImages   TeamPitch[]                  @relation("TeamPitchHeaderImage")
+  spvSpotlightMedia       SpvSpotlightMedia[]
   dealLogos               Deal[]                       @relation("DealLogo")
   dealSubmissionLogos     DealSubmission[]             @relation("DealSubmissionLogo")
   articleCoverImages      Article[]                    @relation("ArticleCoverImage")
@@ -1556,6 +1565,105 @@ model TeamPitchExpressInterest {
   @@unique([teamPitchUid, memberUid, teamPitchProfileUid, isPrep])
   @@index([memberUid, teamPitchProfileUid])
   @@index([teamPitchUid])
+}
+
+enum SpvInvestorCohort {
+  PRE_APPROVED
+  OUTREACH
+}
+
+enum SpvAccessRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model SpvSpotlight {
+  id            Int             @id @default(autoincrement())
+  uid           String          @unique @default(cuid())
+  teamUid       String          @unique
+  team          Team            @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+  slug          String          @unique
+  title         String
+  description   String
+  status        TeamPitchStatus @default(DRAFT)
+  supportEmail  String
+  senderEmail   String?
+  senderName    String?
+  replyToEmail  String?
+  docSendUrl    String?
+  summary       String?
+  emailTemplates Json
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  media         SpvSpotlightMedia[]
+  participants  SpvSpotlightParticipant[]
+  accessRequests SpvAccessRequest[]
+
+  @@index([status])
+}
+
+model SpvSpotlightMedia {
+  id              Int          @id @default(autoincrement())
+  uid             String       @unique @default(cuid())
+  spvSpotlightUid String
+  spvSpotlight    SpvSpotlight @relation(fields: [spvSpotlightUid], references: [uid], onDelete: Cascade)
+  imageUid        String
+  image           Image        @relation(fields: [imageUid], references: [uid])
+  alt             String
+  fit             String       @default("cover")
+  sortOrder       Int          @default(0)
+  createdAt       DateTime     @default(now())
+
+  @@index([spvSpotlightUid, sortOrder])
+}
+
+model SpvSpotlightParticipant {
+  id                     Int                        @id @default(autoincrement())
+  uid                    String                     @unique @default(cuid())
+  spvSpotlightUid        String
+  spvSpotlight           SpvSpotlight               @relation(fields: [spvSpotlightUid], references: [uid], onDelete: Cascade)
+  memberUid              String
+  member                 Member                     @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  type                   TeamPitchParticipantType
+  access                 TeamPitchParticipantAccess
+  cohort                 SpvInvestorCohort?
+  teamUid                String?
+  team                   Team?                      @relation(fields: [teamUid], references: [uid], onDelete: SetNull)
+  inviteSentAt           DateTime?
+  inviteSentCount        Int                        @default(0)
+  followUpSentAt         DateTime?
+  followUpSentCount      Int                        @default(0)
+  openNoticeSentAt       DateTime?
+  openNoticeSentCount    Int                        @default(0)
+  emailTemplateVariables Json?
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
+
+  @@unique([spvSpotlightUid, memberUid])
+  @@index([spvSpotlightUid, type])
+}
+
+model SpvAccessRequest {
+  id                    Int                    @id @default(autoincrement())
+  uid                   String                 @unique @default(cuid())
+  spvSpotlightUid       String
+  spvSpotlight          SpvSpotlight           @relation(fields: [spvSpotlightUid], references: [uid], onDelete: Cascade)
+  memberUid             String
+  member                Member                 @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  status                SpvAccessRequestStatus @default(PENDING)
+  role                  String
+  organization          String
+  teamUid               String?
+  team                  Team?                  @relation(fields: [teamUid], references: [uid], onDelete: SetNull)
+  isAccreditedInvestor  Boolean                @default(false)
+  openNoticeSentAt      DateTime?
+  openNoticeSentCount   Int                    @default(0)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  @@unique([spvSpotlightUid, memberUid])
+  @@index([spvSpotlightUid, status])
 }
 
 model DemoDayFeedback {

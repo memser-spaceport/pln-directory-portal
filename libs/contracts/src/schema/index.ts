@@ -37,6 +37,7 @@ export * from './forum';
 export * from './demo-day';
 export * from './team-pitch';
 export * from './admin-team-pitch';
+export * from './spv-spotlight';
 export * from './demo-day-engagement-analytics';
 export * from './contact-support';
 export * from './community-affiliation';

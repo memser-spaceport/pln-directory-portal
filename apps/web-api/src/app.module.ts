@@ -64,6 +64,7 @@ import { UploadsService } from './uploads/uploads.service';
 import { UploadsModule } from './uploads/uploads.module';
 import { DemoDaysModule } from './demo-days/demo-days.module';
 import { TeamPitchesModule } from './team-pitches/team-pitches.module';
+import { SpvSpotlightsModule } from './spv-spotlights/spv-spotlights.module';
 import { ContactSupportModule } from './contact-support/contact-support.module';
 import { PushNotificationsModule } from './push-notifications/push-notifications.module';
 import { WebSocketModule } from './websocket/websocket.module';
@@ -174,6 +175,7 @@ import { McpModule } from './mcp/mcp.module';
     UploadsModule,
     DemoDaysModule,
     TeamPitchesModule,
+    SpvSpotlightsModule,
     ContactSupportModule,
     PushNotificationsModule,
     WebSocketModule,
