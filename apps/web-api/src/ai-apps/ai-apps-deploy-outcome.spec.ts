@@ -37,6 +37,7 @@ jest.mock('../analytics/service/analytics.service', () => ({
 
 import axios from 'axios';
 import { AiAppsService } from './ai-apps.service';
+import { withInlineDeploys } from './ai-apps-deploy-queue.spec-helper';
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
@@ -80,11 +81,14 @@ function buildService(app: Record<string, any> = APP) {
     aiAppActiveMember: { groupBy: jest.fn().mockResolvedValue([]) },
     aiAppAllowedMember: { findMany: jest.fn().mockResolvedValue([]) },
   };
-  const service = new AiAppsService(
-    prisma as any,
-    { uploadFileToS3: jest.fn() } as any,
-    { create: jest.fn().mockResolvedValue({}) } as any,
-    { trackEvent: jest.fn() } as any
+  const service = withInlineDeploys(
+    prisma,
+    new AiAppsService(
+      prisma as any,
+      { uploadFileToS3: jest.fn() } as any,
+      { create: jest.fn().mockResolvedValue({}) } as any,
+      { trackEvent: jest.fn() } as any
+    )
   );
   return { service, prisma };
 }
@@ -162,6 +166,13 @@ function writes(prisma: any): Record<string, any>[] {
 
 function restoredRows(prisma: any): Record<string, any>[] {
   return prisma.aiApp.updateMany.mock.calls.map(([{ data }]: any) => data);
+}
+
+/** DEPLOY_FAILED events recorded for a lock-rejected attempt (the "another deploy is in progress" message). */
+function lockRejections(prisma: any): Record<string, any>[] {
+  return prisma.aiAppEvent.create.mock.calls
+    .map(([{ data }]: any) => data)
+    .filter((data: any) => data.type === 'DEPLOY_FAILED' && /still in progress/.test(data.message ?? ''));
 }
 
 function eventTypes(prisma: any): string[] {
@@ -313,7 +324,9 @@ describe('concurrent deploy conflict', () => {
     await expect(service.deployDraft('creator-1', 'app-1', undefined)).rejects.toThrow(/still in progress/);
 
     expect(restoredRows(prisma)[0]).toMatchObject({ status: 'READY', deploymentId: 'd1', failureStream: null });
-    expect(eventTypes(prisma)).not.toContain('DEPLOY_FAILED');
+    // The rejected attempt stays visible to the status endpoint as its own DEPLOY_FAILED.
+    expect(lockRejections(prisma)).toEqual([expect.objectContaining({ deploymentId: 'd1' })]);
+    expect(eventTypes(prisma).filter((type) => type === 'DEPLOY_FAILED')).toHaveLength(1);
     expect(writes(prisma).some((data) => data.status === 'ERROR')).toBe(false);
     expect(mockedAxios.get).not.toHaveBeenCalled();
   });
@@ -359,7 +372,8 @@ describe('concurrent deploy conflict', () => {
     await expect(service.deployDraft('creator-1', 'app-1', undefined)).rejects.toThrow(/still in progress/);
 
     expect(restoredRows(prisma)[0]).toMatchObject({ status: 'READY', deploymentId: 'd1' });
-    expect(eventTypes(prisma)).not.toContain('DEPLOY_FAILED');
+    expect(lockRejections(prisma)).toHaveLength(1);
+    expect(eventTypes(prisma).filter((type) => type === 'DEPLOY_FAILED')).toHaveLength(1);
   });
 
   it('a polled record failed on the release lock is a conflict, not a build failure', async () => {
@@ -379,7 +393,8 @@ describe('concurrent deploy conflict', () => {
     await expect(service.deployDraft('creator-1', 'app-1', undefined)).rejects.toThrow(/still in progress/);
 
     expect(restoredRows(prisma)[0]).toMatchObject({ status: 'READY', deploymentId: 'd1' });
-    expect(eventTypes(prisma)).not.toContain('DEPLOY_FAILED');
+    expect(lockRejections(prisma)).toHaveLength(1);
+    expect(eventTypes(prisma).filter((type) => type === 'DEPLOY_FAILED')).toHaveLength(1);
     expect(writes(prisma).find((data) => data.status === 'ERROR')).toBeUndefined();
   });
 

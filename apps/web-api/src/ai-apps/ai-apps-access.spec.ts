@@ -17,6 +17,7 @@ jest.mock('../analytics/service/analytics.service', () => ({
 import 'reflect-metadata';
 import axios from 'axios';
 import { AiAppsService } from './ai-apps.service';
+import { withInlineDeploys } from './ai-apps-deploy-queue.spec-helper';
 import { AiAppsAccessService } from './ai-apps-access.service';
 import { AiAppsController } from './ai-apps.controller';
 import { DeployAppSchema } from './dto/deploy-app.dto';
@@ -192,13 +193,16 @@ function buildPrisma(apps: Row[] = [PRIVATE_APP, OPEN_APP], allowed: Row[] = [],
 function buildServices(prisma = buildPrisma(), membersWithAccess: string[] = [OWNER, VIEWER, ADMIN, 'friend-1']) {
   const pushNotifications = { create: jest.fn().mockResolvedValue({}) };
   const aws = { uploadFileToS3: jest.fn().mockResolvedValue(undefined) };
-  const aiAppsService = new AiAppsService(
+  const aiAppsService = withInlineDeploys(
     prisma,
-    aws as any,
-    pushNotifications as any,
-    {
-      trackEvent: jest.fn(),
-    } as any
+    new AiAppsService(
+      prisma,
+      aws as any,
+      pushNotifications as any,
+      {
+        trackEvent: jest.fn(),
+      } as any
+    )
   );
   const rbacService = { hasPermission: jest.fn(async () => false) };
   const accessControl = {

@@ -122,6 +122,27 @@ describe('AiAppsStarterKitService buildZip', () => {
     expect(deploySkill).toContain('clientName');
   });
 
+  it('kit 1.15: deploys answer 202 and the agent polls statusEndpoint for the real outcome', () => {
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.15');
+    const config = JSON.parse(entries.get('pln-app.config.json') as string);
+    expect(config.statusEndpoint).toContain('/v1/ai-apps/{appUid}/deployments/{deploymentId}');
+    expect(config.notes).toContain('poll statusEndpoint');
+    const deploySkill = entries.get('.claude/skills/deploy-to-labs/SKILL.md') as string;
+    expect(deploySkill).toContain('**`202 Accepted`**');
+    expect(deploySkill).toContain('statusEndpoint');
+    expect(deploySkill).toContain('pollIntervalSec');
+    expect(deploySkill).toContain('`failureStream`');
+    expect(deploySkill).toContain('**`stale: true`**');
+    expect(deploySkill).toContain('## If polling fails or the upload hangs');
+    // The /health probe is only a last resort now, never proof that a redeploy shipped.
+    expect(deploySkill).not.toContain('## If the upload times out (504)');
+    expect(deploySkill).not.toContain('the deploy worked — proceed');
+    expect(deploySkill).not.toContain('"status": "READY", "url"');
+    for (const path of ['CLAUDE.md', 'AGENTS.md']) {
+      expect(entries.get(path) as string).toContain('The upload answers `202` with `status: "DEPLOYING"`');
+    }
+  });
+
   it('explains reserved appIds without publishing the internal hostname list', () => {
     const deploySkill = entries.get('.claude/skills/deploy-to-labs/SKILL.md') as string;
     expect(deploySkill).toContain('400 Bad Request');
@@ -139,7 +160,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('kit 1.14: member context comes from same-origin /_pln/me, with the Bearer fallback for older gates', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.14');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.15');
     const skill = entries.get('.claude/skills/pln-member-context/SKILL.md') as string;
     expect(skill).toContain("fetch('/_pln/me', { credentials: 'same-origin' })");
     expect(skill).toContain('res.status === 404');
@@ -431,7 +452,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('defaults apps to all PL Infra members and asks about private access before the first deploy (kit 1.13+)', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.14');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.15');
     const readme = entries.get('README.md') as string;
     expect(readme).toContain('New apps are open to **all PL Infra members**');
     expect(readme).toContain('**Manage access**');
@@ -451,7 +472,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('documents public endpoints and that the app must secure them (kit 1.13+)', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.14');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.15');
     const deploySkill = entries.get('.claude/skills/deploy-to-labs/SKILL.md') as string;
     expect(deploySkill).toContain('## Public endpoints (paths without LabOS sign-in)');
     expect(deploySkill).toContain(

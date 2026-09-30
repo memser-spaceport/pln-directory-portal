@@ -3805,6 +3805,14 @@ model AiApp {
   /// request path to the Directory. Apps last deployed before that ignore
   /// `publicPaths` until a redeploy.
   publicPathsGateReady Boolean @default(false)
+  /// Coarse progress of the current deploy attempt: queued | building |
+  /// injecting_runtime_config | done | failed. The background deploy job
+  /// resumes from it after a web-api restart. Written mid-deploy via raw SQL
+  /// so `updatedAt` stays the deploy start (stuck-deploy window).
+  deployPhase     String?
+  /// Id of the deploy attempt that owns this row. The background job writes
+  /// phases and its outcome only while the row still carries its id.
+  deployAttemptId String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
@@ -3844,6 +3852,10 @@ model AiAppTarget {
   database             Json?
   directLinkGateReady  Boolean                 @default(false)
   publicPathsGateReady Boolean                 @default(false)
+  /// Same as AiApp.deployPhase, for this target's current deploy attempt.
+  deployPhase          String?
+  /// Same as AiApp.deployAttemptId, for this target.
+  deployAttemptId      String?
   createdAt            DateTime                @default(now())
   updatedAt            DateTime                @updatedAt
 

@@ -11,7 +11,7 @@
  */
 
 /** Starter kit version shown in the README, ZIP filename, and LabOS UI. Bump when the kit contents or flow change. */
-export const AI_APPS_STARTER_KIT_VERSION = '1.14';
+export const AI_APPS_STARTER_KIT_VERSION = '1.15';
 
 /** Max members on one private app's whitelist (the owner and directory admins never count). */
 export const AI_APPS_MAX_ALLOWED_MEMBERS = 200;
@@ -107,11 +107,12 @@ export const AI_APPS_HELM_LOCK_RETRY_INTERVAL_MS = Number(process.env.AI_APPS_HE
 
 /**
  * How long an app may sit in DEPLOYING before the deploy counts as STUCK.
- * Deploys run synchronously inside the API process (runner build, waiting for
- * the orchestrator's deployment record, secrets injection), and the record
- * wait below is capped under this window — a DEPLOYING row older than this
- * means the process died mid-deploy or the runner hung, and the row would
- * otherwise stay DEPLOYING forever. Stuck rows are settled to ERROR lazily on read.
+ * Deploys run as a background job (runner build, waiting for the
+ * orchestrator's deployment record, secrets injection), and the record wait
+ * below is capped under this window — a DEPLOYING row older than this means
+ * the job was lost (not resumed after a restart) or the runner hung, and the
+ * row would otherwise stay DEPLOYING forever. Stuck rows are settled to ERROR
+ * lazily on read.
  */
 export const AI_APPS_DEPLOY_STUCK_MINUTES = Number(process.env.AI_APPS_DEPLOY_STUCK_MINUTES) || 15;
 export const AI_APPS_DEPLOY_STUCK_MS = AI_APPS_DEPLOY_STUCK_MINUTES * 60 * 1000;
@@ -133,6 +134,29 @@ export const AI_APPS_DEPLOY_POLL_INTERVAL_MS = Number(process.env.AI_APPS_DEPLOY
 export const AI_APPS_DEPLOY_REGISTER_GRACE_MS = Number(process.env.AI_APPS_DEPLOY_REGISTER_GRACE_MS) || 2 * 60 * 1000;
 export const AI_APPS_DEPLOY_POLL_DEADLINE_MS =
   Number(process.env.AI_APPS_DEPLOY_POLL_DEADLINE_MS) || Math.max(AI_APPS_DEPLOY_STUCK_MS - 2 * 60 * 1000, 60 * 1000);
+
+/**
+ * Request timeout for the runner `/deploy` call. The ALB in front of the runner
+ * drops the connection after ~60s anyway; a timeout turns a hung connection
+ * into an uncertain answer, which is settled from the orchestrator's
+ * deployment record like a gateway timeout.
+ */
+export const AI_APPS_RUNNER_DEPLOY_TIMEOUT_MS = Number(process.env.AI_APPS_RUNNER_DEPLOY_TIMEOUT_MS) || 120000;
+
+/**
+ * Background deploy job (Bull queue). Deploy requests answer `202` once the
+ * bundle is stored and the job is queued; the job runs the pipeline.
+ * - concurrency: jobs processed at once per API replica (they mostly wait on I/O);
+ * - timeout: backstop above the pipeline's worst case (record wait + lock
+ *   retries + injection). Bull can't cancel the work — the attempt-ownership
+ *   check keeps a late write harmless.
+ */
+export const AI_APPS_DEPLOY_QUEUE = 'ai-apps-deploy';
+export const AI_APPS_DEPLOY_JOB_CONCURRENCY = Number(process.env.AI_APPS_DEPLOY_JOB_CONCURRENCY) || 5;
+export const AI_APPS_DEPLOY_JOB_TIMEOUT_MS = Number(process.env.AI_APPS_DEPLOY_JOB_TIMEOUT_MS) || 25 * 60 * 1000;
+
+/** How often (seconds) the agent is told to poll the deployment status endpoint. */
+export const AI_APPS_DEPLOY_POLL_INTERVAL_SEC = Number(process.env.AI_APPS_DEPLOY_POLL_INTERVAL_SEC) || 10;
 
 /** Sandbox runner base URL (override via env for other environments). */
 export const AI_APPS_RUNNER_URL = process.env.AI_APPS_RUNNER_URL || 'https://sandbox-runner.plnetwork.io';
@@ -409,6 +433,15 @@ export const AI_APPS_ME_ENDPOINT = process.env.AI_APPS_ME_ENDPOINT || `${AI_APPS
  */
 export const AI_APPS_METADATA_ENDPOINT =
   process.env.AI_APPS_METADATA_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/agent`;
+
+/**
+ * Public URL TEMPLATE of THIS API's agent deployment-status endpoint
+ * (`GET /v1/ai-apps/:uid/deployments/:deploymentId`). The deploy response fills
+ * both placeholders; the starter kit ships the template as `statusEndpoint`.
+ */
+export const AI_APPS_DEPLOYMENT_STATUS_ENDPOINT =
+  process.env.AI_APPS_DEPLOYMENT_STATUS_ENDPOINT ||
+  `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/deployments/{deploymentId}`;
 
 /** Public (no auth) controlled tag vocabulary, so any kit version can read the live list. */
 export const AI_APPS_TAGS_ENDPOINT = `${AI_APPS_BASE_URL}/v1/ai-apps/tags`;

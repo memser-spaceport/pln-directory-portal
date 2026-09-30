@@ -457,6 +457,30 @@ export class AiAppsController {
   }
 
   /**
+   * Status of one deployment for the agent (deploy-token auth, owner-only):
+   * `status`/`phase`/`notes`/`failureStream` of the attempt, `stale: true` when
+   * a newer deploy replaced it. `:deploymentId` may be `latest`. The deploy
+   * endpoints answer 202 with this URL as `statusEndpoint`.
+   */
+  @NoCache()
+  @Get(':uid/deployments/:deploymentId')
+  @UseGuards(AiAppTokenGuard)
+  async getDeploymentStatus(
+    @Param('uid') uid: string,
+    @Param('deploymentId') deploymentId: string,
+    @Req() req: any,
+    @Query('environment') environment?: string
+  ) {
+    return this.aiAppsService.getDeploymentStatus(
+      req.aiAppMemberUid,
+      uid,
+      this.parseDeploymentId(deploymentId) as string,
+      this.parseTargetEnvironment(environment),
+      req.aiAppKeyScope
+    );
+  }
+
+  /**
    * Build logs for a signed-in member from the LabOS dashboard (member JWT +
    * `ai_apps.read`), gated to the app's creator OR a directory admin — so an
    * admin can debug any app's logs without a deploy token.
@@ -796,10 +820,12 @@ export class AiAppsController {
   /**
    * Deploy endpoint called by the member's AI agent, authenticated by the deploy
    * token. Accepts multipart/form-data: the app ZIP in `file` plus the metadata
-   * fields. The backend uploads the ZIP to S3 and proxies to the sandbox runner.
+   * fields. The backend uploads the ZIP to S3, queues the deploy and answers
+   * 202 with `statusEndpoint` + `pollIntervalSec`; the build runs in the background.
    */
   @NoCache()
   @Post('deploy')
+  @HttpCode(HttpStatus.ACCEPTED)
   @UseGuards(AiAppTokenGuard)
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: AI_APPS_MAX_ZIP_BYTES } }))
@@ -829,9 +855,11 @@ export class AiAppsController {
    * after secret updates). Optionally carries `secrets` (name → value) which are
    * forwarded to the sandbox runner's secret store — never persisted here.
    * Blocks with a 400 listing the missing names if a required var has no value.
+   * Answers 202 once the secrets are stored and the deploy is queued.
    */
   @NoCache()
   @Post(':uid/deploy')
+  @HttpCode(HttpStatus.ACCEPTED)
   @UseGuards(UserTokenCheckGuard, RbacGuard)
   @RequirePermissions(WRITE)
   @UsePipes(ZodValidationPipe)
