@@ -617,11 +617,25 @@ describe('managing access', () => {
       },
       { uid: 'outsider', name: 'Alina', image: null, teamName: null, hasAiAppsAccess: false, alreadyAdded: false },
     ]);
-    expect(prisma.member.findMany.mock.calls[0][0].where).toMatchObject({
+    const query = prisma.member.findMany.mock.calls[0][0];
+    expect(query.where).toMatchObject({
       name: { contains: 'ali', mode: 'insensitive' },
       deletedAt: null,
       uid: { not: OWNER },
     });
+    expect(query.take).toBe(10);
+    expect(query.where.OR).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          policyAssignmentsV2: {
+            some: { policy: { policyPermissions: { some: { permission: { code: { in: ['ai_apps.read', 'ai_apps.write'] } } } } } },
+          },
+        }),
+        expect.objectContaining({
+          memberPermissionsV2: { some: { permission: { code: { in: ['ai_apps.read', 'ai_apps.write'] } } } },
+        }),
+      ])
+    );
   });
 
   it('validates the request bodies', () => {
