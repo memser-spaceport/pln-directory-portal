@@ -127,7 +127,11 @@ export class AiAppsAccessService {
     return this.getAccess(requesterUid, uid);
   }
 
-  /** Member name search for the whitelist picker, flagged with AI Apps access and current membership. */
+  /**
+   * Member name search for the whitelist picker, flagged with AI Apps access and current membership.
+   * The result cap applies only to members who hold AI Apps access. Filtering after `take` hid
+   * them whenever earlier name matches (e.g. every other "Chris") filled the page.
+   */
   async searchCandidates(
     requesterUid: string,
     uid: string,
@@ -140,6 +144,7 @@ export class AiAppsAccessService {
         name: { contains: search, mode: 'insensitive' },
         deletedAt: null,
         uid: { not: app.memberUid },
+        OR: aiAppsAccessMemberFilter(),
       },
       select: {
         uid: true,
@@ -324,4 +329,23 @@ export class AiAppsAccessService {
 
 function toPublicPathsSettings(app: AiApp): AiAppPublicPathsSettings {
   return { publicPaths: app.publicPaths ?? [], publicPathsGateReady: app.publicPathsGateReady };
+}
+
+/** Same grants `hasAiAppsAccess` accepts: v2 policy or direct, or an active v1 role or direct grant. */
+function aiAppsAccessMemberFilter() {
+  const permission = { code: { in: [...READ_PERMISSIONS] } };
+  return [
+    { policyAssignmentsV2: { some: { policy: { policyPermissions: { some: { permission } } } } } },
+    { memberPermissionsV2: { some: { permission } } },
+    {
+      roleAssignments: {
+        some: {
+          status: 'ACTIVE',
+          revokedAt: null,
+          role: { rolePermissions: { some: { permission } } },
+        },
+      },
+    },
+    { memberPermissions: { some: { status: 'ACTIVE', revokedAt: null, permission } } },
+  ];
 }
