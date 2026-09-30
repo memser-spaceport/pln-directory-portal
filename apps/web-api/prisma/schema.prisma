@@ -2485,7 +2485,7 @@ model JobOpening {
 /// A server credential bound to one team, issued and revoked by a Directory admin.
 /// Only the sha256 of the key is stored; the plaintext is returned once on creation.
 /// Integration routes (/v1/integrations) authenticate with it and may act only on
-/// the key's team. Scopes: jobs:write, candidates:read.
+/// the key's team. Scopes: jobs:write, candidates:read, members:sign-in.
 model IntegrationKey {
   id           Int       @id @default(autoincrement())
   uid          String    @unique @default(cuid())

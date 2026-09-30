@@ -7,6 +7,7 @@ import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { IntegrationKeyGuard } from '../guards/integration-key.guard';
 import type { IntegrationCandidatesService } from './integration-candidates.service';
 import type { IntegrationKeysService } from './integration-keys.service';
+import type { MemberSignInService } from './member-sign-in.service';
 import { IntegrationsController } from './integrations.controller';
 
 // Metadata key @nestjs/throttler's SkipThrottle() sets on the class (THROTTLER_SKIP).
@@ -20,7 +21,8 @@ describe('IntegrationsController', () => {
     service = { describe: jest.fn() };
     controller = new IntegrationsController(
       service as unknown as IntegrationKeysService,
-      { feed: jest.fn(), applicationCvUrl: jest.fn() } as unknown as IntegrationCandidatesService
+      { feed: jest.fn(), applicationCvUrl: jest.fn() } as unknown as IntegrationCandidatesService,
+      {} as unknown as MemberSignInService
     );
   });
 
