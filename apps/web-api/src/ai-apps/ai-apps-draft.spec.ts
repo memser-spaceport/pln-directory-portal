@@ -395,15 +395,17 @@ describe('AiAppsService.deployDraft', () => {
         : Promise.resolve({ status: 200, data: { port: 31001 } })
     );
 
-    await expect(service.deployDraft('creator-1', 'app-1', undefined)).rejects.toBeInstanceOf(BadGatewayException);
+    await expect(service.deployDraft('creator-1', 'app-1', undefined)).rejects.toThrow(/still in progress/);
 
     // Initial attempt + the mocked AI_APPS_HELM_LOCK_RETRIES (2).
     expect(mockedAxios.post.mock.calls.filter(([url]) => url.includes('/deployments'))).toHaveLength(3);
-    expect(prisma.aiApp.update).toHaveBeenCalledWith(
+    expect(prisma.aiApp.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
+        where: expect.objectContaining({ status: 'DEPLOYING' }),
         data: expect.objectContaining({
           status: 'ERROR',
-          notes: expect.stringContaining('Runtime config injection failed'),
+          failureStream: null,
+          notes: expect.stringContaining('Another deploy of this app is still in progress'),
         }),
       })
     );
