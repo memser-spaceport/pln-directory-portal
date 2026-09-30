@@ -1519,11 +1519,73 @@ export class AiAppsService {
     if (!(await this.isCreatorOrDirectoryAdmin(requesterUid, app))) {
       throw new ForbiddenException('Only the app creator or a directory admin can view feedback');
     }
+    return this.queryFeedback(app.uid);
+  }
+
+  /**
+   * All feedback for one app for the agent (deploy token or deployment key),
+   * newest first, optionally narrowed to one status. Owner-only; a deployment
+   * key must belong to this app (either environment — feedback is app-level).
+   */
+  async listAgentFeedback(
+    requesterUid: string,
+    uid: string,
+    status?: AiAppFeedbackStatus,
+    scope?: AiAppKeyScope
+  ): Promise<Array<WithMember<AiAppFeedback>>> {
+    const app = await this.findAgentFeedbackApp(requesterUid, uid, scope);
+    return this.queryFeedback(app.uid, status);
+  }
+
+  /**
+   * Sets the shared review status on one feedback row for the agent. The DTO
+   * limits agents to VIEWED / IMPLEMENTED; same ownership rules as the list.
+   */
+  async updateAgentFeedbackStatus(
+    requesterUid: string,
+    uid: string,
+    feedbackUid: string,
+    status: AiAppFeedbackStatus,
+    scope?: AiAppKeyScope
+  ): Promise<WithMember<AiAppFeedback>> {
+    const app = await this.findAgentFeedbackApp(requesterUid, uid, scope);
+    return this.applyFeedbackStatus(app.uid, feedbackUid, status);
+  }
+
+  private async findAgentFeedbackApp(requesterUid: string, uid: string, scope?: AiAppKeyScope): Promise<AiApp> {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid } });
+    if (!app || app.status === 'DELETED') {
+      throw new NotFoundException(`AI App not found: ${uid}`);
+    }
+    if (app.memberUid !== requesterUid) {
+      throw new ForbiddenException('The agent may access feedback only for apps owned by its connected member');
+    }
+    this.assertKeyCanAccessApp(scope, app.uid);
+    return app;
+  }
+
+  private async queryFeedback(appUid: string, status?: AiAppFeedbackStatus): Promise<Array<WithMember<AiAppFeedback>>> {
     const feedback = await this.prisma.aiAppFeedback.findMany({
-      where: { appUid: app.uid },
+      where: status ? { appUid, status } : { appUid },
       orderBy: { createdAt: 'desc' },
     });
     return this.withMember(feedback);
+  }
+
+  private async applyFeedbackStatus(
+    appUid: string,
+    feedbackUid: string,
+    status: AiAppFeedbackStatus
+  ): Promise<WithMember<AiAppFeedback>> {
+    const feedback = await this.prisma.aiAppFeedback.findUnique({ where: { uid: feedbackUid } });
+    if (!feedback || feedback.appUid !== appUid) {
+      throw new NotFoundException(`AI App feedback not found: ${feedbackUid}`);
+    }
+    const updated = await this.prisma.aiAppFeedback.update({
+      where: { uid: feedbackUid },
+      data: { status },
+    });
+    return (await this.withMember([updated]))[0];
   }
 
   /**
@@ -1567,15 +1629,7 @@ export class AiAppsService {
     if (!(await this.isCreatorOrDirectoryAdmin(requesterUid, app))) {
       throw new ForbiddenException('Only the app creator or a directory admin can update feedback status');
     }
-    const feedback = await this.prisma.aiAppFeedback.findUnique({ where: { uid: feedbackUid } });
-    if (!feedback || feedback.appUid !== app.uid) {
-      throw new NotFoundException(`AI App feedback not found: ${feedbackUid}`);
-    }
-    const updated = await this.prisma.aiAppFeedback.update({
-      where: { uid: feedbackUid },
-      data: { status },
-    });
-    return (await this.withMember([updated]))[0];
+    return this.applyFeedbackStatus(app.uid, feedbackUid, status);
   }
 
   /** True when the requester created the app or is a directory admin. */

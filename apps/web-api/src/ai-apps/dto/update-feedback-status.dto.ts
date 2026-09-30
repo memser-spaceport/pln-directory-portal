@@ -10,3 +10,13 @@ export const UpdateFeedbackStatusSchema = z.object({
 });
 
 export class UpdateFeedbackStatusDto extends createZodDto(UpdateFeedbackStatusSchema) {}
+
+/**
+ * Body posted by an agent to `PATCH /v1/ai-apps/:uid/agent/feedback/:feedbackUid`.
+ * Agents may acknowledge or ship feedback; only members can move a row back to NEW.
+ */
+export const AgentUpdateFeedbackStatusSchema = z.object({
+  status: z.enum(['VIEWED', 'IMPLEMENTED']),
+});
+
+export class AgentUpdateFeedbackStatusDto extends createZodDto(AgentUpdateFeedbackStatusSchema) {}

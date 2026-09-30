@@ -11,7 +11,7 @@
  */
 
 /** Starter kit version shown in the README, ZIP filename, and LabOS UI. Bump when the kit contents or flow change. */
-export const AI_APPS_STARTER_KIT_VERSION = '1.14';
+export const AI_APPS_STARTER_KIT_VERSION = '1.15';
 
 /** Max members on one private app's whitelist (the owner and directory admins never count). */
 export const AI_APPS_MAX_ALLOWED_MEMBERS = 200;
@@ -399,6 +399,18 @@ export const AI_APPS_BUILD_LOGS_ENDPOINT =
   process.env.AI_APPS_BUILD_LOGS_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/logs/build`;
 export const AI_APPS_RUNTIME_LOGS_ENDPOINT =
   process.env.AI_APPS_RUNTIME_LOGS_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/logs/runtime`;
+
+/**
+ * Public URL TEMPLATES of THIS API's agent feedback endpoints
+ * (`GET /v1/ai-apps/:uid/agent/feedback` and
+ * `PATCH /v1/ai-apps/:uid/agent/feedback/:feedbackUid`), written into the
+ * starter kit. The agent fills the literal `{appUid}` / `{feedbackUid}` placeholders.
+ */
+export const AI_APPS_FEEDBACK_ENDPOINT =
+  process.env.AI_APPS_FEEDBACK_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/agent/feedback`;
+export const AI_APPS_FEEDBACK_STATUS_ENDPOINT =
+  process.env.AI_APPS_FEEDBACK_STATUS_ENDPOINT ||
+  `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/agent/feedback/{feedbackUid}`;
 
 /**
  * Public URL of THIS API's custom-event analytics endpoint
