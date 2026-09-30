@@ -9,13 +9,17 @@ jest.mock('axios', () => ({
 }));
 
 // The constants module reads env vars at import time; pin the bucket, and make
-// the post-timeout liveness verification instant (one failing attempt) so the
-// "timeout, app never came up" classification path runs in milliseconds.
+// the post-timeout waits instant (liveness verify: one failing attempt; the
+// orchestrator-record wait: no interval, a grace window that lapses at once) so
+// the "timeout, outcome unknown" classification path runs in milliseconds.
 jest.mock('./ai-apps.constants', () => ({
   ...jest.requireActual('./ai-apps.constants'),
   AI_APPS_S3_BUCKET: 'test-bucket',
   AI_APPS_VERIFY_ATTEMPTS: 1,
   AI_APPS_VERIFY_INTERVAL_MS: 0,
+  AI_APPS_DEPLOY_POLL_INTERVAL_MS: 0,
+  AI_APPS_DEPLOY_REGISTER_GRACE_MS: 0,
+  AI_APPS_DEPLOY_POLL_DEADLINE_MS: 0,
 }));
 
 // The real module pulls in a transitive chain that breaks under ts-jest (an
@@ -79,6 +83,24 @@ function buildService(app: Record<string, any> | null = APP) {
     prisma,
     aws,
     pushNotifications,
+  };
+}
+
+/** The orchestrator's deployments list with a finished `success` record for this attempt (`d1`). */
+function succeededRecord() {
+  return {
+    status: 200,
+    data: {
+      deployments: [
+        {
+          id: 'rec-1',
+          deployment_id: 'd1',
+          release_name: 'demo',
+          status: 'success',
+          created_at: new Date().toISOString(),
+        },
+      ],
+    },
   };
 }
 
@@ -308,10 +330,12 @@ describe('deploy outcome writes', () => {
     expect(prisma.aiApp.update.mock.calls.map(([{ data }]: any) => data.status)).not.toContain('READY');
   });
 
-  it('a timeout where the app never comes up leaves the stream unclassified', async () => {
+  it('a timeout the orchestrator has no record of leaves the stream unclassified', async () => {
     const { service, prisma } = buildService({ ...APP, status: 'ERROR' });
     mockedAxios.post.mockRejectedValue({ isAxiosError: true, response: undefined, code: 'ECONNABORTED' });
-    mockedAxios.get.mockRejectedValue(new Error('unreachable')); // liveness verify fails
+    mockedAxios.get.mockImplementation(async (url: string) =>
+      url.endsWith('/deployments') ? { status: 200, data: { deployments: [] } } : { status: 200, data: '' }
+    );
 
     await expect(service.deployDraft('creator-1', 'app-1', undefined)).rejects.toThrow();
 
@@ -323,9 +347,10 @@ describe('deploy outcome writes', () => {
     const upsert = jest.fn().mockResolvedValue({});
     (prisma as any).aiAppAuthGate = { upsert };
     mockedAxios.post.mockRejectedValue({ isAxiosError: true, response: undefined, code: 'ECONNABORTED' });
-    mockedAxios.get.mockImplementation(async (url: string) =>
-      url.endsWith('/_pln/gate') ? { status: 200, data: { version: 2 } } : { status: 401, data: '' }
-    );
+    mockedAxios.get.mockImplementation(async (url: string) => {
+      if (url.endsWith('/deployments')) return succeededRecord();
+      return url.endsWith('/_pln/gate') ? { status: 200, data: { version: 2 } } : { status: 401, data: '' };
+    });
 
     await service.deployDraft('creator-1', 'app-1', undefined);
 
@@ -342,7 +367,9 @@ describe('deploy outcome writes', () => {
     const upsert = jest.fn().mockResolvedValue({});
     (prisma as any).aiAppAuthGate = { upsert };
     mockedAxios.post.mockRejectedValue({ isAxiosError: true, response: undefined, code: 'ECONNABORTED' });
-    mockedAxios.get.mockResolvedValue({ status: 401, data: 'Unauthorized' });
+    mockedAxios.get.mockImplementation(async (url: string) =>
+      url.endsWith('/deployments') ? succeededRecord() : { status: 401, data: 'Unauthorized' }
+    );
 
     await service.deployDraft('creator-1', 'app-1', undefined);
 

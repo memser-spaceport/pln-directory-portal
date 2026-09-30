@@ -38,11 +38,18 @@ export class LogException extends BaseExceptionFilter {
       // Handle NestJS errors
       const status = exception.getStatus();
       const responseObj = exception.getResponse();
+      const body = typeof responseObj === 'object' ? (responseObj as { message?: unknown; reason?: unknown }) : {};
+      const reason = typeof body.reason === 'string' ? body.reason : undefined;
       const message =
-        typeof responseObj === 'string' ? responseObj : exception.message;
+        typeof responseObj === 'string'
+          ? responseObj
+          : typeof body.message === 'string'
+          ? body.message
+          : reason ?? exception.message;
       response.status(status).json({
         statusCode: status,
         message,
+        ...(reason ? { reason } : {}),
       });
     } else {
       // Handle all other errors

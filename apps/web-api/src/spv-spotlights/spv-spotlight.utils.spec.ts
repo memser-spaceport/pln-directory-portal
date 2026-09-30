@@ -2,6 +2,7 @@ import {
   accessRequestConflict,
   mergeTemplate,
   openNoticeCounts,
+  replaceNbsp,
   resolveViewerAccess,
   sanitizeEmailHtml,
   visibleDocSendUrl,
@@ -49,6 +50,17 @@ describe('accessRequestConflict', () => {
 describe('mergeTemplate', () => {
   it('replaces known tokens and blanks unknown ones', () => {
     expect(mergeTemplate('Hi {{investorName}} {{missing}}', { investorName: 'Ada' })).toBe('Hi Ada ');
+  });
+
+  it('uses the fallback when a value is missing or empty', () => {
+    expect(mergeTemplate('From {{firm|a fund}}, {{note | none}}', { note: '' })).toBe('From a fund, none');
+    expect(mergeTemplate('From {{firm|a fund}}', { firm: 'Gamma' })).toBe('From Gamma');
+  });
+});
+
+describe('replaceNbsp', () => {
+  it('turns non-breaking spaces into normal spaces', () => {
+    expect(replaceNbsp('<p>a&nbsp;b c</p>')).toBe('<p>a b c</p>');
   });
 });
 

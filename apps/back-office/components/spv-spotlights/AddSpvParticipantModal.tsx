@@ -14,6 +14,7 @@ interface AddSpvParticipantModalProps {
   onClose: () => void;
   spotlightUid: string;
   defaultType: ParticipantTabType;
+  defaultCohort: 'PRE_APPROVED' | 'OUTREACH';
   onAdded?: () => void;
 }
 
@@ -22,11 +23,12 @@ export const AddSpvParticipantModal: React.FC<AddSpvParticipantModalProps> = ({
   onClose,
   spotlightUid,
   defaultType,
+  defaultCohort,
   onAdded,
 }) => {
   const [authToken] = useCookie('plnadmin');
   const [participantType, setParticipantType] = useState<ParticipantTabType>(defaultType);
-  const [cohort, setCohort] = useState<'PRE_APPROVED' | 'OUTREACH'>('PRE_APPROVED');
+  const [cohort, setCohort] = useState<'PRE_APPROVED' | 'OUTREACH'>(defaultCohort);
   const [addMode, setAddMode] = useState<'existing' | 'new'>('existing');
   const [memberSearch, setMemberSearch] = useState('');
   const [debouncedMemberSearch, setDebouncedMemberSearch] = useState('');
@@ -38,8 +40,9 @@ export const AddSpvParticipantModal: React.FC<AddSpvParticipantModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setParticipantType(defaultType);
+      setCohort(defaultCohort);
     }
-  }, [isOpen, defaultType]);
+  }, [isOpen, defaultType, defaultCohort]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedMemberSearch(memberSearch.trim()), 300);
@@ -63,7 +66,7 @@ export const AddSpvParticipantModal: React.FC<AddSpvParticipantModalProps> = ({
 
   const resetAll = () => {
     setParticipantType(defaultType);
-    setCohort('PRE_APPROVED');
+    setCohort(defaultCohort);
     setAddMode('existing');
     setMemberSearch('');
     setDebouncedMemberSearch('');

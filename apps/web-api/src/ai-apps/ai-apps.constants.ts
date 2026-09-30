@@ -85,37 +85,54 @@ export const AI_APPS_MAX_ZIP_BYTES = 50 * 1024 * 1024;
 export const AI_APPS_MAX_PRD_BYTES = 1 * 1024 * 1024;
 
 /**
- * Post-deploy liveness verification: when the runner call ends in a gateway
- * timeout, the deploy flow polls the app URL before deciding READY vs ERROR.
- * The window must cover the pod-up → domain-registration gap, which has been
- * observed to take 1–5 minutes — 24 attempts every 8s (plus up to 10s per
- * probe) covers ~6 minutes worst case.
+ * Liveness verification after the secret-aware runtime-config deployment ends
+ * in a gateway timeout: the deploy flow polls the app URL before deciding
+ * READY vs ERROR. (The `/deploy` build's outcome comes from the orchestrator's
+ * deployment record instead — see AI_APPS_DEPLOY_POLL_*.) 24 attempts every 8s
+ * (plus up to 10s per probe) covers ~6 minutes worst case.
  */
 export const AI_APPS_VERIFY_ATTEMPTS = Number(process.env.AI_APPS_VERIFY_ATTEMPTS) || 24;
 export const AI_APPS_VERIFY_INTERVAL_MS = Number(process.env.AI_APPS_VERIFY_INTERVAL_MS) || 8000;
 
 /**
- * Secrets-injection retry while the Helm release is locked: when the runner's
- * `/deploy` build outlives the gateway timeout, its Helm upgrade is often still
- * running when the injection deployment fires, and the runner 409s with
- * `helm_release_locked`. The lock clears as soon as that upgrade finishes
- * (observed under ~2 minutes), so wait and retry instead of failing the deploy.
- * 8 retries every 15s covers ~2 minutes.
+ * Secrets-injection retry while the Helm release is locked: the injection only
+ * starts after the build's own deployment has finished, but another Helm
+ * operation on the release (e.g. an auth-gate refresh) can still hold the lock,
+ * and the runner then 409s with `helm_release_locked`. Such operations are
+ * short, so wait and retry instead of failing the deploy. 8 retries every 15s
+ * covers ~2 minutes.
  */
 export const AI_APPS_HELM_LOCK_RETRIES = Number(process.env.AI_APPS_HELM_LOCK_RETRIES) || 8;
 export const AI_APPS_HELM_LOCK_RETRY_INTERVAL_MS = Number(process.env.AI_APPS_HELM_LOCK_RETRY_INTERVAL_MS) || 15000;
 
 /**
  * How long an app may sit in DEPLOYING before the deploy counts as STUCK.
- * Deploys run synchronously inside the API process (runner build + liveness
- * verification + secrets injection), so a legitimate one settles to READY or
- * ERROR within ~10 minutes worst case (edge timeout + the verify window and
- * helm-lock retry budget above) — a DEPLOYING row older than this window means the
- * process died mid-deploy or the runner hung, and the row would otherwise stay
- * DEPLOYING forever. Stuck rows are settled to ERROR lazily on read.
+ * Deploys run synchronously inside the API process (runner build, waiting for
+ * the orchestrator's deployment record, secrets injection), and the record
+ * wait below is capped under this window — a DEPLOYING row older than this
+ * means the process died mid-deploy or the runner hung, and the row would
+ * otherwise stay DEPLOYING forever. Stuck rows are settled to ERROR lazily on read.
  */
 export const AI_APPS_DEPLOY_STUCK_MINUTES = Number(process.env.AI_APPS_DEPLOY_STUCK_MINUTES) || 15;
 export const AI_APPS_DEPLOY_STUCK_MS = AI_APPS_DEPLOY_STUCK_MINUTES * 60 * 1000;
+
+/**
+ * Waiting for the orchestrator's own deployment record when the `/deploy` call
+ * ends without an answer (gateway timeout / no response). The build keeps
+ * running on the orchestrator, which records every attempt under the caller's
+ * `deploymentId` and finishes it as `success` or `failed`; the deploy flow
+ * polls that record instead of trusting that the app URL answers (on a
+ * redeploy the previous version keeps answering).
+ * - interval: time between polls;
+ * - register grace: no record for this attempt by then means the request never
+ *   reached the orchestrator's deploy workflow;
+ * - deadline: overall wait from the start of the attempt, kept 2 minutes under
+ *   the stuck window so a still-waiting deploy is never settled as stuck.
+ */
+export const AI_APPS_DEPLOY_POLL_INTERVAL_MS = Number(process.env.AI_APPS_DEPLOY_POLL_INTERVAL_MS) || 10000;
+export const AI_APPS_DEPLOY_REGISTER_GRACE_MS = Number(process.env.AI_APPS_DEPLOY_REGISTER_GRACE_MS) || 2 * 60 * 1000;
+export const AI_APPS_DEPLOY_POLL_DEADLINE_MS =
+  Number(process.env.AI_APPS_DEPLOY_POLL_DEADLINE_MS) || Math.max(AI_APPS_DEPLOY_STUCK_MS - 2 * 60 * 1000, 60 * 1000);
 
 /** Sandbox runner base URL (override via env for other environments). */
 export const AI_APPS_RUNNER_URL = process.env.AI_APPS_RUNNER_URL || 'https://sandbox-runner.plnetwork.io';
@@ -161,12 +178,19 @@ export const buildRunnerSecretsUrl = (): string =>
   `${AI_APPS_RUNNER_URL}/v1/projects/${AI_APPS_RUNNER_PROJECT}/secrets`;
 
 /**
- * Runner endpoint that (re)deploys an already-built image with the named stored
- * secrets injected. The legacy `/deploy` (s3Key build) does NOT inject secrets,
- * so secret-bearing apps need this second call after the build.
+ * Runner deployments collection: `POST` (re)deploys an already-built image with
+ * the named stored secrets (and/or a provisioned database) injected; `GET`
+ * (`?appId=…`) lists deployment records, including `/deploy` build attempts
+ * keyed by the caller's `deploymentId`. The `/deploy` build only re-attaches
+ * the secret keys an earlier successful secret-aware deployment recorded, so a
+ * secret or database it did not attach still needs the `POST` after the build.
  */
 export const buildRunnerDeploymentsUrl = (): string =>
   `${AI_APPS_RUNNER_URL}/v1/projects/${AI_APPS_RUNNER_PROJECT}/deployments`;
+
+/** Runner endpoint returning one deployment record with its events (`GET /v1/deployments/:id`). */
+export const buildRunnerDeploymentUrl = (id: string): string =>
+  `${AI_APPS_RUNNER_URL}/v1/deployments/${encodeURIComponent(id)}`;
 
 /** Log phases the runner serves from CloudWatch: the image build (Kaniko) vs the running app pod. */
 export type AiAppLogPhase = 'build' | 'runtime';
