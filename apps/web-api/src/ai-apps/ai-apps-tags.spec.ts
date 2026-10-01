@@ -120,6 +120,32 @@ describe('AI App tags', () => {
       const { service } = buildService();
       await expect(service.updateMetadata('creator-1', 'app-1', {} as any)).rejects.toBeInstanceOf(BadRequestException);
     });
+
+    it('accepts a feedback-only edit and returns the flag', async () => {
+      const { service, prisma } = buildService();
+      const result = await service.updateMetadata('creator-1', 'app-1', { feedbackEnabled: false } as any);
+      expect(prisma.aiApp.update).toHaveBeenCalledWith({
+        where: { uid: 'app-1' },
+        data: { feedbackEnabled: false },
+      });
+      expect(result.feedbackEnabled).toBe(false);
+    });
+
+    it('leaves feedback on when the edit does not mention it', async () => {
+      const { service, prisma } = buildService();
+      await service.updateMetadata('creator-1', 'app-1', { name: 'Renamed' } as any);
+      expect(prisma.aiApp.update.mock.calls[0][0].data).not.toHaveProperty('feedbackEnabled');
+    });
+  });
+
+  describe('UpdateAppMetadataSchema feedbackEnabled', () => {
+    it('parses JSON booleans and multipart true/false strings, and defaults to omitted', () => {
+      expect(UpdateAppMetadataSchema.parse({ feedbackEnabled: false }).feedbackEnabled).toBe(false);
+      expect(UpdateAppMetadataSchema.parse({ feedbackEnabled: 'true' }).feedbackEnabled).toBe(true);
+      expect(UpdateAppMetadataSchema.parse({ feedbackEnabled: 'false' }).feedbackEnabled).toBe(false);
+      expect(UpdateAppMetadataSchema.parse({}).feedbackEnabled).toBeUndefined();
+      expect(() => UpdateAppMetadataSchema.parse({ feedbackEnabled: 'yes' })).toThrow();
+    });
   });
 
   describe('uploads', () => {

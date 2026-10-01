@@ -991,8 +991,16 @@ export class AiAppsService {
     ownerOnly = false,
     scope?: AiAppKeyScope
   ): Promise<ApiAiApp<AiApp>> {
-    if (dto.name === undefined && dto.description === undefined && dto.prd === undefined && dto.tags === undefined) {
-      throw new BadRequestException('At least one of name, description, prd, or tags must be provided');
+    if (
+      dto.name === undefined &&
+      dto.description === undefined &&
+      dto.prd === undefined &&
+      dto.tags === undefined &&
+      dto.feedbackEnabled === undefined
+    ) {
+      throw new BadRequestException(
+        'At least one of name, description, prd, tags, or feedbackEnabled must be provided'
+      );
     }
 
     const app = await this.prisma.aiApp.findUnique({ where: { uid } });
@@ -1007,11 +1015,18 @@ export class AiAppsService {
     }
     this.assertKeyCanAccessApp(scope, app.uid);
 
-    const data: { name?: string; description?: string | null; prd?: string | null; tags?: string[] } = {};
+    const data: {
+      name?: string;
+      description?: string | null;
+      prd?: string | null;
+      tags?: string[];
+      feedbackEnabled?: boolean;
+    } = {};
     if (dto.name !== undefined) data.name = dto.name.trim();
     if (dto.description !== undefined) data.description = dto.description?.trim() || null;
     if (dto.prd !== undefined) data.prd = dto.prd?.trim() || null;
     if (dto.tags !== undefined) data.tags = dto.tags;
+    if (dto.feedbackEnabled !== undefined) data.feedbackEnabled = dto.feedbackEnabled;
 
     const updated = await this.prisma.aiApp.update({ where: { uid }, data });
     return this.toApiApp((await this.withMember([updated]))[0], true);

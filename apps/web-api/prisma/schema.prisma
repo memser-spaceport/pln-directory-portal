@@ -3780,6 +3780,10 @@ model AiApp {
   /// Slugs from the controlled vocabulary in `ai-apps-tags.ts` (max 5). Set by
   /// the agent on first upload, editable by the creator/admin afterwards.
   tags            String[]    @default([])
+  /// When false, LabOS hides Give feedback on the open app. List-level
+  /// feedback still works. Existing and new apps stay on until an editor
+  /// turns it off.
+  feedbackEnabled Boolean     @default(true)
   /// New apps are open to all PL Infra members; the owner (or a directory
   /// admin) can restrict them from LabOS, or the agent on deploy when the
   /// member chooses. A deploy that doesn't send `access` keeps it.
