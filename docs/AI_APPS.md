@@ -120,7 +120,7 @@ The `deployToken` is held in agent memory only and never written into the kit, s
 | GET    | `/v1/ai-apps/:uid/feedback`      | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | All feedback for one app, newest first, with submitter info |
 | PATCH  | `/v1/ai-apps/:uid/feedback/:feedbackUid` | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | Set the shared review status: `{ status: 'NEW' \| 'VIEWED' \| 'IMPLEMENTED' }` |
 | GET    | `/v1/ai-apps/:uid/agent/feedback` | `AiAppTokenGuard` (`x-app-token`) | — (token = member, **owner only**; a deployment key only for its own app, prod or preview) | Agent feedback list: every row, newest first, stored HTML `text` verbatim (screenshots are `<img>` links) + `member { uid, name, image }`; optional `?status=` (case-insensitive, 400 otherwise); not paginated |
-| PATCH  | `/v1/ai-apps/:uid/agent/feedback/:feedbackUid` | `AiAppTokenGuard` (`x-app-token`) | — (same scope as the agent list) | Agent status update: `{ status: 'VIEWED' \| 'IMPLEMENTED' }` (`NEW` → 400; reopening is member-only); 404 for a row of another app |
+| PATCH  | `/v1/ai-apps/:uid/agent/feedback/:feedbackUid` | `AiAppTokenGuard` (`x-app-token`) | — (same scope as the agent list) | Agent status update: `{ status: 'VIEWED' \| 'IMPLEMENTED' }` (`NEW` → 422 from the validation pipe; reopening is member-only); 404 for a row of another app |
 | GET    | `/v1/ai-apps/starter-kit/download` | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.write`   | Stream the starter-kit ZIP (no token inside) |
 | POST   | `/v1/ai-apps/connect`            | none (agent)                  | —                 | Start a connect session; returns `connectUrl`/`userCode`/`pollToken` |
 | POST   | `/v1/ai-apps/connect/poll`       | none (agent, `pollToken` in body) | —             | Poll a session; returns the `deployToken` once `APPROVED` |
@@ -553,7 +553,8 @@ UI: `GET /v1/ai-apps/:uid/agent/feedback` and
   image bucket), `status`, `createdAt`, `member { uid, name, image }` (no
   contact details). Optional `?status=` filter; no pagination.
 - **Statuses:** agents set `VIEWED` (picked up) or `IMPLEMENTED` (fix deployed);
-  `NEW` is rejected so only members reopen items. Members and agents write the
+  `NEW` is rejected with 422 (the shared Zod validation pipe, same as the member
+  status route) so only members reopen items. Members and agents write the
   same column in parallel — last write wins, no locking, no audit event.
 - **Kit (≥1.15):** `feedbackEndpoint` / `feedbackStatusEndpoint` templates in
   `pln-app.config.json` plus the `app-feedback` skill, which tells the agent to
