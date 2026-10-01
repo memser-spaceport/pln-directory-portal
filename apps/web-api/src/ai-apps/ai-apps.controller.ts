@@ -55,6 +55,7 @@ import {
 import { AiAppsAuthGateService } from './ai-apps-auth-gate.service';
 import { PollConnectDto } from './dto/poll-connect.dto';
 import { SubmitFeedbackDto } from './dto/submit-feedback.dto';
+import { CreateFeedbackCommentDto } from './dto/feedback-comment.dto';
 import { AgentUpdateFeedbackStatusDto, UpdateFeedbackStatusDto } from './dto/update-feedback-status.dto';
 import { UpdateAppMetadataDto } from './dto/update-app-metadata.dto';
 import { TrackEventDto } from './dto/track-event.dto';
@@ -605,7 +606,8 @@ export class AiAppsController {
       uid,
       feedbackUid,
       body.status,
-      req.aiAppKeyScope
+      req.aiAppKeyScope,
+      body.note
     );
   }
 
@@ -806,6 +808,53 @@ export class AiAppsController {
   ) {
     const memberUid = await this.resolveMemberUid(req);
     return this.aiAppsService.updateFeedbackStatus(memberUid, uid, feedbackUid, body.status);
+  }
+
+  /**
+   * One feedback item's conversation, oldest first. Participants only (the
+   * app's creator, directory admins, the member who left it — checked in the
+   * service). Declared after the `:uid/feedback/pins` reads; the paths end in
+   * different literal segments, so neither shadows the other.
+   */
+  @NoCache()
+  @Get(':uid/feedback/:feedbackUid/comments')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async listFeedbackComments(@Param('uid') uid: string, @Param('feedbackUid') feedbackUid: string, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.listFeedbackComments(memberUid, uid, feedbackUid);
+  }
+
+  /** A reply in the item's conversation; notifies the other participants. */
+  @NoCache()
+  @Post(':uid/feedback/:feedbackUid/comments')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  @UsePipes(ZodValidationPipe)
+  async addFeedbackComment(
+    @Param('uid') uid: string,
+    @Param('feedbackUid') feedbackUid: string,
+    @Body() body: CreateFeedbackCommentDto,
+    @Req() req: any
+  ) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.addFeedbackComment(memberUid, uid, feedbackUid, body.text);
+  }
+
+  /** Delete a reply: its author, or a directory admin. */
+  @NoCache()
+  @Delete(':uid/feedback/:feedbackUid/comments/:commentUid')
+  @HttpCode(204)
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async deleteFeedbackComment(
+    @Param('uid') uid: string,
+    @Param('feedbackUid') feedbackUid: string,
+    @Param('commentUid') commentUid: string,
+    @Req() req: any
+  ): Promise<void> {
+    const memberUid = await this.resolveMemberUid(req);
+    await this.aiAppsService.deleteFeedbackComment(memberUid, uid, feedbackUid, commentUid);
   }
 
   /**
