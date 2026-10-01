@@ -18,7 +18,8 @@ import { AiAppsController } from './ai-apps.controller';
 import { AiAppTokenGuard } from './guards/ai-app-token.guard';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { RbacGuard } from '../rbac/rbac.guard';
-import { AgentUpdateFeedbackStatusSchema } from './dto/update-feedback-status.dto';
+import { ZodValidationPipe } from '@abitia/zod-dto';
+import { AgentUpdateFeedbackStatusDto, AgentUpdateFeedbackStatusSchema } from './dto/update-feedback-status.dto';
 
 const APP = { uid: 'app-1', memberUid: 'owner-1', appId: 'demo', access: 'OPEN', status: 'READY' };
 const HTML = '<p>Broken chart</p><img src="https://pl-directory-images-prod.s3.us-west-1.amazonaws.com/x.png">';
@@ -164,6 +165,17 @@ describe('AgentUpdateFeedbackStatusSchema', () => {
 
   it.each(['NEW', 'DONE', undefined])('rejects %s', (status) => {
     expect(AgentUpdateFeedbackStatusSchema.safeParse({ status }).success).toBe(false);
+  });
+
+  it('answers a disallowed status with 422 through the route pipe', () => {
+    const pipe = new ZodValidationPipe();
+    let status: number | undefined;
+    try {
+      pipe.transform({ status: 'NEW' }, { type: 'body', metatype: AgentUpdateFeedbackStatusDto });
+    } catch (err: any) {
+      status = err.getStatus();
+    }
+    expect(status).toBe(422);
   });
 });
 
