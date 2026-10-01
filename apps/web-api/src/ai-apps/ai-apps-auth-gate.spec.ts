@@ -18,6 +18,7 @@ jest.mock('../analytics/service/analytics.service', () => ({
 
 import axios from 'axios';
 import { AiAppsService } from './ai-apps.service';
+import { withInlineDeploys } from './ai-apps-deploy-queue.spec-helper';
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 const FILE = { buffer: Buffer.from('zip'), mimetype: 'application/zip' } as Express.Multer.File;
@@ -41,11 +42,9 @@ function build() {
     member: { findMany: jest.fn().mockResolvedValue([]), findUnique: jest.fn().mockResolvedValue(null) },
   };
   const aws = { uploadFileToS3: jest.fn().mockResolvedValue(undefined) };
-  const service = new AiAppsService(
-    prisma as any,
-    aws as any,
-    { create: jest.fn() } as any,
-    { trackEvent: jest.fn() } as any
+  const service = withInlineDeploys(
+    prisma,
+    new AiAppsService(prisma as any, aws as any, { create: jest.fn() } as any, { trackEvent: jest.fn() } as any)
   );
   return { service, prisma };
 }

@@ -12,6 +12,7 @@ import {
   AI_APPS_BUILD_LOGS_ENDPOINT,
   AI_APPS_CONNECT_ENDPOINT,
   AI_APPS_DEPLOY_ENDPOINT,
+  AI_APPS_DEPLOYMENT_STATUS_ENDPOINT,
   AI_APPS_DRAFT_ENDPOINT,
   AI_APPS_FEEDBACK_ENDPOINT,
   AI_APPS_FEEDBACK_STATUS_ENDPOINT,
@@ -560,9 +561,12 @@ follow "Apps that need secrets" above instead of deploying directly. In short:
    upload that ZIP to \`deployEndpoint\` as multipart/form-data with the
    \`deployToken\` in the \`${AI_APP_TOKEN_HEADER}\` header. The PLN backend stores it
    and runs the build — you do not need any cloud credentials.
-6. Save the \`uid\` from the response as \`appUid\` in \`pln-app.config.json\`, then
-   tell the member the deploy succeeded and that they can open their app from the
-   PL Infra → AI Apps dashboard. After the FIRST deploy, also confirm who can open
+6. The upload answers \`202\` with \`status: "DEPLOYING"\` — the build has only
+   started. Save the \`uid\` from the response as \`appUid\` in
+   \`pln-app.config.json\`, then poll the response's \`statusEndpoint\` every
+   \`pollIntervalSec\` seconds until it reports \`READY\` or \`ERROR\` (see step 7 of
+   the deploy skill). Only on \`READY\` tell the member the deploy succeeded and
+   that they can open their app from the PL Infra → AI Apps dashboard. After the FIRST deploy, also confirm who can open
    it (all PL Infra members, or — if they chose private — only them, directory
    admins, and the members they add from the app's ⋮ menu → **Manage access** in
    LabOS). **Do NOT reveal the deployment URL, host, or port**
@@ -1571,27 +1575,55 @@ connection string into the LabOS secrets page, same as an API key.
    member has just approved making specific paths reachable without LabOS
    sign-in — see "Public endpoints" below. Otherwise omit it.
 
-7. On success the response contains the app record with its deployment URL and
-   status:
+7. The upload answers **\`202 Accepted\`** within seconds, once the bundle is
+   stored. The build has only **started** — it has not finished, and it can
+   still fail:
 
    \`\`\`json
-   { "uid": "cl…", "status": "READY", "url": "https://<appId>.${AI_APPS_APP_DOMAIN}", "host": "...", "port": 31001 }
+   { "uid": "cl…", "status": "DEPLOYING", "deploymentId": "<your deploymentId>",
+     "statusEndpoint": "https://…/v1/ai-apps/<uid>/deployments/<deploymentId>", "pollIntervalSec": 10 }
    \`\`\`
 
    Save the response's \`uid\` as \`appUid\` in \`pln-app.config.json\` (it addresses
-   the metadata endpoint later). Use the URL only for the internal checks below —
-   **do not reveal it to the member** (see "Keep the deployment URL private").
+   the metadata endpoint later). **Don't tell the member it's deployed yet.** Poll
+   the response's \`statusEndpoint\` with the same token every \`pollIntervalSec\`
+   seconds, for up to ~15 minutes. (It is the \`statusEndpoint\` template from
+   \`pln-app.config.json\` with \`{appUid}\` and \`{deploymentId}\` filled in; a
+   \`preview\` deploy's URL carries \`?environment=preview\`.)
+
+   \`\`\`bash
+   curl -sS "<statusEndpoint from the deploy response>" -H "${AI_APP_TOKEN_HEADER}: <deployToken>"
+   # → { "status": "DEPLOYING", "phase": "building", "notes": null, "failureStream": null, "stale": false, … }
+   \`\`\`
+
+   While \`status\` is \`DEPLOYING\`, \`phase\` says what is going on: \`queued\`,
+   \`building\` (the image build — usually the longest part), or
+   \`injecting_runtime_config\` (attaching secrets / the database). Give the member
+   a short progress note now and then, not on every poll. Then branch on \`status\`:
+   - **\`stale: true\`** — this is no longer the app's current deploy: a newer
+     deploy replaced it, or it was rejected because another deploy was still
+     running (\`notes\` says which). Don't re-upload blindly — poll
+     \`statusEndpoint\` with \`latest\` as the \`{deploymentId}\` to see the current
+     deploy, and tell the member what happened.
+   - A \`401\` while polling means the deploy token expired — reconnect (step 3)
+     and keep polling the SAME \`deploymentId\`; the deploy itself keeps running.
+   - **\`READY\`** or **\`ERROR\`** — the deploy is over; see below.
+
+   The status response never contains the app's URL. Use the URL you derive from
+   the \`appId\` only for internal checks — **do not reveal it to the member**
+   (see "Keep the deployment URL private").
    On \`READY\`, tell the member the app is live and can be opened from the
    PL Infra → AI Apps dashboard. On the app's FIRST successful deploy, also
-   confirm who can open it (the response's \`access\`): \`OPEN\` → all PL Infra
+   confirm who can open it (the deploy response's \`access\`): \`OPEN\` → all PL Infra
    members; \`PRIVATE\` → only them and directory admins until they add
    specific members from the app's ⋮ menu → **Manage access** in LabOS (you
    can't add members for them). Either way they can switch it there anytime,
    without a redeploy.
    If \`status\` is \`ERROR\`, surface \`notes\`
-   (never the URL) — and when \`notes\` alone doesn't explain the failure, fetch
-   the **build logs** via the app-logs skill (\`.claude/skills/app-logs/SKILL.md\`)
-   to find the real error before retrying.
+   (never the URL), and use \`failureStream\` to pick the logs via the app-logs
+   skill (\`.claude/skills/app-logs/SKILL.md\`): \`build\` → **build logs** (the image
+   didn't build), \`runtime\` → **runtime logs** (it built but didn't start or
+   crashed), \`null\` → check both. Find the real error before retrying.
 
    **If \`notes\` mentions "OOM-killed" or "exceeded its memory limit"**, the
    deploy hit the platform's fixed resource budget (see "Resource limits" in
@@ -1839,20 +1871,29 @@ It does NOT cover the LabOS links — \`connectUrl\` (approval page) and
 and you MUST share them in chat whenever the flow produces one. Withholding
 \`appPageUrl\` strands a draft app: nothing deploys until the member opens it.
 
-## If the upload times out (504) or seems to hang
-A slow build can exceed the gateway's request timeout, so the upload may return a
-\`504 Gateway Time-out\` (or hang) **even though the build succeeded**. Do NOT assume
-failure and blindly re-upload. Instead poll the app (internal check — don't share the
-URL with the member):
+## If polling fails or the upload hangs
+The upload returns within seconds; the build runs in the background and the
+status endpoint is the source of truth. Do NOT assume failure and blindly
+re-upload.
+- A status poll that errors or times out (network blip, \`5xx\`) says nothing
+  about the deploy — wait \`pollIntervalSec\` and poll again.
+- If the **upload** hangs or fails without a JSON error body, poll
+  \`statusEndpoint\` with \`latest\` as the \`{deploymentId}\` before re-uploading.
+  If it shows your \`deploymentId\`, the upload went through — keep polling it.
+  A \`503\` saying the deploy "could not be started" means nothing was queued —
+  deploy again.
+- Only if the status endpoint stays unreachable for several minutes, probe the
+  app as a last resort (internal check — don't share the URL with the member):
 
 \`\`\`bash
 curl -sS -m 20 -o /dev/null -w '%{http_code}\\n' "https://<appId>.${AI_APPS_APP_DOMAIN}/health"
 \`\`\`
 
-If it returns \`200\` within a minute or two, the deploy worked — proceed to the
-verification steps. Only re-deploy if it stays unreachable — and before
-re-deploying, check the **build logs** (app-logs skill) to see whether and why
-the build actually failed.
+  A \`200\` only says *some* version answers — on a redeploy the previous
+  version keeps answering — so tell the member the result isn't confirmed yet
+  and check the status endpoint again once it's reachable. Before re-deploying,
+  check the **build logs** (app-logs skill) to see whether and why the build
+  actually failed.
 
 ## Debugging with logs
 Build and runtime logs are available through the app-logs skill
@@ -2233,6 +2274,7 @@ Once the code and migrations are ready:
       {
         connectEndpoint: AI_APPS_CONNECT_ENDPOINT,
         deployEndpoint: AI_APPS_DEPLOY_ENDPOINT,
+        statusEndpoint: AI_APPS_DEPLOYMENT_STATUS_ENDPOINT,
         draftEndpoint: AI_APPS_DRAFT_ENDPOINT,
         metadataEndpoint: AI_APPS_METADATA_ENDPOINT,
         tagsEndpoint: AI_APPS_TAGS_ENDPOINT,
@@ -2252,7 +2294,7 @@ Once the code and migrations are ready:
         appTags: [],
         database: null,
         notes:
-          'No token is stored here. At deploy time the agent runs the LabOS connect flow (see .claude/skills/deploy-to-labs) to get a short-lived deploy token. Set appId to a stable lowercase slug on first deploy and reuse it. appName/appDescription/appTags hold the member-APPROVED display metadata (see .claude/skills/app-metadata; appTags are slugs from the fixed list in that skill, also served live at tagsEndpoint) — redeploys resend them verbatim. After the first deploy, save the response uid as appUid; metadataEndpoint, buildLogsEndpoint, runtimeLogsEndpoint, and appSettingsUrl are templates where {appUid} is replaced with it (appSettingsUrl opens the member-facing Deployment settings modal to update secrets & redeploy; the logs endpoints serve the build and runtime logs — see .claude/skills/app-logs). If the app needs runtime secrets, register it via draftEndpoint instead of deploying (see the deploy skill). database is null unless the member has opted into a PLN-provisioned database — once they do, set it to {"enabled":true,"type":"postgres"} and resend it verbatim on every deploy/draft call (see the deploy skill\'s "Apps that want a provisioned database"); a bring-your-own database is a regular runtime secret instead and never goes in this field. analyticsEndpoint takes usage events — baseline events (opened/error/closed) are wired into every app by default, custom events are added on request (no auth required, no deploy token) — see .claude/skills/app-analytics.',
+          'No token is stored here. At deploy time the agent runs the LabOS connect flow (see .claude/skills/deploy-to-labs) to get a short-lived deploy token. Set appId to a stable lowercase slug on first deploy and reuse it. appName/appDescription/appTags hold the member-APPROVED display metadata (see .claude/skills/app-metadata; appTags are slugs from the fixed list in that skill, also served live at tagsEndpoint) — redeploys resend them verbatim. After the first deploy, save the response uid as appUid; metadataEndpoint, buildLogsEndpoint, runtimeLogsEndpoint, and appSettingsUrl are templates where {appUid} is replaced with it (appSettingsUrl opens the member-facing Deployment settings modal to update secrets & redeploy; the logs endpoints serve the build and runtime logs — see .claude/skills/app-logs). A deploy answers 202 while the build runs in the background: poll statusEndpoint ({appUid} and {deploymentId} replaced — the deploy response also returns it filled in, and {deploymentId} may be "latest") until it reports READY or ERROR (see the deploy skill). If the app needs runtime secrets, register it via draftEndpoint instead of deploying (see the deploy skill). database is null unless the member has opted into a PLN-provisioned database — once they do, set it to {"enabled":true,"type":"postgres"} and resend it verbatim on every deploy/draft call (see the deploy skill\'s "Apps that want a provisioned database"); a bring-your-own database is a regular runtime secret instead and never goes in this field. analyticsEndpoint takes usage events — baseline events (opened/error/closed) are wired into every app by default, custom events are added on request (no auth required, no deploy token) — see .claude/skills/app-analytics.',
       },
       null,
       2

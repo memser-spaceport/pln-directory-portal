@@ -26,6 +26,7 @@ jest.mock('../analytics/service/analytics.service', () => ({
 
 import axios from 'axios';
 import { AiAppsService } from './ai-apps.service';
+import { withInlineDeploys } from './ai-apps-deploy-queue.spec-helper';
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
@@ -66,7 +67,10 @@ function buildService(initial: Record<string, any> | null = null) {
   const aws = { uploadFileToS3: jest.fn().mockResolvedValue(undefined) };
   const pushNotifications = { create: jest.fn().mockResolvedValue({}) };
   return {
-    service: new AiAppsService(prisma as any, aws as any, pushNotifications as any, { trackEvent: jest.fn() } as any),
+    service: withInlineDeploys(
+      prisma,
+      new AiAppsService(prisma as any, aws as any, pushNotifications as any, { trackEvent: jest.fn() } as any)
+    ),
     prisma,
     aws,
     getRow: () => row,
