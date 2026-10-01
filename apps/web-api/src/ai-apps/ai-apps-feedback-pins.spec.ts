@@ -34,7 +34,12 @@ const PIN: FeedbackPinInput = {
   viewportH: 800,
   note: 'Looks disabled until hover',
   cropUrl: 'https://cdn.example/crop-1.webp',
+  ox: 0.25,
+  oy: 0.5,
 };
+
+/** A pin from a client that predates the click point. */
+const PIN_WITHOUT_POINT: FeedbackPinInput = { ...PIN, ox: undefined, oy: undefined };
 
 const CONTEXT: FeedbackContext = {
   env: 'prod',
@@ -91,8 +96,14 @@ describe('feedback pins', () => {
       ['an unknown environment', { env: 'staging' }],
       ['an unexpected field', { html: '<button>' }],
       ['an oversized selector', { selector: 'x'.repeat(1001) }],
+      ['a click point outside the element', { ox: 1.2 }],
+      ['a negative click point', { oy: -0.1 }],
     ])('rejects a pin with %s', (_label, patch) => {
       expect(SubmitFeedbackSchema.safeParse({ text: 'hi', pins: [{ ...PIN, ...patch }] }).success).toBe(false);
+    });
+
+    it('accepts a pin without a click point (older clients)', () => {
+      expect(SubmitFeedbackSchema.safeParse({ text: 'hi', pins: [PIN_WITHOUT_POINT] }).success).toBe(true);
     });
 
     it('rejects two pins with the same number', () => {
@@ -112,6 +123,13 @@ describe('feedback pins', () => {
       const { data } = prisma.aiAppFeedback.create.mock.calls[0][0];
       expect(data.context).toEqual(CONTEXT);
       expect(data.pins.create).toEqual([PIN]);
+    });
+
+    it('stores a missing click point as null, so the pin falls back to the element corner', async () => {
+      const { service, prisma } = buildService();
+      await service.submitFeedback('member-1', 'app-1', '<p>hi</p>', { pins: [PIN_WITHOUT_POINT] });
+      const { data } = prisma.aiAppFeedback.create.mock.calls[0][0];
+      expect(data.pins.create[0]).toMatchObject({ ox: null, oy: null });
     });
 
     it('sends neither field when the client sent none', async () => {
