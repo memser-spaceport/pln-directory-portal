@@ -4,7 +4,11 @@ import { Request } from 'express';
 import { ZodError, ZodType } from 'zod';
 import { apiJobOpenings } from 'libs/contracts/src/lib/contract-job-openings';
 import { CreateJobApplicationSchema, JobBoardSignUpSchema } from 'libs/contracts/src/schema/job-application';
-import { JobsListQueryParams, MarkTeamInterestSchema } from 'libs/contracts/src/schema/job-opening';
+import {
+  JobsListQueryParams,
+  MarkJobInterestSchema,
+  MarkTeamInterestSchema,
+} from 'libs/contracts/src/schema/job-opening';
 import { CreateJobReferralSchema, JobReferralDraftQuerySchema } from 'libs/contracts/src/schema/job-referral';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserAuthValidateGuard } from '../guards/user-auth-validate.guard';
@@ -124,7 +128,8 @@ export class JobOpeningsController {
   @UseGuards(UserAuthValidateGuard)
   @NoCache()
   async markJobInterest(@Req() request: Request & { userEmail?: string }) {
-    return this.jobOpeningsInterestService.markInterest(request.params.uid, request.userEmail);
+    const input = this.parse(MarkJobInterestSchema, request.body ?? {});
+    return this.jobOpeningsInterestService.markInterest(request.params.uid, request.userEmail, input);
   }
 
   @Api(server.route.removeJobInterest)

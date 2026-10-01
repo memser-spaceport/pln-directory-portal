@@ -63,6 +63,8 @@ export const ApplicantRowSchema = z.object({
   createdAt: z.string(),
   /** Always null on an interest: the press carries no words. */
   coverLetter: z.string().nullable(),
+  /** The optional note left with an interest. Always null on an application. */
+  note: z.string().nullable(),
   /** Always null on an interest too — an interest carries no document. */
   cv: ApplicantCvSchema.nullable(),
   /** Not opened by THIS viewer. Per lead, not per row. */

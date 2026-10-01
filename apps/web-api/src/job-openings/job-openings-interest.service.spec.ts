@@ -5,8 +5,19 @@ jest.mock('../integration-keys/ats-push.service', () => ({ AtsPushService: class
 
 import { NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { JobOpeningStatus } from '@prisma/client';
+import { MarkJobInterestSchema } from 'libs/contracts/src/schema/job-opening';
 import { PrismaService } from '../shared/prisma.service';
 import { JobOpeningsInterestService } from './job-openings-interest.service';
+
+describe('MarkJobInterestSchema', () => {
+  it('accepts a missing note and rejects one longer than 280 after trim', () => {
+    expect(MarkJobInterestSchema.safeParse({}).success).toBe(true);
+    expect(MarkJobInterestSchema.safeParse({ note: null }).success).toBe(true);
+    expect(MarkJobInterestSchema.safeParse({ note: `  ${'a'.repeat(280)}  ` }).success).toBe(true);
+    expect(MarkJobInterestSchema.safeParse({ note: 'a'.repeat(281) }).success).toBe(false);
+    expect(MarkJobInterestSchema.parse({ note: '  hello \n there  ' }).note).toBe('hello \n there');
+  });
+});
 
 describe('JobOpeningsInterestService', () => {
   let service: JobOpeningsInterestService;
@@ -56,7 +67,7 @@ describe('JobOpeningsInterestService', () => {
       team: { uid: 'team-1', name: 'Acme', jobReferEmail: null, jobReferCcEmails: [] },
     });
     interestFindUnique.mockResolvedValue(null);
-    interestUpsert.mockResolvedValue({ uid: 'interest-1' });
+    interestUpsert.mockResolvedValue({ uid: 'interest-1', note: null });
     interestDeleteMany.mockResolvedValue({ count: 1 });
     interestCount.mockResolvedValue(2);
     interestFindMany.mockResolvedValue([]);
@@ -92,9 +103,9 @@ describe('JobOpeningsInterestService', () => {
 
       expect(interestUpsert).toHaveBeenCalledWith({
         where: { jobOpeningUid_memberUid: { jobOpeningUid: 'job-1', memberUid: 'member-1' } },
-        create: { jobOpeningUid: 'job-1', memberUid: 'member-1' },
-        update: {},
-        select: { uid: true },
+        create: { jobOpeningUid: 'job-1', memberUid: 'member-1', note: null },
+        update: { note: null },
+        select: { uid: true, note: true },
       });
       expect(analyticsMock.trackEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -108,7 +119,38 @@ describe('JobOpeningsInterestService', () => {
           }),
         })
       );
-      expect(result).toEqual({ jobUid: 'job-1', interestedCount: 2, viewerIsInterested: true });
+      expect(result).toEqual({ jobUid: 'job-1', interestedCount: 2, viewerIsInterested: true, note: null });
+    });
+
+    it('stores a trimmed note, and stores no note for blank or whitespace', async () => {
+      interestUpsert.mockResolvedValue({ uid: 'interest-1', note: 'I can start in May' });
+
+      const withNote = await service.markInterest('job-1', 'a@b.com', { note: '  I can start in May  ' });
+
+      expect(interestUpsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({ note: 'I can start in May' }),
+          update: { note: 'I can start in May' },
+        })
+      );
+      expect(withNote.note).toBe('I can start in May');
+
+      for (const note of [undefined, null, '', '   \n  ']) {
+        interestUpsert.mockClear();
+        interestUpsert.mockResolvedValue({ uid: 'interest-1', note: null });
+        const result = await service.markInterest('job-1', 'a@b.com', note === undefined ? undefined : { note });
+        expect(interestUpsert).toHaveBeenCalledWith(expect.objectContaining({ update: { note: null } }));
+        expect(result.note).toBeNull();
+      }
+    });
+
+    it('replaces a stored note on re-mark, including clearing it', async () => {
+      interestFindUnique.mockResolvedValue({ uid: 'interest-existing' });
+      interestUpsert.mockResolvedValue({ uid: 'interest-existing', note: null });
+
+      await service.markInterest('job-1', 'a@b.com', { note: null });
+
+      expect(interestUpsert).toHaveBeenCalledWith(expect.objectContaining({ update: { note: null } }));
     });
 
     it('does not emit analytics when interest already exists', async () => {
@@ -155,7 +197,7 @@ describe('JobOpeningsInterestService', () => {
       expect(interestDeleteMany).toHaveBeenCalledWith({
         where: { jobOpeningUid: 'job-1', memberUid: 'member-1' },
       });
-      expect(result).toEqual({ jobUid: 'job-1', interestedCount: 1, viewerIsInterested: false });
+      expect(result).toEqual({ jobUid: 'job-1', interestedCount: 1, viewerIsInterested: false, note: null });
     });
 
     it('throws NotFound when the job opening is missing or hidden', async () => {
@@ -173,17 +215,26 @@ describe('JobOpeningsInterestService', () => {
 
     it('maps stored interests to the wire shape', async () => {
       const createdAt = new Date('2026-08-01T00:00:00.000Z');
-      interestFindMany.mockResolvedValue([{ uid: 'interest-1', jobOpeningUid: 'job-1', createdAt }]);
+      interestFindMany.mockResolvedValue([
+        { uid: 'interest-1', jobOpeningUid: 'job-1', createdAt, note: 'I can start in May' },
+      ]);
 
       const result = await service.listMine('a@b.com');
 
       expect(interestFindMany).toHaveBeenCalledWith({
         where: { memberUid: 'member-1' },
-        select: { uid: true, jobOpeningUid: true, createdAt: true },
+        select: { uid: true, jobOpeningUid: true, createdAt: true, note: true },
         orderBy: { createdAt: 'desc' },
       });
       expect(result).toEqual({
-        interests: [{ uid: 'interest-1', jobUid: 'job-1', interestedAt: createdAt.toISOString() }],
+        interests: [
+          {
+            uid: 'interest-1',
+            jobUid: 'job-1',
+            interestedAt: createdAt.toISOString(),
+            note: 'I can start in May',
+          },
+        ],
       });
     });
   });

@@ -213,6 +213,7 @@ describe('TeamHiringService', () => {
         'location',
         'memberUid',
         'name',
+        'note',
         'profileUrl',
         'reviewed',
         'tags',
@@ -231,6 +232,7 @@ describe('TeamHiringService', () => {
         tags: ['Rust'],
         createdAt: '2026-09-01T10:00:00.000Z',
         coverLetter: 'Hello',
+        note: null,
         unseen: true,
         reviewed: false,
       });
@@ -255,6 +257,7 @@ describe('TeamHiringService', () => {
       prisma.jobOpeningInterest.findMany.mockResolvedValue([
         {
           uid: 'int-1',
+          note: null,
           createdAt: new Date('2026-09-03T10:00:00Z'),
           reviewedAt: null,
           reviewedByUid: null,
@@ -276,6 +279,26 @@ describe('TeamHiringService', () => {
       // The member HAS a stored CV; an interest still reports none.
       expect(out.interests[0].cv).toBeNull();
       expect(out.interests[0].coverLetter).toBeNull();
+      expect(out.interests[0].note).toBeNull();
+    });
+
+    it('returns an interest note without treating it as a cover letter', async () => {
+      prisma.jobOpeningInterest.findMany.mockResolvedValue([
+        {
+          uid: 'int-1',
+          note: 'I can start in May',
+          createdAt: new Date('2026-09-03T10:00:00Z'),
+          reviewedAt: null,
+          reviewedByUid: null,
+          member: member('m-1'),
+        },
+      ]);
+
+      const out = await service.roleApplicants('team-1', 'job-1', 'm-lead');
+
+      expect(out.interests[0].note).toBe('I can start in May');
+      expect(out.interests[0].coverLetter).toBeNull();
+      expect(out.applications).toEqual([]);
     });
 
     it('never signs a CV link for a list', async () => {

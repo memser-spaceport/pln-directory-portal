@@ -2576,6 +2576,8 @@ model JobOpeningInterest {
   jobOpening    JobOpening @relation(fields: [jobOpeningUid], references: [uid], onDelete: Cascade)
   memberUid     String
   member        Member     @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  /// What the member wrote. A later mark replaces it, including with nothing.
+  note          String?
   /// The team's tick; see JobApplication for what it does and does not mean.
   reviewedAt    DateTime?
   reviewedByUid String?
