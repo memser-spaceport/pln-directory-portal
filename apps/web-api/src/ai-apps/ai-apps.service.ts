@@ -36,6 +36,14 @@ import { RegisterDraftDto } from './dto/register-draft.dto';
 import { UpdateAppMetadataDto } from './dto/update-app-metadata.dto';
 import { assertValidPublicPaths, samePublicPaths } from './ai-apps-public-paths';
 import {
+  MAX_PINS_PER_RESPONSE,
+  PIN_PUBLIC_SELECT,
+  toPinCreateData,
+  type OverlayFeedbackPin,
+  type PublicFeedbackPin,
+} from './ai-app-feedback-pins';
+import type { FeedbackContext, FeedbackPinInput } from './dto/submit-feedback.dto';
+import {
   AiAppLogPhase,
   AiAppTargetEnvironment,
   AI_APP_ANON_ID_REGEX,
@@ -274,6 +282,9 @@ function runtimeConfigAlreadyAttached(
 }
 
 type AiAppMember = { uid: string; name: string; image: string | null };
+
+/** Feedback as the feedback reads return it: with its pinned elements, in order. */
+type FeedbackWithPins = AiAppFeedback & { pins: PublicFeedbackPin[] };
 
 /** Response shape across all AI Apps endpoints: `memberUid` replaced by `member`. */
 type WithMember<T extends { memberUid: string }> = Omit<T, 'memberUid'> & { member: AiAppMember | null };
@@ -816,10 +827,7 @@ export class AiAppsService {
     return grouped;
   }
 
-  private resolveTargetEnvironment(
-    requested: string | undefined,
-    scope?: AiAppKeyScope
-  ): AiAppTargetEnvironment {
+  private resolveTargetEnvironment(requested: string | undefined, scope?: AiAppKeyScope): AiAppTargetEnvironment {
     const environment = normalizeAppTarget(requested);
     if (scope && scope.environment !== environment) {
       throw new ForbiddenException('This deployment key is not valid for that environment');
@@ -1792,8 +1800,17 @@ export class AiAppsService {
    * Stores feedback from a member viewing the app's detail page. Text may be
    * Quill HTML (headings, links, images). Any member with AI Apps access may
    * submit, and may do so more than once per app.
+   *
+   * `pins` and `context` are optional (older clients send neither). Pins are
+   * created in the same statement as the feedback, so a submission is stored
+   * whole or not at all.
    */
-  async submitFeedback(memberUid: string, appUid: string, text: string): Promise<WithMember<AiAppFeedback>> {
+  async submitFeedback(
+    memberUid: string,
+    appUid: string,
+    text: string,
+    extras: { pins?: FeedbackPinInput[]; context?: FeedbackContext } = {}
+  ): Promise<WithMember<AiAppFeedback>> {
     const app = await this.prisma.aiApp.findUnique({ where: { uid: appUid } });
     if (!app) {
       throw new NotFoundException(`AI App not found: ${appUid}`);
@@ -1805,7 +1822,13 @@ export class AiAppsService {
       throw new BadRequestException('Feedback text is required');
     }
     const feedback = await this.prisma.aiAppFeedback.create({
-      data: { appUid: app.uid, memberUid, text: sanitized },
+      data: {
+        appUid: app.uid,
+        memberUid,
+        text: sanitized,
+        ...(extras.context ? { context: extras.context } : {}),
+        ...(extras.pins?.length ? { pins: { create: extras.pins.map(toPinCreateData) } } : {}),
+      },
     });
     return (await this.withMember([feedback]))[0];
   }
@@ -1814,7 +1837,7 @@ export class AiAppsService {
    * All feedback for one app, newest first, with submitter info. Visible only
    * to the app's creator and directory admins.
    */
-  async listFeedback(requesterUid: string, appUid: string): Promise<Array<WithMember<AiAppFeedback>>> {
+  async listFeedback(requesterUid: string, appUid: string): Promise<Array<WithMember<FeedbackWithPins>>> {
     const app = await this.prisma.aiApp.findUnique({ where: { uid: appUid } });
     if (!app) {
       throw new NotFoundException(`AI App not found: ${appUid}`);
@@ -1835,7 +1858,7 @@ export class AiAppsService {
     uid: string,
     status?: AiAppFeedbackStatus,
     scope?: AiAppKeyScope
-  ): Promise<Array<WithMember<AiAppFeedback>>> {
+  ): Promise<Array<WithMember<FeedbackWithPins>>> {
     const app = await this.findAgentFeedbackApp(requesterUid, uid, scope);
     return this.queryFeedback(app.uid, status);
   }
@@ -1867,12 +1890,84 @@ export class AiAppsService {
     return app;
   }
 
-  private async queryFeedback(appUid: string, status?: AiAppFeedbackStatus): Promise<Array<WithMember<AiAppFeedback>>> {
+  private async queryFeedback(
+    appUid: string,
+    status?: AiAppFeedbackStatus
+  ): Promise<Array<WithMember<FeedbackWithPins>>> {
     const feedback = await this.prisma.aiAppFeedback.findMany({
       where: status ? { appUid, status } : { appUid },
       orderBy: { createdAt: 'desc' },
+      include: { pins: { select: PIN_PUBLIC_SELECT, orderBy: { n: 'asc' } } },
     });
     return this.withMember(feedback);
+  }
+
+  /**
+   * Every pin on the app's feedback, for the live-app overlay. Creator and
+   * directory admins only. Pins of IMPLEMENTED feedback are left out unless
+   * asked for ("Show resolved"); `env` narrows to one environment, and both are
+   * returned when it is omitted (the overlay labels the other one).
+   */
+  async listAppFeedbackPins(
+    requesterUid: string,
+    appUid: string,
+    options: { includeResolved?: boolean; env?: 'prod' | 'preview' } = {}
+  ): Promise<OverlayFeedbackPin[]> {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid: appUid } });
+    if (!app || app.status === 'DELETED') {
+      throw new NotFoundException(`AI App not found: ${appUid}`);
+    }
+    if (!(await this.isCreatorOrDirectoryAdmin(requesterUid, app))) {
+      throw new ForbiddenException('Only the app creator or a directory admin can view feedback');
+    }
+    return this.queryOverlayPins({
+      appUid: app.uid,
+      env: options.env,
+      excludeStatus: options.includeResolved ? undefined : 'IMPLEMENTED',
+    });
+  }
+
+  /**
+   * The requester's own pins on the app, resolved ones included: seeing their
+   * report marked Implemented is the point. Anyone who may open the app may ask;
+   * it never returns another member's feedback.
+   */
+  async listMyAppFeedbackPins(requesterUid: string, appUid: string): Promise<OverlayFeedbackPin[]> {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid: appUid } });
+    if (!app || app.status === 'DELETED') {
+      throw new NotFoundException(`AI App not found: ${appUid}`);
+    }
+    await this.assertCanViewApp(requesterUid, app);
+    return this.queryOverlayPins({ appUid: app.uid, memberUid: requesterUid });
+  }
+
+  private async queryOverlayPins(filter: {
+    appUid: string;
+    memberUid?: string;
+    env?: 'prod' | 'preview';
+    excludeStatus?: AiAppFeedbackStatus;
+  }): Promise<OverlayFeedbackPin[]> {
+    const pins = await this.prisma.aiAppFeedbackPin.findMany({
+      where: {
+        ...(filter.env ? { env: filter.env } : {}),
+        feedback: {
+          appUid: filter.appUid,
+          ...(filter.memberUid ? { memberUid: filter.memberUid } : {}),
+          ...(filter.excludeStatus ? { status: { not: filter.excludeStatus } } : {}),
+        },
+      },
+      select: {
+        ...PIN_PUBLIC_SELECT,
+        feedback: { select: { uid: true, status: true, createdAt: true, memberUid: true } },
+      },
+      orderBy: [{ feedback: { createdAt: 'desc' } }, { n: 'asc' }],
+      take: MAX_PINS_PER_RESPONSE,
+    });
+    if (pins.length === MAX_PINS_PER_RESPONSE) {
+      this.logger.warn(`AI App ${filter.appUid}: feedback pins response hit the ${MAX_PINS_PER_RESPONSE} cap`);
+    }
+    const feedbacks = await this.withMember(pins.map((pin) => pin.feedback));
+    return pins.map((pin, index) => ({ ...pin, feedback: feedbacks[index] }));
   }
 
   private async applyFeedbackStatus(
@@ -1896,7 +1991,9 @@ export class AiAppsService {
    * Directory admins see every non-deleted app; everyone else only apps they
    * created. Skips deleted apps so the list matches the dashboard catalog.
    */
-  async listAccessibleFeedback(requesterUid: string): Promise<Array<WithMember<AiAppFeedback> & { appName: string }>> {
+  async listAccessibleFeedback(
+    requesterUid: string
+  ): Promise<Array<WithMember<AiAppFeedback> & { appName: string; pinCount: number }>> {
     const isAdmin = await this.isRequesterDirectoryAdmin(requesterUid);
     const apps = await this.prisma.aiApp.findMany({
       where: isAdmin ? { status: { not: 'DELETED' } } : { memberUid: requesterUid, status: { not: 'DELETED' } },
@@ -1909,9 +2006,15 @@ export class AiAppsService {
     const feedback = await this.prisma.aiAppFeedback.findMany({
       where: { appUid: { in: apps.map((app) => app.uid) } },
       orderBy: { createdAt: 'desc' },
+      include: { _count: { select: { pins: true } } },
     });
     const withMembers = await this.withMember(feedback);
-    return withMembers.map((row) => ({ ...row, appName: appNameByUid.get(row.appUid) ?? '' }));
+    // `pinCount` lets the list offer "Show on page" without sending every pin.
+    return withMembers.map(({ _count, ...row }) => ({
+      ...row,
+      appName: appNameByUid.get(row.appUid) ?? '',
+      pinCount: _count?.pins ?? 0,
+    }));
   }
 
   /**
@@ -2071,8 +2174,7 @@ export class AiAppsService {
     environment: AiAppTargetEnvironment = 'prod'
   ): Promise<void> {
     const access = environment === 'preview' ? app.previewAccess : app.access;
-    const shipped =
-      environment === 'preview' ? await this.previewLastDeployedAt(app.uid) : app.lastDeployedAt;
+    const shipped = environment === 'preview' ? await this.previewLastDeployedAt(app.uid) : app.lastDeployedAt;
     if (access !== 'PRIVATE' || !shipped) {
       return;
     }
@@ -2531,7 +2633,14 @@ export class AiAppsService {
       );
     } catch (error) {
       const message = `Deploy failed: ${(error as Error).message}`;
-      await this.failDeploy(app, memberUid, { appUid: app.uid, appId: dto.appId, deploymentId: dto.deploymentId }, message, 'build', 'preview');
+      await this.failDeploy(
+        app,
+        memberUid,
+        { appUid: app.uid, appId: dto.appId, deploymentId: dto.deploymentId },
+        message,
+        'build',
+        'preview'
+      );
       throw new BadGatewayException('Failed to store the app bundle');
     }
     await this.recordEvent('DEPLOY_STARTED', memberUid, {
@@ -2693,7 +2802,9 @@ export class AiAppsService {
       where: { appUid_environment: { appUid: app.uid, environment: 'preview' } },
     });
     if (!target?.s3Key || !target.deploymentId) {
-      throw new BadRequestException('This environment has no uploaded bundle yet — ask your AI agent to register it first');
+      throw new BadRequestException(
+        'This environment has no uploaded bundle yet — ask your AI agent to register it first'
+      );
     }
     this.assertNoDeployInProgress(target);
     const submittedNames = Object.keys(secrets ?? {});
@@ -3214,7 +3325,13 @@ export class AiAppsService {
       this.logger.log(`Runtime config for ${app.appId} not attached by the build (missing: ${missing.join(', ')})`);
       await this.setDeployPhase(app.uid, environment, attemptId, 'injecting_runtime_config');
       try {
-        databaseInfo = await this.deployImageWithRuntimeConfig(app.appId, secretNames, url, requestedDatabase, environment);
+        databaseInfo = await this.deployImageWithRuntimeConfig(
+          app.appId,
+          secretNames,
+          url,
+          requestedDatabase,
+          environment
+        );
       } catch (error) {
         if ((error as Error).message?.includes(HELM_RELEASE_LOCKED_TEXT)) {
           this.logger.warn(
@@ -3786,10 +3903,11 @@ export class AiAppsService {
     if (!(await this.isCreatorOrDirectoryAdmin(memberUid, app))) {
       throw new ForbiddenException('Only the app creator or a directory admin can list deployment keys');
     }
-    const rows = (await this.deployKeyTable()?.findMany({
-      where: { appUid: app.uid, revokedAt: null },
-      orderBy: { createdAt: 'desc' },
-    })) ?? [];
+    const rows =
+      (await this.deployKeyTable()?.findMany({
+        where: { appUid: app.uid, revokedAt: null },
+        orderBy: { createdAt: 'desc' },
+      })) ?? [];
     return {
       keys: rows.map((row) => ({
         uid: row.uid,

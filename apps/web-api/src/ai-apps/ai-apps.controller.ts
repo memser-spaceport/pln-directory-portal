@@ -351,7 +351,13 @@ export class AiAppsController {
       if (!session) {
         throw new UnauthorizedException('Invalid or expired app session');
       }
-      return this.accessService.checkAccess(session.memberUid, query.appId, query.method, { app }, query.target ?? 'prod');
+      return this.accessService.checkAccess(
+        session.memberUid,
+        query.appId,
+        query.method,
+        { app },
+        query.target ?? 'prod'
+      );
     }
     await validateUserAccessToken(req);
     const memberUid = await this.resolveMemberUid(req);
@@ -729,7 +735,40 @@ export class AiAppsController {
   @UsePipes(ZodValidationPipe)
   async submitFeedback(@Param('uid') uid: string, @Body() body: SubmitFeedbackDto, @Req() req: any) {
     const memberUid = await this.resolveMemberUid(req);
-    return this.aiAppsService.submitFeedback(memberUid, uid, body.text);
+    return this.aiAppsService.submitFeedback(memberUid, uid, body.text, { pins: body.pins, context: body.context });
+  }
+
+  /**
+   * Pins on the app's feedback, for the live-app overlay. Creator and directory
+   * admins only (checked in the service). Pins of IMPLEMENTED feedback are left
+   * out unless `includeResolved=true`; `env` narrows to one environment.
+   * (`:uid/feedback/:feedbackUid` is PATCH-only, so it cannot shadow these GETs.)
+   */
+  @NoCache()
+  @Get(':uid/feedback/pins')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async listFeedbackPins(
+    @Param('uid') uid: string,
+    @Req() req: any,
+    @Query('includeResolved') includeResolved?: string,
+    @Query('env') env?: string
+  ) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.listAppFeedbackPins(memberUid, uid, {
+      includeResolved: includeResolved === 'true',
+      env: this.parseFeedbackEnv(env),
+    });
+  }
+
+  /** The requester's own pins on the app (any member who may open it). */
+  @NoCache()
+  @Get(':uid/feedback/pins/mine')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async listMyFeedbackPins(@Param('uid') uid: string, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.listMyAppFeedbackPins(memberUid, uid);
   }
 
   /**
@@ -797,11 +836,7 @@ export class AiAppsController {
   @Delete(':uid/deployments/:environment')
   @UseGuards(UserTokenCheckGuard, RbacGuard)
   @RequirePermissions(WRITE)
-  async deleteTarget(
-    @Param('uid') uid: string,
-    @Param('environment') environment: string,
-    @Req() req: any
-  ) {
+  async deleteTarget(@Param('uid') uid: string, @Param('environment') environment: string, @Req() req: any) {
     const memberUid = await this.resolveMemberUid(req);
     const target = this.parseTargetEnvironment(environment);
     if (!target) throw new BadRequestException('environment must be prod or preview');
@@ -916,6 +951,13 @@ export class AiAppsController {
   private optionalEnvironment(value?: string): { environment?: 'prod' | 'preview' } {
     const environment = this.parseTargetEnvironment(value);
     return environment ? { environment } : {};
+  }
+
+  /** Optional pin environment filter, 400ing on anything but prod / preview. */
+  private parseFeedbackEnv(value?: string): 'prod' | 'preview' | undefined {
+    if (value === undefined || value === '') return undefined;
+    if (value === 'prod' || value === 'preview') return value;
+    throw new BadRequestException(`Unknown env: ${value}`);
   }
 
   /** Optional feedback status filter (case-insensitive), 400ing on an unknown value. */
