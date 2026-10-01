@@ -27,6 +27,7 @@ import { Throttle } from '@nestjs/throttler';
 import { ZodValidationPipe } from '@abitia/zod-dto';
 import { Request, Response } from 'express';
 import { NoCache } from '../decorators/no-cache.decorator';
+import { SkipEmptyStringToNull } from '../decorators/skip-empty-string-to-null.decorator';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { validateUserAccessToken } from '../guards/user-access-token-validate.guard';
 import { extractTokenFromRequest } from '../utils/auth';
@@ -727,8 +728,11 @@ export class AiAppsController {
   /**
    * Submit feedback on an app from its detail page. Text may be Quill HTML.
    * Any member with AI Apps access may submit, more than once per app.
+   * Empty strings are meaningful here (a pin with no note, an element with no
+   * visible text), so the app-wide empty-string-to-null rewrite is skipped.
    */
   @NoCache()
+  @SkipEmptyStringToNull()
   @Post(':uid/feedback')
   @UseGuards(UserTokenCheckGuard, RbacGuard)
   @RequirePermissions(READ)

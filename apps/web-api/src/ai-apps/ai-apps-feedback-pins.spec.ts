@@ -106,6 +106,18 @@ describe('feedback pins', () => {
       expect(SubmitFeedbackSchema.safeParse({ text: 'hi', pins: [PIN_WITHOUT_POINT] }).success).toBe(true);
     });
 
+    /* The app-wide EmptyStringToNullInterceptor rewrites '' to null before
+       validation; a pin with no note on an element with no text must still pass. */
+    it('accepts a pin whose empty text and note arrive as null, and stores them as empty', () => {
+      const parsed = SubmitFeedbackSchema.safeParse({ text: 'hi', pins: [{ ...PIN, text: null, note: null }] });
+      expect(parsed.success).toBe(true);
+      expect(parsed.success && parsed.data.pins?.[0]).toMatchObject({ text: '', note: '' });
+    });
+
+    it('accepts a context whose empty strings arrive as null', () => {
+      expect(SubmitFeedbackSchema.safeParse({ text: 'hi', context: { ...CONTEXT, appPath: null } }).success).toBe(true);
+    });
+
     it('rejects two pins with the same number', () => {
       expect(SubmitFeedbackSchema.safeParse({ text: 'hi', pins: [PIN, { ...PIN }] }).success).toBe(false);
     });
