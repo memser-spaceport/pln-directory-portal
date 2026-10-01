@@ -816,10 +816,7 @@ export class AiAppsService {
     return grouped;
   }
 
-  private resolveTargetEnvironment(
-    requested: string | undefined,
-    scope?: AiAppKeyScope
-  ): AiAppTargetEnvironment {
+  private resolveTargetEnvironment(requested: string | undefined, scope?: AiAppKeyScope): AiAppTargetEnvironment {
     const environment = normalizeAppTarget(requested);
     if (scope && scope.environment !== environment) {
       throw new ForbiddenException('This deployment key is not valid for that environment');
@@ -983,8 +980,16 @@ export class AiAppsService {
     ownerOnly = false,
     scope?: AiAppKeyScope
   ): Promise<ApiAiApp<AiApp>> {
-    if (dto.name === undefined && dto.description === undefined && dto.prd === undefined && dto.tags === undefined) {
-      throw new BadRequestException('At least one of name, description, prd, or tags must be provided');
+    if (
+      dto.name === undefined &&
+      dto.description === undefined &&
+      dto.prd === undefined &&
+      dto.tags === undefined &&
+      dto.feedbackEnabled === undefined
+    ) {
+      throw new BadRequestException(
+        'At least one of name, description, prd, tags, or feedbackEnabled must be provided'
+      );
     }
 
     const app = await this.prisma.aiApp.findUnique({ where: { uid } });
@@ -999,11 +1004,18 @@ export class AiAppsService {
     }
     this.assertKeyCanAccessApp(scope, app.uid);
 
-    const data: { name?: string; description?: string | null; prd?: string | null; tags?: string[] } = {};
+    const data: {
+      name?: string;
+      description?: string | null;
+      prd?: string | null;
+      tags?: string[];
+      feedbackEnabled?: boolean;
+    } = {};
     if (dto.name !== undefined) data.name = dto.name.trim();
     if (dto.description !== undefined) data.description = dto.description?.trim() || null;
     if (dto.prd !== undefined) data.prd = dto.prd?.trim() || null;
     if (dto.tags !== undefined) data.tags = dto.tags;
+    if (dto.feedbackEnabled !== undefined) data.feedbackEnabled = dto.feedbackEnabled;
 
     const updated = await this.prisma.aiApp.update({ where: { uid }, data });
     return this.toApiApp((await this.withMember([updated]))[0], true);
@@ -2071,8 +2083,7 @@ export class AiAppsService {
     environment: AiAppTargetEnvironment = 'prod'
   ): Promise<void> {
     const access = environment === 'preview' ? app.previewAccess : app.access;
-    const shipped =
-      environment === 'preview' ? await this.previewLastDeployedAt(app.uid) : app.lastDeployedAt;
+    const shipped = environment === 'preview' ? await this.previewLastDeployedAt(app.uid) : app.lastDeployedAt;
     if (access !== 'PRIVATE' || !shipped) {
       return;
     }
@@ -2531,7 +2542,14 @@ export class AiAppsService {
       );
     } catch (error) {
       const message = `Deploy failed: ${(error as Error).message}`;
-      await this.failDeploy(app, memberUid, { appUid: app.uid, appId: dto.appId, deploymentId: dto.deploymentId }, message, 'build', 'preview');
+      await this.failDeploy(
+        app,
+        memberUid,
+        { appUid: app.uid, appId: dto.appId, deploymentId: dto.deploymentId },
+        message,
+        'build',
+        'preview'
+      );
       throw new BadGatewayException('Failed to store the app bundle');
     }
     await this.recordEvent('DEPLOY_STARTED', memberUid, {
@@ -2693,7 +2711,9 @@ export class AiAppsService {
       where: { appUid_environment: { appUid: app.uid, environment: 'preview' } },
     });
     if (!target?.s3Key || !target.deploymentId) {
-      throw new BadRequestException('This environment has no uploaded bundle yet — ask your AI agent to register it first');
+      throw new BadRequestException(
+        'This environment has no uploaded bundle yet — ask your AI agent to register it first'
+      );
     }
     this.assertNoDeployInProgress(target);
     const submittedNames = Object.keys(secrets ?? {});
@@ -3214,7 +3234,13 @@ export class AiAppsService {
       this.logger.log(`Runtime config for ${app.appId} not attached by the build (missing: ${missing.join(', ')})`);
       await this.setDeployPhase(app.uid, environment, attemptId, 'injecting_runtime_config');
       try {
-        databaseInfo = await this.deployImageWithRuntimeConfig(app.appId, secretNames, url, requestedDatabase, environment);
+        databaseInfo = await this.deployImageWithRuntimeConfig(
+          app.appId,
+          secretNames,
+          url,
+          requestedDatabase,
+          environment
+        );
       } catch (error) {
         if ((error as Error).message?.includes(HELM_RELEASE_LOCKED_TEXT)) {
           this.logger.warn(
@@ -3786,10 +3812,11 @@ export class AiAppsService {
     if (!(await this.isCreatorOrDirectoryAdmin(memberUid, app))) {
       throw new ForbiddenException('Only the app creator or a directory admin can list deployment keys');
     }
-    const rows = (await this.deployKeyTable()?.findMany({
-      where: { appUid: app.uid, revokedAt: null },
-      orderBy: { createdAt: 'desc' },
-    })) ?? [];
+    const rows =
+      (await this.deployKeyTable()?.findMany({
+        where: { appUid: app.uid, revokedAt: null },
+        orderBy: { createdAt: 'desc' },
+      })) ?? [];
     return {
       keys: rows.map((row) => ({
         uid: row.uid,

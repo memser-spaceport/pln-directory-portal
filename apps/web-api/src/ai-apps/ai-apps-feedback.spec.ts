@@ -67,6 +67,15 @@ describe('AiAppsService feedback', () => {
       await expect(service.submitFeedback('member-1', 'missing', 'hi')).rejects.toBeInstanceOf(NotFoundException);
     });
 
+    it('still stores feedback when LabOS feedback is turned off on the app', async () => {
+      const { service, prisma } = buildService();
+      prisma.aiApp.findUnique.mockResolvedValue({ ...APP, feedbackEnabled: false });
+      await service.submitFeedback('member-1', 'app-1', 'from the list');
+      expect(prisma.aiAppFeedback.create).toHaveBeenCalledWith({
+        data: { appUid: 'app-1', memberUid: 'member-1', text: 'from the list' },
+      });
+    });
+
     it('stores feedback for any member and allows repeat submissions', async () => {
       const { service, prisma } = buildService();
       await service.submitFeedback('member-1', 'app-1', 'first');
