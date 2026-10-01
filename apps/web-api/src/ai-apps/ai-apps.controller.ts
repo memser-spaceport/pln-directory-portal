@@ -21,6 +21,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { AiAppFeedbackStatus } from '@prisma/client';
 import { ApiTags, ApiConsumes } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { ZodValidationPipe } from '@abitia/zod-dto';
@@ -53,7 +54,7 @@ import {
 import { AiAppsAuthGateService } from './ai-apps-auth-gate.service';
 import { PollConnectDto } from './dto/poll-connect.dto';
 import { SubmitFeedbackDto } from './dto/submit-feedback.dto';
-import { UpdateFeedbackStatusDto } from './dto/update-feedback-status.dto';
+import { AgentUpdateFeedbackStatusDto, UpdateFeedbackStatusDto } from './dto/update-feedback-status.dto';
 import { UpdateAppMetadataDto } from './dto/update-app-metadata.dto';
 import { TrackEventDto } from './dto/track-event.dto';
 import {
@@ -565,6 +566,42 @@ export class AiAppsController {
     return this.aiAppsService.updateMetadata(req.aiAppMemberUid, uid, body, true, req.aiAppKeyScope);
   }
 
+  /**
+   * All feedback for the app, newest first, for the agent (deploy-token or
+   * deployment-key auth, owner-only). Optional `status` narrows to one status.
+   */
+  @NoCache()
+  @Get(':uid/agent/feedback')
+  @UseGuards(AiAppTokenGuard)
+  async listAgentFeedback(@Param('uid') uid: string, @Req() req: any, @Query('status') status?: string) {
+    return this.aiAppsService.listAgentFeedback(
+      req.aiAppMemberUid,
+      uid,
+      this.parseFeedbackStatus(status),
+      req.aiAppKeyScope
+    );
+  }
+
+  /** Agent marks one feedback row VIEWED or IMPLEMENTED (NEW stays member-only). */
+  @NoCache()
+  @Patch(':uid/agent/feedback/:feedbackUid')
+  @UseGuards(AiAppTokenGuard)
+  @UsePipes(ZodValidationPipe)
+  async updateAgentFeedbackStatus(
+    @Param('uid') uid: string,
+    @Param('feedbackUid') feedbackUid: string,
+    @Body() body: AgentUpdateFeedbackStatusDto,
+    @Req() req: any
+  ) {
+    return this.aiAppsService.updateAgentFeedbackStatus(
+      req.aiAppMemberUid,
+      uid,
+      feedbackUid,
+      body.status,
+      req.aiAppKeyScope
+    );
+  }
+
   /** Upload a Markdown or HTML PRD file from the dashboard without redeploying. */
   @NoCache()
   @Post(':uid/prd')
@@ -879,6 +916,18 @@ export class AiAppsController {
   private optionalEnvironment(value?: string): { environment?: 'prod' | 'preview' } {
     const environment = this.parseTargetEnvironment(value);
     return environment ? { environment } : {};
+  }
+
+  /** Optional feedback status filter (case-insensitive), 400ing on an unknown value. */
+  private parseFeedbackStatus(value?: string): AiAppFeedbackStatus | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+    const status = value.toUpperCase();
+    if (status !== 'NEW' && status !== 'VIEWED' && status !== 'IMPLEMENTED') {
+      throw new BadRequestException(`status must be NEW, VIEWED or IMPLEMENTED, got: ${value}`);
+    }
+    return status;
   }
 
   /** Parse an optional numeric query param, 400ing on anything but a positive integer. */
