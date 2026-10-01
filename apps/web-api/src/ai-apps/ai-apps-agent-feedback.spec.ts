@@ -61,7 +61,11 @@ describe('AiAppsService agent feedback', () => {
       expect(prisma.aiAppFeedback.findMany).toHaveBeenCalledWith({
         where: { appUid: 'app-1' },
         orderBy: { createdAt: 'desc' },
-        include: { pins: { select: expect.any(Object), orderBy: { n: 'asc' } } },
+        include: {
+          pins: { select: expect.any(Object), orderBy: { n: 'asc' } },
+          _count: { select: { comments: true } },
+          comments: { select: expect.any(Object), orderBy: { createdAt: 'asc' } },
+        },
       });
       expect(result.map((row) => row.uid)).toEqual(['fb-2', 'fb-1']);
       expect(result[0].text).toBe(HTML);
@@ -75,7 +79,11 @@ describe('AiAppsService agent feedback', () => {
       expect(prisma.aiAppFeedback.findMany).toHaveBeenCalledWith({
         where: { appUid: 'app-1', status: 'NEW' },
         orderBy: { createdAt: 'desc' },
-        include: { pins: { select: expect.any(Object), orderBy: { n: 'asc' } } },
+        include: {
+          pins: { select: expect.any(Object), orderBy: { n: 'asc' } },
+          _count: { select: { comments: true } },
+          comments: { select: expect.any(Object), orderBy: { createdAt: 'asc' } },
+        },
       });
     });
 

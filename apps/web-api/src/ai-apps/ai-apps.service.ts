@@ -10,6 +10,7 @@ import {
   NotFoundException,
   Optional,
   ServiceUnavailableException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import axios from 'axios';
@@ -21,6 +22,7 @@ import {
   AiAppEvent,
   AiAppEventType,
   AiAppFeedback,
+  AiAppFeedbackComment,
   AiAppFeedbackStatus,
   Prisma,
   PushNotificationCategory,
@@ -83,6 +85,7 @@ import {
   AI_APPS_VERIFY_INTERVAL_MS,
   AI_APPS_WAU_WINDOW_MS,
   aiAppDetailPath,
+  aiAppFeedbackPath,
   buildAppHost,
   buildAppHttpUrl,
   buildAppPageUrl,
@@ -283,8 +286,15 @@ function runtimeConfigAlreadyAttached(
 
 type AiAppMember = { uid: string; name: string; image: string | null };
 
-/** Feedback as the feedback reads return it: with its pinned elements, in order. */
-type FeedbackWithPins = AiAppFeedback & { pins: PublicFeedbackPin[] };
+/** Feedback as the feedback reads return it: with its pinned elements, in order, and its reply count. */
+type FeedbackWithPins = AiAppFeedback & { pins: PublicFeedbackPin[]; commentCount: number };
+
+/** A reply or closing note as the API returns it (before `memberUid` becomes `member`). */
+type FeedbackComment = Pick<AiAppFeedbackComment, 'uid' | 'text' | 'kind' | 'createdAt' | 'memberUid'>;
+const COMMENT_PUBLIC_SELECT = { uid: true, text: true, kind: true, createdAt: true, memberUid: true } as const;
+
+/** Most comments one feedback item may hold, so a runaway client or agent can't fill the table. */
+export const MAX_COMMENTS_PER_FEEDBACK = 200;
 
 /** Response shape across all AI Apps endpoints: `memberUid` replaced by `member`. */
 type WithMember<T extends { memberUid: string }> = Omit<T, 'memberUid'> & { member: AiAppMember | null };
@@ -1873,24 +1883,49 @@ export class AiAppsService {
     uid: string,
     status?: AiAppFeedbackStatus,
     scope?: AiAppKeyScope
-  ): Promise<Array<WithMember<FeedbackWithPins>>> {
+  ): Promise<Array<WithMember<FeedbackWithPins> & { comments?: Array<WithMember<FeedbackComment>> }>> {
     const app = await this.findAgentFeedbackApp(requesterUid, uid, scope);
-    return this.queryFeedback(app.uid, status);
+    return this.queryFeedback(app.uid, status, { withComments: true });
   }
 
   /**
    * Sets the shared review status on one feedback row for the agent. The DTO
    * limits agents to VIEWED / IMPLEMENTED; same ownership rules as the list.
+   *
+   * With IMPLEMENTED the agent may leave a closing note — what changed. It is
+   * stored in the item's conversation as written by the app's creator (the
+   * agent acts for them) and tells the member who left the feedback. A bare
+   * status change still notifies nobody.
    */
   async updateAgentFeedbackStatus(
     requesterUid: string,
     uid: string,
     feedbackUid: string,
     status: AiAppFeedbackStatus,
-    scope?: AiAppKeyScope
+    scope?: AiAppKeyScope,
+    note?: string
   ): Promise<WithMember<AiAppFeedback>> {
+    if (note && status !== 'IMPLEMENTED') {
+      throw new UnprocessableEntityException('A closing note is only accepted with status IMPLEMENTED');
+    }
     const app = await this.findAgentFeedbackApp(requesterUid, uid, scope);
-    return this.applyFeedbackStatus(app.uid, feedbackUid, status);
+    const updated = await this.applyFeedbackStatus(app.uid, feedbackUid, status);
+    if (note) {
+      await this.prisma.aiAppFeedbackComment.create({
+        data: { feedbackUid, memberUid: app.memberUid, text: note, kind: 'CLOSING_NOTE' },
+      });
+      const feedback = await this.prisma.aiAppFeedback.findUnique({
+        where: { uid: feedbackUid },
+        select: { memberUid: true, _count: { select: { pins: true } } },
+      });
+      if (feedback && feedback.memberUid !== app.memberUid) {
+        await this.notifyFeedbackConversation(app, feedbackUid, feedback._count.pins > 0, feedback.memberUid, {
+          ...AI_APPS_NOTIFICATION_MESSAGES.feedbackShipped(app.name, note),
+          trigger: AI_APPS_NOTIFICATION_TRIGGERS.FEEDBACK_SHIPPED,
+        });
+      }
+    }
+    return updated;
   }
 
   private async findAgentFeedbackApp(requesterUid: string, uid: string, scope?: AiAppKeyScope): Promise<AiApp> {
@@ -1905,16 +1940,42 @@ export class AiAppsService {
     return app;
   }
 
+  /**
+   * `withComments` adds each item's conversation, oldest first — the agent reads
+   * it before acting. Every read carries `commentCount`.
+   */
   private async queryFeedback(
     appUid: string,
-    status?: AiAppFeedbackStatus
-  ): Promise<Array<WithMember<FeedbackWithPins>>> {
+    status?: AiAppFeedbackStatus,
+    options: { withComments?: boolean } = {}
+  ): Promise<Array<WithMember<FeedbackWithPins> & { comments?: Array<WithMember<FeedbackComment>> }>> {
     const feedback = await this.prisma.aiAppFeedback.findMany({
       where: status ? { appUid, status } : { appUid },
       orderBy: { createdAt: 'desc' },
-      include: { pins: { select: PIN_PUBLIC_SELECT, orderBy: { n: 'asc' } } },
+      include: {
+        pins: { select: PIN_PUBLIC_SELECT, orderBy: { n: 'asc' } },
+        _count: { select: { comments: true } },
+        ...(options.withComments
+          ? { comments: { select: COMMENT_PUBLIC_SELECT, orderBy: { createdAt: 'asc' as const } } }
+          : {}),
+      },
     });
-    return this.withMember(feedback);
+    const rows = feedback as Array<
+      AiAppFeedback & {
+        pins: PublicFeedbackPin[];
+        _count?: { comments: number };
+        comments?: FeedbackComment[];
+      }
+    >;
+    const withMembers = await this.withMember(rows);
+    const comments = options.withComments ? await this.withMember(rows.flatMap((row) => row.comments ?? [])) : [];
+    let offset = 0;
+    return withMembers.map(({ _count, comments: own, ...row }) => {
+      const count = own?.length ?? 0;
+      const thread = options.withComments ? { comments: comments.slice(offset, offset + count) } : {};
+      offset += count;
+      return { ...row, ...thread, commentCount: _count?.comments ?? 0 };
+    });
   }
 
   /**
@@ -1973,7 +2034,15 @@ export class AiAppsService {
       },
       select: {
         ...PIN_PUBLIC_SELECT,
-        feedback: { select: { uid: true, status: true, createdAt: true, memberUid: true } },
+        feedback: {
+          select: {
+            uid: true,
+            status: true,
+            createdAt: true,
+            memberUid: true,
+            _count: { select: { comments: true } },
+          },
+        },
       },
       orderBy: [{ feedback: { createdAt: 'desc' } }, { n: 'asc' }],
       take: MAX_PINS_PER_RESPONSE,
@@ -1982,7 +2051,10 @@ export class AiAppsService {
       this.logger.warn(`AI App ${filter.appUid}: feedback pins response hit the ${MAX_PINS_PER_RESPONSE} cap`);
     }
     const feedbacks = await this.withMember(pins.map((pin) => pin.feedback));
-    return pins.map((pin, index) => ({ ...pin, feedback: feedbacks[index] }));
+    return pins.map((pin, index) => {
+      const { _count, ...feedback } = feedbacks[index];
+      return { ...pin, feedback: { ...feedback, commentCount: _count?.comments ?? 0 } };
+    });
   }
 
   private async applyFeedbackStatus(
@@ -2008,7 +2080,7 @@ export class AiAppsService {
    */
   async listAccessibleFeedback(
     requesterUid: string
-  ): Promise<Array<WithMember<AiAppFeedback> & { appName: string; pinCount: number }>> {
+  ): Promise<Array<WithMember<AiAppFeedback> & { appName: string; pinCount: number; commentCount: number }>> {
     const isAdmin = await this.isRequesterDirectoryAdmin(requesterUid);
     const apps = await this.prisma.aiApp.findMany({
       where: isAdmin ? { status: { not: 'DELETED' } } : { memberUid: requesterUid, status: { not: 'DELETED' } },
@@ -2021,7 +2093,7 @@ export class AiAppsService {
     const feedback = await this.prisma.aiAppFeedback.findMany({
       where: { appUid: { in: apps.map((app) => app.uid) } },
       orderBy: { createdAt: 'desc' },
-      include: { _count: { select: { pins: true } } },
+      include: { _count: { select: { pins: true, comments: true } } },
     });
     const withMembers = await this.withMember(feedback);
     // `pinCount` lets the list offer "Show on page" without sending every pin.
@@ -2029,6 +2101,7 @@ export class AiAppsService {
       ...row,
       appName: appNameByUid.get(row.appUid) ?? '',
       pinCount: _count?.pins ?? 0,
+      commentCount: _count?.comments ?? 0,
     }));
   }
 
@@ -2051,6 +2124,136 @@ export class AiAppsService {
       throw new ForbiddenException('Only the app creator or a directory admin can update feedback status');
     }
     return this.applyFeedbackStatus(app.uid, feedbackUid, status);
+  }
+
+  // ── Feedback conversation (phase 2): replies under each item ─────────────
+
+  /**
+   * The item's conversation, oldest first. Participants only: the app's
+   * creator, directory admins, and the member who left the feedback.
+   */
+  async listFeedbackComments(
+    requesterUid: string,
+    appUid: string,
+    feedbackUid: string
+  ): Promise<Array<WithMember<FeedbackComment>>> {
+    const { feedback } = await this.findFeedbackConversation(requesterUid, appUid, feedbackUid);
+    const comments = await this.prisma.aiAppFeedbackComment.findMany({
+      where: { feedbackUid: feedback.uid },
+      select: COMMENT_PUBLIC_SELECT,
+      orderBy: { createdAt: 'asc' },
+    });
+    return this.withMember(comments);
+  }
+
+  /**
+   * A reply from a participant. Tells everyone else in the conversation: the
+   * member who left the feedback and the app's creator always, an admin only
+   * once they have written in it (admins see every app; every thread would be
+   * noise). A failed notification never fails the reply.
+   */
+  async addFeedbackComment(
+    requesterUid: string,
+    appUid: string,
+    feedbackUid: string,
+    text: string
+  ): Promise<WithMember<FeedbackComment>> {
+    const { app, feedback } = await this.findFeedbackConversation(requesterUid, appUid, feedbackUid);
+    const earlier = await this.prisma.aiAppFeedbackComment.findMany({
+      where: { feedbackUid: feedback.uid },
+      select: { memberUid: true },
+    });
+    if (earlier.length >= MAX_COMMENTS_PER_FEEDBACK) {
+      throw new ConflictException(`This feedback already has ${MAX_COMMENTS_PER_FEEDBACK} replies`);
+    }
+    const comment = await this.prisma.aiAppFeedbackComment.create({
+      data: { feedbackUid: feedback.uid, memberUid: requesterUid, text },
+      select: COMMENT_PUBLIC_SELECT,
+    });
+
+    const recipients = new Set([feedback.memberUid, app.memberUid, ...earlier.map((c) => c.memberUid)]);
+    recipients.delete(requesterUid);
+    for (const recipientUid of recipients) {
+      await this.notifyFeedbackConversation(app, feedback.uid, feedback._count.pins > 0, recipientUid, {
+        ...AI_APPS_NOTIFICATION_MESSAGES.feedbackReply(app.name, text, recipientUid === feedback.memberUid),
+        trigger: AI_APPS_NOTIFICATION_TRIGGERS.FEEDBACK_REPLY,
+      });
+    }
+    return (await this.withMember([comment]))[0];
+  }
+
+  /** Removes a reply. Its author may; so may a directory admin (moderation). */
+  async deleteFeedbackComment(
+    requesterUid: string,
+    appUid: string,
+    feedbackUid: string,
+    commentUid: string
+  ): Promise<void> {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid: appUid } });
+    if (!app || app.status === 'DELETED') {
+      throw new NotFoundException(`AI App not found: ${appUid}`);
+    }
+    const comment = await this.prisma.aiAppFeedbackComment.findUnique({
+      where: { uid: commentUid },
+      select: { uid: true, memberUid: true, feedbackUid: true, feedback: { select: { appUid: true } } },
+    });
+    if (!comment || comment.feedbackUid !== feedbackUid || comment.feedback.appUid !== app.uid) {
+      throw new NotFoundException(`Feedback reply not found: ${commentUid}`);
+    }
+    if (comment.memberUid !== requesterUid && !(await this.isRequesterDirectoryAdmin(requesterUid))) {
+      throw new ForbiddenException('Only its author or a directory admin can delete a reply');
+    }
+    await this.prisma.aiAppFeedbackComment.delete({ where: { uid: comment.uid } });
+  }
+
+  private async findFeedbackConversation(requesterUid: string, appUid: string, feedbackUid: string) {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid: appUid } });
+    if (!app || app.status === 'DELETED') {
+      throw new NotFoundException(`AI App not found: ${appUid}`);
+    }
+    const feedback = await this.prisma.aiAppFeedback.findUnique({
+      where: { uid: feedbackUid },
+      select: { uid: true, appUid: true, memberUid: true, _count: { select: { pins: true } } },
+    });
+    if (!feedback || feedback.appUid !== app.uid) {
+      throw new NotFoundException(`AI App feedback not found: ${feedbackUid}`);
+    }
+    const isParticipant =
+      feedback.memberUid === requesterUid ||
+      app.memberUid === requesterUid ||
+      (await this.isRequesterDirectoryAdmin(requesterUid));
+    if (!isParticipant) {
+      throw new ForbiddenException(
+        'Only the app creator, a directory admin, or the member who left this feedback can see its replies'
+      );
+    }
+    return { app, feedback };
+  }
+
+  private async notifyFeedbackConversation(
+    app: Pick<AiApp, 'uid' | 'name'>,
+    feedbackUid: string,
+    hasPins: boolean,
+    recipientUid: string,
+    message: { title: string; description: string; trigger: string }
+  ): Promise<void> {
+    const { trigger, ...copy } = message;
+    try {
+      await this.pushNotifications.create({
+        category: PushNotificationCategory.AI_APP,
+        ...copy,
+        link: aiAppFeedbackPath(app.uid, feedbackUid, hasPins),
+        recipientUid,
+        isPublic: false,
+        metadata: { eventType: 'ai_app_feedback', appUid: app.uid, feedbackUid, trigger },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `AI App feedback notification (${trigger}) failed for ${app.uid}/${feedbackUid} → ${recipientUid}: ${
+          error instanceof Error ? error.message : error
+        }`
+      );
+    }
   }
 
   /** True when the requester created the app or is a directory admin. */

@@ -367,7 +367,10 @@ export const AI_APPS_RESERVED_APP_IDS: ReadonlySet<string> = new Set([
 export const isReservedAppId = (appId: string): boolean => AI_APPS_RESERVED_APP_IDS.has(appId.toLowerCase());
 
 function safeAppLabel(value: string) {
-  const name = value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '');
+  const name = value
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/^-+|-+$/g, '');
   return name || 'app';
 }
 
@@ -583,6 +586,8 @@ export const AI_APPS_NOTIFICATION_TRIGGERS = {
   DEPLOY_SUCCEEDED: 'deploy_succeeded',
   DEPLOY_FAILED: 'deploy_failed',
   ACCESS_GRANTED: 'access_granted',
+  FEEDBACK_REPLY: 'feedback_reply',
+  FEEDBACK_SHIPPED: 'feedback_shipped',
 } as const;
 
 /**
@@ -606,4 +611,29 @@ export const AI_APPS_NOTIFICATION_MESSAGES = {
     title: `${appName} was shared with you`,
     description: `${ownerName ?? 'Its owner'} gave you access to this private AI App.`,
   }),
+  feedbackReply: (appName: string, text: string, toSubmitter: boolean) => ({
+    title: toSubmitter ? `New reply on your feedback · ${appName}` : `New reply on feedback · ${appName}`,
+    description: feedbackNotificationExcerpt(text),
+  }),
+  feedbackShipped: (appName: string, note: string) => ({
+    title: `Shipped: your feedback on ${appName}`,
+    description: feedbackNotificationExcerpt(note),
+  }),
 } as const;
+
+/** The start of a reply, for a bell notification's one-line description. */
+export function feedbackNotificationExcerpt(text: string, max = 140): string {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  return flat.length > max ? `${flat.slice(0, max - 1).trimEnd()}…` : flat;
+}
+
+/**
+ * Where a feedback notification opens. A pinned item opens the app with comment
+ * mode on and that pin's thread open; a whole-app item (no pin) has nothing to
+ * open on the page, so it opens the Feedback list with the item selected.
+ */
+export function aiAppFeedbackPath(appUid: string, feedbackUid: string, hasPins: boolean): string {
+  return hasPins
+    ? `${aiAppDetailPath(appUid)}?feedback=${encodeURIComponent(feedbackUid)}`
+    : `/pl-infra/ai-apps/feedback?item=${encodeURIComponent(feedbackUid)}`;
+}

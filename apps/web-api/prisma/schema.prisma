@@ -3993,9 +3993,33 @@ model AiAppFeedback {
   /// Null on feedback filed before it was captured.
   context   Json?
   pins      AiAppFeedbackPin[]
+  comments  AiAppFeedbackComment[]
 
   @@index([appUid])
   @@index([memberUid])
+}
+
+/// A reply in a feedback item's conversation (flat, oldest first). Participants:
+/// the app's creator, directory admins, and the member who left the feedback.
+/// A CLOSING_NOTE is the agent's one line when it marks the item IMPLEMENTED,
+/// stored as written by the app's creator (the agent acts for them).
+model AiAppFeedbackComment {
+  id          Int                      @id @default(autoincrement())
+  uid         String                   @unique @default(cuid())
+  feedbackUid String
+  feedback    AiAppFeedback            @relation(fields: [feedbackUid], references: [uid], onDelete: Cascade)
+  memberUid   String
+  /// Plain text, trimmed, 1–2000 chars. Rendered escaped by clients.
+  text        String
+  kind        AiAppFeedbackCommentKind @default(REPLY)
+  createdAt   DateTime                 @default(now())
+
+  @@index([feedbackUid, createdAt])
+}
+
+enum AiAppFeedbackCommentKind {
+  REPLY
+  CLOSING_NOTE
 }
 
 /// One element a member pinned in the app while leaving feedback (element-pins
