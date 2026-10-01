@@ -3984,9 +3984,51 @@ model AiAppFeedback {
   text      String
   status    AiAppFeedbackStatus @default(NEW)
   createdAt DateTime            @default(now())
+  /// Where and on what the feedback was left: env, app path, LabOS URL, the app
+  /// frame's viewport, pixel ratio, touch, user agent, bridge capabilities.
+  /// Null on feedback filed before it was captured.
+  context   Json?
+  pins      AiAppFeedbackPin[]
 
   @@index([appUid])
   @@index([memberUid])
+}
+
+/// One element a member pinned in the app while leaving feedback (element-pins
+/// bridge). The source of truth for showing pins on the live app; the feedback
+/// `text` keeps a frozen, human-readable copy of the same list.
+model AiAppFeedbackPin {
+  id          Int           @id @default(autoincrement())
+  uid         String        @unique @default(cuid())
+  feedbackUid String
+  feedback    AiAppFeedback @relation(fields: [feedbackUid], references: [uid], onDelete: Cascade)
+  /// 1-based position within the feedback, matching the numbered list in `text`.
+  n           Int
+  /// 'prod' | 'preview': the environment the pin was made on.
+  env         String
+  /// App pathname, no query (e.g. "/settings").
+  pagePath    String
+  /// Query string as captured, for context only; never used to match.
+  pageQuery   String?
+  selector    String
+  tag         String
+  /// The element's visible text, whitespace-collapsed (bridge-capped at 200).
+  text        String
+  role        String?
+  ariaLabel   String?
+  component   String?
+  source      String?
+  /// {x, y, w, h} in the app's viewport at pick time.
+  rect        Json
+  viewportW   Int
+  viewportH   Int
+  /// The member's note on this pin; '' when none.
+  note        String
+  /// Hosted crop image; null when the crop failed.
+  cropUrl     String?
+  createdAt   DateTime      @default(now())
+
+  @@index([feedbackUid])
 }
 
 enum AiAppConnectStatus {
