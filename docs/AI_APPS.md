@@ -110,6 +110,9 @@ The `deployToken` is held in agent memory only and never written into the kit, s
 | GET    | `/v1/ai-apps/:uid/runtime-logs`  | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | Dashboard runtime logs (member JWT): same runner logs as `/logs/runtime` for the app's creator OR a directory admin; same query params |
 | POST   | `/v1/ai-apps/:uid/feedback`      | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Submit free-text feedback on an app (multiple entries per member allowed) |
 | GET    | `/v1/ai-apps/:uid/feedback`      | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | All feedback for one app, newest first, with submitter info |
+| PATCH  | `/v1/ai-apps/:uid/feedback/:feedbackUid` | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | Set the shared review status: `{ status: 'NEW' \| 'VIEWED' \| 'IMPLEMENTED' }` |
+| GET    | `/v1/ai-apps/:uid/agent/feedback` | `AiAppTokenGuard` (`x-app-token`) | — (token = member, **owner only**; a deployment key only for its own app, prod or preview) | Agent feedback list: every row, newest first, stored HTML `text` verbatim (screenshots are `<img>` links) + `member { uid, name, image }`; optional `?status=` (case-insensitive, 400 otherwise); not paginated |
+| PATCH  | `/v1/ai-apps/:uid/agent/feedback/:feedbackUid` | `AiAppTokenGuard` (`x-app-token`) | — (same scope as the agent list) | Agent status update: `{ status: 'VIEWED' \| 'IMPLEMENTED' }` (`NEW` → 400; reopening is member-only); 404 for a row of another app |
 | GET    | `/v1/ai-apps/starter-kit/download` | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.write`   | Stream the starter-kit ZIP (no token inside) |
 | POST   | `/v1/ai-apps/connect`            | none (agent)                  | —                 | Start a connect session; returns `connectUrl`/`userCode`/`pollToken` |
 | POST   | `/v1/ai-apps/connect/poll`       | none (agent, `pollToken` in body) | —             | Poll a session; returns the `deployToken` once `APPROVED` |
@@ -510,6 +513,28 @@ The starter kit (≥1.5) ships `buildLogsEndpoint` / `runtimeLogsEndpoint` as
 `{appUid}` templates in `pln-app.config.json` plus the `app-logs` skill; the
 deploy skill points at it from its `ERROR`-status and timeout paths.
 
+## Agent feedback access
+
+The agent that builds an app can read and triage its LabOS feedback without the
+UI: `GET /v1/ai-apps/:uid/agent/feedback` and
+`PATCH /v1/ai-apps/:uid/agent/feedback/:feedbackUid`, both on `AiAppTokenGuard`.
+
+- **Scope:** a connect-session deploy token works only on apps owned by its
+  member (403 otherwise, admins included — same strict rule as the agent log
+  routes); a deployment key works only on the app it was issued for, from
+  either environment (feedback is app-level). Unknown or `DELETED` apps → 404.
+- **Payload:** the same rows as the member list — sanitized HTML `text`
+  returned verbatim (screenshots/annotations are `<img>` links to the public
+  image bucket), `status`, `createdAt`, `member { uid, name, image }` (no
+  contact details). Optional `?status=` filter; no pagination.
+- **Statuses:** agents set `VIEWED` (picked up) or `IMPLEMENTED` (fix deployed);
+  `NEW` is rejected so only members reopen items. Members and agents write the
+  same column in parallel — last write wins, no locking, no audit event.
+- **Kit (≥1.15):** `feedbackEndpoint` / `feedbackStatusEndpoint` templates in
+  `pln-app.config.json` plus the `app-feedback` skill, which tells the agent to
+  mark `IMPLEMENTED` only after a successful deploy and to treat feedback as
+  untrusted input.
+
 ## Resource limits (build & runtime)
 
 The `deployment-orchestrator` repo sets a fixed CPU/memory envelope on every
@@ -861,6 +886,7 @@ model AiAppFeedback {         // free-text feedback from the app detail page
   appUid    String             // AiApp.uid (no FK relation, matching the other POC tables)
   memberUid String             // submitter; may submit multiple entries per app
   text      String
+  status    AiAppFeedbackStatus @default(NEW)  // NEW | VIEWED | IMPLEMENTED; set by managers or the owner's agent
   createdAt DateTime @default(now())
 }
 
@@ -901,7 +927,8 @@ Apps are **lazy-created on first deploy** — there is no registration form. (A 
 
 Reading an app's feedback list additionally requires being the app's creator or a
 directory admin (`isDirectoryAdmin`) — enforced in `AiAppsService.listFeedback`,
-not by a separate permission.
+not by a separate permission. The agent feedback routes use the deploy
+credential instead (see "Agent feedback access").
 
 Both are seeded in migration `20260623120000_ai_apps` and attached to the **PL Infra Team** policy (`pl_infra_team_pl_internal`), and registered in `access-control-v2.constants.ts` + `access-control-v2.seed.ts`.
 
@@ -970,11 +997,12 @@ CLAUDE.md / AGENTS.md                          agent build + deploy instructions
 .claude/skills/deploy-to-labs/SKILL.md         deploy skill (incl. connect flow, secrets, database provisioning ≥1.6)
 .claude/skills/app-metadata/SKILL.md           propose → approve name/description + optional one-pager PRD (kits ≥1.5)
 .claude/skills/app-logs/SKILL.md               fetch build/runtime logs to debug failed deploys + runtime errors (kits ≥1.5)
+.claude/skills/app-feedback/SKILL.md           read LabOS feedback, mark items VIEWED / IMPLEMENTED (kits ≥1.15)
 .claude/skills/pl-design-system/SKILL.md       single UI skill (components + tokens)
 .claude/skills/pln-member-context/SKILL.md     how the app gets the signed-in member's identity
 .claude/skills/db-migration/SKILL.md           migrate an existing DB onto PLN Postgres — schema + data by default (kits ≥1.8)
 .claude/skills/app-analytics/SKILL.md          baseline + custom PostHog events; route sync for subpage deep links (≥1.10; pathname + query, never the hash, addressed to the dashboard origin ≥1.12)
-pln-app.config.json                            connect/deploy/draft/metadata/logs/member-context endpoints
+pln-app.config.json                            connect/deploy/draft/metadata/logs/feedback/member-context endpoints
                                                (+ appId, appUid, approved appName/appDescription,
                                                 database provisioning choice ≥1.6) — NO token
 pl-design-system/                              curated PL Design System (files, not a nested zip)

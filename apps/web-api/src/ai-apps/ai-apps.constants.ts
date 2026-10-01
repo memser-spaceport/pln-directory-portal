@@ -425,6 +425,18 @@ export const AI_APPS_RUNTIME_LOGS_ENDPOINT =
   process.env.AI_APPS_RUNTIME_LOGS_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/logs/runtime`;
 
 /**
+ * Public URL TEMPLATES of THIS API's agent feedback endpoints
+ * (`GET /v1/ai-apps/:uid/agent/feedback` and
+ * `PATCH /v1/ai-apps/:uid/agent/feedback/:feedbackUid`), written into the
+ * starter kit. The agent fills the literal `{appUid}` / `{feedbackUid}` placeholders.
+ */
+export const AI_APPS_FEEDBACK_ENDPOINT =
+  process.env.AI_APPS_FEEDBACK_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/agent/feedback`;
+export const AI_APPS_FEEDBACK_STATUS_ENDPOINT =
+  process.env.AI_APPS_FEEDBACK_STATUS_ENDPOINT ||
+  `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/agent/feedback/{feedbackUid}`;
+
+/**
  * Public URL of THIS API's custom-event analytics endpoint
  * (`POST /v1/ai-apps/track`), written into the starter kit as
  * `analyticsEndpoint` so a deployed app can emit product events that land in
