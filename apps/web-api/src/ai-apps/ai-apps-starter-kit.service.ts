@@ -1011,7 +1011,7 @@ Response rows (the PATCH returns one updated row):
 
 ## Rules
 
-- You may set only \`VIEWED\` or \`IMPLEMENTED\` (a 400 otherwise). Reopening an
+- You may set only \`VIEWED\` or \`IMPLEMENTED\` (a 422 otherwise). Reopening an
   item (\`NEW\`) is done by members in LabOS.
 - Members can change statuses at any time too; re-list before a bulk update
   rather than trusting an old copy.
