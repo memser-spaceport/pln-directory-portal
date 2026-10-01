@@ -11,7 +11,7 @@
  */
 
 /** Starter kit version shown in the README, ZIP filename, and LabOS UI. Bump when the kit contents or flow change. */
-export const AI_APPS_STARTER_KIT_VERSION = '1.14';
+export const AI_APPS_STARTER_KIT_VERSION = '1.15';
 
 /** Max members on one private app's whitelist (the owner and directory admins never count). */
 export const AI_APPS_MAX_ALLOWED_MEMBERS = 200;
@@ -484,6 +484,14 @@ export const AI_APPS_PORTAL_ORIGIN: string = (() => {
     return 'https://os.pl.xyz';
   }
 })();
+
+/**
+ * The LabOS bridge script every app loads (starter kit 1.15+). Served by the
+ * LabOS frontend, which is also the only parent origin the script will talk to
+ * — so it is derived from the portal origin, and a dev kit points at dev LabOS.
+ * Lets a member pin feedback to elements of the app without screen sharing.
+ */
+export const AI_APPS_BRIDGE_SCRIPT_URL = `${AI_APPS_PORTAL_ORIGIN}/ai-apps/bridge/v1.js`;
 
 /** The LabOS connect page URL a member opens to approve an agent's session. */
 export const buildConnectUrl = (sessionUid: string): string =>
