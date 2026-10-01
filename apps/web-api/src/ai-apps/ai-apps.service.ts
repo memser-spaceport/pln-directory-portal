@@ -49,6 +49,8 @@ import {
   AiAppLogPhase,
   AiAppTargetEnvironment,
   AI_APP_ANON_ID_REGEX,
+  AI_APPS_AGENT_FEEDBACK_LISTED,
+  AI_APPS_AGENT_FEEDBACK_STATUS_CHANGED,
   AI_APPS_APP_DOMAIN,
   AI_APPS_DEPLOY_JOB_TIMEOUT_MS,
   AI_APPS_DEPLOY_POLL_DEADLINE_MS,
@@ -1885,7 +1887,13 @@ export class AiAppsService {
     scope?: AiAppKeyScope
   ): Promise<Array<WithMember<FeedbackWithPins> & { comments?: Array<WithMember<FeedbackComment>> }>> {
     const app = await this.findAgentFeedbackApp(requesterUid, uid, scope);
-    return this.queryFeedback(app.uid, status, { withComments: true });
+    const rows = await this.queryFeedback(app.uid, status, { withComments: true });
+    this.trackAgentFeedback(AI_APPS_AGENT_FEEDBACK_LISTED, requesterUid, {
+      appUid: app.uid,
+      status: status ?? null,
+      resultCount: rows.length,
+    });
+    return rows;
   }
 
   /**
@@ -1909,7 +1917,7 @@ export class AiAppsService {
       throw new UnprocessableEntityException('A closing note is only accepted with status IMPLEMENTED');
     }
     const app = await this.findAgentFeedbackApp(requesterUid, uid, scope);
-    const updated = await this.applyFeedbackStatus(app.uid, feedbackUid, status);
+    const { updated, from } = await this.applyFeedbackStatus(app.uid, feedbackUid, status);
     if (note) {
       await this.prisma.aiAppFeedbackComment.create({
         data: { feedbackUid, memberUid: app.memberUid, text: note, kind: 'CLOSING_NOTE' },
@@ -1925,7 +1933,18 @@ export class AiAppsService {
         });
       }
     }
+    this.trackAgentFeedback(AI_APPS_AGENT_FEEDBACK_STATUS_CHANGED, requesterUid, {
+      appUid: app.uid,
+      feedbackUid,
+      from,
+      to: status,
+      hasNote: Boolean(note),
+    });
     return updated;
+  }
+
+  private trackAgentFeedback(name: string, distinctId: string, properties: Record<string, unknown>): void {
+    void this.analyticsService.trackEvent({ name, distinctId, properties });
   }
 
   private async findAgentFeedbackApp(requesterUid: string, uid: string, scope?: AiAppKeyScope): Promise<AiApp> {
@@ -2061,7 +2080,7 @@ export class AiAppsService {
     appUid: string,
     feedbackUid: string,
     status: AiAppFeedbackStatus
-  ): Promise<WithMember<AiAppFeedback>> {
+  ): Promise<{ updated: WithMember<AiAppFeedback>; from: AiAppFeedbackStatus }> {
     const feedback = await this.prisma.aiAppFeedback.findUnique({ where: { uid: feedbackUid } });
     if (!feedback || feedback.appUid !== appUid) {
       throw new NotFoundException(`AI App feedback not found: ${feedbackUid}`);
@@ -2070,7 +2089,7 @@ export class AiAppsService {
       where: { uid: feedbackUid },
       data: { status },
     });
-    return (await this.withMember([updated]))[0];
+    return { updated: (await this.withMember([updated]))[0], from: feedback.status };
   }
 
   /**
@@ -2123,7 +2142,7 @@ export class AiAppsService {
     if (!(await this.isCreatorOrDirectoryAdmin(requesterUid, app))) {
       throw new ForbiddenException('Only the app creator or a directory admin can update feedback status');
     }
-    return this.applyFeedbackStatus(app.uid, feedbackUid, status);
+    return (await this.applyFeedbackStatus(app.uid, feedbackUid, status)).updated;
   }
 
   // ── Feedback conversation (phase 2): replies under each item ─────────────

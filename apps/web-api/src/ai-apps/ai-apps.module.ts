@@ -16,6 +16,7 @@ import { AiAppsSessionService } from './ai-apps-session.service';
 import { AiAppsAuthGateService } from './ai-apps-auth-gate.service';
 import { AiAppsStarterKitService } from './ai-apps-starter-kit.service';
 import { AiAppTokenGuard } from './guards/ai-app-token.guard';
+import { AgentFeedbackDeniedInterceptor } from './agent-feedback-denied.interceptor';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { AiAppTokenGuard } from './guards/ai-app-token.guard';
     AiAppsAuthGateService,
     AiAppsStarterKitService,
     AiAppTokenGuard,
+    AgentFeedbackDeniedInterceptor,
     AwsService,
   ],
   exports: [AiAppsService],

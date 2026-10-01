@@ -36,6 +36,7 @@ import { RbacGuard } from '../rbac/rbac.guard';
 import { RbacService } from '../rbac/rbac.service';
 import { AI_APPS_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { AiAppsService } from './ai-apps.service';
+import { AgentFeedbackDeniedInterceptor } from './agent-feedback-denied.interceptor';
 import { AiAppsAccessService } from './ai-apps-access.service';
 import { AiAppsConnectService } from './ai-apps-connect.service';
 import { AiAppsSessionService, isAiAppSessionToken } from './ai-apps-session.service';
@@ -581,6 +582,7 @@ export class AiAppsController {
   @NoCache()
   @Get(':uid/agent/feedback')
   @UseGuards(AiAppTokenGuard)
+  @UseInterceptors(AgentFeedbackDeniedInterceptor)
   async listAgentFeedback(@Param('uid') uid: string, @Req() req: any, @Query('status') status?: string) {
     return this.aiAppsService.listAgentFeedback(
       req.aiAppMemberUid,
@@ -594,6 +596,7 @@ export class AiAppsController {
   @NoCache()
   @Patch(':uid/agent/feedback/:feedbackUid')
   @UseGuards(AiAppTokenGuard)
+  @UseInterceptors(AgentFeedbackDeniedInterceptor)
   @UsePipes(ZodValidationPipe)
   async updateAgentFeedbackStatus(
     @Param('uid') uid: string,

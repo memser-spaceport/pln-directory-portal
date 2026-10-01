@@ -44,19 +44,15 @@ function buildService(app: any = APP) {
       findUnique: jest.fn().mockResolvedValue(null),
     },
   };
-  const service = new AiAppsService(
-    prisma as any,
-    {} as any,
-    { create: jest.fn() } as any,
-    { trackEvent: jest.fn() } as any
-  );
-  return { service, prisma };
+  const analytics = { trackEvent: jest.fn() };
+  const service = new AiAppsService(prisma as any, {} as any, { create: jest.fn() } as any, analytics as any);
+  return { service, prisma, analytics };
 }
 
 describe('AiAppsService agent feedback', () => {
   describe('listAgentFeedback', () => {
     it('returns every status newest first with verbatim HTML and submitter info', async () => {
-      const { service, prisma } = buildService();
+      const { service, prisma, analytics } = buildService();
       const result = await service.listAgentFeedback('owner-1', 'app-1');
 
       expect(prisma.aiAppFeedback.findMany).toHaveBeenCalledWith({
@@ -72,6 +68,11 @@ describe('AiAppsService agent feedback', () => {
       expect(result[0].text).toBe(HTML);
       expect(result[0].member).toEqual({ uid: 'member-1', name: 'Ada', image: 'https://img/ada.png' });
       expect(result[1].member).toEqual({ uid: 'member-2', name: 'Bob', image: null });
+      expect(analytics.trackEvent).toHaveBeenCalledWith({
+        name: 'ai_apps_agent_feedback_listed',
+        distinctId: 'owner-1',
+        properties: { appUid: 'app-1', status: null, resultCount: 2 },
+      });
     });
 
     it('narrows to one status when asked', async () => {
@@ -120,18 +121,24 @@ describe('AiAppsService agent feedback', () => {
       ['unknown', null],
       ['deleted', { ...APP, status: 'DELETED' }],
     ])('404s for an %s app', async (_label, app) => {
-      const { service } = buildService(app);
+      const { service, analytics } = buildService(app);
       await expect(service.listAgentFeedback('owner-1', 'app-1')).rejects.toBeInstanceOf(NotFoundException);
+      expect(analytics.trackEvent).not.toHaveBeenCalled();
     });
   });
 
   describe('updateAgentFeedbackStatus', () => {
     it.each(['VIEWED', 'IMPLEMENTED'] as const)('sets %s and returns the updated row', async (status) => {
-      const { service, prisma } = buildService();
+      const { service, prisma, analytics } = buildService();
       const result = await service.updateAgentFeedbackStatus('owner-1', 'app-1', 'fb-2', status);
       expect(prisma.aiAppFeedback.update).toHaveBeenCalledWith({ where: { uid: 'fb-2' }, data: { status } });
       expect(result.status).toBe(status);
       expect(result.member).toEqual({ uid: 'member-1', name: 'Ada', image: 'https://img/ada.png' });
+      expect(analytics.trackEvent).toHaveBeenCalledWith({
+        name: 'ai_apps_agent_feedback_status_changed',
+        distinctId: 'owner-1',
+        properties: { appUid: 'app-1', feedbackUid: 'fb-2', from: 'NEW', to: status, hasNote: false },
+      });
     });
 
     it('allows moving IMPLEMENTED back to VIEWED', async () => {

@@ -472,6 +472,11 @@ export const AI_APPS_FEEDBACK_STATUS_ENDPOINT =
   process.env.AI_APPS_FEEDBACK_STATUS_ENDPOINT ||
   `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/agent/feedback/{feedbackUid}`;
 
+/** Directory PostHog names for the agent feedback API. Snake case, `ai_apps_` prefix, same project as LabOS. */
+export const AI_APPS_AGENT_FEEDBACK_LISTED = 'ai_apps_agent_feedback_listed';
+export const AI_APPS_AGENT_FEEDBACK_STATUS_CHANGED = 'ai_apps_agent_feedback_status_changed';
+export const AI_APPS_AGENT_FEEDBACK_DENIED = 'ai_apps_agent_feedback_denied';
+
 /**
  * Public URL of THIS API's custom-event analytics endpoint
  * (`POST /v1/ai-apps/track`), written into the starter kit as
