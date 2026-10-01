@@ -28,6 +28,14 @@ import { z } from 'zod';
 const coord = z.number();
 
 /**
+ * A string that may legitimately be empty (an element with no visible text, a
+ * pin with no note). The app-wide EmptyStringToNullInterceptor turns '' into
+ * null on every POST body; the submit route opts out, and this keeps the schema
+ * correct even where it doesn't.
+ */
+const maybeEmpty = (max: number) => z.preprocess((value) => value ?? '', z.string().max(max));
+
+/**
  * One pinned element, as the LabOS feedback dialog sends it. The bridge already
  * caps every field inside the app; these limits are re-applied here because the
  * request comes from a browser, not from the bridge.
@@ -43,7 +51,7 @@ export const FeedbackPinInputSchema = z
     pageQuery: z.string().max(2000).nullable().optional(),
     selector: z.string().min(1).max(1000),
     tag: z.string().min(1).max(64),
-    text: z.string().max(200),
+    text: maybeEmpty(200),
     role: z.string().max(100).nullable().optional(),
     ariaLabel: z.string().max(200).nullable().optional(),
     component: z.string().max(200).nullable().optional(),
@@ -51,7 +59,7 @@ export const FeedbackPinInputSchema = z
     rect: z.object({ x: coord, y: coord, w: coord.min(0), h: coord.min(0) }).strict(),
     viewportW: z.number().int().min(1).max(20000),
     viewportH: z.number().int().min(1).max(20000),
-    note: z.string().max(2000),
+    note: maybeEmpty(2000),
     // A hosted image (S3 or the IPFS worker, depending on the environment), so
     // only the scheme is checked: https, never an inline data: URI.
     /** The click within the element, as a fraction of its box; optional for older clients. */
@@ -71,12 +79,12 @@ export const FeedbackPinInputSchema = z
 export const FeedbackContextSchema = z
   .object({
     env: z.enum(['prod', 'preview']),
-    appPath: z.string().max(2000),
+    appPath: maybeEmpty(2000),
     labosUrl: z.string().url().max(2000),
     viewport: z.object({ w: z.number().int().min(0).max(20000), h: z.number().int().min(0).max(20000) }).strict(),
     pixelRatio: z.number().positive().max(10),
     touch: z.boolean(),
-    userAgent: z.string().max(500),
+    userAgent: maybeEmpty(500),
     bridge: z
       .object({ version: z.number().int().min(1).max(100), capabilities: z.array(z.string().max(32)).max(10) })
       .strict()
