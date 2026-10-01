@@ -4030,6 +4030,11 @@ model AiAppFeedbackPin {
   note        String
   /// Hosted crop image; null when the crop failed.
   cropUrl     String?
+  /// Where in the element the member clicked, as a fraction of its box (0–1),
+  /// so the pin sits on that spot and follows the element. Null on pins made
+  /// before it was recorded: they sit at the element's top-left corner.
+  ox          Float?
+  oy          Float?
   createdAt   DateTime      @default(now())
 
   @@index([feedbackUid])

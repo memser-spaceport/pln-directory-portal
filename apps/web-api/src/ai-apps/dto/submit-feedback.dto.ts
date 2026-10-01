@@ -54,6 +54,9 @@ export const FeedbackPinInputSchema = z
     note: z.string().max(2000),
     // A hosted image (S3 or the IPFS worker, depending on the environment), so
     // only the scheme is checked: https, never an inline data: URI.
+    /** The click within the element, as a fraction of its box; optional for older clients. */
+    ox: z.number().min(0).max(1).nullable().optional(),
+    oy: z.number().min(0).max(1).nullable().optional(),
     cropUrl: z
       .string()
       .max(2000)

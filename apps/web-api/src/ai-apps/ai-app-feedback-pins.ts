@@ -33,6 +33,8 @@ export function toPinCreateData(pin: FeedbackPinInput): Omit<Prisma.AiAppFeedbac
     viewportH: pin.viewportH,
     note: pin.note,
     cropUrl: pin.cropUrl ?? null,
+    ox: pin.ox ?? null,
+    oy: pin.oy ?? null,
   };
 }
 
@@ -56,6 +58,8 @@ export const PIN_PUBLIC_SELECT = Prisma.validator<Prisma.AiAppFeedbackPinSelect>
   viewportH: true,
   note: true,
   cropUrl: true,
+  ox: true,
+  oy: true,
   createdAt: true,
 });
 
