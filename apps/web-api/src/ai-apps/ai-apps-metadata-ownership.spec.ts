@@ -69,6 +69,15 @@ describe('dashboard metadata edits are limited to the creator or a directory adm
     expect(prisma.aiApp.update).not.toHaveBeenCalled();
   });
 
+  it('rejects turning LabOS feedback off by someone who cannot edit the app', async () => {
+    const { service, prisma } = buildService();
+
+    await expect(service.updateMetadata('viewer-1', 'app-1', { feedbackEnabled: false } as any)).rejects.toBeInstanceOf(
+      ForbiddenException
+    );
+    expect(prisma.aiApp.update).not.toHaveBeenCalled();
+  });
+
   it('rejects a multipart edit with a PRD file by another member before any S3 upload', async () => {
     const { service, prisma, aws } = buildService();
 
@@ -102,6 +111,12 @@ describe('dashboard metadata edits are limited to the creator or a directory adm
 
     await service.updateMetadata('admin-1', 'app-1', { description: 'Fixed typo' } as any);
     expect(prisma.aiApp.update).toHaveBeenCalled();
+
+    await service.updateMetadata('admin-1', 'app-1', { feedbackEnabled: true } as any);
+    expect(prisma.aiApp.update).toHaveBeenLastCalledWith({
+      where: { uid: 'app-1' },
+      data: { feedbackEnabled: true },
+    });
 
     await service.uploadPrd('admin-1', 'app-1', PRD_FILE);
     expect(aws.uploadFileToS3).toHaveBeenCalledTimes(1);

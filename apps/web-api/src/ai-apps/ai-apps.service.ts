@@ -3,12 +3,18 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpException,
   Injectable,
   InternalServerErrorException,
   Logger,
   NotFoundException,
+  Optional,
+  ServiceUnavailableException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bull';
 import axios from 'axios';
+import { Queue } from 'bull';
 import { createHash, randomBytes, randomUUID } from 'crypto';
 import DOMPurify from 'isomorphic-dompurify';
 import {
@@ -16,6 +22,7 @@ import {
   AiAppEvent,
   AiAppEventType,
   AiAppFeedback,
+  AiAppFeedbackComment,
   AiAppFeedbackStatus,
   Prisma,
   PushNotificationCategory,
@@ -31,12 +38,27 @@ import { RegisterDraftDto } from './dto/register-draft.dto';
 import { UpdateAppMetadataDto } from './dto/update-app-metadata.dto';
 import { assertValidPublicPaths, samePublicPaths } from './ai-apps-public-paths';
 import {
+  MAX_PINS_PER_RESPONSE,
+  PIN_PUBLIC_SELECT,
+  toPinCreateData,
+  type OverlayFeedbackPin,
+  type PublicFeedbackPin,
+} from './ai-app-feedback-pins';
+import type { FeedbackContext, FeedbackPinInput } from './dto/submit-feedback.dto';
+import {
   AiAppLogPhase,
   AiAppTargetEnvironment,
   AI_APP_ANON_ID_REGEX,
+  AI_APPS_AGENT_FEEDBACK_LISTED,
+  AI_APPS_AGENT_FEEDBACK_STATUS_CHANGED,
   AI_APPS_APP_DOMAIN,
+  AI_APPS_DEPLOY_JOB_TIMEOUT_MS,
   AI_APPS_DEPLOY_POLL_DEADLINE_MS,
   AI_APPS_DEPLOY_POLL_INTERVAL_MS,
+  AI_APPS_DEPLOY_POLL_INTERVAL_SEC,
+  AI_APPS_DEPLOY_QUEUE,
+  AI_APPS_DEPLOYMENT_STATUS_ENDPOINT,
+  AI_APPS_RUNNER_DEPLOY_TIMEOUT_MS,
   AI_APPS_DEPLOY_REGISTER_GRACE_MS,
   AI_APPS_DEPLOY_STUCK_MINUTES,
   AI_APPS_DEPLOY_STUCK_MS,
@@ -65,6 +87,7 @@ import {
   AI_APPS_VERIFY_INTERVAL_MS,
   AI_APPS_WAU_WINDOW_MS,
   aiAppDetailPath,
+  aiAppFeedbackPath,
   buildAppHost,
   buildAppHttpUrl,
   buildAppPageUrl,
@@ -152,6 +175,93 @@ const DATABASE_CREDENTIALS_KEY = 'DATABASE_URL';
 const DEPLOY_IN_PROGRESS_MESSAGE =
   'Another deploy of this app is still in progress — wait for it to finish, then deploy again.';
 
+const DEPLOY_NOT_STARTED_MESSAGE =
+  'Deploy could not be started: the deploy queue is unavailable. Retry the deploy in a minute.';
+
+/** Coarse progress of a deploy attempt; the background job's resume checkpoint. */
+type DeployPhase = 'queued' | 'building' | 'injecting_runtime_config' | 'done' | 'failed';
+
+/** Row state a lock-rejected attempt restores: what the row held before the attempt's DEPLOYING write. */
+type DeployRowSnapshot = Pick<
+  AiApp,
+  'status' | 'deploymentId' | 's3Key' | 'url' | 'httpUrl' | 'host' | 'notes' | 'failureStream' | 'deployPhase'
+>;
+
+/** Payload of one queued deploy attempt. Ids only — the bundle is already in S3. */
+export interface AiAppDeployJobData {
+  attemptId: string;
+  /** Who triggered the attempt (audited on the outcome events). */
+  actorUid: string;
+  appUid: string;
+  environment: AiAppTargetEnvironment;
+  deploymentId: string;
+  s3Key: string;
+  secretNames: string[];
+  previous: DeployRowSnapshot | null;
+  /** Set right before the runner `/deploy` call; a resumed job settles from the orchestrator record from this time. */
+  attemptStartedAt?: number;
+}
+
+/** The part of a Bull job the deploy job uses. */
+export interface AiAppDeployJob {
+  data: AiAppDeployJobData;
+  update?(data: AiAppDeployJobData): Promise<void>;
+}
+
+/** How the pipeline runs for one attempt: which attempt owns the row, and whether it resumes after a restart. */
+interface DeployAttempt {
+  attemptId: string;
+  previous: DeployRowSnapshot | null;
+  /** The runner `/deploy` call already went out in an earlier run: settle from the orchestrator record instead. */
+  resumeFromRecord: boolean;
+  attemptStartedAt?: number;
+  recordStart(startedAt: number): Promise<void>;
+}
+
+/** Fields the 202 deploy response adds to the app payload. */
+interface DeployAcceptedFields {
+  statusEndpoint: string;
+  pollIntervalSec: number;
+}
+
+/** One deployment as the agent's status endpoint reports it. */
+export interface AiAppDeploymentStatus {
+  uid: string;
+  appId: string;
+  environment: AiAppTargetEnvironment;
+  deploymentId: string | null;
+  status: string;
+  phase: DeployPhase | null;
+  notes: string | null;
+  failureStream: 'build' | 'runtime' | null;
+  startedAt: Date | null;
+  finishedAt: Date | null;
+  stale: boolean;
+}
+
+function deployRowSnapshot(row: DeployRowSnapshot): DeployRowSnapshot {
+  return {
+    status: row.status,
+    deploymentId: row.deploymentId,
+    s3Key: row.s3Key,
+    url: row.url,
+    httpUrl: row.httpUrl,
+    host: row.host,
+    notes: row.notes,
+    failureStream: row.failureStream,
+    deployPhase: row.deployPhase ?? null,
+  };
+}
+
+/** Absolute status URL for one deployment (preview adds `?environment=preview`). */
+function buildDeploymentStatusUrl(appUid: string, deploymentId: string, environment: AiAppTargetEnvironment): string {
+  const url = AI_APPS_DEPLOYMENT_STATUS_ENDPOINT.replace('{appUid}', encodeURIComponent(appUid)).replace(
+    '{deploymentId}',
+    encodeURIComponent(deploymentId)
+  );
+  return environment === 'preview' ? `${url}?environment=preview` : url;
+}
+
 /** Secret keys a deployment record's Helm values attach to the app, or undefined when it attaches none. */
 function attachedRuntimeSecretKeys(values: unknown): string[] | undefined {
   const runtimeSecrets = (values as { runtimeSecrets?: { enabled?: unknown; keys?: unknown } } | null | undefined)
@@ -177,6 +287,16 @@ function runtimeConfigAlreadyAttached(
 }
 
 type AiAppMember = { uid: string; name: string; image: string | null };
+
+/** Feedback as the feedback reads return it: with its pinned elements, in order, and its reply count. */
+type FeedbackWithPins = AiAppFeedback & { pins: PublicFeedbackPin[]; commentCount: number };
+
+/** A reply or closing note as the API returns it (before `memberUid` becomes `member`). */
+type FeedbackComment = Pick<AiAppFeedbackComment, 'uid' | 'text' | 'kind' | 'createdAt' | 'memberUid'>;
+const COMMENT_PUBLIC_SELECT = { uid: true, text: true, kind: true, createdAt: true, memberUid: true } as const;
+
+/** Most comments one feedback item may hold, so a runaway client or agent can't fill the table. */
+export const MAX_COMMENTS_PER_FEEDBACK = 200;
 
 /** Response shape across all AI Apps endpoints: `memberUid` replaced by `member`. */
 type WithMember<T extends { memberUid: string }> = Omit<T, 'memberUid'> & { member: AiAppMember | null };
@@ -241,7 +361,15 @@ interface AiAppDatabaseInfo {
  */
 type ApiAiApp<T extends { memberUid: string }> = Omit<
   WithMember<T>,
-  'failureStream' | 'database' | 'announcedAt' | 'directLinkGateReady' | 'publicPaths' | 'publicPathsGateReady' | 'previewAccess'
+  | 'failureStream'
+  | 'database'
+  | 'announcedAt'
+  | 'directLinkGateReady'
+  | 'publicPaths'
+  | 'publicPathsGateReady'
+  | 'previewAccess'
+  | 'deployPhase'
+  | 'deployAttemptId'
 > & {
   canViewPreview?: boolean;
   deployment: AiAppDeploymentInfo;
@@ -264,7 +392,8 @@ export class AiAppsService {
     private readonly prisma: PrismaService,
     private readonly awsService: AwsService,
     private readonly pushNotifications: PushNotificationsService,
-    private readonly analyticsService: AnalyticsService
+    private readonly analyticsService: AnalyticsService,
+    @Optional() @InjectQueue(AI_APPS_DEPLOY_QUEUE) private readonly deployQueue?: Queue<AiAppDeployJobData>
   ) {}
 
   private async withMember<T extends { memberUid: string }>(records: T[]): Promise<Array<WithMember<T>>> {
@@ -527,6 +656,10 @@ export class AiAppsService {
       publicPathsGateReady,
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       previewAccess,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      deployPhase,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      deployAttemptId,
       ...rest
     } = app;
     const serving: AiAppServing = this.servingOf(app.status, app.lastDeployedAt);
@@ -686,6 +819,7 @@ export class AiAppsService {
     findUnique: (args: any) => Promise<any | null>;
     upsert: (args: any) => Promise<any>;
     update: (args: any) => Promise<any>;
+    updateMany?: (args: any) => Promise<{ count: number }>;
     deleteMany: (args: any) => Promise<{ count: number }>;
   } | null {
     const table = (this.prisma as any).aiAppTarget;
@@ -705,10 +839,7 @@ export class AiAppsService {
     return grouped;
   }
 
-  private resolveTargetEnvironment(
-    requested: string | undefined,
-    scope?: AiAppKeyScope
-  ): AiAppTargetEnvironment {
+  private resolveTargetEnvironment(requested: string | undefined, scope?: AiAppKeyScope): AiAppTargetEnvironment {
     const environment = normalizeAppTarget(requested);
     if (scope && scope.environment !== environment) {
       throw new ForbiddenException('This deployment key is not valid for that environment');
@@ -754,6 +885,8 @@ export class AiAppsService {
       database: app.database ?? Prisma.DbNull,
       directLinkGateReady: app.directLinkGateReady,
       publicPathsGateReady: app.publicPathsGateReady,
+      deployPhase: app.deployPhase ?? null,
+      deployAttemptId: app.deployAttemptId ?? null,
     };
   }
 
@@ -870,8 +1003,16 @@ export class AiAppsService {
     ownerOnly = false,
     scope?: AiAppKeyScope
   ): Promise<ApiAiApp<AiApp>> {
-    if (dto.name === undefined && dto.description === undefined && dto.prd === undefined && dto.tags === undefined) {
-      throw new BadRequestException('At least one of name, description, prd, or tags must be provided');
+    if (
+      dto.name === undefined &&
+      dto.description === undefined &&
+      dto.prd === undefined &&
+      dto.tags === undefined &&
+      dto.feedbackEnabled === undefined
+    ) {
+      throw new BadRequestException(
+        'At least one of name, description, prd, tags, or feedbackEnabled must be provided'
+      );
     }
 
     const app = await this.prisma.aiApp.findUnique({ where: { uid } });
@@ -886,11 +1027,18 @@ export class AiAppsService {
     }
     this.assertKeyCanAccessApp(scope, app.uid);
 
-    const data: { name?: string; description?: string | null; prd?: string | null; tags?: string[] } = {};
+    const data: {
+      name?: string;
+      description?: string | null;
+      prd?: string | null;
+      tags?: string[];
+      feedbackEnabled?: boolean;
+    } = {};
     if (dto.name !== undefined) data.name = dto.name.trim();
     if (dto.description !== undefined) data.description = dto.description?.trim() || null;
     if (dto.prd !== undefined) data.prd = dto.prd?.trim() || null;
     if (dto.tags !== undefined) data.tags = dto.tags;
+    if (dto.feedbackEnabled !== undefined) data.feedbackEnabled = dto.feedbackEnabled;
 
     const updated = await this.prisma.aiApp.update({ where: { uid }, data });
     return this.toApiApp((await this.withMember([updated]))[0], true);
@@ -1051,6 +1199,137 @@ export class AiAppsService {
     this.assertKeyCanAccessApp(scope, app.uid);
     const environment = this.resolveTargetEnvironment(query.environment, scope);
     return this.fetchRunnerLogs(app, phase, { ...query, environment });
+  }
+
+  /**
+   * Status of one deployment for the connected member's agent (deploy token or
+   * deployment key; owner-only, like the agent log routes). `latest` or the
+   * target's current `deploymentId` → the live row (stuck deploys settled on
+   * read). An earlier deployment of this target → its own outcome from the
+   * event log, `stale: true`. Never returns the app URL/host or secrets.
+   */
+  async getDeploymentStatus(
+    requesterUid: string,
+    uid: string,
+    deploymentId: string,
+    requestedEnvironment?: string,
+    scope?: AiAppKeyScope
+  ): Promise<AiAppDeploymentStatus> {
+    let app = await this.prisma.aiApp.findUnique({ where: { uid } });
+    if (!app || app.status === 'DELETED') {
+      throw new NotFoundException(`AI App not found: ${uid}`);
+    }
+    if (app.memberUid !== requesterUid) {
+      throw new ForbiddenException('The agent may read deployments only for apps owned by its connected member');
+    }
+    this.assertKeyCanAccessApp(scope, app.uid);
+    const environment = this.resolveTargetEnvironment(requestedEnvironment ?? scope?.environment, scope);
+
+    let row: {
+      status: string;
+      deploymentId: string | null;
+      notes: string | null;
+      failureStream: string | null;
+      deployPhase?: string | null;
+    } | null;
+    if (environment === 'preview') {
+      await this.settleStuckDevTarget(app);
+      row =
+        (await this.targetTable()?.findUnique({
+          where: { appUid_environment: { appUid: app.uid, environment: 'preview' } },
+        })) ?? null;
+    } else {
+      app = await this.settleStuckDeploy(app);
+      row = app;
+    }
+
+    const base = { uid: app.uid, appId: app.appId, environment };
+    const isCurrent = deploymentId === 'latest' || (!!row?.deploymentId && row.deploymentId === deploymentId);
+    if (isCurrent) {
+      if (!row?.deploymentId) {
+        throw new NotFoundException('This app has no deployment in that environment yet');
+      }
+      const { startedAt, finishedAt } = await this.deploymentEventTimes(app.uid, row.deploymentId, environment);
+      const deploying = row.status === 'DEPLOYING';
+      return {
+        ...base,
+        deploymentId: row.deploymentId,
+        status: row.status,
+        phase: this.deploymentPhaseOf(row.status, row.deployPhase),
+        notes: row.notes ?? null,
+        failureStream: this.failureStreamOf(row.failureStream),
+        startedAt,
+        finishedAt: deploying ? null : finishedAt,
+        stale: false,
+      };
+    }
+
+    const { startedAt, finishedAt, terminal } = await this.deploymentEventTimes(app.uid, deploymentId, environment);
+    if (!startedAt) {
+      throw new NotFoundException(`Deployment not found: ${deploymentId}`);
+    }
+    const succeeded = terminal?.type === 'DEPLOY_SUCCEEDED';
+    const notes = succeeded
+      ? null
+      : terminal
+      ? (terminal.message ?? '').replace(/^preview: /, '') || null
+      : 'This deploy was superseded by a newer deploy before it reported a result.';
+    return {
+      ...base,
+      deploymentId,
+      status: succeeded ? 'READY' : 'ERROR',
+      phase: succeeded ? 'done' : 'failed',
+      notes,
+      failureStream: null,
+      startedAt,
+      finishedAt,
+      stale: true,
+    };
+  }
+
+  /**
+   * Start/finish of the newest attempt of `deploymentId` on one target, from the
+   * event log. Only DEPLOY_STARTED carries the environment (`environment=preview`
+   * vs no message), so starts are filtered by it and the first outcome event of
+   * that deploymentId after the newest start is the attempt's outcome.
+   */
+  private async deploymentEventTimes(
+    appUid: string,
+    deploymentId: string,
+    environment: AiAppTargetEnvironment
+  ): Promise<{ startedAt: Date | null; finishedAt: Date | null; terminal: AiAppEvent | null }> {
+    const events = await this.prisma.aiAppEvent.findMany({
+      where: { appUid, deploymentId, type: { in: ['DEPLOY_STARTED', 'DEPLOY_SUCCEEDED', 'DEPLOY_FAILED'] } },
+      orderBy: { createdAt: 'asc' },
+    });
+    const isPreviewStart = (event: AiAppEvent) => event.message === 'environment=preview';
+    const start = [...events]
+      .reverse()
+      .find((event) => event.type === 'DEPLOY_STARTED' && isPreviewStart(event) === (environment === 'preview'));
+    if (!start) {
+      return { startedAt: null, finishedAt: null, terminal: null };
+    }
+    const terminal =
+      events.find(
+        (event) =>
+          event.type !== 'DEPLOY_STARTED' && event.createdAt.getTime() >= start.createdAt.getTime() && event !== start
+      ) ?? null;
+    return { startedAt: start.createdAt, finishedAt: terminal?.createdAt ?? null, terminal };
+  }
+
+  /** The row's phase, or one derived from its status for rows that predate the phase column. */
+  private deploymentPhaseOf(status: string, phase: string | null | undefined): DeployPhase | null {
+    if (phase === 'queued' || phase === 'building' || phase === 'injecting_runtime_config') {
+      return status === 'DEPLOYING' ? phase : status === 'READY' ? 'done' : 'failed';
+    }
+    if (phase === 'done' || phase === 'failed') {
+      return phase;
+    }
+    return status === 'READY' ? 'done' : status === 'ERROR' ? 'failed' : null;
+  }
+
+  private failureStreamOf(value: string | null | undefined): 'build' | 'runtime' | null {
+    return value === 'build' || value === 'runtime' ? value : null;
   }
 
   /**
@@ -1421,9 +1700,9 @@ export class AiAppsService {
 
   /**
    * A deploy that has sat in DEPLOYING beyond the stuck window is stuck: the
-   * deploy runs synchronously in the API process, so a legitimate one settles
-   * to READY/ERROR within minutes. Nothing touches the row between the flip to
-   * DEPLOYING and the settle, so `updatedAt` is exactly "deploy started at".
+   * background deploy job settles a legitimate one to READY/ERROR within
+   * minutes. Mid-deploy phase writes skip `updatedAt` (raw SQL), so
+   * `updatedAt` is exactly "deploy started at".
    */
   private isDeployStuck(app: Pick<AiApp, 'status' | 'updatedAt'>): boolean {
     return app.status === 'DEPLOYING' && Date.now() - app.updatedAt.getTime() > AI_APPS_DEPLOY_STUCK_MS;
@@ -1448,7 +1727,7 @@ export class AiAppsService {
       where: { uid: app.uid, status: 'DEPLOYING' },
       // failureStream stays null: an interrupted deploy's failing phase is
       // genuinely unknown (and a stale value from an older failure must not leak).
-      data: { status: 'ERROR', notes: message, failureStream: null },
+      data: { status: 'ERROR', notes: message, failureStream: null, deployPhase: 'failed' },
     });
     if (count > 0) {
       this.logger.warn(
@@ -1478,7 +1757,7 @@ export class AiAppsService {
       'or the sandbox runner is unavailable. Retry the deploy once the runner is healthy.';
     await table.update({
       where: { uid: stuck.uid },
-      data: { status: 'ERROR', notes: message, failureStream: null },
+      data: { status: 'ERROR', notes: message, failureStream: null, deployPhase: 'failed' },
     });
     await this.recordEvent('DEPLOY_FAILED', app.memberUid, {
       appUid: app.uid,
@@ -1548,8 +1827,17 @@ export class AiAppsService {
    * Stores feedback from a member viewing the app's detail page. Text may be
    * Quill HTML (headings, links, images). Any member with AI Apps access may
    * submit, and may do so more than once per app.
+   *
+   * `pins` and `context` are optional (older clients send neither). Pins are
+   * created in the same statement as the feedback, so a submission is stored
+   * whole or not at all.
    */
-  async submitFeedback(memberUid: string, appUid: string, text: string): Promise<WithMember<AiAppFeedback>> {
+  async submitFeedback(
+    memberUid: string,
+    appUid: string,
+    text: string,
+    extras: { pins?: FeedbackPinInput[]; context?: FeedbackContext } = {}
+  ): Promise<WithMember<AiAppFeedback>> {
     const app = await this.prisma.aiApp.findUnique({ where: { uid: appUid } });
     if (!app) {
       throw new NotFoundException(`AI App not found: ${appUid}`);
@@ -1561,7 +1849,13 @@ export class AiAppsService {
       throw new BadRequestException('Feedback text is required');
     }
     const feedback = await this.prisma.aiAppFeedback.create({
-      data: { appUid: app.uid, memberUid, text: sanitized },
+      data: {
+        appUid: app.uid,
+        memberUid,
+        text: sanitized,
+        ...(extras.context ? { context: extras.context } : {}),
+        ...(extras.pins?.length ? { pins: { create: extras.pins.map(toPinCreateData) } } : {}),
+      },
     });
     return (await this.withMember([feedback]))[0];
   }
@@ -1570,7 +1864,7 @@ export class AiAppsService {
    * All feedback for one app, newest first, with submitter info. Visible only
    * to the app's creator and directory admins.
    */
-  async listFeedback(requesterUid: string, appUid: string): Promise<Array<WithMember<AiAppFeedback>>> {
+  async listFeedback(requesterUid: string, appUid: string): Promise<Array<WithMember<FeedbackWithPins>>> {
     const app = await this.prisma.aiApp.findUnique({ where: { uid: appUid } });
     if (!app) {
       throw new NotFoundException(`AI App not found: ${appUid}`);
@@ -1578,11 +1872,224 @@ export class AiAppsService {
     if (!(await this.isCreatorOrDirectoryAdmin(requesterUid, app))) {
       throw new ForbiddenException('Only the app creator or a directory admin can view feedback');
     }
-    const feedback = await this.prisma.aiAppFeedback.findMany({
-      where: { appUid: app.uid },
-      orderBy: { createdAt: 'desc' },
+    return this.queryFeedback(app.uid);
+  }
+
+  /**
+   * All feedback for one app for the agent (deploy token or deployment key),
+   * newest first, optionally narrowed to one status. Owner-only; a deployment
+   * key must belong to this app (either environment — feedback is app-level).
+   */
+  async listAgentFeedback(
+    requesterUid: string,
+    uid: string,
+    status?: AiAppFeedbackStatus,
+    scope?: AiAppKeyScope
+  ): Promise<Array<WithMember<FeedbackWithPins> & { comments?: Array<WithMember<FeedbackComment>> }>> {
+    const app = await this.findAgentFeedbackApp(requesterUid, uid, scope);
+    const rows = await this.queryFeedback(app.uid, status, { withComments: true });
+    this.trackAgentFeedback(AI_APPS_AGENT_FEEDBACK_LISTED, requesterUid, {
+      appUid: app.uid,
+      status: status ?? null,
+      resultCount: rows.length,
     });
-    return this.withMember(feedback);
+    return rows;
+  }
+
+  /**
+   * Sets the shared review status on one feedback row for the agent. The DTO
+   * limits agents to VIEWED / IMPLEMENTED; same ownership rules as the list.
+   *
+   * With IMPLEMENTED the agent may leave a closing note — what changed. It is
+   * stored in the item's conversation as written by the app's creator (the
+   * agent acts for them) and tells the member who left the feedback. A bare
+   * status change still notifies nobody.
+   */
+  async updateAgentFeedbackStatus(
+    requesterUid: string,
+    uid: string,
+    feedbackUid: string,
+    status: AiAppFeedbackStatus,
+    scope?: AiAppKeyScope,
+    note?: string
+  ): Promise<WithMember<AiAppFeedback>> {
+    if (note && status !== 'IMPLEMENTED') {
+      throw new UnprocessableEntityException('A closing note is only accepted with status IMPLEMENTED');
+    }
+    const app = await this.findAgentFeedbackApp(requesterUid, uid, scope);
+    const { updated, from } = await this.applyFeedbackStatus(app.uid, feedbackUid, status);
+    if (note) {
+      await this.prisma.aiAppFeedbackComment.create({
+        data: { feedbackUid, memberUid: app.memberUid, text: note, kind: 'CLOSING_NOTE' },
+      });
+      const feedback = await this.prisma.aiAppFeedback.findUnique({
+        where: { uid: feedbackUid },
+        select: { memberUid: true, _count: { select: { pins: true } } },
+      });
+      if (feedback && feedback.memberUid !== app.memberUid) {
+        await this.notifyFeedbackConversation(app, feedbackUid, feedback._count.pins > 0, feedback.memberUid, {
+          ...AI_APPS_NOTIFICATION_MESSAGES.feedbackShipped(app.name, note),
+          trigger: AI_APPS_NOTIFICATION_TRIGGERS.FEEDBACK_SHIPPED,
+        });
+      }
+    }
+    this.trackAgentFeedback(AI_APPS_AGENT_FEEDBACK_STATUS_CHANGED, requesterUid, {
+      appUid: app.uid,
+      feedbackUid,
+      from,
+      to: status,
+      hasNote: Boolean(note),
+    });
+    return updated;
+  }
+
+  private trackAgentFeedback(name: string, distinctId: string, properties: Record<string, unknown>): void {
+    void this.analyticsService.trackEvent({ name, distinctId, properties });
+  }
+
+  private async findAgentFeedbackApp(requesterUid: string, uid: string, scope?: AiAppKeyScope): Promise<AiApp> {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid } });
+    if (!app || app.status === 'DELETED') {
+      throw new NotFoundException(`AI App not found: ${uid}`);
+    }
+    if (app.memberUid !== requesterUid) {
+      throw new ForbiddenException('The agent may access feedback only for apps owned by its connected member');
+    }
+    this.assertKeyCanAccessApp(scope, app.uid);
+    return app;
+  }
+
+  /**
+   * `withComments` adds each item's conversation, oldest first — the agent reads
+   * it before acting. Every read carries `commentCount`.
+   */
+  private async queryFeedback(
+    appUid: string,
+    status?: AiAppFeedbackStatus,
+    options: { withComments?: boolean } = {}
+  ): Promise<Array<WithMember<FeedbackWithPins> & { comments?: Array<WithMember<FeedbackComment>> }>> {
+    const feedback = await this.prisma.aiAppFeedback.findMany({
+      where: status ? { appUid, status } : { appUid },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        pins: { select: PIN_PUBLIC_SELECT, orderBy: { n: 'asc' } },
+        _count: { select: { comments: true } },
+        ...(options.withComments
+          ? { comments: { select: COMMENT_PUBLIC_SELECT, orderBy: { createdAt: 'asc' as const } } }
+          : {}),
+      },
+    });
+    const rows = feedback as Array<
+      AiAppFeedback & {
+        pins: PublicFeedbackPin[];
+        _count?: { comments: number };
+        comments?: FeedbackComment[];
+      }
+    >;
+    const withMembers = await this.withMember(rows);
+    const comments = options.withComments ? await this.withMember(rows.flatMap((row) => row.comments ?? [])) : [];
+    let offset = 0;
+    return withMembers.map(({ _count, comments: own, ...row }) => {
+      const count = own?.length ?? 0;
+      const thread = options.withComments ? { comments: comments.slice(offset, offset + count) } : {};
+      offset += count;
+      return { ...row, ...thread, commentCount: _count?.comments ?? 0 };
+    });
+  }
+
+  /**
+   * Every pin on the app's feedback, for the live-app overlay. Creator and
+   * directory admins only. Pins of IMPLEMENTED feedback are left out unless
+   * asked for ("Show resolved"); `env` narrows to one environment, and both are
+   * returned when it is omitted (the overlay labels the other one).
+   */
+  async listAppFeedbackPins(
+    requesterUid: string,
+    appUid: string,
+    options: { includeResolved?: boolean; env?: 'prod' | 'preview' } = {}
+  ): Promise<OverlayFeedbackPin[]> {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid: appUid } });
+    if (!app || app.status === 'DELETED') {
+      throw new NotFoundException(`AI App not found: ${appUid}`);
+    }
+    if (!(await this.isCreatorOrDirectoryAdmin(requesterUid, app))) {
+      throw new ForbiddenException('Only the app creator or a directory admin can view feedback');
+    }
+    return this.queryOverlayPins({
+      appUid: app.uid,
+      env: options.env,
+      excludeStatus: options.includeResolved ? undefined : 'IMPLEMENTED',
+    });
+  }
+
+  /**
+   * The requester's own pins on the app, resolved ones included: seeing their
+   * report marked Implemented is the point. Anyone who may open the app may ask;
+   * it never returns another member's feedback.
+   */
+  async listMyAppFeedbackPins(requesterUid: string, appUid: string): Promise<OverlayFeedbackPin[]> {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid: appUid } });
+    if (!app || app.status === 'DELETED') {
+      throw new NotFoundException(`AI App not found: ${appUid}`);
+    }
+    await this.assertCanViewApp(requesterUid, app);
+    return this.queryOverlayPins({ appUid: app.uid, memberUid: requesterUid });
+  }
+
+  private async queryOverlayPins(filter: {
+    appUid: string;
+    memberUid?: string;
+    env?: 'prod' | 'preview';
+    excludeStatus?: AiAppFeedbackStatus;
+  }): Promise<OverlayFeedbackPin[]> {
+    const pins = await this.prisma.aiAppFeedbackPin.findMany({
+      where: {
+        ...(filter.env ? { env: filter.env } : {}),
+        feedback: {
+          appUid: filter.appUid,
+          ...(filter.memberUid ? { memberUid: filter.memberUid } : {}),
+          ...(filter.excludeStatus ? { status: { not: filter.excludeStatus } } : {}),
+        },
+      },
+      select: {
+        ...PIN_PUBLIC_SELECT,
+        feedback: {
+          select: {
+            uid: true,
+            status: true,
+            createdAt: true,
+            memberUid: true,
+            _count: { select: { comments: true } },
+          },
+        },
+      },
+      orderBy: [{ feedback: { createdAt: 'desc' } }, { n: 'asc' }],
+      take: MAX_PINS_PER_RESPONSE,
+    });
+    if (pins.length === MAX_PINS_PER_RESPONSE) {
+      this.logger.warn(`AI App ${filter.appUid}: feedback pins response hit the ${MAX_PINS_PER_RESPONSE} cap`);
+    }
+    const feedbacks = await this.withMember(pins.map((pin) => pin.feedback));
+    return pins.map((pin, index) => {
+      const { _count, ...feedback } = feedbacks[index];
+      return { ...pin, feedback: { ...feedback, commentCount: _count?.comments ?? 0 } };
+    });
+  }
+
+  private async applyFeedbackStatus(
+    appUid: string,
+    feedbackUid: string,
+    status: AiAppFeedbackStatus
+  ): Promise<{ updated: WithMember<AiAppFeedback>; from: AiAppFeedbackStatus }> {
+    const feedback = await this.prisma.aiAppFeedback.findUnique({ where: { uid: feedbackUid } });
+    if (!feedback || feedback.appUid !== appUid) {
+      throw new NotFoundException(`AI App feedback not found: ${feedbackUid}`);
+    }
+    const updated = await this.prisma.aiAppFeedback.update({
+      where: { uid: feedbackUid },
+      data: { status },
+    });
+    return { updated: (await this.withMember([updated]))[0], from: feedback.status };
   }
 
   /**
@@ -1590,7 +2097,9 @@ export class AiAppsService {
    * Directory admins see every non-deleted app; everyone else only apps they
    * created. Skips deleted apps so the list matches the dashboard catalog.
    */
-  async listAccessibleFeedback(requesterUid: string): Promise<Array<WithMember<AiAppFeedback> & { appName: string }>> {
+  async listAccessibleFeedback(
+    requesterUid: string
+  ): Promise<Array<WithMember<AiAppFeedback> & { appName: string; pinCount: number; commentCount: number }>> {
     const isAdmin = await this.isRequesterDirectoryAdmin(requesterUid);
     const apps = await this.prisma.aiApp.findMany({
       where: isAdmin ? { status: { not: 'DELETED' } } : { memberUid: requesterUid, status: { not: 'DELETED' } },
@@ -1603,9 +2112,16 @@ export class AiAppsService {
     const feedback = await this.prisma.aiAppFeedback.findMany({
       where: { appUid: { in: apps.map((app) => app.uid) } },
       orderBy: { createdAt: 'desc' },
+      include: { _count: { select: { pins: true, comments: true } } },
     });
     const withMembers = await this.withMember(feedback);
-    return withMembers.map((row) => ({ ...row, appName: appNameByUid.get(row.appUid) ?? '' }));
+    // `pinCount` lets the list offer "Show on page" without sending every pin.
+    return withMembers.map(({ _count, ...row }) => ({
+      ...row,
+      appName: appNameByUid.get(row.appUid) ?? '',
+      pinCount: _count?.pins ?? 0,
+      commentCount: _count?.comments ?? 0,
+    }));
   }
 
   /**
@@ -1626,15 +2142,137 @@ export class AiAppsService {
     if (!(await this.isCreatorOrDirectoryAdmin(requesterUid, app))) {
       throw new ForbiddenException('Only the app creator or a directory admin can update feedback status');
     }
-    const feedback = await this.prisma.aiAppFeedback.findUnique({ where: { uid: feedbackUid } });
+    return (await this.applyFeedbackStatus(app.uid, feedbackUid, status)).updated;
+  }
+
+  // ── Feedback conversation (phase 2): replies under each item ─────────────
+
+  /**
+   * The item's conversation, oldest first. Participants only: the app's
+   * creator, directory admins, and the member who left the feedback.
+   */
+  async listFeedbackComments(
+    requesterUid: string,
+    appUid: string,
+    feedbackUid: string
+  ): Promise<Array<WithMember<FeedbackComment>>> {
+    const { feedback } = await this.findFeedbackConversation(requesterUid, appUid, feedbackUid);
+    const comments = await this.prisma.aiAppFeedbackComment.findMany({
+      where: { feedbackUid: feedback.uid },
+      select: COMMENT_PUBLIC_SELECT,
+      orderBy: { createdAt: 'asc' },
+    });
+    return this.withMember(comments);
+  }
+
+  /**
+   * A reply from a participant. Tells everyone else in the conversation: the
+   * member who left the feedback and the app's creator always, an admin only
+   * once they have written in it (admins see every app; every thread would be
+   * noise). A failed notification never fails the reply.
+   */
+  async addFeedbackComment(
+    requesterUid: string,
+    appUid: string,
+    feedbackUid: string,
+    text: string
+  ): Promise<WithMember<FeedbackComment>> {
+    const { app, feedback } = await this.findFeedbackConversation(requesterUid, appUid, feedbackUid);
+    const earlier = await this.prisma.aiAppFeedbackComment.findMany({
+      where: { feedbackUid: feedback.uid },
+      select: { memberUid: true },
+    });
+    if (earlier.length >= MAX_COMMENTS_PER_FEEDBACK) {
+      throw new ConflictException(`This feedback already has ${MAX_COMMENTS_PER_FEEDBACK} replies`);
+    }
+    const comment = await this.prisma.aiAppFeedbackComment.create({
+      data: { feedbackUid: feedback.uid, memberUid: requesterUid, text },
+      select: COMMENT_PUBLIC_SELECT,
+    });
+
+    const recipients = new Set([feedback.memberUid, app.memberUid, ...earlier.map((c) => c.memberUid)]);
+    recipients.delete(requesterUid);
+    for (const recipientUid of recipients) {
+      await this.notifyFeedbackConversation(app, feedback.uid, feedback._count.pins > 0, recipientUid, {
+        ...AI_APPS_NOTIFICATION_MESSAGES.feedbackReply(app.name, text, recipientUid === feedback.memberUid),
+        trigger: AI_APPS_NOTIFICATION_TRIGGERS.FEEDBACK_REPLY,
+      });
+    }
+    return (await this.withMember([comment]))[0];
+  }
+
+  /** Removes a reply. Its author may; so may a directory admin (moderation). */
+  async deleteFeedbackComment(
+    requesterUid: string,
+    appUid: string,
+    feedbackUid: string,
+    commentUid: string
+  ): Promise<void> {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid: appUid } });
+    if (!app || app.status === 'DELETED') {
+      throw new NotFoundException(`AI App not found: ${appUid}`);
+    }
+    const comment = await this.prisma.aiAppFeedbackComment.findUnique({
+      where: { uid: commentUid },
+      select: { uid: true, memberUid: true, feedbackUid: true, feedback: { select: { appUid: true } } },
+    });
+    if (!comment || comment.feedbackUid !== feedbackUid || comment.feedback.appUid !== app.uid) {
+      throw new NotFoundException(`Feedback reply not found: ${commentUid}`);
+    }
+    if (comment.memberUid !== requesterUid && !(await this.isRequesterDirectoryAdmin(requesterUid))) {
+      throw new ForbiddenException('Only its author or a directory admin can delete a reply');
+    }
+    await this.prisma.aiAppFeedbackComment.delete({ where: { uid: comment.uid } });
+  }
+
+  private async findFeedbackConversation(requesterUid: string, appUid: string, feedbackUid: string) {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid: appUid } });
+    if (!app || app.status === 'DELETED') {
+      throw new NotFoundException(`AI App not found: ${appUid}`);
+    }
+    const feedback = await this.prisma.aiAppFeedback.findUnique({
+      where: { uid: feedbackUid },
+      select: { uid: true, appUid: true, memberUid: true, _count: { select: { pins: true } } },
+    });
     if (!feedback || feedback.appUid !== app.uid) {
       throw new NotFoundException(`AI App feedback not found: ${feedbackUid}`);
     }
-    const updated = await this.prisma.aiAppFeedback.update({
-      where: { uid: feedbackUid },
-      data: { status },
-    });
-    return (await this.withMember([updated]))[0];
+    const isParticipant =
+      feedback.memberUid === requesterUid ||
+      app.memberUid === requesterUid ||
+      (await this.isRequesterDirectoryAdmin(requesterUid));
+    if (!isParticipant) {
+      throw new ForbiddenException(
+        'Only the app creator, a directory admin, or the member who left this feedback can see its replies'
+      );
+    }
+    return { app, feedback };
+  }
+
+  private async notifyFeedbackConversation(
+    app: Pick<AiApp, 'uid' | 'name'>,
+    feedbackUid: string,
+    hasPins: boolean,
+    recipientUid: string,
+    message: { title: string; description: string; trigger: string }
+  ): Promise<void> {
+    const { trigger, ...copy } = message;
+    try {
+      await this.pushNotifications.create({
+        category: PushNotificationCategory.AI_APP,
+        ...copy,
+        link: aiAppFeedbackPath(app.uid, feedbackUid, hasPins),
+        recipientUid,
+        isPublic: false,
+        metadata: { eventType: 'ai_app_feedback', appUid: app.uid, feedbackUid, trigger },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `AI App feedback notification (${trigger}) failed for ${app.uid}/${feedbackUid} → ${recipientUid}: ${
+          error instanceof Error ? error.message : error
+        }`
+      );
+    }
   }
 
   /** True when the requester created the app or is a directory admin. */
@@ -1773,8 +2411,7 @@ export class AiAppsService {
     environment: AiAppTargetEnvironment = 'prod'
   ): Promise<void> {
     const access = environment === 'preview' ? app.previewAccess : app.access;
-    const shipped =
-      environment === 'preview' ? await this.previewLastDeployedAt(app.uid) : app.lastDeployedAt;
+    const shipped = environment === 'preview' ? await this.previewLastDeployedAt(app.uid) : app.lastDeployedAt;
     if (access !== 'PRIVATE' || !shipped) {
       return;
     }
@@ -1908,7 +2545,7 @@ export class AiAppsService {
     file: Express.Multer.File,
     agentClient?: string | null,
     scope?: AiAppKeyScope
-  ): Promise<ApiAiApp<AiApp>> {
+  ): Promise<ApiAiApp<AiApp> & DeployAcceptedFields> {
     if (!file?.buffer?.length) {
       throw new BadGatewayException('Missing app ZIP file');
     }
@@ -2010,7 +2647,15 @@ export class AiAppsService {
 
     // Apps that went through the draft flow keep their stored secrets across
     // agent-initiated redeploys.
-    return this.proxyDeploy(memberUid, app, dto.deploymentId, s3Key, app.providedEnvVars);
+    return this.startDeployAttempt(
+      memberUid,
+      app,
+      dto.deploymentId,
+      s3Key,
+      app.providedEnvVars,
+      'prod',
+      existing ? deployRowSnapshot(existing) : null
+    );
   }
 
   /**
@@ -2171,7 +2816,7 @@ export class AiAppsService {
     file: Express.Multer.File,
     agentClient: string | null | undefined,
     existing: AiApp | null
-  ): Promise<ApiAiApp<AiApp>> {
+  ): Promise<ApiAiApp<AiApp> & DeployAcceptedFields> {
     const table = this.targetTable();
     if (!table) throw new InternalServerErrorException('AI App targets are not available');
     const publicPaths = this.publicPathsForUpload(dto.publicPaths);
@@ -2225,7 +2870,14 @@ export class AiAppsService {
       );
     } catch (error) {
       const message = `Deploy failed: ${(error as Error).message}`;
-      await this.failDeploy(app, memberUid, { appUid: app.uid, appId: dto.appId, deploymentId: dto.deploymentId }, message, 'build', 'preview');
+      await this.failDeploy(
+        app,
+        memberUid,
+        { appUid: app.uid, appId: dto.appId, deploymentId: dto.deploymentId },
+        message,
+        'build',
+        'preview'
+      );
       throw new BadGatewayException('Failed to store the app bundle');
     }
     await this.recordEvent('DEPLOY_STARTED', memberUid, {
@@ -2234,13 +2886,14 @@ export class AiAppsService {
       deploymentId: dto.deploymentId,
       message: 'environment=preview',
     });
-    return this.proxyDeploy(
+    return this.startDeployAttempt(
       memberUid,
-      { ...app, database: target.database },
+      app,
       dto.deploymentId,
       s3Key,
       target.providedEnvVars ?? [],
-      'preview'
+      'preview',
+      null
     );
   }
 
@@ -2323,7 +2976,7 @@ export class AiAppsService {
     uid: string,
     secrets?: Record<string, string>,
     environment: AiAppTargetEnvironment = 'prod'
-  ): Promise<ApiAiApp<AiApp>> {
+  ): Promise<ApiAiApp<AiApp> & DeployAcceptedFields> {
     const app = await this.prisma.aiApp.findUnique({ where: { uid } });
     if (!app) {
       throw new NotFoundException(`AI App not found: ${uid}`);
@@ -2364,17 +3017,31 @@ export class AiAppsService {
       appId: app.appId,
       deploymentId: app.deploymentId,
     });
-    return this.proxyDeploy(requesterUid, app, app.deploymentId, app.s3Key, Array.from(provided), 'prod');
+    return this.startDeployAttempt(
+      requesterUid,
+      app,
+      app.deploymentId,
+      app.s3Key,
+      Array.from(provided),
+      'prod',
+      deployRowSnapshot(app)
+    );
   }
 
-  private async deployDevDraft(requesterUid: string, app: AiApp, secrets?: Record<string, string>): Promise<ApiAiApp<AiApp>> {
+  private async deployDevDraft(
+    requesterUid: string,
+    app: AiApp,
+    secrets?: Record<string, string>
+  ): Promise<ApiAiApp<AiApp> & DeployAcceptedFields> {
     const table = this.targetTable();
     if (!table) throw new InternalServerErrorException('AI App targets are not available');
     const target = await table.findUnique({
       where: { appUid_environment: { appUid: app.uid, environment: 'preview' } },
     });
     if (!target?.s3Key || !target.deploymentId) {
-      throw new BadRequestException('This environment has no uploaded bundle yet — ask your AI agent to register it first');
+      throw new BadRequestException(
+        'This environment has no uploaded bundle yet — ask your AI agent to register it first'
+      );
     }
     this.assertNoDeployInProgress(target);
     const submittedNames = Object.keys(secrets ?? {});
@@ -2392,13 +3059,14 @@ export class AiAppsService {
       deploymentId: target.deploymentId,
       message: 'environment=preview',
     });
-    return this.proxyDeploy(
+    return this.startDeployAttempt(
       requesterUid,
-      { ...app, database: target.database },
+      app,
       target.deploymentId,
       target.s3Key,
       Array.from(provided),
-      'preview'
+      'preview',
+      null
     );
   }
 
@@ -2453,57 +3121,229 @@ export class AiAppsService {
   }
 
   /**
-   * Shared deploy proxy: flips the app to DEPLOYING, asks the runner to build
-   * and start the bundle at `s3Key`, then settles READY/ERROR. When the `/deploy`
-   * call ends without an answer (gateway timeout / no response), the outcome
-   * comes from the orchestrator's own deployment record for this attempt — never
-   * from the app URL answering, which the previous version does on a redeploy.
-   * After a successful build, apps with stored secrets or a database get the
-   * secret-aware redeploy only when the build did not already attach all of
-   * them (the build re-attaches only what an earlier secret-aware deployment
-   * recorded). Callers record DEPLOY_STARTED themselves.
+   * Starts one deploy attempt and hands the pipeline to the background job:
+   * flips the app/target to DEPLOYING under a fresh attempt id (phase `queued`),
+   * queues the job, and returns the app payload plus where to poll. Callers
+   * run the synchronous checks, store the bundle and record DEPLOY_STARTED
+   * first. If the job can't be queued the attempt fails at once (the bundle
+   * stays in S3, so a retry works).
    */
-  private async proxyDeploy(
-    memberUid: string,
-    app: Pick<
-      AiApp,
-      | 'uid'
-      | 'appId'
-      | 'name'
-      | 'memberUid'
-      | 'database'
-      | 'lastDeployedAt'
-      | 'status'
-      | 'deploymentId'
-      | 's3Key'
-      | 'url'
-      | 'httpUrl'
-      | 'host'
-      | 'notes'
-      | 'failureStream'
-    >,
+  private async startDeployAttempt(
+    actorUid: string,
+    app: Pick<AiApp, 'uid' | 'appId' | 'name' | 'memberUid'>,
     deploymentId: string,
     s3Key: string,
-    secretNames: string[] = [],
-    environment: AiAppTargetEnvironment = 'prod'
-  ): Promise<ApiAiApp<AiApp>> {
-    const host = buildAppHost(app.appId, environment);
-    const url = buildAppUrl(app.appId, environment);
-    const httpUrl = buildAppHttpUrl(app.appId, environment);
-    const requestedDatabase = app.database as AiAppDatabaseInfo | null;
+    secretNames: string[],
+    environment: AiAppTargetEnvironment,
+    previous: DeployRowSnapshot | null
+  ): Promise<ApiAiApp<AiApp> & DeployAcceptedFields> {
+    const attemptId = randomUUID();
+    const deployingData = {
+      status: 'DEPLOYING' as const,
+      deploymentId,
+      s3Key,
+      url: buildAppUrl(app.appId, environment),
+      httpUrl: buildAppHttpUrl(app.appId, environment),
+      host: buildAppHost(app.appId, environment),
+      notes: null,
+      failureStream: null,
+      deployPhase: 'queued',
+      deployAttemptId: attemptId,
+    };
     if (environment === 'prod') {
-      const updated = await this.prisma.aiApp.update({
-        where: { uid: app.uid },
-        data: { status: 'DEPLOYING', deploymentId, s3Key, url, httpUrl, host, notes: null, failureStream: null },
-      });
+      const updated = await this.prisma.aiApp.update({ where: { uid: app.uid }, data: deployingData });
       await this.mirrorProdTarget(updated);
     } else {
       await this.targetTable()?.update({
         where: { appUid_environment: { appUid: app.uid, environment: 'preview' } },
-        data: { status: 'DEPLOYING', deploymentId, s3Key, url, httpUrl, host, notes: null, failureStream: null },
+        data: deployingData,
       });
     }
     this.dropLogsTailCache(app.appId, environment);
+
+    const data: AiAppDeployJobData = {
+      attemptId,
+      actorUid,
+      appUid: app.uid,
+      environment,
+      deploymentId,
+      s3Key,
+      secretNames: secretNames ?? [],
+      previous,
+    };
+    try {
+      if (!this.deployQueue) {
+        throw new Error('the deploy queue is not configured');
+      }
+      await this.deployQueue.add('deploy', data, {
+        jobId: attemptId,
+        // A blind re-run could double-deploy; retries go through the member/agent deploy endpoints.
+        attempts: 1,
+        timeout: AI_APPS_DEPLOY_JOB_TIMEOUT_MS,
+        removeOnComplete: true,
+        removeOnFail: 1000,
+      });
+    } catch (error) {
+      this.logger.error(`Could not queue the deploy of ${app.appId} (${deploymentId}): ${(error as Error).message}`);
+      await this.failDeploy(
+        app,
+        actorUid,
+        { appUid: app.uid, appId: app.appId, deploymentId },
+        DEPLOY_NOT_STARTED_MESSAGE,
+        null,
+        environment,
+        attemptId
+      );
+      throw new ServiceUnavailableException('The deploy could not be started — try again in a minute.');
+    }
+
+    const fresh = (await this.prisma.aiApp.findUnique({ where: { uid: app.uid } })) ?? (app as AiApp);
+    const targets = (await this.loadTargetRows([app.uid])).get(app.uid) ?? [];
+    return {
+      ...this.toApiApp((await this.withMember([fresh]))[0], true, 0, targets),
+      statusEndpoint: buildDeploymentStatusUrl(app.uid, deploymentId, environment),
+      pollIntervalSec: AI_APPS_DEPLOY_POLL_INTERVAL_SEC,
+    };
+  }
+
+  /**
+   * Bull entry point for one queued deploy attempt. The outcome is recorded on
+   * the row by the pipeline itself, so handled failures resolve normally; an
+   * unexpected error fails the attempt instead of waiting for the stuck sweep.
+   */
+  async runDeployJob(job: AiAppDeployJob): Promise<void> {
+    try {
+      await this.executeDeployJob(job);
+    } catch (error) {
+      if (error instanceof HttpException) {
+        return;
+      }
+      const { data } = job;
+      this.logger.error(
+        `AI App deploy job ${data.attemptId} (${data.deploymentId}) crashed: ${(error as Error).message}`
+      );
+      try {
+        const app = await this.prisma.aiApp.findUnique({ where: { uid: data.appUid } });
+        if (app) {
+          await this.failDeploy(
+            app,
+            data.actorUid,
+            { appUid: app.uid, appId: app.appId, deploymentId: data.deploymentId },
+            `Deploy failed: ${(error as Error).message}`,
+            null,
+            data.environment,
+            data.attemptId
+          );
+        }
+      } catch (settleError) {
+        this.logger.error(`Could not settle crashed deploy job ${data.attemptId}: ${(settleError as Error).message}`);
+      }
+    }
+  }
+
+  /**
+   * Runs the pipeline for a queued attempt, or resumes it after a restart:
+   * returns without touching anything when the row no longer belongs to this
+   * attempt or the attempt already settled; past `building`, the runner build
+   * already went out, so the outcome comes from the orchestrator's record
+   * instead of a second `/deploy` call. Throws the pipeline's HTTP errors.
+   */
+  async executeDeployJob(job: AiAppDeployJob): Promise<ApiAiApp<AiApp> | null> {
+    const { data } = job;
+    const app = await this.prisma.aiApp.findUnique({ where: { uid: data.appUid } });
+    if (!app) {
+      return null;
+    }
+    const row =
+      data.environment === 'preview'
+        ? await this.targetTable()?.findUnique({
+            where: { appUid_environment: { appUid: app.uid, environment: 'preview' } },
+          })
+        : app;
+    if (!row || row.deployAttemptId !== data.attemptId) {
+      this.logger.warn(`AI App deploy job ${data.attemptId} for ${app.appId} no longer owns the row — skipping`);
+      return null;
+    }
+    if (row.deployPhase === 'done' || row.deployPhase === 'failed') {
+      return null;
+    }
+    const resumeFromRecord =
+      (row.deployPhase === 'building' || row.deployPhase === 'injecting_runtime_config') &&
+      typeof data.attemptStartedAt === 'number';
+    if (resumeFromRecord) {
+      this.logger.log(`Resuming AI App deploy ${data.deploymentId} for ${app.appId} from phase ${row.deployPhase}`);
+    }
+    return this.proxyDeploy(
+      data.actorUid,
+      data.environment === 'preview' ? { ...app, database: row.database } : app,
+      data.deploymentId,
+      data.s3Key,
+      data.secretNames,
+      data.environment,
+      {
+        attemptId: data.attemptId,
+        previous: data.previous,
+        resumeFromRecord,
+        attemptStartedAt: data.attemptStartedAt,
+        recordStart: async (startedAt) => {
+          data.attemptStartedAt = startedAt;
+          await job.update?.(data);
+        },
+      }
+    );
+  }
+
+  /**
+   * Checkpoints the attempt's phase. Raw SQL on purpose: `updatedAt` must stay
+   * the deploy start (stuck window). Never throws — a missed checkpoint only
+   * weakens resume, it must not fail the deploy.
+   */
+  private async setDeployPhase(
+    appUid: string,
+    environment: AiAppTargetEnvironment,
+    attemptId: string,
+    phase: DeployPhase
+  ): Promise<void> {
+    try {
+      if (environment === 'preview') {
+        await this.prisma.$executeRaw`
+          UPDATE "AiAppTarget" SET "deployPhase" = ${phase}
+          WHERE "appUid" = ${appUid} AND "environment" = 'preview' AND "deployAttemptId" = ${attemptId}`;
+      } else {
+        await this.prisma.$executeRaw`
+          UPDATE "AiApp" SET "deployPhase" = ${phase}
+          WHERE "uid" = ${appUid} AND "deployAttemptId" = ${attemptId}`;
+      }
+    } catch (error) {
+      this.logger.warn(`Could not record deploy phase ${phase} for ${appUid}: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * The deploy pipeline of one attempt (run by the background job): asks the
+   * runner to build and start the bundle at `s3Key`, then settles READY/ERROR.
+   * When the `/deploy` call ends without an answer (gateway timeout / no
+   * response / our request timeout) — or a resumed job already sent it — the
+   * outcome comes from the orchestrator's own deployment record for this
+   * attempt, never from the app URL answering, which the previous version does
+   * on a redeploy. After a successful build, apps with stored secrets or a
+   * database get the secret-aware redeploy only when the build did not already
+   * attach all of them. Every write is scoped to `attempt.attemptId`.
+   */
+  private async proxyDeploy(
+    memberUid: string,
+    app: Pick<AiApp, 'uid' | 'appId' | 'name' | 'memberUid' | 'database' | 'lastDeployedAt'>,
+    deploymentId: string,
+    s3Key: string,
+    secretNames: string[],
+    environment: AiAppTargetEnvironment,
+    attempt: DeployAttempt
+  ): Promise<ApiAiApp<AiApp> | null> {
+    const host = buildAppHost(app.appId, environment);
+    const url = buildAppUrl(app.appId, environment);
+    const httpUrl = buildAppHttpUrl(app.appId, environment);
+    const requestedDatabase = app.database as AiAppDatabaseInfo | null;
+    const { attemptId } = attempt;
 
     const eventContext = { appUid: app.uid, appId: app.appId, deploymentId };
 
@@ -2516,6 +3356,7 @@ export class AiAppsService {
         port,
         notes: null,
         failureStream: null,
+        deployPhase: 'done',
         lastDeployedAt: new Date(),
         directLinkGateReady: true,
         publicPathsGateReady: true,
@@ -2534,20 +3375,31 @@ export class AiAppsService {
           : {}),
       };
       if (environment === 'preview') {
-        await this.targetTable()?.update({
-          where: { appUid_environment: { appUid: app.uid, environment: 'preview' } },
+        const claimed = await this.targetTable()?.updateMany?.({
+          where: { appUid: app.uid, environment: 'preview', deployAttemptId: attemptId },
           data: readyData,
         });
+        if (!claimed?.count) {
+          this.logger.warn(
+            `AI App ${app.appId} preview deploy ${deploymentId} succeeded after another attempt took over`
+          );
+          return null;
+        }
         await this.recordEvent('DEPLOY_SUCCEEDED', memberUid, { ...eventContext, message: url });
         const fresh = (await this.prisma.aiApp.findUnique({ where: { uid: app.uid } })) ?? (app as AiApp);
         const targets = (await this.loadTargetRows([app.uid])).get(app.uid) ?? [];
         return this.toApiApp((await this.withMember([fresh]))[0], true, 0, targets);
       }
-      const updated = await this.prisma.aiApp.update({
-        where: { uid: app.uid },
-        // The ONLY writer of lastDeployedAt on the app row — prod's "last successful ship".
+      // The ONLY writer of lastDeployedAt on the app row — prod's "last successful ship".
+      const claimed = await this.prisma.aiApp.updateMany({
+        where: { uid: app.uid, deployAttemptId: attemptId },
         data: readyData,
       });
+      const updated = claimed.count ? await this.prisma.aiApp.findUnique({ where: { uid: app.uid } }) : null;
+      if (!updated) {
+        this.logger.warn(`AI App ${app.appId} deploy ${deploymentId} succeeded after another attempt took over`);
+        return null;
+      }
       await this.mirrorProdTarget(updated);
       await this.recordEvent('DEPLOY_SUCCEEDED', memberUid, { ...eventContext, message: url });
       await this.announceIfEligible(updated);
@@ -2556,80 +3408,35 @@ export class AiAppsService {
       return this.toApiApp((await this.withMember([updated]))[0], true, 0, targets);
     };
 
+    /** Another operation holds the Helm release: this attempt never took the lock. */
+    const rejectLockedAttempt = async () => {
+      if (environment === 'prod') {
+        await this.releaseLockedDeploy(attempt.previous, app, memberUid, eventContext, attemptId);
+      } else {
+        await this.failDeployIfCurrent(
+          app,
+          memberUid,
+          eventContext,
+          DEPLOY_IN_PROGRESS_MESSAGE,
+          null,
+          environment,
+          attemptId
+        );
+      }
+      throw new BadGatewayException('Another deploy of this app is still in progress');
+    };
+
     let port: number | null = null;
     let databaseInfo: RunnerDeployDatabaseInfo | undefined;
     let authGateVersion: number | undefined;
     // Secret keys the build's own deployment attached (undefined = none / unknown).
     let attachedKeys: string[] | undefined;
-    const attemptStartedAt = Date.now();
-    try {
-      this.logger.log(
-        `Runner deploy request for ${app.appId}: POST ${AI_APPS_RUNNER_URL}/deploy ` +
-          `(deploymentId=${deploymentId}, s3Key=${s3Key}${
-            requestedDatabase?.enabled ? `, database=${requestedDatabase.type}` : ''
-          })`
-      );
-      const response = await axios.post<RunnerDeployResponse>(
-        `${AI_APPS_RUNNER_URL}/deploy`,
-        { appId: app.appId, deploymentId, s3Key, environment },
-        { headers: { 'Content-Type': 'application/json', 'x-runner-token': AI_APPS_RUNNER_TOKEN } }
-      );
-      this.logRunnerResponse('deploy', app.appId, response.status, response.data);
-      // The runner sometimes reports failure inside a 2xx body (see
-      // logRunnerResponse) — treating that as success would mark a dead deploy
-      // READY and corrupt lastDeployedAt/serving.
-      if (typeof response.data?.status === 'string' && response.data.status.toLowerCase() === 'failed') {
-        const message = `Runner reported failure: ${this.safeStringify(response.data)}`;
-        this.logger.error(`AI App deploy failed for ${app.appId}: ${message}`);
-        await this.failDeploy(app, memberUid, eventContext, message, 'build', environment);
-        throw new BadGatewayException('Failed to deploy app to the sandbox runner');
-      }
-      port = response.data.port ?? null;
-      authGateVersion = typeof response.data.authGateVersion === 'number' ? response.data.authGateVersion : undefined;
-      attachedKeys = attachedRuntimeSecretKeys(response.data.deployment?.values);
-    } catch (error) {
-      if (error instanceof BadGatewayException) {
-        throw error;
-      }
-      this.logRunnerError('deploy', app.appId, error);
-      // Prefer the runner's own classified message (e.g. container_oom_killed's
-      // actionable text) verbatim over the full JSON body, so `notes` reads as
-      // a clear error instead of an escaped JSON blob.
-      const runnerErrorText =
-        axios.isAxiosError(error) && typeof error.response?.data?.error === 'string'
-          ? error.response.data.error
-          : undefined;
-      const message = axios.isAxiosError(error)
-        ? `Runner error: ${error.response?.status ?? ''} ${
-            runnerErrorText ?? JSON.stringify(error.response?.data ?? error.message)
-          }`
-        : `Deploy failed: ${(error as Error).message}`;
 
-      // Another operation (typically an earlier deploy's build) holds the release:
-      // this attempt never started — not a build failure. Don't stamp ERROR if a
-      // concurrent attempt already moved the row off DEPLOYING.
-      if (this.isHelmReleaseLocked(error) || message.includes(HELM_RELEASE_LOCKED_TEXT)) {
-        this.logger.warn(`AI App deploy rejected for ${app.appId}: release locked by another deploy (${message})`);
-        if (environment === 'prod') {
-          await this.releaseLockedDeploy(app, deploymentId);
-        } else {
-          await this.failDeployIfCurrent(app, memberUid, eventContext, DEPLOY_IN_PROGRESS_MESSAGE, null, environment);
-        }
-        throw new BadGatewayException('Another deploy of this app is still in progress');
-      }
-
-      if (!this.isUncertainRunnerError(error)) {
-        this.logger.error(`AI App deploy failed for ${app.appId}: ${message}`);
-        await this.failDeploy(app, memberUid, eventContext, message, 'build', environment);
-        throw new BadGatewayException('Failed to deploy app to the sandbox runner');
-      }
-
-      // A gateway timeout (Cloudflare 504/524, etc.) or no response doesn't mean the
-      // deploy failed — the build keeps running on the orchestrator. Its deployment
-      // record for this attempt decides the outcome.
-      this.logger.warn(
-        `Runner /deploy gave no answer for ${app.appId}; waiting for the orchestrator's deployment record. (${message})`
-      );
+    /**
+     * The `/deploy` call gave no answer (or went out before a restart): the
+     * orchestrator's deployment record for this attempt decides the outcome.
+     */
+    const settleFromOrchestratorRecord = async (attemptStartedAt: number, reason: string) => {
       const result = await this.waitForOrchestratorDeployment(app.appId, environment, deploymentId, attemptStartedAt);
       if (result.outcome !== 'success') {
         let failureMessage: string;
@@ -2638,31 +3445,19 @@ export class AiAppsService {
           const failure = await this.classifyOrchestratorFailure(app.appId, result.record);
           if (failure === 'conflict') {
             this.logger.warn(`AI App deploy for ${app.appId} lost the Helm lock to another operation`);
-            if (environment === 'prod') {
-              await this.releaseLockedDeploy(app, deploymentId);
-            } else {
-              await this.failDeployIfCurrent(
-                app,
-                memberUid,
-                eventContext,
-                DEPLOY_IN_PROGRESS_MESSAGE,
-                null,
-                environment
-              );
-            }
-            throw new BadGatewayException('Another deploy of this app is still in progress');
+            await rejectLockedAttempt();
           }
           failureMessage = `Runner error: ${result.record.error ?? 'deployment failed'}`;
-          failureStream = failure;
+          failureStream = failure === 'conflict' ? null : failure;
         } else {
           // The build may have hung, or the request never reached the build — genuinely unknown.
           failureMessage =
             result.outcome === 'unregistered'
-              ? `Deploy outcome could not be confirmed: the runner has no record of this deploy. (${message})`
-              : `Deploy outcome could not be confirmed: the runner still reports this deploy as running. (${message})`;
+              ? `Deploy outcome could not be confirmed: the runner has no record of this deploy. (${reason})`
+              : `Deploy outcome could not be confirmed: the runner still reports this deploy as running. (${reason})`;
         }
         this.logger.error(`AI App deploy failed for ${app.appId}: ${failureMessage}`);
-        await this.failDeploy(app, memberUid, eventContext, failureMessage, failureStream, environment);
+        await this.failDeploy(app, memberUid, eventContext, failureMessage, failureStream, environment, attemptId);
         throw new BadGatewayException('Failed to deploy app to the sandbox runner');
       }
       this.logger.log(`AI App ${app.appId}: orchestrator reports deployment ${deploymentId} succeeded — continuing`);
@@ -2670,6 +3465,81 @@ export class AiAppsService {
       // The runner's response (which reports the gate version) never arrived: ask the
       // live gate, now served by the new release.
       authGateVersion = await this.gateVersionServed(url);
+    };
+
+    if (attempt.resumeFromRecord && attempt.attemptStartedAt !== undefined) {
+      await settleFromOrchestratorRecord(attempt.attemptStartedAt, 'resumed after a restart');
+    } else {
+      const attemptStartedAt = Date.now();
+      await attempt.recordStart(attemptStartedAt);
+      await this.setDeployPhase(app.uid, environment, attemptId, 'building');
+      try {
+        this.logger.log(
+          `Runner deploy request for ${app.appId}: POST ${AI_APPS_RUNNER_URL}/deploy ` +
+            `(deploymentId=${deploymentId}, s3Key=${s3Key}${
+              requestedDatabase?.enabled ? `, database=${requestedDatabase.type}` : ''
+            })`
+        );
+        const response = await axios.post<RunnerDeployResponse>(
+          `${AI_APPS_RUNNER_URL}/deploy`,
+          { appId: app.appId, deploymentId, s3Key, environment },
+          {
+            headers: { 'Content-Type': 'application/json', 'x-runner-token': AI_APPS_RUNNER_TOKEN },
+            timeout: AI_APPS_RUNNER_DEPLOY_TIMEOUT_MS,
+          }
+        );
+        this.logRunnerResponse('deploy', app.appId, response.status, response.data);
+        // The runner sometimes reports failure inside a 2xx body (see
+        // logRunnerResponse) — treating that as success would mark a dead deploy
+        // READY and corrupt lastDeployedAt/serving.
+        if (typeof response.data?.status === 'string' && response.data.status.toLowerCase() === 'failed') {
+          const message = `Runner reported failure: ${this.safeStringify(response.data)}`;
+          this.logger.error(`AI App deploy failed for ${app.appId}: ${message}`);
+          await this.failDeploy(app, memberUid, eventContext, message, 'build', environment, attemptId);
+          throw new BadGatewayException('Failed to deploy app to the sandbox runner');
+        }
+        port = response.data.port ?? null;
+        authGateVersion = typeof response.data.authGateVersion === 'number' ? response.data.authGateVersion : undefined;
+        attachedKeys = attachedRuntimeSecretKeys(response.data.deployment?.values);
+      } catch (error) {
+        if (error instanceof BadGatewayException) {
+          throw error;
+        }
+        this.logRunnerError('deploy', app.appId, error);
+        // Prefer the runner's own classified message (e.g. container_oom_killed's
+        // actionable text) verbatim over the full JSON body, so `notes` reads as
+        // a clear error instead of an escaped JSON blob.
+        const runnerErrorText =
+          axios.isAxiosError(error) && typeof error.response?.data?.error === 'string'
+            ? error.response.data.error
+            : undefined;
+        const message = axios.isAxiosError(error)
+          ? `Runner error: ${error.response?.status ?? ''} ${
+              runnerErrorText ?? JSON.stringify(error.response?.data ?? error.message)
+            }`
+          : `Deploy failed: ${(error as Error).message}`;
+
+        // Another operation (typically an earlier deploy's build) holds the release:
+        // this attempt never started — not a build failure. Don't stamp ERROR if a
+        // concurrent attempt already moved the row off DEPLOYING.
+        if (this.isHelmReleaseLocked(error) || message.includes(HELM_RELEASE_LOCKED_TEXT)) {
+          this.logger.warn(`AI App deploy rejected for ${app.appId}: release locked by another deploy (${message})`);
+          await rejectLockedAttempt();
+        }
+
+        if (!this.isUncertainRunnerError(error)) {
+          this.logger.error(`AI App deploy failed for ${app.appId}: ${message}`);
+          await this.failDeploy(app, memberUid, eventContext, message, 'build', environment, attemptId);
+          throw new BadGatewayException('Failed to deploy app to the sandbox runner');
+        }
+
+        // A gateway timeout (Cloudflare 504/524, etc.) or no response doesn't mean the
+        // deploy failed — the build keeps running on the orchestrator.
+        this.logger.warn(
+          `Runner /deploy gave no answer for ${app.appId}; waiting for the orchestrator's deployment record. (${message})`
+        );
+        await settleFromOrchestratorRecord(attemptStartedAt, message);
+      }
     }
 
     // The build mounts every secret currently in SSM, including keys saved
@@ -2690,20 +3560,35 @@ export class AiAppsService {
         ...(requestedDatabase?.enabled && !attached.has(DATABASE_CREDENTIALS_KEY) ? ['database'] : []),
       ];
       this.logger.log(`Runtime config for ${app.appId} not attached by the build (missing: ${missing.join(', ')})`);
+      await this.setDeployPhase(app.uid, environment, attemptId, 'injecting_runtime_config');
       try {
-        databaseInfo = await this.deployImageWithRuntimeConfig(app.appId, secretNames, url, requestedDatabase, environment);
+        databaseInfo = await this.deployImageWithRuntimeConfig(
+          app.appId,
+          secretNames,
+          url,
+          requestedDatabase,
+          environment
+        );
       } catch (error) {
         if ((error as Error).message?.includes(HELM_RELEASE_LOCKED_TEXT)) {
           this.logger.warn(
             `Runtime config for ${app.appId} stayed locked after retries; not overwriting a settled deploy`
           );
-          await this.failDeployIfCurrent(app, memberUid, eventContext, DEPLOY_IN_PROGRESS_MESSAGE, null, environment);
+          await this.failDeployIfCurrent(
+            app,
+            memberUid,
+            eventContext,
+            DEPLOY_IN_PROGRESS_MESSAGE,
+            null,
+            environment,
+            attemptId
+          );
           throw new BadGatewayException('Another deploy of this app is still in progress');
         }
         const message = `Runtime config injection failed: ${(error as Error).message}`;
         this.logger.error(`AI App deploy failed for ${app.appId}: ${message}`);
         // The image already built — injecting/starting it is a runtime story.
-        await this.failDeploy(app, memberUid, eventContext, message, 'runtime', environment);
+        await this.failDeploy(app, memberUid, eventContext, message, 'runtime', environment, attemptId);
         throw new BadGatewayException('Failed to inject secrets/database on the sandbox runner');
       }
     }
@@ -2890,32 +3775,41 @@ export class AiAppsService {
 
   /**
    * This attempt never took the Helm lock, so put the row back to what it was
-   * before the DEPLOYING write. The where-clause gives up when a concurrent
-   * attempt already settled the row.
+   * before the attempt's DEPLOYING write, and record the rejected attempt as
+   * DEPLOY_FAILED (no bell notification — nothing the owner has to act on).
+   * The where-clause gives up when a concurrent attempt already settled or
+   * took over the row. Without a prior state (first-ever deploy) the attempt
+   * is failed instead.
    */
   private async releaseLockedDeploy(
-    app: Pick<
-      AiApp,
-      'uid' | 'status' | 'deploymentId' | 's3Key' | 'url' | 'httpUrl' | 'host' | 'notes' | 'failureStream'
-    >,
-    deploymentId: string
+    previous: DeployRowSnapshot | null,
+    app: Pick<AiApp, 'uid' | 'name' | 'memberUid'>,
+    actorUid: string,
+    eventContext: { appUid: string; appId: string; deploymentId: string },
+    attemptId: string
   ): Promise<void> {
+    if (!previous) {
+      await this.failDeployIfCurrent(app, actorUid, eventContext, DEPLOY_IN_PROGRESS_MESSAGE, null, 'prod', attemptId);
+      return;
+    }
     const claimed = await this.prisma.aiApp.updateMany({
-      where: { uid: app.uid, deploymentId, status: 'DEPLOYING' },
+      where: { uid: app.uid, deploymentId: eventContext.deploymentId, status: 'DEPLOYING', deployAttemptId: attemptId },
       data: {
-        status: app.status,
-        deploymentId: app.deploymentId,
-        s3Key: app.s3Key,
-        url: app.url,
-        httpUrl: app.httpUrl,
-        host: app.host,
-        notes: app.notes,
-        failureStream: app.failureStream,
+        status: previous.status,
+        deploymentId: previous.deploymentId,
+        s3Key: previous.s3Key,
+        url: previous.url,
+        httpUrl: previous.httpUrl,
+        host: previous.host,
+        notes: previous.notes,
+        failureStream: previous.failureStream,
+        deployPhase: previous.deployPhase,
       },
     });
     if (!claimed.count) return;
     const updated = await this.prisma.aiApp.findUnique({ where: { uid: app.uid } });
     if (updated) await this.mirrorProdTarget(updated);
+    await this.recordEvent('DEPLOY_FAILED', actorUid, { ...eventContext, message: DEPLOY_IN_PROGRESS_MESSAGE });
   }
 
   /**
@@ -2929,14 +3823,15 @@ export class AiAppsService {
     eventContext: { appUid: string; appId: string; deploymentId: string },
     message: string,
     failureStream: 'build' | 'runtime' | null,
-    environment: AiAppTargetEnvironment
+    environment: AiAppTargetEnvironment,
+    attemptId: string
   ): Promise<boolean> {
     const notes = message.slice(0, 2000);
+    const data = { status: 'ERROR' as const, notes, failureStream, deployPhase: 'failed' };
     if (environment === 'preview') {
-      const table = this.targetTable() as { updateMany?: (args: any) => Promise<{ count: number }> } | null;
+      const table = this.targetTable();
       if (!table?.updateMany) {
-        await this.failDeploy(app, actorUid, eventContext, message, failureStream, environment);
-        return true;
+        return this.failDeploy(app, actorUid, eventContext, message, failureStream, environment, attemptId);
       }
       const claimed = await table.updateMany({
         where: {
@@ -2944,8 +3839,9 @@ export class AiAppsService {
           environment: 'preview',
           deploymentId: eventContext.deploymentId,
           status: 'DEPLOYING',
+          deployAttemptId: attemptId,
         },
-        data: { status: 'ERROR', notes, failureStream },
+        data,
       });
       if (!claimed.count) {
         this.logger.warn(`AI App ${eventContext.appId} lock conflict ignored; preview attempt no longer owns the row`);
@@ -2953,8 +3849,13 @@ export class AiAppsService {
       }
     } else {
       const claimed = await this.prisma.aiApp.updateMany({
-        where: { uid: app.uid, deploymentId: eventContext.deploymentId, status: 'DEPLOYING' },
-        data: { status: 'ERROR', notes, failureStream },
+        where: {
+          uid: app.uid,
+          deploymentId: eventContext.deploymentId,
+          status: 'DEPLOYING',
+          deployAttemptId: attemptId,
+        },
+        data,
       });
       if (!claimed.count) {
         this.logger.warn(
@@ -2983,6 +3884,8 @@ export class AiAppsService {
    * `actorUid` is who triggered this deploy attempt (audited on DEPLOY_FAILED) —
    * for a member-triggered redeploy that may be a directory admin, not the app
    * owner, so the failure bell notification always goes to `app.memberUid`.
+   * With `attemptId` (the background job) the write applies only while that
+   * attempt owns the row; returns false when it was left untouched.
    */
   private async failDeploy(
     app: Pick<AiApp, 'uid' | 'name' | 'memberUid'>,
@@ -2990,19 +3893,38 @@ export class AiAppsService {
     eventContext: { appUid: string; appId: string; deploymentId: string },
     message: string,
     failureStream: 'build' | 'runtime' | null = null,
-    environment: AiAppTargetEnvironment = 'prod'
-  ): Promise<void> {
+    environment: AiAppTargetEnvironment = 'prod',
+    attemptId?: string
+  ): Promise<boolean> {
     const notes = message.slice(0, 2000);
+    const data = { status: 'ERROR' as const, notes, failureStream, ...(attemptId ? { deployPhase: 'failed' } : {}) };
     if (environment === 'preview') {
-      await this.targetTable()?.update({
-        where: { appUid_environment: { appUid: app.uid, environment: 'preview' } },
-        data: { status: 'ERROR', notes, failureStream },
-      });
+      const table = this.targetTable();
+      if (attemptId && table?.updateMany) {
+        const claimed = await table.updateMany({
+          where: { appUid: app.uid, environment: 'preview', deployAttemptId: attemptId },
+          data,
+        });
+        if (!claimed.count) {
+          this.logger.warn(`AI App ${eventContext.appId} preview failure ignored; attempt no longer owns the row`);
+          return false;
+        }
+      } else {
+        await table?.update({
+          where: { appUid_environment: { appUid: app.uid, environment: 'preview' } },
+          data,
+        });
+      }
+    } else if (attemptId) {
+      const claimed = await this.prisma.aiApp.updateMany({ where: { uid: app.uid, deployAttemptId: attemptId }, data });
+      if (!claimed.count) {
+        this.logger.warn(`AI App ${eventContext.appId} failure ignored; attempt ${attemptId} no longer owns the row`);
+        return false;
+      }
+      const updated = await this.prisma.aiApp.findUnique({ where: { uid: app.uid } });
+      if (updated) await this.mirrorProdTarget(updated);
     } else {
-      const updated = await this.prisma.aiApp.update({
-        where: { uid: app.uid },
-        data: { status: 'ERROR', notes, failureStream },
-      });
+      const updated = await this.prisma.aiApp.update({ where: { uid: app.uid }, data });
       await this.mirrorProdTarget(updated);
     }
     await this.recordEvent('DEPLOY_FAILED', actorUid, {
@@ -3010,6 +3932,7 @@ export class AiAppsService {
       message: environment === 'preview' ? `preview: ${notes}` : notes,
     });
     await this.notifyDeployFailed(app);
+    return true;
   }
 
   /**
@@ -3217,10 +4140,11 @@ export class AiAppsService {
     if (!(await this.isCreatorOrDirectoryAdmin(memberUid, app))) {
       throw new ForbiddenException('Only the app creator or a directory admin can list deployment keys');
     }
-    const rows = (await this.deployKeyTable()?.findMany({
-      where: { appUid: app.uid, revokedAt: null },
-      orderBy: { createdAt: 'desc' },
-    })) ?? [];
+    const rows =
+      (await this.deployKeyTable()?.findMany({
+        where: { appUid: app.uid, revokedAt: null },
+        orderBy: { createdAt: 'desc' },
+      })) ?? [];
     return {
       keys: rows.map((row) => ({
         uid: row.uid,

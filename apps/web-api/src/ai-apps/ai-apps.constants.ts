@@ -11,7 +11,7 @@
  */
 
 /** Starter kit version shown in the README, ZIP filename, and LabOS UI. Bump when the kit contents or flow change. */
-export const AI_APPS_STARTER_KIT_VERSION = '1.14';
+export const AI_APPS_STARTER_KIT_VERSION = '1.15';
 
 /** Max members on one private app's whitelist (the owner and directory admins never count). */
 export const AI_APPS_MAX_ALLOWED_MEMBERS = 200;
@@ -107,11 +107,12 @@ export const AI_APPS_HELM_LOCK_RETRY_INTERVAL_MS = Number(process.env.AI_APPS_HE
 
 /**
  * How long an app may sit in DEPLOYING before the deploy counts as STUCK.
- * Deploys run synchronously inside the API process (runner build, waiting for
- * the orchestrator's deployment record, secrets injection), and the record
- * wait below is capped under this window — a DEPLOYING row older than this
- * means the process died mid-deploy or the runner hung, and the row would
- * otherwise stay DEPLOYING forever. Stuck rows are settled to ERROR lazily on read.
+ * Deploys run as a background job (runner build, waiting for the
+ * orchestrator's deployment record, secrets injection), and the record wait
+ * below is capped under this window — a DEPLOYING row older than this means
+ * the job was lost (not resumed after a restart) or the runner hung, and the
+ * row would otherwise stay DEPLOYING forever. Stuck rows are settled to ERROR
+ * lazily on read.
  */
 export const AI_APPS_DEPLOY_STUCK_MINUTES = Number(process.env.AI_APPS_DEPLOY_STUCK_MINUTES) || 15;
 export const AI_APPS_DEPLOY_STUCK_MS = AI_APPS_DEPLOY_STUCK_MINUTES * 60 * 1000;
@@ -133,6 +134,29 @@ export const AI_APPS_DEPLOY_POLL_INTERVAL_MS = Number(process.env.AI_APPS_DEPLOY
 export const AI_APPS_DEPLOY_REGISTER_GRACE_MS = Number(process.env.AI_APPS_DEPLOY_REGISTER_GRACE_MS) || 2 * 60 * 1000;
 export const AI_APPS_DEPLOY_POLL_DEADLINE_MS =
   Number(process.env.AI_APPS_DEPLOY_POLL_DEADLINE_MS) || Math.max(AI_APPS_DEPLOY_STUCK_MS - 2 * 60 * 1000, 60 * 1000);
+
+/**
+ * Request timeout for the runner `/deploy` call. The ALB in front of the runner
+ * drops the connection after ~60s anyway; a timeout turns a hung connection
+ * into an uncertain answer, which is settled from the orchestrator's
+ * deployment record like a gateway timeout.
+ */
+export const AI_APPS_RUNNER_DEPLOY_TIMEOUT_MS = Number(process.env.AI_APPS_RUNNER_DEPLOY_TIMEOUT_MS) || 120000;
+
+/**
+ * Background deploy job (Bull queue). Deploy requests answer `202` once the
+ * bundle is stored and the job is queued; the job runs the pipeline.
+ * - concurrency: jobs processed at once per API replica (they mostly wait on I/O);
+ * - timeout: backstop above the pipeline's worst case (record wait + lock
+ *   retries + injection). Bull can't cancel the work — the attempt-ownership
+ *   check keeps a late write harmless.
+ */
+export const AI_APPS_DEPLOY_QUEUE = 'ai-apps-deploy';
+export const AI_APPS_DEPLOY_JOB_CONCURRENCY = Number(process.env.AI_APPS_DEPLOY_JOB_CONCURRENCY) || 5;
+export const AI_APPS_DEPLOY_JOB_TIMEOUT_MS = Number(process.env.AI_APPS_DEPLOY_JOB_TIMEOUT_MS) || 25 * 60 * 1000;
+
+/** How often (seconds) the agent is told to poll the deployment status endpoint. */
+export const AI_APPS_DEPLOY_POLL_INTERVAL_SEC = Number(process.env.AI_APPS_DEPLOY_POLL_INTERVAL_SEC) || 10;
 
 /** Sandbox runner base URL (override via env for other environments). */
 export const AI_APPS_RUNNER_URL = process.env.AI_APPS_RUNNER_URL || 'https://sandbox-runner.plnetwork.io';
@@ -343,7 +367,10 @@ export const AI_APPS_RESERVED_APP_IDS: ReadonlySet<string> = new Set([
 export const isReservedAppId = (appId: string): boolean => AI_APPS_RESERVED_APP_IDS.has(appId.toLowerCase());
 
 function safeAppLabel(value: string) {
-  const name = value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '');
+  const name = value
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/^-+|-+$/g, '');
   return name || 'app';
 }
 
@@ -410,6 +437,15 @@ export const AI_APPS_ME_ENDPOINT = process.env.AI_APPS_ME_ENDPOINT || `${AI_APPS
 export const AI_APPS_METADATA_ENDPOINT =
   process.env.AI_APPS_METADATA_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/agent`;
 
+/**
+ * Public URL TEMPLATE of THIS API's agent deployment-status endpoint
+ * (`GET /v1/ai-apps/:uid/deployments/:deploymentId`). The deploy response fills
+ * both placeholders; the starter kit ships the template as `statusEndpoint`.
+ */
+export const AI_APPS_DEPLOYMENT_STATUS_ENDPOINT =
+  process.env.AI_APPS_DEPLOYMENT_STATUS_ENDPOINT ||
+  `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/deployments/{deploymentId}`;
+
 /** Public (no auth) controlled tag vocabulary, so any kit version can read the live list. */
 export const AI_APPS_TAGS_ENDPOINT = `${AI_APPS_BASE_URL}/v1/ai-apps/tags`;
 
@@ -423,6 +459,23 @@ export const AI_APPS_BUILD_LOGS_ENDPOINT =
   process.env.AI_APPS_BUILD_LOGS_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/logs/build`;
 export const AI_APPS_RUNTIME_LOGS_ENDPOINT =
   process.env.AI_APPS_RUNTIME_LOGS_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/logs/runtime`;
+
+/**
+ * Public URL TEMPLATES of THIS API's agent feedback endpoints
+ * (`GET /v1/ai-apps/:uid/agent/feedback` and
+ * `PATCH /v1/ai-apps/:uid/agent/feedback/:feedbackUid`), written into the
+ * starter kit. The agent fills the literal `{appUid}` / `{feedbackUid}` placeholders.
+ */
+export const AI_APPS_FEEDBACK_ENDPOINT =
+  process.env.AI_APPS_FEEDBACK_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/agent/feedback`;
+export const AI_APPS_FEEDBACK_STATUS_ENDPOINT =
+  process.env.AI_APPS_FEEDBACK_STATUS_ENDPOINT ||
+  `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/agent/feedback/{feedbackUid}`;
+
+/** Directory PostHog names for the agent feedback API. Snake case, `ai_apps_` prefix, same project as LabOS. */
+export const AI_APPS_AGENT_FEEDBACK_LISTED = 'ai_apps_agent_feedback_listed';
+export const AI_APPS_AGENT_FEEDBACK_STATUS_CHANGED = 'ai_apps_agent_feedback_status_changed';
+export const AI_APPS_AGENT_FEEDBACK_DENIED = 'ai_apps_agent_feedback_denied';
 
 /**
  * Public URL of THIS API's custom-event analytics endpoint
@@ -485,6 +538,14 @@ export const AI_APPS_PORTAL_ORIGIN: string = (() => {
   }
 })();
 
+/**
+ * The LabOS bridge script every app loads (starter kit 1.15+). Served by the
+ * LabOS frontend, which is also the only parent origin the script will talk to
+ * — so it is derived from the portal origin, and a dev kit points at dev LabOS.
+ * Lets a member pin feedback to elements of the app without screen sharing.
+ */
+export const AI_APPS_BRIDGE_SCRIPT_URL = `${AI_APPS_PORTAL_ORIGIN}/ai-apps/bridge/v1.js`;
+
 /** The LabOS connect page URL a member opens to approve an agent's session. */
 export const buildConnectUrl = (sessionUid: string): string =>
   `${AI_APPS_PORTAL_URL}/pl-infra/ai-apps/connect?session=${encodeURIComponent(sessionUid)}`;
@@ -530,6 +591,8 @@ export const AI_APPS_NOTIFICATION_TRIGGERS = {
   DEPLOY_SUCCEEDED: 'deploy_succeeded',
   DEPLOY_FAILED: 'deploy_failed',
   ACCESS_GRANTED: 'access_granted',
+  FEEDBACK_REPLY: 'feedback_reply',
+  FEEDBACK_SHIPPED: 'feedback_shipped',
 } as const;
 
 /**
@@ -553,4 +616,29 @@ export const AI_APPS_NOTIFICATION_MESSAGES = {
     title: `${appName} was shared with you`,
     description: `${ownerName ?? 'Its owner'} gave you access to this private AI App.`,
   }),
+  feedbackReply: (appName: string, text: string, toSubmitter: boolean) => ({
+    title: toSubmitter ? `New reply on your feedback · ${appName}` : `New reply on feedback · ${appName}`,
+    description: feedbackNotificationExcerpt(text),
+  }),
+  feedbackShipped: (appName: string, note: string) => ({
+    title: `Shipped: your feedback on ${appName}`,
+    description: feedbackNotificationExcerpt(note),
+  }),
 } as const;
+
+/** The start of a reply, for a bell notification's one-line description. */
+export function feedbackNotificationExcerpt(text: string, max = 140): string {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  return flat.length > max ? `${flat.slice(0, max - 1).trimEnd()}…` : flat;
+}
+
+/**
+ * Where a feedback notification opens. A pinned item opens the app with comment
+ * mode on and that pin's thread open; a whole-app item (no pin) has nothing to
+ * open on the page, so it opens the Feedback list with the item selected.
+ */
+export function aiAppFeedbackPath(appUid: string, feedbackUid: string, hasPins: boolean): string {
+  return hasPins
+    ? `${aiAppDetailPath(appUid)}?feedback=${encodeURIComponent(feedbackUid)}`
+    : `/pl-infra/ai-apps/feedback?item=${encodeURIComponent(feedbackUid)}`;
+}

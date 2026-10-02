@@ -1,0 +1,1405 @@
+import React, { useCallback, useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
+import clsx from 'clsx';
+import { useRouter } from 'next/router';
+import { useCookie } from 'react-use';
+import { useDropzone } from 'react-dropzone';
+import { toast } from 'react-toastify';
+import { ApprovalLayout } from '../../layout/approval-layout';
+import { useAuth } from '../../context/auth-context';
+import { RichText } from '../../components/common/rich-text';
+import { AddSpvParticipantModal } from '../../components/spv-spotlights/AddSpvParticipantModal';
+import { EditSpvTemplateVariablesModal } from '../../components/spv-spotlights/EditSpvTemplateVariablesModal';
+import { TeamPitchConfirmModal } from '../../components/team-pitches/TeamPitchConfirmModal';
+import api from '../../utils/api';
+import { API_ROUTE, WEB_UI_BASE_URL } from '../../utils/constants';
+
+import s from '../demo-days/styles.module.scss';
+
+const RichTextEditor = dynamic(() => import('../../components/common/rich-text-editor'), { ssr: false });
+
+type TemplateKey =
+  | 'invitePreapproved'
+  | 'followUpPreapproved'
+  | 'inviteOutreach'
+  | 'followUpOutreach'
+  | 'approved'
+  | 'opened';
+
+const TEMPLATE_LABELS: { key: TemplateKey; label: string }[] = [
+  { key: 'invitePreapproved', label: 'Invite, pre-approved' },
+  { key: 'followUpPreapproved', label: 'Follow-up, pre-approved' },
+  { key: 'inviteOutreach', label: 'Invite, outreach' },
+  { key: 'followUpOutreach', label: 'Follow-up, outreach' },
+  { key: 'approved', label: 'Application approved' },
+  { key: 'opened', label: 'Spotlight is open' },
+];
+
+const BUILT_IN_TOKENS = ['investorName', 'investorEmail', 'spotlightTitle', 'spotlightLink', 'teamName', 'supportEmail'];
+
+const requiredTokens = (template?: { subject: string; body: string }) => {
+  const tokens = new Set<string>();
+  for (const match of `${template?.subject ?? ''} ${template?.body ?? ''}`.matchAll(
+    /\{\{\s*([a-zA-Z0-9_]+)\s*(\|[^}]*)?\}\}/g
+  )) {
+    if (!match[2] && !BUILT_IN_TOKENS.includes(match[1])) tokens.add(match[1]);
+  }
+  return [...tokens];
+};
+
+const splitCsvLine = (line: string) => {
+  const cells: string[] = [];
+  let cell = '';
+  let quoted = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    if (quoted && char === '"' && line[i + 1] === '"') {
+      cell += '"';
+      i += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === ',' && !quoted) {
+      cells.push(cell.trim());
+      cell = '';
+    } else {
+      cell += char;
+    }
+  }
+  cells.push(cell.trim());
+  return cells;
+};
+
+const ACCESS_OPTIONS = ['VIEW', 'VIEW_ADMIN', 'EDIT', 'RESTRICTED'] as const;
+
+const ACCESS_LABELS: Record<typeof ACCESS_OPTIONS[number], string> = {
+  VIEW: 'View Open Spotlight',
+  VIEW_ADMIN: 'View Draft + Open Spotlight',
+  EDIT: 'Admin (View/Edit)',
+  RESTRICTED: 'No Access',
+};
+
+const getParticipantTypeSelectClass = (type: string) => {
+  switch (type) {
+    case 'INVESTOR':
+      return 'bg-purple-100 text-purple-800';
+    case 'FOUNDER':
+      return 'bg-blue-100 text-blue-800';
+    default:
+      return 'bg-gray-100 text-gray-600';
+  }
+};
+
+const getAccessSelectClass = (access: string) => {
+  switch (access) {
+    case 'EDIT':
+      return 'bg-green-100 text-green-800';
+    case 'VIEW':
+      return 'bg-blue-100 text-blue-800';
+    case 'VIEW_ADMIN':
+      return 'bg-indigo-100 text-indigo-800';
+    case 'RESTRICTED':
+      return 'bg-red-100 text-red-800';
+    default:
+      return 'bg-gray-100 text-gray-600';
+  }
+};
+
+type PendingConfirm = {
+  title: string;
+  message: string;
+  details?: string;
+  confirmLabel?: string;
+  participant?: Participant;
+  run: () => Promise<void>;
+};
+
+type MediaItem = { imageUid: string; alt: string; fit: 'cover' | 'contain'; url?: string };
+type Participant = {
+  uid: string;
+  type: string;
+  access: string;
+  cohort: string | null;
+  inviteSentCount: number;
+  followUpSentCount: number;
+  openNoticeSentCount: number;
+  emailTemplateVariables: Record<string, string> | null;
+  accessRequestStatus: 'PENDING' | 'APPROVED' | 'REJECTED' | null;
+  member: { uid: string; name: string | null; email: string | null };
+};
+type AccessRequest = {
+  uid: string;
+  status: string;
+  role: string;
+  organization: string;
+  isAccreditedInvestor: boolean;
+  createdAt: string;
+  member: { name: string | null; email: string | null };
+};
+
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case 'OPEN':
+      return 'text-green-600 bg-green-100';
+    case 'CLOSED':
+      return 'text-red-600 bg-red-100';
+    default:
+      return 'text-gray-600 bg-gray-100';
+  }
+};
+
+const SpvSpotlightDetailPage = () => {
+  const router = useRouter();
+  const uid = typeof router.query.uid === 'string' ? router.query.uid : '';
+  const [authToken] = useCookie('plnadmin');
+  const { canViewTeamPitches, canMutateTeamPitches, isLoading } = useAuth();
+  const [tab, setTab] = useState<'applications' | 'investors' | 'outreach' | 'founders' | 'templates'>('applications');
+  const [isEditing, setIsEditing] = useState(false);
+  const [showAddParticipant, setShowAddParticipant] = useState(false);
+  const [listSearch, setListSearch] = useState('');
+  const [spotlight, setSpotlight] = useState<Record<string, unknown> | null>(null);
+  const [form, setForm] = useState<Record<string, string>>({});
+  const [media, setMedia] = useState<MediaItem[]>([]);
+  const [requests, setRequests] = useState<AccessRequest[]>([]);
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [templates, setTemplates] = useState<Record<TemplateKey, { subject: string; body: string }> | null>(null);
+  const [editingTemplateVars, setEditingTemplateVars] = useState<Participant | null>(null);
+  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
+  const [isConfirmRunning, setIsConfirmRunning] = useState(false);
+  const [selectedUids, setSelectedUids] = useState<string[]>([]);
+  const [bulkSend, setBulkSend] = useState<{
+    kind: 'invites' | 'follow-ups' | 'open-notice';
+    mode: 'all' | 'selected';
+  } | null>(null);
+  const [requestStatusFilter, setRequestStatusFilter] = useState('');
+  const [includeAlreadySent, setIncludeAlreadySent] = useState(false);
+
+  const authHeaders = { authorization: `Bearer ${authToken}` };
+  const base = `${API_ROUTE.ADMIN_SPV_SPOTLIGHTS}/${uid}`;
+
+  const load = useCallback(async () => {
+    if (!authToken || !uid) return;
+    const { data } = await api.get(base, { headers: authHeaders });
+    setSpotlight(data);
+    setForm({
+      title: data.title ?? '',
+      description: data.description ?? '',
+      slug: data.slug ?? '',
+      status: data.status ?? 'DRAFT',
+      supportEmail: data.supportEmail ?? '',
+      senderName: data.senderName ?? '',
+      senderEmail: data.senderEmail ?? '',
+      replyToEmail: data.replyToEmail ?? '',
+      docSendUrl: data.docSendUrl ?? '',
+      summary: data.summary ?? '',
+    });
+    setMedia(
+      (data.media ?? []).map((item: { imageUid: string; alt: string; fit: string; image?: { url: string } }) => ({
+        imageUid: item.imageUid,
+        alt: item.alt,
+        fit: item.fit === 'contain' ? 'contain' : 'cover',
+        url: item.image?.url,
+      }))
+    );
+    setTemplates(data.emailTemplates);
+  }, [authToken, uid]);
+
+  const loadRequests = useCallback(async () => {
+    if (!authToken || !uid) return;
+    const { data } = await api.get(`${base}/access-requests`, { headers: authHeaders });
+    setRequests(data);
+  }, [authToken, uid]);
+
+  const loadParticipants = useCallback(async () => {
+    if (!authToken || !uid) return;
+    const { data } = await api.get(`${base}/participants`, { headers: authHeaders });
+    setParticipants(data);
+  }, [authToken, uid]);
+
+  useEffect(() => {
+    if (!authToken) router.replace(`/?backlink=${router.asPath}`);
+  }, [authToken, router]);
+
+  useEffect(() => {
+    if (!isLoading && authToken && !canViewTeamPitches) router.replace('/');
+  }, [authToken, canViewTeamPitches, isLoading, router]);
+
+  useEffect(() => {
+    load().catch(() => toast.error('Failed to load spotlight'));
+  }, [load]);
+
+  useEffect(() => {
+    if (tab === 'applications') loadRequests().catch(() => undefined);
+    if (tab === 'applications' || tab === 'investors' || tab === 'outreach' || tab === 'founders') {
+      loadParticipants().catch(() => undefined);
+    }
+  }, [tab, loadRequests, loadParticipants]);
+
+  useEffect(() => {
+    setSelectedUids([]);
+  }, [tab]);
+
+  const statusWarning = form.status && form.status !== 'OPEN' ? `This spotlight is ${form.status}. The link will show that page.` : '';
+
+  const saveContent = async (event: React.FormEvent) => {
+    event.preventDefault();
+    await api.patch(
+      base,
+      {
+        ...form,
+        supportEmail: form.supportEmail || null,
+        senderEmail: form.senderEmail || null,
+        senderName: form.senderName || null,
+        replyToEmail: form.replyToEmail || null,
+        docSendUrl: form.docSendUrl || null,
+        summary: form.summary || null,
+        media: media.map(({ imageUid, alt, fit }) => ({ imageUid, alt, fit })),
+      },
+      { headers: authHeaders }
+    );
+    await load();
+    setIsEditing(false);
+    toast.success('Saved');
+  };
+
+  const uploadImages = async (files: File[]) => {
+    const uploaded = await Promise.all(
+      files.map(async (file): Promise<MediaItem> => {
+        const body = new FormData();
+        body.append('file', file);
+        const response = await api.post('/v1/images', body, { headers: { 'content-type': 'multipart/form-data' } });
+        const image = response.data.image ?? response.data;
+        return { imageUid: image.uid, alt: file.name, fit: 'cover', url: image.url };
+      })
+    );
+    setMedia((current) => [...current, ...uploaded]);
+  };
+
+  const mediaDropzone = useDropzone({
+    accept: { 'image/png': [], 'image/jpeg': [], 'image/webp': [], 'image/gif': [] },
+    multiple: true,
+    noClick: true,
+    onDrop: (accepted, rejected) => {
+      if (rejected.length) toast.error('Only PNG, JPG, WebP and GIF files are supported.');
+      if (accepted.length) uploadImages(accepted).catch(() => toast.error('Upload failed'));
+    },
+  });
+
+  const parseCsv = (text: string) => {
+    const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    if (!lines.length) return [];
+    const headers = splitCsvLine(lines[0]);
+    const emailIndex = Math.max(headers.findIndex((header) => header.toLowerCase() === 'email'), 0);
+    const nameIndex = headers.findIndex((header) => header.toLowerCase() === 'name');
+    return lines.slice(1).map((line) => {
+      const cells = splitCsvLine(line);
+      const emailTemplateVariables: Record<string, string> = {};
+      headers.forEach((header, index) => {
+        const key = header.toLowerCase();
+        if (index === emailIndex || key === 'name' || !header) return;
+        if (cells[index]) emailTemplateVariables[header] = cells[index];
+      });
+      return {
+        email: cells[emailIndex],
+        name: nameIndex >= 0 ? cells[nameIndex] : undefined,
+        emailTemplateVariables,
+      };
+    }).filter((row) => row.email);
+  };
+
+  const uploadCohort = async (cohort: 'PRE_APPROVED' | 'OUTREACH', file: File) => {
+    const participants = parseCsv(await file.text());
+    if (!participants.length) {
+      toast.error('No rows with an email column were found.');
+      return;
+    }
+    const { data } = await api.post(`${base}/participants-bulk`, { cohort, participants }, { headers: authHeaders });
+    await loadParticipants();
+    const uploaded = participants.length - (data.skipped ?? 0);
+    toast.success(
+      `Uploaded ${uploaded} ${cohort === 'PRE_APPROVED' ? 'pre-approved' : 'outreach'} investors.${
+        data.skipped ? ` ${data.skipped} already pre-approved, left unchanged.` : ''
+      }`
+    );
+  };
+
+  const runConfirmed = async (run: () => Promise<void>) => {
+    setIsConfirmRunning(true);
+    try {
+      await run();
+      setPendingConfirm(null);
+    } catch {
+      toast.error('Something went wrong. Please try again.');
+    } finally {
+      setIsConfirmRunning(false);
+    }
+  };
+
+  const confirmIfNotOpen = (title: string, confirmLabel: string, run: () => Promise<void>) => {
+    if (!statusWarning) return runConfirmed(run);
+    setPendingConfirm({ title, message: statusWarning, confirmLabel, run });
+  };
+
+  const sendBulk = async (
+    kind: 'invites' | 'follow-ups' | 'open-notice',
+    mode: 'all' | 'selected',
+    participantUids: string[]
+  ) => {
+    const { data } =
+      kind === 'open-notice'
+        ? await api.post(`${base}/open-notice`, { includeAlreadySent, participantUids }, { headers: authHeaders })
+        : await api.post(
+            `${base}/participants/${kind === 'invites' ? 'send-invites-bulk' : 'send-follow-ups-bulk'}`,
+            kind === 'invites'
+              ? { includeAlreadyInvited: includeAlreadySent, participantUids }
+              : { includeAlreadyFollowedUp: includeAlreadySent, participantUids },
+            { headers: authHeaders }
+          );
+    const { sent, skipped, errors } = data.summary;
+    if (errors > 0) {
+      toast.warning(`Sent ${sent}; ${errors} failed${skipped > 0 ? `, ${skipped} skipped` : ''}`);
+    } else {
+      toast.success(`Sent ${sent}${skipped > 0 ? ` (${skipped} skipped)` : ''}`);
+    }
+    setBulkSend(null);
+    if (mode === 'selected') setSelectedUids([]);
+    await loadParticipants();
+  };
+
+  const removeSelected = () =>
+    setPendingConfirm({
+      title: 'Remove selected participants',
+      message: `Remove ${selectedUids.length} selected participant${
+        selectedUids.length === 1 ? '' : 's'
+      } from this spotlight? Approved applications are marked rejected, so they lose access and can't re-apply. Member profiles are not deleted.`,
+      confirmLabel: `Remove ${selectedUids.length}`,
+      run: async () => {
+        const { data } = await api.post(
+          `${base}/participants/remove-bulk`,
+          { participantUids: selectedUids },
+          { headers: authHeaders }
+        );
+        toast.success(`Removed ${data.removed} participant${data.removed === 1 ? '' : 's'}`);
+        setSelectedUids([]);
+        await loadParticipants();
+      },
+    });
+
+  const exportLinks = (list: Participant[], fileName: string) =>
+    confirmIfNotOpen('Export login links', 'Export anyway', async () => {
+      const { data } = await api.get(`${base}/login-links`, { headers: authHeaders });
+      const emails = new Set(list.map((participant) => participant.member.email));
+      const rows = data.rows.filter((row: { email: string }) => emails.has(row.email));
+      const lines = ['email,name,cohort,url', ...rows.map((row: { email: string; name: string; cohort: string; url: string }) =>
+        [row.email, row.name, row.cohort, row.url].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')
+      )];
+      const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+      const href = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = href;
+      anchor.download = fileName;
+      anchor.click();
+      URL.revokeObjectURL(href);
+    });
+
+  const removeParticipant = (participant: Participant) =>
+    setPendingConfirm({
+      title: 'Remove participant',
+      message:
+        "Remove this participant from the spotlight? An approved application is marked rejected, so they lose access and can't re-apply.",
+      confirmLabel: 'Remove',
+      participant,
+      run: async () => {
+        await api.delete(`${base}/participants/${participant.uid}`, { headers: authHeaders });
+        toast.success('Participant removed');
+        await loadParticipants();
+      },
+    });
+
+  const reviewRequest = (request: AccessRequest, action: 'approve' | 'reject') =>
+    setPendingConfirm({
+      title: action === 'approve' ? 'Approve application' : 'Reject application',
+      message:
+        action === 'approve'
+          ? `Approve ${request.member.name || request.member.email}? They are added to Investors and get the approval email now.`
+          : `Reject ${request.member.name || request.member.email}? They can't apply again. No email is sent.`,
+      confirmLabel: action === 'approve' ? 'Approve and send email' : 'Reject',
+      run: async () => {
+        await api.post(`${base}/access-requests/${request.uid}/${action}`, {}, { headers: authHeaders });
+        toast.success(action === 'approve' ? 'Application approved' : 'Application rejected');
+        await Promise.all([loadRequests(), loadParticipants()]);
+      },
+    });
+
+  const saveTemplates = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!templates) return;
+    try {
+      const { data } = await api.patch(`${base}/email-templates`, { templates }, { headers: authHeaders });
+      const saved = data.templates as Record<TemplateKey, { subject: string; body: string }>;
+      const stripped = TEMPLATE_LABELS.some(({ key }) => saved[key].body !== templates[key].body);
+      setTemplates(saved);
+      if (stripped) {
+        toast.warning('Templates saved. Scripts, iframes or event handlers were removed from the HTML.');
+      } else {
+        toast.success('Templates saved');
+      }
+    } catch {
+      toast.error('Failed to save templates');
+    }
+  };
+
+  const updateParticipantField = (participant: Participant, field: 'type' | 'access', value: string) => {
+    const label = field === 'type' ? value.charAt(0) + value.slice(1).toLowerCase() : ACCESS_LABELS[value as typeof ACCESS_OPTIONS[number]];
+    setPendingConfirm({
+      title: field === 'type' ? 'Change participant type' : 'Change participant access',
+      message:
+        field === 'type'
+          ? value === 'FOUNDER'
+            ? `Change this participant's type to ${label}? They get admin (edit) access and lose their investor cohort.`
+            : `Change this participant's type to ${label}? They become an outreach investor and have to apply.`
+          : `Change this participant's access to ${label}?`,
+      participant,
+      run: async () => {
+        await api.patch(`${base}/participants/${participant.uid}`, { [field]: value }, { headers: authHeaders });
+        toast.success('Participant updated');
+        await loadParticipants();
+      },
+    });
+  };
+
+  const moveCohort = (participant: Participant, cohort: 'PRE_APPROVED' | 'OUTREACH') =>
+    setPendingConfirm({
+      title: cohort === 'PRE_APPROVED' ? 'Grant access' : 'Move to outreach',
+      message:
+        cohort === 'PRE_APPROVED'
+          ? 'This investor becomes pre-approved and can view the spotlight without applying. A pending or rejected application is removed.'
+          : 'This investor loses pre-approved access and has to apply to view the spotlight.',
+      confirmLabel: cohort === 'PRE_APPROVED' ? 'Grant access' : 'Move to outreach',
+      participant,
+      run: async () => {
+        await api.patch(`${base}/participants/${participant.uid}`, { cohort }, { headers: authHeaders });
+        toast.success('Participant updated');
+        await loadParticipants();
+      },
+    });
+
+  const typeSelect = (participant: Participant) => (
+    <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 130 }}>
+      <select
+        value={participant.type}
+        disabled={!canMutateTeamPitches}
+        onChange={(e) => updateParticipantField(participant, 'type', e.target.value)}
+        className={clsx(
+          'inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold disabled:opacity-50',
+          getParticipantTypeSelectClass(participant.type)
+        )}
+      >
+        <option value="INVESTOR">Investor</option>
+        <option value="FOUNDER">Founder</option>
+      </select>
+    </div>
+  );
+
+  const accessSelect = (participant: Participant) => (
+    <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 220 }}>
+      <select
+        value={participant.access}
+        disabled={!canMutateTeamPitches}
+        onChange={(e) => updateParticipantField(participant, 'access', e.target.value)}
+        className={clsx(
+          'inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold disabled:opacity-50',
+          getAccessSelectClass(participant.access)
+        )}
+      >
+        {ACCESS_OPTIONS.map((access) => (
+          <option key={access} value={access}>
+            {ACCESS_LABELS[access]}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+
+  if (!authToken || isLoading) return null;
+
+  if (!spotlight) {
+    return (
+      <ApprovalLayout>
+        <div className={clsx(s.root, s.wide)}>
+          <div className={s.loadingState}>Loading SPV spotlight details...</div>
+        </div>
+      </ApprovalLayout>
+    );
+  }
+
+  const team = spotlight.team as { uid: string; name: string };
+  const hasAccess = (participant: Participant) =>
+    participant.accessRequestStatus === 'APPROVED' ||
+    (participant.cohort === 'PRE_APPROVED' && participant.accessRequestStatus !== 'REJECTED');
+  const investors = participants.filter((participant) => participant.type === 'INVESTOR' && hasAccess(participant));
+  const outreach = participants.filter((participant) => participant.type === 'INVESTOR' && !hasAccess(participant));
+  const inviteRecipients =
+    tab === 'outreach'
+      ? outreach.filter((participant) => participant.cohort === 'OUTREACH' && !participant.accessRequestStatus)
+      : investors.filter((participant) => participant.cohort === 'PRE_APPROVED');
+  const founders = participants.filter((participant) => participant.type === 'FOUNDER');
+  const query = listSearch.trim().toLowerCase();
+  const matchesPerson = (name?: string | null, email?: string | null) =>
+    !query || `${name ?? ''} ${email ?? ''}`.toLowerCase().includes(query);
+  const visibleRequests = requests.filter(
+    (request) =>
+      matchesPerson(request.member.name, request.member.email) &&
+      (!requestStatusFilter || request.status === requestStatusFilter)
+  );
+  const visibleInvestors = investors.filter((participant) =>
+    matchesPerson(participant.member.name, participant.member.email)
+  );
+  const visibleOutreach = outreach.filter((participant) =>
+    matchesPerson(participant.member.name, participant.member.email)
+  );
+  const visibleList = tab === 'investors' ? visibleInvestors : visibleOutreach;
+  const selectedUidSet = new Set(selectedUids);
+  const allVisibleSelected = visibleList.length > 0 && visibleList.every((participant) => selectedUidSet.has(participant.uid));
+  const someVisibleSelected = visibleList.some((participant) => selectedUidSet.has(participant.uid));
+  const toggleSelectAllVisible = () => {
+    const visibleUids = visibleList.map((participant) => participant.uid);
+    setSelectedUids((prev) =>
+      allVisibleSelected ? prev.filter((id) => !visibleUids.includes(id)) : [...new Set([...prev, ...visibleUids])]
+    );
+  };
+  const toggleSelectUid = (participantUid: string) =>
+    setSelectedUids((prev) =>
+      prev.includes(participantUid) ? prev.filter((id) => id !== participantUid) : [...prev, participantUid]
+    );
+  const isReachable = (participant: Participant) => participant.access !== 'RESTRICTED' && !!participant.member.email;
+  const eligibleRecipients = inviteRecipients.filter(isReachable);
+  const openNoticeRecipients = investors.filter(isReachable);
+  const kindRecipients = bulkSend?.kind === 'open-notice' ? investors : inviteRecipients;
+  const eligibleUidSet = new Set(kindRecipients.filter(isReachable).map((participant) => participant.uid));
+  const sendTargets =
+    bulkSend?.mode === 'selected' ? participants.filter((participant) => selectedUidSet.has(participant.uid)) : kindRecipients;
+  const sendEligible = sendTargets.filter((participant) => eligibleUidSet.has(participant.uid));
+  const wasSent = (participant: Participant) =>
+    (bulkSend?.kind === 'open-notice'
+      ? participant.openNoticeSentCount
+      : bulkSend?.kind === 'follow-ups'
+      ? participant.followUpSentCount
+      : participant.inviteSentCount) > 0;
+  const sendAlreadySent = sendEligible.filter(wasSent);
+  const sendRecipients = includeAlreadySent ? sendEligible : sendEligible.filter((participant) => !wasSent(participant));
+  const sendSkipped = sendTargets.length - sendEligible.length;
+  const sendNoun = bulkSend?.kind === 'open-notice' ? 'open notice' : bulkSend?.kind === 'follow-ups' ? 'follow-up' : 'invite';
+  const sendTemplateKey: TemplateKey =
+    bulkSend?.kind === 'open-notice'
+      ? 'opened'
+      : tab === 'outreach'
+      ? bulkSend?.kind === 'follow-ups'
+        ? 'followUpOutreach'
+        : 'inviteOutreach'
+      : bulkSend?.kind === 'follow-ups'
+      ? 'followUpPreapproved'
+      : 'invitePreapproved';
+  const sendTokens = requiredTokens(templates?.[sendTemplateKey]);
+  const missingTokens = sendTokens.filter((token) =>
+    sendRecipients.some((participant) => !participant.emailTemplateVariables?.[token])
+  );
+  const missingVariables = sendRecipients.filter((participant) =>
+    missingTokens.some((token) => !participant.emailTemplateVariables?.[token])
+  );
+  const openBulkSend = (kind: 'invites' | 'follow-ups' | 'open-notice', mode: 'all' | 'selected') => {
+    setIncludeAlreadySent(mode === 'selected');
+    setBulkSend({ kind, mode });
+  };
+  const visibleFounders = founders.filter((participant) =>
+    matchesPerson(participant.member.name, participant.member.email)
+  );
+  const publicUrl = `${WEB_UI_BASE_URL}/spv-spotlight/${form.slug || spotlight.slug}`;
+
+  const cancelEdit = () => {
+    setForm({
+      title: String(spotlight.title ?? ''),
+      description: String(spotlight.description ?? ''),
+      slug: String(spotlight.slug ?? ''),
+      status: String(spotlight.status ?? 'DRAFT'),
+      supportEmail: String(spotlight.supportEmail ?? ''),
+      senderName: String(spotlight.senderName ?? ''),
+      senderEmail: String(spotlight.senderEmail ?? ''),
+      replyToEmail: String(spotlight.replyToEmail ?? ''),
+      docSendUrl: String(spotlight.docSendUrl ?? ''),
+      summary: String(spotlight.summary ?? ''),
+    });
+    setMedia(
+      ((spotlight.media as { imageUid: string; alt: string; fit: string; image?: { url: string } }[]) ?? []).map(
+        (item) => ({
+          imageUid: item.imageUid,
+          alt: item.alt,
+          fit: item.fit === 'contain' ? 'contain' : 'cover',
+          url: item.image?.url,
+        })
+      )
+    );
+    setIsEditing(false);
+  };
+
+  const textField = (key: keyof typeof form, label: string, hint?: string) => (
+    <div className={s.overviewField}>
+      <label className={s.fieldLabel}>{label}</label>
+      {isEditing ? (
+        <input
+          type="text"
+          value={form[key] ?? ''}
+          onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+          className={s.fieldInput}
+        />
+      ) : (
+        <div className={s.fieldValue}>{form[key] || '—'}</div>
+      )}
+      {hint && <p className="text-xs text-gray-500">{hint}</p>}
+    </div>
+  );
+
+  return (
+    <ApprovalLayout>
+      <div className={clsx(s.root, s.wide)}>
+        <div className={s.backButton}>
+          <button onClick={() => router.push('/spv-spotlights')} className="mb-4 text-blue-600 hover:text-blue-800">
+            ← Back to SPV Spotlights
+          </button>
+        </div>
+
+        <div className={s.header}>
+          <div>
+            <span className={s.title}>{String(spotlight.title)}</span>
+            {team?.name && (
+              <p className="mt-1 text-sm text-gray-500">
+                Team:{' '}
+                <a
+                  href={`${WEB_UI_BASE_URL}/teams/${team.uid}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:text-blue-800"
+                >
+                  {team.name}
+                </a>
+              </p>
+            )}
+          </div>
+          <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${getStatusColor(String(spotlight.status))}`}>
+            {String(spotlight.status)}
+          </span>
+        </div>
+
+        <div className={s.body}>
+          <form className={s.overview} onSubmit={saveContent}>
+            <div className={s.overviewHeader}>
+              <h2 className={s.overviewTitle}>Overview</h2>
+              {canMutateTeamPitches &&
+                (!isEditing ? (
+                  <button type="button" onClick={() => setIsEditing(true)} className={s.editButton}>
+                    Edit
+                  </button>
+                ) : (
+                  <div className="flex space-x-2">
+                    <button type="button" onClick={cancelEdit} className={s.editButton}>
+                      Cancel
+                    </button>
+                    <button type="submit" className={clsx(s.editButton, s.primary)}>
+                      Save
+                    </button>
+                  </div>
+                ))}
+            </div>
+            <div className={s.overviewGrid}>
+              {textField('title', 'Title')}
+              {textField('slug', 'URL Slug')}
+              <div className={s.overviewField}>
+                <label className={s.fieldLabel}>Status</label>
+                {isEditing ? (
+                  <select
+                    value={form.status}
+                    onChange={(e) => setForm({ ...form, status: e.target.value })}
+                    className={s.fieldInput}
+                  >
+                    <option value="DRAFT">Draft</option>
+                    <option value="OPEN">Open</option>
+                    <option value="CLOSED">Closed</option>
+                  </select>
+                ) : (
+                  <div className={s.fieldValue}>{form.status}</div>
+                )}
+                <p className="text-xs text-gray-500">Changing status does not send email.</p>
+              </div>
+              {textField('supportEmail', 'Support Email', 'Leave blank to use the default support email.')}
+              {textField('senderEmail', 'Sender Email', 'From address used for investor invite and follow-up emails.')}
+              {textField('senderName', 'Sender Name')}
+              {textField('replyToEmail', 'Reply-To Email')}
+              {textField('docSendUrl', 'DocSend URL')}
+              <div className={clsx(s.overviewField, s.fullWidth)}>
+                <label className={s.fieldLabel}>Summary</label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={form.summary}
+                    onChange={(e) => setForm({ ...form, summary: e.target.value })}
+                    className={s.fieldInput}
+                  />
+                ) : (
+                  <div className={s.fieldValue}>{form.summary || '—'}</div>
+                )}
+              </div>
+              <div className={clsx(s.overviewField, s.fullWidth)}>
+                <label className={s.fieldLabel}>Description</label>
+                {isEditing ? (
+                  <RichTextEditor
+                    id="spv-description"
+                    value={form.description}
+                    onChange={(description: string) => setForm({ ...form, description })}
+                  />
+                ) : (
+                  <div className={s.fieldValue}>
+                    <RichText text={form.description ?? ''} />
+                  </div>
+                )}
+              </div>
+              <div className={clsx(s.overviewField, s.fullWidth)}>
+                <label className={s.fieldLabel}>Media</label>
+                <div className="flex w-full flex-col gap-3">
+                  {media.map((item, index) => (
+                    <div key={`${item.imageUid}-${index}`} className="flex items-center gap-3">
+                      {item.url && (
+                        <img src={item.url} alt={item.alt} className="h-16 w-24 rounded border border-gray-200 object-cover" />
+                      )}
+                      {isEditing ? (
+                        <>
+                          <input
+                            className={s.fieldInput}
+                            value={item.alt}
+                            onChange={(e) => {
+                              const next = [...media];
+                              next[index] = { ...item, alt: e.target.value };
+                              setMedia(next);
+                            }}
+                          />
+                          <select
+                            className={s.filterSelect}
+                            value={item.fit}
+                            onChange={(e) => {
+                              const next = [...media];
+                              next[index] = { ...item, fit: e.target.value === 'contain' ? 'contain' : 'cover' };
+                              setMedia(next);
+                            }}
+                          >
+                            <option value="cover">Cover</option>
+                            <option value="contain">Contain</option>
+                          </select>
+                          <button
+                            type="button"
+                            className="text-sm text-red-600"
+                            onClick={() => setMedia(media.filter((_, i) => i !== index))}
+                          >
+                            Remove
+                          </button>
+                        </>
+                      ) : (
+                        <div className={s.fieldValue}>
+                          {item.alt || 'Untitled'} · {item.fit}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {media.length === 0 && !isEditing && <div className={s.fieldValue}>—</div>}
+                  {isEditing && canMutateTeamPitches && (
+                    <div
+                      {...mediaDropzone.getRootProps()}
+                      className={clsx(
+                        'flex flex-col items-center gap-3 rounded-lg border-2 border-dashed p-6 text-center transition-colors',
+                        mediaDropzone.isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-gray-50'
+                      )}
+                    >
+                      <input {...mediaDropzone.getInputProps()} />
+                      <div className="text-sm text-gray-600">Drag and drop images here</div>
+                      <div className="text-xs text-gray-400">PNG, JPG, WebP or GIF. Multiple files allowed.</div>
+                      <button type="button" className={s.editButton} onClick={mediaDropzone.open}>
+                        Choose files
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className={clsx(s.overviewField, s.fullWidth)}>
+                <label className={s.fieldLabel}>Spotlight Page URL</label>
+                <div className={s.fieldValue}>
+                  <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="break-all text-blue-600 hover:text-blue-800">
+                    {publicUrl}
+                  </a>
+                </div>
+              </div>
+            </div>
+          </form>
+
+          <div className={s.participants}>
+            <div className={s.participantsHeader}>
+              <div className={s.participantsHeaderTop}>
+                <h2 className={s.participantsTitle}>
+                  {tab === 'templates' ? 'Email templates' : 'Participants'}
+                </h2>
+                {canMutateTeamPitches && (tab === 'investors' || tab === 'outreach' || tab === 'founders') && (
+                  <div className="flex flex-col items-end gap-2">
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowAddParticipant(true)}
+                        className={clsx(s.editButton, s.primary)}
+                      >
+                        Add Participant
+                      </button>
+                      {(tab === 'investors' || tab === 'outreach') && (
+                        <>
+                          <label className="cursor-pointer rounded-lg bg-green-600 px-4 py-2 text-white hover:bg-green-700">
+                            {tab === 'investors' ? 'Upload pre-approved CSV' : 'Upload outreach CSV'}
+                            <input
+                              type="file"
+                              accept=".csv,text/csv"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                const cohort = tab === 'investors' ? 'PRE_APPROVED' : 'OUTREACH';
+                                if (file) uploadCohort(cohort, file).catch(() => toast.error('Upload failed'));
+                                e.target.value = '';
+                              }}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              tab === 'investors'
+                                ? exportLinks(investors, 'spv-investors-login-links.csv')
+                                : exportLinks(outreach, 'spv-outreach-login-links.csv')
+                            }
+                            className={s.editButton}
+                          >
+                            Export login links
+                          </button>
+                        </>
+                      )}
+                    </div>
+                    {(tab === 'investors' || tab === 'outreach') && (
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openBulkSend('invites', 'all')}
+                          disabled={!eligibleRecipients.length}
+                          className="rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+                        >
+                          Send Invites to All
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openBulkSend('follow-ups', 'all')}
+                          disabled={!eligibleRecipients.length}
+                          className="rounded-lg bg-violet-600 px-4 py-2 text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+                        >
+                          Send Follow-ups to All
+                        </button>
+                        {tab === 'investors' && (
+                          <button
+                            type="button"
+                            onClick={() => openBulkSend('open-notice', 'all')}
+                            disabled={!openNoticeRecipients.length}
+                            className={clsx(s.editButton, 'disabled:cursor-not-allowed disabled:opacity-50')}
+                          >
+                            Email that spotlight is open
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className={s.tabs}>
+                {(
+                  [
+                    ['applications', 'Applications', requests.length],
+                    ['investors', 'Investors', investors.length],
+                    ['outreach', 'Outreach', outreach.length],
+                    ['founders', 'Founders', founders.length],
+                    ['templates', 'Templates', null],
+                  ] as const
+                ).map(([item, label, count]) => (
+                  <button
+                    key={item}
+                    type="button"
+                    className={clsx(s.tab, { [s.active]: tab === item })}
+                    onClick={() => setTab(item)}
+                  >
+                    {label}
+                    {count !== null ? ` (${count})` : ''}
+                  </button>
+                ))}
+              </div>
+
+              {tab !== 'templates' && (
+                <div className={s.participantsFilters}>
+                  <input
+                    type="text"
+                    placeholder="Search by name or email"
+                    value={listSearch}
+                    onChange={(e) => setListSearch(e.target.value)}
+                    className={s.input}
+                  />
+                  {tab === 'applications' && (
+                    <select
+                      value={requestStatusFilter}
+                      onChange={(e) => setRequestStatusFilter(e.target.value)}
+                      className={s.filterSelect}
+                    >
+                      <option value="">All statuses</option>
+                      <option value="PENDING">Pending</option>
+                      <option value="APPROVED">Approved</option>
+                      <option value="REJECTED">Rejected</option>
+                    </select>
+                  )}
+                </div>
+              )}
+
+              {canMutateTeamPitches && (tab === 'investors' || tab === 'outreach') && selectedUids.length > 0 && (
+                <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
+                  <span className="text-sm font-medium text-indigo-900">{selectedUids.length} selected</span>
+                  <button
+                    type="button"
+                    className="text-sm text-indigo-700 underline hover:text-indigo-900"
+                    onClick={() => setSelectedUids([])}
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openBulkSend('invites', 'selected')}
+                    className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700"
+                  >
+                    Send Invite to Selected
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openBulkSend('follow-ups', 'selected')}
+                    className="rounded-lg bg-violet-600 px-3 py-1.5 text-sm text-white hover:bg-violet-700"
+                  >
+                    Send Follow-up to Selected
+                  </button>
+                  {tab === 'investors' && (
+                    <button
+                      type="button"
+                      onClick={() => openBulkSend('open-notice', 'selected')}
+                      className={clsx(s.editButton, 'px-3 py-1.5')}
+                    >
+                      Send Open Notice to Selected
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={removeSelected}
+                    className="rounded-lg bg-red-600 px-3 py-1.5 text-sm text-white hover:bg-red-700"
+                  >
+                    Remove Selected
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {tab === 'applications' && (
+            <div className={s.participantsTable}>
+              {visibleRequests.length === 0 ? (
+                <div className={s.emptyState}>No applications found</div>
+              ) : (
+                <div className={s.table}>
+                  <div className={clsx(s.tableRow, s.tableHeader)}>
+                    <div className={clsx(s.headerCell, s.first, s.flexible)}>Member</div>
+                    <div className={clsx(s.headerCell, s.flexible)}>Role</div>
+                    <div className={clsx(s.headerCell, s.flexible)}>Organization</div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 110 }}>Accredited</div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 120 }}>Applied</div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 120 }}>Status</div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 140 }}>Actions</div>
+                  </div>
+                  {visibleRequests.map((request) => (
+                    <div key={request.uid} className={s.tableRow}>
+                      <div className={clsx(s.bodyCell, s.first, s.flexible)}>
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{request.member.name || '—'}</div>
+                          <div className="text-sm text-gray-500">{request.member.email}</div>
+                        </div>
+                      </div>
+                      <div className={clsx(s.bodyCell, s.flexible)}>{request.role}</div>
+                      <div className={clsx(s.bodyCell, s.flexible)}>{request.organization}</div>
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 110 }}>
+                        {request.isAccreditedInvestor ? 'Yes' : 'No'}
+                      </div>
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 120 }}>
+                        {new Date(request.createdAt).toLocaleDateString()}
+                      </div>
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 120 }}>{request.status}</div>
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 140 }}>
+                        {canMutateTeamPitches && request.status !== 'APPROVED' && (
+                          <button
+                            type="button"
+                            className="text-sm text-blue-600 hover:text-blue-800"
+                            onClick={() => reviewRequest(request, 'approve')}
+                          >
+                            Approve
+                          </button>
+                        )}
+                        {canMutateTeamPitches && request.status === 'PENDING' && (
+                          <button
+                            type="button"
+                            className="ml-3 text-sm text-red-600 hover:text-red-800"
+                            onClick={() => reviewRequest(request, 'reject')}
+                          >
+                            Reject
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {(tab === 'investors' || tab === 'outreach') && (
+            <div className={s.participantsTable}>
+              {visibleList.length === 0 ? (
+                <div className={s.emptyState}>No participants found</div>
+              ) : (
+                <div className={s.table}>
+                  <div className={clsx(s.tableRow, s.tableHeader)}>
+                    {canMutateTeamPitches && (
+                      <div className={clsx(s.headerCell, s.fixed)} style={{ width: 48 }}>
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          checked={allVisibleSelected}
+                          ref={(el) => {
+                            if (el) el.indeterminate = someVisibleSelected && !allVisibleSelected;
+                          }}
+                          onChange={toggleSelectAllVisible}
+                          aria-label="Select all visible participants"
+                        />
+                      </div>
+                    )}
+                    <div className={clsx(s.headerCell, s.first, s.flexible)}>Member</div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 140 }}>
+                      {tab === 'investors' ? 'Access via' : 'Application'}
+                    </div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 130 }}>Type</div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 90 }}>Invites</div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 110 }}>Follow-up</div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 220 }}>Template vars</div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 220 }}>Actions</div>
+                  </div>
+                  {visibleList.map((participant) => (
+                    <div key={participant.uid} className={s.tableRow}>
+                      {canMutateTeamPitches && (
+                        <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 48 }}>
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                            checked={selectedUidSet.has(participant.uid)}
+                            onChange={() => toggleSelectUid(participant.uid)}
+                            aria-label={`Select ${participant.member.name || participant.member.email || 'participant'}`}
+                          />
+                        </div>
+                      )}
+                      <div className={clsx(s.bodyCell, s.first, s.flexible)}>
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{participant.member.name || '—'}</div>
+                          <div className="text-sm text-gray-500">{participant.member.email}</div>
+                        </div>
+                      </div>
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 140 }}>
+                        {tab === 'investors'
+                          ? participant.cohort === 'PRE_APPROVED'
+                            ? 'Pre-approved'
+                            : 'Application'
+                          : participant.accessRequestStatus === 'PENDING'
+                          ? 'Pending'
+                          : participant.accessRequestStatus === 'REJECTED'
+                          ? 'Rejected'
+                          : 'Not applied'}
+                      </div>
+                      {typeSelect(participant)}
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 90 }}>{participant.inviteSentCount}</div>
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 110 }}>{participant.followUpSentCount}</div>
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 220 }}>
+                        {(() => {
+                          const vars = participant.emailTemplateVariables;
+                          const preview = vars && Object.keys(vars).length > 0 ? JSON.stringify(vars) : null;
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => setEditingTemplateVars(participant)}
+                              className={
+                                preview
+                                  ? 'block w-full truncate text-left text-sm text-blue-600 hover:text-blue-800'
+                                  : 'text-sm text-gray-400 hover:text-blue-600'
+                              }
+                              title={preview ?? undefined}
+                            >
+                              {preview ?? 'no data'}
+                            </button>
+                          );
+                        })()}
+                      </div>
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 220 }}>
+                        {canMutateTeamPitches && tab === 'outreach' && (
+                          <button
+                            type="button"
+                            className="text-sm text-blue-600 hover:text-blue-800"
+                            onClick={() => moveCohort(participant, 'PRE_APPROVED')}
+                          >
+                            Grant access
+                          </button>
+                        )}
+                        {canMutateTeamPitches &&
+                          tab === 'investors' &&
+                          participant.cohort === 'PRE_APPROVED' &&
+                          participant.accessRequestStatus !== 'APPROVED' && (
+                            <button
+                              type="button"
+                              className="text-sm text-blue-600 hover:text-blue-800"
+                              onClick={() => moveCohort(participant, 'OUTREACH')}
+                            >
+                              Move to outreach
+                            </button>
+                          )}
+                        <button
+                          type="button"
+                          className="text-sm text-red-600 hover:text-red-800"
+                          onClick={() => removeParticipant(participant)}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {tab === 'founders' && (
+            <div className={s.participantsTable}>
+              {visibleFounders.length === 0 ? (
+                <div className={s.emptyState}>No team leads were on this team when the spotlight was created.</div>
+              ) : (
+                <div className={s.table}>
+                  <div className={clsx(s.tableRow, s.tableHeader)}>
+                    <div className={clsx(s.headerCell, s.first, s.flexible)}>Member</div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 130 }}>Type</div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 220 }}>Access</div>
+                  </div>
+                  {visibleFounders.map((founder) => (
+                    <div key={founder.uid} className={s.tableRow}>
+                      <div className={clsx(s.bodyCell, s.first, s.flexible)}>
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{founder.member.name || '—'}</div>
+                          <div className="text-sm text-gray-500">{founder.member.email}</div>
+                        </div>
+                      </div>
+                      {typeSelect(founder)}
+                      {accessSelect(founder)}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {tab === 'templates' && templates && (
+            <form className={s.overview} onSubmit={saveTemplates}>
+              <div className={s.overviewHeader}>
+                <h2 className={s.overviewTitle}>Templates</h2>
+                {canMutateTeamPitches && (
+                  <button type="submit" className={clsx(s.editButton, s.primary)}>
+                    Save
+                  </button>
+                )}
+              </div>
+              <p className="mb-6 text-sm text-gray-500">
+                Built-in tokens: investorName, investorEmail, spotlightTitle, spotlightLink, teamName, supportEmail.
+                Every email also replaces the investor&apos;s template variables (extra CSV columns, using the column header
+                as the token). Approval emails also have role and organization. Add a fallback for empty values with{' '}
+                {'{{firm|your fund}}'}. HTML is allowed.
+              </p>
+              <div className="flex flex-col gap-6">
+                {TEMPLATE_LABELS.map(({ key, label }) => (
+                  <div key={key} className={clsx(s.overviewField, 'w-full')}>
+                    <label className={s.fieldLabel}>{label}</label>
+                    <input
+                      className={clsx(s.fieldInput, 'box-border w-full self-stretch')}
+                      value={templates[key].subject}
+                      onChange={(e) => setTemplates({ ...templates, [key]: { ...templates[key], subject: e.target.value } })}
+                    />
+                    <textarea
+                      className={clsx(s.fieldTextarea, 'min-h-[160px]')}
+                      value={templates[key].body}
+                      onChange={(e) => setTemplates({ ...templates, [key]: { ...templates[key], body: e.target.value } })}
+                    />
+                  </div>
+                ))}
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+      <AddSpvParticipantModal
+        isOpen={showAddParticipant}
+        onClose={() => setShowAddParticipant(false)}
+        spotlightUid={uid}
+        defaultType={tab === 'founders' ? 'FOUNDER' : 'INVESTOR'}
+        defaultCohort={tab === 'outreach' ? 'OUTREACH' : 'PRE_APPROVED'}
+        onAdded={() => loadParticipants()}
+      />
+      <TeamPitchConfirmModal
+        isOpen={!!bulkSend}
+        title={
+          bulkSend?.kind === 'open-notice'
+            ? `Email that spotlight is open to ${bulkSend.mode === 'selected' ? 'selected' : 'all'} investors`
+            : `Send ${sendNoun}s to ${bulkSend?.mode === 'selected' ? 'selected' : 'all'} ${
+                tab === 'outreach' ? 'outreach' : 'pre-approved'
+              } investors`
+        }
+        message={
+          sendRecipients.length > 0
+            ? `Send the ${sendNoun} email to ${sendRecipients.length} investor${sendRecipients.length === 1 ? '' : 's'}?`
+            : sendEligible.length > 0
+            ? `Every eligible investor in this set already received the ${sendNoun}. Enable the option below to resend.`
+            : 'No eligible investors in this set.'
+        }
+        confirmLabel={`Send ${sendRecipients.length} ${sendNoun}${sendRecipients.length === 1 ? '' : 's'}`}
+        confirmDisabled={sendRecipients.length === 0}
+        isPending={isConfirmRunning}
+        onClose={() => {
+          if (!isConfirmRunning) setBulkSend(null);
+        }}
+        details={
+          <div className="space-y-3 text-sm text-gray-600">
+            {bulkSend?.mode === 'selected' && (
+              <p>
+                Selected: <span className="font-medium text-gray-900">{selectedUids.length}</span>
+              </p>
+            )}
+            <ul className="list-disc space-y-1 pl-5">
+              <li>
+                Eligible investors: <span className="font-medium text-gray-900">{sendEligible.length}</span>
+              </li>
+              <li>
+                Not yet sent:{' '}
+                <span className="font-medium text-gray-900">{sendEligible.length - sendAlreadySent.length}</span>
+              </li>
+              <li>
+                Already sent: <span className="font-medium text-gray-900">{sendAlreadySent.length}</span>
+              </li>
+              {sendSkipped > 0 && (
+                <li>
+                  Skipped (not eligible): <span className="font-medium text-gray-900">{sendSkipped}</span>
+                </li>
+              )}
+            </ul>
+            <p className="text-xs text-gray-500">
+              {bulkSend?.kind === 'open-notice'
+                ? 'Everyone in Investors gets this email. No Access investors are skipped.'
+                : tab === 'outreach'
+                ? 'Only outreach investors who have not applied get these emails.'
+                : 'Only pre-approved investors get these emails. Approved applicants and No Access investors are skipped.'}
+            </p>
+            {sendRecipients.length > 0 && (
+              <div className="max-h-40 overflow-y-auto rounded-md border border-gray-200">
+                {sendRecipients.map((participant) => (
+                  <div key={participant.uid} className="border-b border-gray-100 px-3 py-1.5 last:border-b-0">
+                    <span className="text-gray-900">{participant.member.name || '—'}</span>{' '}
+                    <span className="text-gray-500">{participant.member.email}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <label className="flex cursor-pointer items-start gap-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-3">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                checked={includeAlreadySent}
+                disabled={isConfirmRunning || sendAlreadySent.length === 0}
+                onChange={(e) => setIncludeAlreadySent(e.target.checked)}
+              />
+              <span>
+                <span className="block font-medium text-gray-900">
+                  Also resend to investors who already received the {sendNoun}
+                </span>
+                <span className="mt-0.5 block text-xs text-gray-500">
+                  {bulkSend?.mode === 'selected'
+                    ? `On by default for selected people. Turn off to skip anyone who already got the ${sendNoun}.`
+                    : `Off by default. Only people who never got the ${sendNoun} will be emailed.`}
+                </span>
+              </span>
+            </label>
+            {includeAlreadySent && sendAlreadySent.length > 0 && (
+              <p className="rounded-md bg-amber-50 px-3 py-2 text-amber-800">
+                {sendAlreadySent.length} investor{sendAlreadySent.length === 1 ? '' : 's'} will receive another copy.
+              </p>
+            )}
+            {missingVariables.length > 0 && (
+              <p className="rounded-md bg-amber-50 px-3 py-2 text-amber-800">
+                {missingVariables.length} recipient{missingVariables.length === 1 ? ' is' : 's are'} missing a value for{' '}
+                {missingTokens.map((token) => `{{${token}}}`).join(', ')}:{' '}
+                {missingVariables.map((participant) => participant.member.name || participant.member.email).join(', ')}.
+                Those tokens will be empty unless the template has a fallback.
+              </p>
+            )}
+            {statusWarning && <p className="rounded-md bg-amber-50 px-3 py-2 text-amber-800">{statusWarning}</p>}
+          </div>
+        }
+        onConfirm={() =>
+          bulkSend &&
+          runConfirmed(() =>
+            sendBulk(
+              bulkSend.kind,
+              bulkSend.mode,
+              sendEligible.map((participant) => participant.uid)
+            )
+          )
+        }
+      />
+      <EditSpvTemplateVariablesModal
+        isOpen={!!editingTemplateVars}
+        onClose={() => setEditingTemplateVars(null)}
+        onSave={async (emailTemplateVariables) => {
+          await api.patch(
+            `${base}/participants/${editingTemplateVars?.uid}`,
+            { emailTemplateVariables },
+            { headers: authHeaders }
+          );
+          await loadParticipants();
+        }}
+        participantName={editingTemplateVars?.member.name}
+        participantEmail={editingTemplateVars?.member.email}
+        emailTemplateVariables={editingTemplateVars?.emailTemplateVariables}
+        canEdit={canMutateTeamPitches}
+      />
+      <TeamPitchConfirmModal
+        isOpen={!!pendingConfirm}
+        title={pendingConfirm?.title ?? ''}
+        message={pendingConfirm?.message ?? ''}
+        details={pendingConfirm?.details && <p className="text-sm text-amber-700">{pendingConfirm.details}</p>}
+        participantName={pendingConfirm?.participant?.member.name ?? undefined}
+        participantEmail={pendingConfirm?.participant?.member.email ?? undefined}
+        confirmLabel={pendingConfirm?.confirmLabel}
+        isPending={isConfirmRunning}
+        onClose={() => setPendingConfirm(null)}
+        onConfirm={() => pendingConfirm && runConfirmed(pendingConfirm.run)}
+      />
+    </ApprovalLayout>
+  );
+};
+
+export default SpvSpotlightDetailPage;

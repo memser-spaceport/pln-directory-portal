@@ -297,6 +297,10 @@
 
 .fieldTextarea {
   @extend .fieldInput;
+  display: block;
+  width: 100%;
+  align-self: stretch;
+  box-sizing: border-box;
   height: auto;
   min-height: 96px;
   resize: vertical;

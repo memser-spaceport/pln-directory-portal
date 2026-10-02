@@ -161,6 +161,7 @@ export const JobOpeningInterestStatusSchema = z.object({
   jobUid: z.string(),
   interestedCount: z.number().int().min(0),
   viewerIsInterested: z.boolean(),
+  note: z.string().nullable(),
 });
 
 export type JobOpeningInterestStatus = z.infer<typeof JobOpeningInterestStatusSchema>;
@@ -169,6 +170,7 @@ export const JobOpeningInterestSchema = z.object({
   uid: z.string(),
   jobUid: z.string(),
   interestedAt: z.string(),
+  note: z.string().nullable(),
 });
 
 export const JobOpeningInterestListResponseSchema = z.object({
@@ -196,6 +198,15 @@ export const SavedJobSchema = z.object({
 export const SavedJobsListResponseSchema = z.object({
   savedJobs: z.array(SavedJobSchema),
 });
+
+/** Counted after trim. Longer notes are rejected, not truncated. */
+export const JOB_INTEREST_NOTE_MAX = 280;
+
+export const MarkJobInterestSchema = z.object({
+  note: z.string().trim().max(JOB_INTEREST_NOTE_MAX).nullish(),
+});
+
+export type MarkJobInterestInput = z.infer<typeof MarkJobInterestSchema>;
 
 /** Same cap as a job application's cover letter. */
 export const MarkTeamInterestSchema = z.object({

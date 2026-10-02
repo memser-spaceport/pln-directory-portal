@@ -24,6 +24,7 @@ jest.mock('../analytics/service/analytics.service', () => ({
 
 import axios from 'axios';
 import { AiAppsService } from './ai-apps.service';
+import { withInlineDeploys } from './ai-apps-deploy-queue.spec-helper';
 import { isReservedAppId } from './ai-apps.constants';
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -43,11 +44,9 @@ function buildService({ existing = null }: { existing?: Record<string, any> | nu
     member: { findMany: jest.fn().mockResolvedValue([]), findUnique: jest.fn().mockResolvedValue(null) },
   };
   const aws = { uploadFileToS3: jest.fn().mockResolvedValue(undefined) };
-  const service = new AiAppsService(
-    prisma as any,
-    aws as any,
-    { create: jest.fn() } as any,
-    { trackEvent: jest.fn() } as any
+  const service = withInlineDeploys(
+    prisma,
+    new AiAppsService(prisma as any, aws as any, { create: jest.fn() } as any, { trackEvent: jest.fn() } as any)
   );
   return { service, prisma, aws };
 }
@@ -138,8 +137,10 @@ describe('reserved appIds on deploy entry points', () => {
 
     await service.deploy('member-1', dto('my-app'), FILE);
 
-    // One lookup: the existing concurrent-deploy check, not the reserved check.
-    expect(prisma.aiApp.findUnique).toHaveBeenCalledTimes(1);
+    // One request-time lookup: the existing concurrent-deploy check, not the
+    // reserved check (the background job's own reads are by uid).
+    const requestLookups = prisma.aiApp.findUnique.mock.calls.filter(([args]: any) => args.where.memberUid_appId);
+    expect(requestLookups).toHaveLength(1);
     expect(aws.uploadFileToS3).toHaveBeenCalled();
   });
 });

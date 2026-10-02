@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import type {
   JobOpeningInterestStatus,
+  MarkJobInterestInput,
   MarkTeamInterestInput,
   TeamInterestStatus,
 } from 'libs/contracts/src/schema/job-opening';
@@ -19,9 +20,14 @@ export class JobOpeningsInterestService {
   ) {}
 
   /** Mark interest in a job opening. Idempotent: re-marking succeeds without double-counting. */
-  async markInterest(jobUid: string, memberEmail: string | undefined): Promise<JobOpeningInterestStatus> {
+  async markInterest(
+    jobUid: string,
+    memberEmail: string | undefined,
+    input?: MarkJobInterestInput
+  ): Promise<JobOpeningInterestStatus> {
     const memberUid = await this.resolveMemberUid(memberEmail);
     const jobOpening = await resolveVisibleJobOpening(this.prisma, jobUid);
+    const note = input?.note?.trim() || null;
 
     const existing = await this.prisma.jobOpeningInterest.findUnique({
       where: { jobOpeningUid_memberUid: { jobOpeningUid: jobUid, memberUid } },
@@ -30,9 +36,9 @@ export class JobOpeningsInterestService {
 
     const interest = await this.prisma.jobOpeningInterest.upsert({
       where: { jobOpeningUid_memberUid: { jobOpeningUid: jobUid, memberUid } },
-      create: { jobOpeningUid: jobUid, memberUid },
-      update: {},
-      select: { uid: true },
+      create: { jobOpeningUid: jobUid, memberUid, note },
+      update: { note },
+      select: { uid: true, note: true },
     });
     if (!existing) {
       trackJobInterestRecorded(this.analytics, {
@@ -43,7 +49,7 @@ export class JobOpeningsInterestService {
     }
     this.atsPush.pushJobInterest(interest.uid);
 
-    return this.buildStatus(jobUid, true);
+    return this.buildStatus(jobUid, true, interest.note);
   }
 
   /**
@@ -94,14 +100,14 @@ export class JobOpeningsInterestService {
       where: { jobOpeningUid: jobUid, memberUid },
     });
 
-    return this.buildStatus(jobUid, false);
+    return this.buildStatus(jobUid, false, null);
   }
 
   async listMine(memberEmail: string | undefined) {
     const memberUid = await this.resolveMemberUid(memberEmail);
     const interests = await this.prisma.jobOpeningInterest.findMany({
       where: { memberUid },
-      select: { uid: true, jobOpeningUid: true, createdAt: true },
+      select: { uid: true, jobOpeningUid: true, createdAt: true, note: true },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -110,6 +116,7 @@ export class JobOpeningsInterestService {
         uid: interest.uid,
         jobUid: interest.jobOpeningUid,
         interestedAt: interest.createdAt.toISOString(),
+        note: interest.note,
       })),
     };
   }
@@ -128,8 +135,12 @@ export class JobOpeningsInterestService {
     return member.uid;
   }
 
-  private async buildStatus(jobUid: string, viewerIsInterested: boolean): Promise<JobOpeningInterestStatus> {
+  private async buildStatus(
+    jobUid: string,
+    viewerIsInterested: boolean,
+    note: string | null
+  ): Promise<JobOpeningInterestStatus> {
     const interestedCount = await this.prisma.jobOpeningInterest.count({ where: { jobOpeningUid: jobUid } });
-    return { jobUid, interestedCount, viewerIsInterested };
+    return { jobUid, interestedCount, viewerIsInterested, note };
   }
 }

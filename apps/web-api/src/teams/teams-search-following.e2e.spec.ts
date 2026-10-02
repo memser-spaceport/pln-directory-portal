@@ -5,7 +5,7 @@ import { createTeam } from './__mocks__/teams.mocks';
 import { createMember } from '../members/__mocks__/members.mocks';
 import { bootstrapTestingApp } from '../utils/bootstrap-testing-app';
 import { FollowsService } from '../follows/follows.service';
-import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { OptionalUserTokenCheckGuard, UserTokenCheckGuard } from '../guards/user-token-check.guard';
 
 class TestUserTokenCheckGuard {
   constructor(private readonly email?: string) {}
@@ -25,6 +25,10 @@ async function bootstrapTeamsFollowingApp(memberEmail?: string) {
     providers: [
       {
         provide: UserTokenCheckGuard,
+        useValue: new TestUserTokenCheckGuard(memberEmail),
+      },
+      {
+        provide: OptionalUserTokenCheckGuard,
         useValue: new TestUserTokenCheckGuard(memberEmail),
       },
     ],

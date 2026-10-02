@@ -73,7 +73,8 @@ export class ImagesController {
     if (
       mimetype !== 'image/jpeg' &&
       mimetype !== 'image/png' &&
-      mimetype !== 'image/webp'
+      mimetype !== 'image/webp' &&
+      mimetype !== 'image/gif'
     ) {
       throw new HttpException('Invalid file type', HttpStatus.BAD_REQUEST);
     }

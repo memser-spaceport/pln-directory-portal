@@ -38,6 +38,9 @@ model Team {
   blueskyHandler               String?
   crunchbaseHandler            String?
   dateFounded                  Int?
+  portfolioIsland              String?
+  portfolioStartYear           Int?
+  portfolioEndYear             Int?
   teamSize                     String?
   location                     String?
   status                       TeamStatus                    @default(ACTIVE)
@@ -108,6 +111,9 @@ model Team {
   portfolioMeta         PlPortfolioTeamMeta?
   teamPitches           TeamPitch[]
   teamPitchParticipants TeamPitchParticipant[]
+  spvSpotlights         SpvSpotlight[]
+  spvSpotlightParticipants SpvSpotlightParticipant[]
+  spvAccessRequestTeams SpvAccessRequest[]
 
   /// Read-only Affinity CRM sidecar (task 02). Optional 1:1 when linked.
   affinityCompany AffinityCompany?
@@ -234,6 +240,8 @@ model Member {
   demoDayParticipants                DemoDayParticipant[]
   teamPitchParticipants              TeamPitchParticipant[]
   teamPitchExpressInterestStatistics TeamPitchExpressInterest[]
+  spvSpotlightParticipants           SpvSpotlightParticipant[]
+  spvAccessRequests                  SpvAccessRequest[]
   demoDayEngagements                 DemoDayEngagement[]
   demoDayExpressInterestStatistics   DemoDayExpressInterestStatistic[]
   demoDayFeedbacks                   DemoDayFeedback[]
@@ -567,6 +575,7 @@ model Image {
   demoDayBrandingHeaders  DemoDayBranding[]            @relation("HeaderImage")
   teamPitchLogos          TeamPitch[]                  @relation("TeamPitchLogo")
   teamPitchHeaderImages   TeamPitch[]                  @relation("TeamPitchHeaderImage")
+  spvSpotlightMedia       SpvSpotlightMedia[]
   dealLogos               Deal[]                       @relation("DealLogo")
   dealSubmissionLogos     DealSubmission[]             @relation("DealSubmissionLogo")
   articleCoverImages      Article[]                    @relation("ArticleCoverImage")
@@ -1558,6 +1567,105 @@ model TeamPitchExpressInterest {
   @@index([teamPitchUid])
 }
 
+enum SpvInvestorCohort {
+  PRE_APPROVED
+  OUTREACH
+}
+
+enum SpvAccessRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model SpvSpotlight {
+  id            Int             @id @default(autoincrement())
+  uid           String          @unique @default(cuid())
+  teamUid       String          @unique
+  team          Team            @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+  slug          String          @unique
+  title         String
+  description   String
+  status        TeamPitchStatus @default(DRAFT)
+  supportEmail  String
+  senderEmail   String?
+  senderName    String?
+  replyToEmail  String?
+  docSendUrl    String?
+  summary       String?
+  emailTemplates Json
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  media         SpvSpotlightMedia[]
+  participants  SpvSpotlightParticipant[]
+  accessRequests SpvAccessRequest[]
+
+  @@index([status])
+}
+
+model SpvSpotlightMedia {
+  id              Int          @id @default(autoincrement())
+  uid             String       @unique @default(cuid())
+  spvSpotlightUid String
+  spvSpotlight    SpvSpotlight @relation(fields: [spvSpotlightUid], references: [uid], onDelete: Cascade)
+  imageUid        String
+  image           Image        @relation(fields: [imageUid], references: [uid])
+  alt             String
+  fit             String       @default("cover")
+  sortOrder       Int          @default(0)
+  createdAt       DateTime     @default(now())
+
+  @@index([spvSpotlightUid, sortOrder])
+}
+
+model SpvSpotlightParticipant {
+  id                     Int                        @id @default(autoincrement())
+  uid                    String                     @unique @default(cuid())
+  spvSpotlightUid        String
+  spvSpotlight           SpvSpotlight               @relation(fields: [spvSpotlightUid], references: [uid], onDelete: Cascade)
+  memberUid              String
+  member                 Member                     @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  type                   TeamPitchParticipantType
+  access                 TeamPitchParticipantAccess
+  cohort                 SpvInvestorCohort?
+  teamUid                String?
+  team                   Team?                      @relation(fields: [teamUid], references: [uid], onDelete: SetNull)
+  inviteSentAt           DateTime?
+  inviteSentCount        Int                        @default(0)
+  followUpSentAt         DateTime?
+  followUpSentCount      Int                        @default(0)
+  openNoticeSentAt       DateTime?
+  openNoticeSentCount    Int                        @default(0)
+  emailTemplateVariables Json?
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
+
+  @@unique([spvSpotlightUid, memberUid])
+  @@index([spvSpotlightUid, type])
+}
+
+model SpvAccessRequest {
+  id                    Int                    @id @default(autoincrement())
+  uid                   String                 @unique @default(cuid())
+  spvSpotlightUid       String
+  spvSpotlight          SpvSpotlight           @relation(fields: [spvSpotlightUid], references: [uid], onDelete: Cascade)
+  memberUid             String
+  member                Member                 @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  status                SpvAccessRequestStatus @default(PENDING)
+  role                  String
+  organization          String
+  teamUid               String?
+  team                  Team?                  @relation(fields: [teamUid], references: [uid], onDelete: SetNull)
+  isAccreditedInvestor  Boolean                @default(false)
+  openNoticeSentAt      DateTime?
+  openNoticeSentCount   Int                    @default(0)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  @@unique([spvSpotlightUid, memberUid])
+  @@index([spvSpotlightUid, status])
+}
+
 model DemoDayFeedback {
   id                  Int      @id @default(autoincrement())
   uid                 String   @unique @default(cuid())
@@ -2468,6 +2576,8 @@ model JobOpeningInterest {
   jobOpening    JobOpening @relation(fields: [jobOpeningUid], references: [uid], onDelete: Cascade)
   memberUid     String
   member        Member     @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  /// What the member wrote. A later mark replaces it, including with nothing.
+  note          String?
   /// The team's tick; see JobApplication for what it does and does not mean.
   reviewedAt    DateTime?
   reviewedByUid String?
@@ -3672,6 +3782,10 @@ model AiApp {
   /// Slugs from the controlled vocabulary in `ai-apps-tags.ts` (max 5). Set by
   /// the agent on first upload, editable by the creator/admin afterwards.
   tags            String[]    @default([])
+  /// When false, LabOS hides Give feedback on the open app. List-level
+  /// feedback still works. Existing and new apps stay on until an editor
+  /// turns it off.
+  feedbackEnabled Boolean     @default(true)
   /// New apps are open to all PL Infra members; the owner (or a directory
   /// admin) can restrict them from LabOS, or the agent on deploy when the
   /// member chooses. A deploy that doesn't send `access` keeps it.
@@ -3697,6 +3811,14 @@ model AiApp {
   /// request path to the Directory. Apps last deployed before that ignore
   /// `publicPaths` until a redeploy.
   publicPathsGateReady Boolean @default(false)
+  /// Coarse progress of the current deploy attempt: queued | building |
+  /// injecting_runtime_config | done | failed. The background deploy job
+  /// resumes from it after a web-api restart. Written mid-deploy via raw SQL
+  /// so `updatedAt` stays the deploy start (stuck-deploy window).
+  deployPhase     String?
+  /// Id of the deploy attempt that owns this row. The background job writes
+  /// phases and its outcome only while the row still carries its id.
+  deployAttemptId String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
@@ -3736,6 +3858,10 @@ model AiAppTarget {
   database             Json?
   directLinkGateReady  Boolean                 @default(false)
   publicPathsGateReady Boolean                 @default(false)
+  /// Same as AiApp.deployPhase, for this target's current deploy attempt.
+  deployPhase          String?
+  /// Same as AiApp.deployAttemptId, for this target.
+  deployAttemptId      String?
   createdAt            DateTime                @default(now())
   updatedAt            DateTime                @updatedAt
 
@@ -3864,9 +3990,80 @@ model AiAppFeedback {
   text      String
   status    AiAppFeedbackStatus @default(NEW)
   createdAt DateTime            @default(now())
+  /// Where and on what the feedback was left: env, app path, LabOS URL, the app
+  /// frame's viewport, pixel ratio, touch, user agent, bridge capabilities.
+  /// Null on feedback filed before it was captured.
+  context   Json?
+  pins      AiAppFeedbackPin[]
+  comments  AiAppFeedbackComment[]
 
   @@index([appUid])
   @@index([memberUid])
+}
+
+/// A reply in a feedback item's conversation (flat, oldest first). Participants:
+/// the app's creator, directory admins, and the member who left the feedback.
+/// A CLOSING_NOTE is the agent's one line when it marks the item IMPLEMENTED,
+/// stored as written by the app's creator (the agent acts for them).
+model AiAppFeedbackComment {
+  id          Int                      @id @default(autoincrement())
+  uid         String                   @unique @default(cuid())
+  feedbackUid String
+  feedback    AiAppFeedback            @relation(fields: [feedbackUid], references: [uid], onDelete: Cascade)
+  memberUid   String
+  /// Plain text, trimmed, 1–2000 chars. Rendered escaped by clients.
+  text        String
+  kind        AiAppFeedbackCommentKind @default(REPLY)
+  createdAt   DateTime                 @default(now())
+
+  @@index([feedbackUid, createdAt])
+}
+
+enum AiAppFeedbackCommentKind {
+  REPLY
+  CLOSING_NOTE
+}
+
+/// One element a member pinned in the app while leaving feedback (element-pins
+/// bridge). The source of truth for showing pins on the live app; the feedback
+/// `text` keeps a frozen, human-readable copy of the same list.
+model AiAppFeedbackPin {
+  id          Int           @id @default(autoincrement())
+  uid         String        @unique @default(cuid())
+  feedbackUid String
+  feedback    AiAppFeedback @relation(fields: [feedbackUid], references: [uid], onDelete: Cascade)
+  /// 1-based position within the feedback, matching the numbered list in `text`.
+  n           Int
+  /// 'prod' | 'preview': the environment the pin was made on.
+  env         String
+  /// App pathname, no query (e.g. "/settings").
+  pagePath    String
+  /// Query string as captured, for context only; never used to match.
+  pageQuery   String?
+  selector    String
+  tag         String
+  /// The element's visible text, whitespace-collapsed (bridge-capped at 200).
+  text        String
+  role        String?
+  ariaLabel   String?
+  component   String?
+  source      String?
+  /// {x, y, w, h} in the app's viewport at pick time.
+  rect        Json
+  viewportW   Int
+  viewportH   Int
+  /// The member's note on this pin; '' when none.
+  note        String
+  /// Hosted crop image; null when the crop failed.
+  cropUrl     String?
+  /// Where in the element the member clicked, as a fraction of its box (0–1),
+  /// so the pin sits on that spot and follows the element. Null on pins made
+  /// before it was recorded: they sit at the element's top-left corner.
+  ox          Float?
+  oy          Float?
+  createdAt   DateTime      @default(now())
+
+  @@index([feedbackUid])
 }
 
 enum AiAppConnectStatus {

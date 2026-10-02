@@ -34,6 +34,7 @@ export const applicantApplicationSelect = {
 
 export const applicantInterestSelect = {
   uid: true,
+  note: true,
   createdAt: true,
   ...reviewSelect,
   member: { select: memberSelect },
@@ -82,6 +83,7 @@ export function toApplicationRow(
     uid: row.uid,
     createdAt: row.createdAt.toISOString(),
     coverLetter: row.coverLetter,
+    note: null,
     cv,
     unseen,
     reviewed: row.reviewedAt !== null,
@@ -89,9 +91,10 @@ export function toApplicationRow(
 }
 
 /**
- * An interest carries neither a note nor a document: the press has no words, and
- * the CV read only admits a lead to the CV of somebody who actually applied, so
- * naming a file here would advertise one the lead is then refused.
+ * An interest carries no cover letter and no document. The CV read only admits
+ * a lead to the CV of somebody who actually applied, so naming a file here would
+ * advertise one the lead is then refused. `note` is the optional words from the
+ * interest press.
  */
 export function toInterestRow(row: ApplicantInterestSource, unseen: boolean): ApplicantRow {
   return {
@@ -99,6 +102,7 @@ export function toInterestRow(row: ApplicantInterestSource, unseen: boolean): Ap
     uid: row.uid,
     createdAt: row.createdAt.toISOString(),
     coverLetter: null,
+    note: row.note,
     cv: null,
     unseen,
     reviewed: row.reviewedAt !== null,

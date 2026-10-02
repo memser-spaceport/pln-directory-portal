@@ -21,11 +21,13 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { AiAppFeedbackStatus } from '@prisma/client';
 import { ApiTags, ApiConsumes } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { ZodValidationPipe } from '@abitia/zod-dto';
 import { Request, Response } from 'express';
 import { NoCache } from '../decorators/no-cache.decorator';
+import { SkipEmptyStringToNull } from '../decorators/skip-empty-string-to-null.decorator';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { validateUserAccessToken } from '../guards/user-access-token-validate.guard';
 import { extractTokenFromRequest } from '../utils/auth';
@@ -34,6 +36,7 @@ import { RbacGuard } from '../rbac/rbac.guard';
 import { RbacService } from '../rbac/rbac.service';
 import { AI_APPS_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { AiAppsService } from './ai-apps.service';
+import { AgentFeedbackDeniedInterceptor } from './agent-feedback-denied.interceptor';
 import { AiAppsAccessService } from './ai-apps-access.service';
 import { AiAppsConnectService } from './ai-apps-connect.service';
 import { AiAppsSessionService, isAiAppSessionToken } from './ai-apps-session.service';
@@ -53,7 +56,8 @@ import {
 import { AiAppsAuthGateService } from './ai-apps-auth-gate.service';
 import { PollConnectDto } from './dto/poll-connect.dto';
 import { SubmitFeedbackDto } from './dto/submit-feedback.dto';
-import { UpdateFeedbackStatusDto } from './dto/update-feedback-status.dto';
+import { CreateFeedbackCommentDto } from './dto/feedback-comment.dto';
+import { AgentUpdateFeedbackStatusDto, UpdateFeedbackStatusDto } from './dto/update-feedback-status.dto';
 import { UpdateAppMetadataDto } from './dto/update-app-metadata.dto';
 import { TrackEventDto } from './dto/track-event.dto';
 import {
@@ -350,7 +354,13 @@ export class AiAppsController {
       if (!session) {
         throw new UnauthorizedException('Invalid or expired app session');
       }
-      return this.accessService.checkAccess(session.memberUid, query.appId, query.method, { app }, query.target ?? 'prod');
+      return this.accessService.checkAccess(
+        session.memberUid,
+        query.appId,
+        query.method,
+        { app },
+        query.target ?? 'prod'
+      );
     }
     await validateUserAccessToken(req);
     const memberUid = await this.resolveMemberUid(req);
@@ -457,6 +467,30 @@ export class AiAppsController {
   }
 
   /**
+   * Status of one deployment for the agent (deploy-token auth, owner-only):
+   * `status`/`phase`/`notes`/`failureStream` of the attempt, `stale: true` when
+   * a newer deploy replaced it. `:deploymentId` may be `latest`. The deploy
+   * endpoints answer 202 with this URL as `statusEndpoint`.
+   */
+  @NoCache()
+  @Get(':uid/deployments/:deploymentId')
+  @UseGuards(AiAppTokenGuard)
+  async getDeploymentStatus(
+    @Param('uid') uid: string,
+    @Param('deploymentId') deploymentId: string,
+    @Req() req: any,
+    @Query('environment') environment?: string
+  ) {
+    return this.aiAppsService.getDeploymentStatus(
+      req.aiAppMemberUid,
+      uid,
+      this.parseDeploymentId(deploymentId) as string,
+      this.parseTargetEnvironment(environment),
+      req.aiAppKeyScope
+    );
+  }
+
+  /**
    * Build logs for a signed-in member from the LabOS dashboard (member JWT +
    * `ai_apps.read`), gated to the app's creator OR a directory admin — so an
    * admin can debug any app's logs without a deploy token.
@@ -539,6 +573,45 @@ export class AiAppsController {
   @UsePipes(ZodValidationPipe)
   async updateAppMetadataFromAgent(@Param('uid') uid: string, @Body() body: UpdateAppMetadataDto, @Req() req: any) {
     return this.aiAppsService.updateMetadata(req.aiAppMemberUid, uid, body, true, req.aiAppKeyScope);
+  }
+
+  /**
+   * All feedback for the app, newest first, for the agent (deploy-token or
+   * deployment-key auth, owner-only). Optional `status` narrows to one status.
+   */
+  @NoCache()
+  @Get(':uid/agent/feedback')
+  @UseGuards(AiAppTokenGuard)
+  @UseInterceptors(AgentFeedbackDeniedInterceptor)
+  async listAgentFeedback(@Param('uid') uid: string, @Req() req: any, @Query('status') status?: string) {
+    return this.aiAppsService.listAgentFeedback(
+      req.aiAppMemberUid,
+      uid,
+      this.parseFeedbackStatus(status),
+      req.aiAppKeyScope
+    );
+  }
+
+  /** Agent marks one feedback row VIEWED or IMPLEMENTED (NEW stays member-only). */
+  @NoCache()
+  @Patch(':uid/agent/feedback/:feedbackUid')
+  @UseGuards(AiAppTokenGuard)
+  @UseInterceptors(AgentFeedbackDeniedInterceptor)
+  @UsePipes(ZodValidationPipe)
+  async updateAgentFeedbackStatus(
+    @Param('uid') uid: string,
+    @Param('feedbackUid') feedbackUid: string,
+    @Body() body: AgentUpdateFeedbackStatusDto,
+    @Req() req: any
+  ) {
+    return this.aiAppsService.updateAgentFeedbackStatus(
+      req.aiAppMemberUid,
+      uid,
+      feedbackUid,
+      body.status,
+      req.aiAppKeyScope,
+      body.note
+    );
   }
 
   /** Upload a Markdown or HTML PRD file from the dashboard without redeploying. */
@@ -660,15 +733,51 @@ export class AiAppsController {
   /**
    * Submit feedback on an app from its detail page. Text may be Quill HTML.
    * Any member with AI Apps access may submit, more than once per app.
+   * Empty strings are meaningful here (a pin with no note, an element with no
+   * visible text), so the app-wide empty-string-to-null rewrite is skipped.
    */
   @NoCache()
+  @SkipEmptyStringToNull()
   @Post(':uid/feedback')
   @UseGuards(UserTokenCheckGuard, RbacGuard)
   @RequirePermissions(READ)
   @UsePipes(ZodValidationPipe)
   async submitFeedback(@Param('uid') uid: string, @Body() body: SubmitFeedbackDto, @Req() req: any) {
     const memberUid = await this.resolveMemberUid(req);
-    return this.aiAppsService.submitFeedback(memberUid, uid, body.text);
+    return this.aiAppsService.submitFeedback(memberUid, uid, body.text, { pins: body.pins, context: body.context });
+  }
+
+  /**
+   * Pins on the app's feedback, for the live-app overlay. Creator and directory
+   * admins only (checked in the service). Pins of IMPLEMENTED feedback are left
+   * out unless `includeResolved=true`; `env` narrows to one environment.
+   * (`:uid/feedback/:feedbackUid` is PATCH-only, so it cannot shadow these GETs.)
+   */
+  @NoCache()
+  @Get(':uid/feedback/pins')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async listFeedbackPins(
+    @Param('uid') uid: string,
+    @Req() req: any,
+    @Query('includeResolved') includeResolved?: string,
+    @Query('env') env?: string
+  ) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.listAppFeedbackPins(memberUid, uid, {
+      includeResolved: includeResolved === 'true',
+      env: this.parseFeedbackEnv(env),
+    });
+  }
+
+  /** The requester's own pins on the app (any member who may open it). */
+  @NoCache()
+  @Get(':uid/feedback/pins/mine')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async listMyFeedbackPins(@Param('uid') uid: string, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.listMyAppFeedbackPins(memberUid, uid);
   }
 
   /**
@@ -705,6 +814,53 @@ export class AiAppsController {
   }
 
   /**
+   * One feedback item's conversation, oldest first. Participants only (the
+   * app's creator, directory admins, the member who left it — checked in the
+   * service). Declared after the `:uid/feedback/pins` reads; the paths end in
+   * different literal segments, so neither shadows the other.
+   */
+  @NoCache()
+  @Get(':uid/feedback/:feedbackUid/comments')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async listFeedbackComments(@Param('uid') uid: string, @Param('feedbackUid') feedbackUid: string, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.listFeedbackComments(memberUid, uid, feedbackUid);
+  }
+
+  /** A reply in the item's conversation; notifies the other participants. */
+  @NoCache()
+  @Post(':uid/feedback/:feedbackUid/comments')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  @UsePipes(ZodValidationPipe)
+  async addFeedbackComment(
+    @Param('uid') uid: string,
+    @Param('feedbackUid') feedbackUid: string,
+    @Body() body: CreateFeedbackCommentDto,
+    @Req() req: any
+  ) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.addFeedbackComment(memberUid, uid, feedbackUid, body.text);
+  }
+
+  /** Delete a reply: its author, or a directory admin. */
+  @NoCache()
+  @Delete(':uid/feedback/:feedbackUid/comments/:commentUid')
+  @HttpCode(204)
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async deleteFeedbackComment(
+    @Param('uid') uid: string,
+    @Param('feedbackUid') feedbackUid: string,
+    @Param('commentUid') commentUid: string,
+    @Req() req: any
+  ): Promise<void> {
+    const memberUid = await this.resolveMemberUid(req);
+    await this.aiAppsService.deleteFeedbackComment(memberUid, uid, feedbackUid, commentUid);
+  }
+
+  /**
    * Live CPU/memory snapshot (no history) for one app vs its configured
    * resource limits — capacity-planning visibility for PL Infra, restricted
    * to directory admins (checked in the service).
@@ -736,11 +892,7 @@ export class AiAppsController {
   @Delete(':uid/deployments/:environment')
   @UseGuards(UserTokenCheckGuard, RbacGuard)
   @RequirePermissions(WRITE)
-  async deleteTarget(
-    @Param('uid') uid: string,
-    @Param('environment') environment: string,
-    @Req() req: any
-  ) {
+  async deleteTarget(@Param('uid') uid: string, @Param('environment') environment: string, @Req() req: any) {
     const memberUid = await this.resolveMemberUid(req);
     const target = this.parseTargetEnvironment(environment);
     if (!target) throw new BadRequestException('environment must be prod or preview');
@@ -796,10 +948,12 @@ export class AiAppsController {
   /**
    * Deploy endpoint called by the member's AI agent, authenticated by the deploy
    * token. Accepts multipart/form-data: the app ZIP in `file` plus the metadata
-   * fields. The backend uploads the ZIP to S3 and proxies to the sandbox runner.
+   * fields. The backend uploads the ZIP to S3, queues the deploy and answers
+   * 202 with `statusEndpoint` + `pollIntervalSec`; the build runs in the background.
    */
   @NoCache()
   @Post('deploy')
+  @HttpCode(HttpStatus.ACCEPTED)
   @UseGuards(AiAppTokenGuard)
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: AI_APPS_MAX_ZIP_BYTES } }))
@@ -829,9 +983,11 @@ export class AiAppsController {
    * after secret updates). Optionally carries `secrets` (name → value) which are
    * forwarded to the sandbox runner's secret store — never persisted here.
    * Blocks with a 400 listing the missing names if a required var has no value.
+   * Answers 202 once the secrets are stored and the deploy is queued.
    */
   @NoCache()
   @Post(':uid/deploy')
+  @HttpCode(HttpStatus.ACCEPTED)
   @UseGuards(UserTokenCheckGuard, RbacGuard)
   @RequirePermissions(WRITE)
   @UsePipes(ZodValidationPipe)
@@ -851,6 +1007,25 @@ export class AiAppsController {
   private optionalEnvironment(value?: string): { environment?: 'prod' | 'preview' } {
     const environment = this.parseTargetEnvironment(value);
     return environment ? { environment } : {};
+  }
+
+  /** Optional pin environment filter, 400ing on anything but prod / preview. */
+  private parseFeedbackEnv(value?: string): 'prod' | 'preview' | undefined {
+    if (value === undefined || value === '') return undefined;
+    if (value === 'prod' || value === 'preview') return value;
+    throw new BadRequestException(`Unknown env: ${value}`);
+  }
+
+  /** Optional feedback status filter (case-insensitive), 400ing on an unknown value. */
+  private parseFeedbackStatus(value?: string): AiAppFeedbackStatus | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+    const status = value.toUpperCase();
+    if (status !== 'NEW' && status !== 'VIEWED' && status !== 'IMPLEMENTED') {
+      throw new BadRequestException(`status must be NEW, VIEWED or IMPLEMENTED, got: ${value}`);
+    }
+    return status;
   }
 
   /** Parse an optional numeric query param, 400ing on anything but a positive integer. */

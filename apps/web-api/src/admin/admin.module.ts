@@ -14,8 +14,10 @@ import { HuskyModule } from '../husky/husky.module';
 import { NotificationSettingsModule } from '../notification-settings/notification-settings.module';
 import { AdminDemoDaysController } from './demo-day.controller';
 import { AdminTeamPitchController } from './team-pitch.controller';
+import { AdminSpvSpotlightController } from './spv-spotlight.controller';
 import { DemoDaysModule } from '../demo-days/demo-days.module';
 import { TeamPitchesModule } from '../team-pitches/team-pitches.module';
+import { SpvSpotlightsModule } from '../spv-spotlights/spv-spotlights.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { AdminTeamsController } from './admin-teams.controller';
@@ -46,6 +48,7 @@ import { AccessControlV2Module } from '../access-control-v2/access-control-v2.mo
     forwardRef(() => MembersModule),
     DemoDaysModule,
     TeamPitchesModule,
+    SpvSpotlightsModule,
     AnalyticsModule,
     TeamEnrichmentModule,
     MemberEnrichmentModule,
@@ -60,6 +63,7 @@ import { AccessControlV2Module } from '../access-control-v2/access-control-v2.mo
     RecommendationsController,
     AdminDemoDaysController,
     AdminTeamPitchController,
+    AdminSpvSpotlightController,
     AdminTeamsController,
   ],
   exports: [MemberService],
