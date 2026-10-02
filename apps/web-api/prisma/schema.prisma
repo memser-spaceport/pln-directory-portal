@@ -3976,10 +3976,11 @@ enum AiAppFeedbackStatus {
   IMPLEMENTED
 }
 
-/// Free-text feedback left by a PL Infra member on an app's detail page. A
-/// member may submit multiple entries per app. Readable only by the app's
-/// creator and directory admins (enforced in the service). Status is shared
-/// across all viewers; only the creator or a directory admin may change it.
+/// What a member left on an app's detail page, more than once per app if they
+/// like. A FEEDBACK item (the written form) is readable by the app's creator,
+/// directory admins and its author; a COMMENT (pinned in the live app) by
+/// anyone who may open the app (enforced in the service). Status is shared;
+/// only the creator or a directory admin may change it.
 model AiAppFeedback {
   id        Int                 @id @default(autoincrement())
   uid       String              @unique @default(cuid())
@@ -3989,7 +3990,13 @@ model AiAppFeedback {
   memberUid String
   text      String
   status    AiAppFeedbackStatus @default(NEW)
+  /// FEEDBACK (private to the creator and admins) or COMMENT (public to the
+  /// app's viewers). Rows from before this column are FEEDBACK: they were left
+  /// under the "only the author and admins see it" promise.
+  kind      AiAppFeedbackItemKind @default(FEEDBACK)
   createdAt DateTime            @default(now())
+  /// Set when the author edits a COMMENT's note; null until then.
+  editedAt  DateTime?
   /// Where and on what the feedback was left: env, app path, LabOS URL, the app
   /// frame's viewport, pixel ratio, touch, user agent, bridge capabilities.
   /// Null on feedback filed before it was captured.
@@ -3999,10 +4006,17 @@ model AiAppFeedback {
 
   @@index([appUid])
   @@index([memberUid])
+  @@index([appUid, kind])
 }
 
-/// A reply in a feedback item's conversation (flat, oldest first). Participants:
-/// the app's creator, directory admins, and the member who left the feedback.
+enum AiAppFeedbackItemKind {
+  FEEDBACK
+  COMMENT
+}
+
+/// A reply in a feedback item's conversation (flat, oldest first). Who may read
+/// and write follows the item: anyone who may open the app for a COMMENT; the
+/// app's creator, directory admins and the item's author for FEEDBACK.
 /// A CLOSING_NOTE is the agent's one line when it marks the item IMPLEMENTED,
 /// stored as written by the app's creator (the agent acts for them).
 model AiAppFeedbackComment {
@@ -4015,6 +4029,8 @@ model AiAppFeedbackComment {
   text        String
   kind        AiAppFeedbackCommentKind @default(REPLY)
   createdAt   DateTime                 @default(now())
+  /// Set when its author edits it; null until then.
+  editedAt    DateTime?
 
   @@index([feedbackUid, createdAt])
 }

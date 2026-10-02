@@ -1,4 +1,4 @@
-import { Prisma, type AiAppFeedbackPin, type AiAppFeedbackStatus } from '@prisma/client';
+import { Prisma, type AiAppFeedbackItemKind, type AiAppFeedbackPin, type AiAppFeedbackStatus } from '@prisma/client';
 import { FeedbackPinInputSchema, type FeedbackPinInput } from './dto/submit-feedback.dto';
 
 /**
@@ -70,10 +70,33 @@ export type OverlayFeedbackPin = PublicFeedbackPin & {
   feedback: {
     uid: string;
     status: AiAppFeedbackStatus;
+    kind: AiAppFeedbackItemKind;
     createdAt: Date;
+    editedAt: Date | null;
     member: { uid: string; name: string; image: string | null } | null;
+    commentCount: number;
   };
 };
+
+function escapeText(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/**
+ * A COMMENT's text after its author edits the note: the new note as paragraphs,
+ * then the element's screenshot(s) kept from the old text. No selector or page
+ * line — that is structured pin data, and the Feedback list doesn't show it.
+ * The caller sanitizes the result.
+ */
+export function rebuildCommentText(note: string, previousText: string): string {
+  const paragraphs = note
+    .trim()
+    .split(/\n{2,}/)
+    .map((block) => `<p>${escapeText(block).replace(/\n/g, '<br>')}</p>`)
+    .join('');
+  const crops = (previousText.match(PIN_CROP_IMG) ?? []).map((img) => `<p>${img}</p>`).join('');
+  return `${paragraphs}${crops}`;
+}
 
 const PINS_LIST = /<ol\b[^>]*\bclass=["'][^"']*\bai-app-element-pins\b[^"']*["'][^>]*>/i;
 const DATA_PINS = /\bdata-pins=("([^"]*)"|'([^']*)')/i;

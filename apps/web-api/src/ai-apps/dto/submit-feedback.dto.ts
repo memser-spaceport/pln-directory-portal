@@ -100,6 +100,12 @@ export const SubmitFeedbackSchema = z.object({
     .refine((pins) => new Set(pins.map((pin) => pin.n)).size === pins.length, 'pin numbers must be unique')
     .optional(),
   context: FeedbackContextSchema.optional(),
+  /**
+   * FEEDBACK (the written form; private to the app's creator and admins) or
+   * COMMENT (pinned in the live app; public to its viewers, exactly one pin).
+   * Omitted means FEEDBACK, so a client that predates comments stays private.
+   */
+  kind: z.enum(['FEEDBACK', 'COMMENT']).optional(),
 });
 
 export type FeedbackPinInput = z.infer<typeof FeedbackPinInputSchema>;

@@ -56,7 +56,7 @@ import {
 import { AiAppsAuthGateService } from './ai-apps-auth-gate.service';
 import { PollConnectDto } from './dto/poll-connect.dto';
 import { SubmitFeedbackDto } from './dto/submit-feedback.dto';
-import { CreateFeedbackCommentDto } from './dto/feedback-comment.dto';
+import { CreateFeedbackCommentDto, EditFeedbackCommentDto, EditFeedbackNoteDto } from './dto/feedback-comment.dto';
 import { AgentUpdateFeedbackStatusDto, UpdateFeedbackStatusDto } from './dto/update-feedback-status.dto';
 import { UpdateAppMetadataDto } from './dto/update-app-metadata.dto';
 import { TrackEventDto } from './dto/track-event.dto';
@@ -744,7 +744,11 @@ export class AiAppsController {
   @UsePipes(ZodValidationPipe)
   async submitFeedback(@Param('uid') uid: string, @Body() body: SubmitFeedbackDto, @Req() req: any) {
     const memberUid = await this.resolveMemberUid(req);
-    return this.aiAppsService.submitFeedback(memberUid, uid, body.text, { pins: body.pins, context: body.context });
+    return this.aiAppsService.submitFeedback(memberUid, uid, body.text, {
+      pins: body.pins,
+      context: body.context,
+      kind: body.kind,
+    });
   }
 
   /**
@@ -858,6 +862,57 @@ export class AiAppsController {
   ): Promise<void> {
     const memberUid = await this.resolveMemberUid(req);
     await this.aiAppsService.deleteFeedbackComment(memberUid, uid, feedbackUid, commentUid);
+  }
+
+  /** Edit a reply's text: its author only (checked in the service). */
+  @NoCache()
+  @Patch(':uid/feedback/:feedbackUid/comments/:commentUid')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  @UsePipes(ZodValidationPipe)
+  async editFeedbackComment(
+    @Param('uid') uid: string,
+    @Param('feedbackUid') feedbackUid: string,
+    @Param('commentUid') commentUid: string,
+    @Body() body: EditFeedbackCommentDto,
+    @Req() req: any
+  ) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.editFeedbackComment(memberUid, uid, feedbackUid, commentUid, body.text);
+  }
+
+  /**
+   * Edit a COMMENT's note: its author only. Distinct from the status PATCH on
+   * `:uid/feedback/:feedbackUid` — different body, different permission.
+   */
+  @NoCache()
+  @Patch(':uid/feedback/:feedbackUid/note')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  @UsePipes(ZodValidationPipe)
+  async editFeedbackNote(
+    @Param('uid') uid: string,
+    @Param('feedbackUid') feedbackUid: string,
+    @Body() body: EditFeedbackNoteDto,
+    @Req() req: any
+  ) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.editFeedbackNote(memberUid, uid, feedbackUid, body.note);
+  }
+
+  /** Delete an item with its pins and replies: its author, or a directory admin. */
+  @NoCache()
+  @Delete(':uid/feedback/:feedbackUid')
+  @HttpCode(204)
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async deleteFeedbackItem(
+    @Param('uid') uid: string,
+    @Param('feedbackUid') feedbackUid: string,
+    @Req() req: any
+  ): Promise<void> {
+    const memberUid = await this.resolveMemberUid(req);
+    await this.aiAppsService.deleteFeedbackItem(memberUid, uid, feedbackUid);
   }
 
   /**
