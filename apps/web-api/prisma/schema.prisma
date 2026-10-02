@@ -3921,8 +3921,6 @@ model AiAppSessionCode {
   @@index([expiresAt])
 }
 
-/// Auth gate (sidecar) version running for one target of an app. Kept outside AiApp/AiAppTarget so a platform
-/// refresh never bumps their updatedAt ("Last updated" in LabOS) or reaches API responses.
 /// A Preview-only testing identity for one AI App (LAB-2743). Never a Member row: member lists, search, digests
 /// and exports read the Member table only. Kept until revoked; revoking keeps the row with `revokedAt` set.
 model AiAppTestingUser {
@@ -3942,6 +3940,8 @@ model AiAppTestingUser {
   @@index([appUid])
 }
 
+/// Auth gate (sidecar) version running for one target of an app. Kept outside AiApp/AiAppTarget so a platform
+/// refresh never bumps their updatedAt ("Last updated" in LabOS) or reaches API responses.
 model AiAppAuthGate {
   id               Int                    @id @default(autoincrement())
   appUid           String

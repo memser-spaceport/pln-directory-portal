@@ -17,7 +17,11 @@ import {
 } from './ai-apps.constants';
 
 const APP = { uid: 'app-1', memberUid: 'creator-1', appId: 'demo', status: 'LIVE' };
-const PREVIEW_TARGET = { appUid: 'app-1', environment: 'preview' };
+const PREVIEW_TARGET = {
+  url: 'https://demo-preview.example',
+  s3Key: 'apps/demo/preview.zip',
+  lastDeployedAt: new Date(0),
+};
 
 interface Row {
   uid: string;
@@ -191,6 +195,12 @@ describe('AiAppsTestingUsersService', () => {
       expect(table.createMany).not.toHaveBeenCalled();
     });
 
+    it('refuses an app whose preview row was never uploaded or deployed', async () => {
+      const { service, table } = buildService({ previewTarget: { url: null, s3Key: null, lastDeployedAt: null } });
+      await expect(service.create('creator-1', 'app-1', 1)).rejects.toThrow(/Preview/);
+      expect(table.createMany).not.toHaveBeenCalled();
+    });
+
     it('maps a concurrent create that took the same numbers to 409', async () => {
       const { service, table } = buildService();
       table.createMany.mockRejectedValueOnce(
@@ -261,6 +271,14 @@ describe('AiAppsTestingUsersService', () => {
       const second = await service.revoke('creator-1', 'app-1', 'seed-1');
       expect(second).toEqual({ uid: 'seed-1', revoked: true, revokedAt: first.revokedAt });
       expect(analytics.trackEvent).toHaveBeenCalledTimes(1);
+    });
+
+    it('a retry after a failed session step still ends the sessions', async () => {
+      const { service, sessionService } = buildService({ rows: activeRows(1) });
+      sessionService.revokeAllForMember.mockRejectedValueOnce(new Error('db down'));
+      await expect(service.revoke('creator-1', 'app-1', 'seed-1')).rejects.toThrow('db down');
+      await expect(service.revoke('creator-1', 'app-1', 'seed-1')).resolves.toMatchObject({ revoked: true });
+      expect(sessionService.revokeAllForMember).toHaveBeenCalledTimes(2);
     });
 
     it('fires ai-apps-testing-user-revoked once per actual revocation with app and testing user uid', async () => {

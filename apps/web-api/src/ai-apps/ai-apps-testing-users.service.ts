@@ -143,6 +143,8 @@ export class AiAppsTestingUsersService {
       throw new NotFoundException('Testing user not found');
     }
     if (existing.revokedAt) {
+      // Ending sessions again is idempotent and covers a first revoke whose session step failed.
+      await this.sessionService.revokeAllForMember(existing.uid);
       return { uid: existing.uid, revoked: true, revokedAt: existing.revokedAt };
     }
 
@@ -182,13 +184,16 @@ export class AiAppsTestingUsersService {
     return app;
   }
 
-  /** An app has a Preview environment while its preview target row exists (tearing the Preview down deletes it). */
+  /**
+   * An app has a Preview environment once its preview target was uploaded or deployed; the same test
+   * `AiAppsService.deleteTarget` uses for "This environment is not deployed". Tearing the Preview down deletes the row.
+   */
   private async assertHasPreview(app: AiApp): Promise<void> {
     const preview = await this.prisma.aiAppTarget.findUnique({
       where: { appUid_environment: { appUid: app.uid, environment: 'preview' } },
-      select: { appUid: true },
+      select: { url: true, s3Key: true, lastDeployedAt: true },
     });
-    if (!preview) {
+    if (!preview?.url && !preview?.s3Key && !preview?.lastDeployedAt) {
       throw new BadRequestException(
         'This app has no Preview environment; deploy a Preview before adding testing users'
       );
