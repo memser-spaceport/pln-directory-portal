@@ -477,6 +477,14 @@ export const AI_APPS_AGENT_FEEDBACK_LISTED = 'ai_apps_agent_feedback_listed';
 export const AI_APPS_AGENT_FEEDBACK_STATUS_CHANGED = 'ai_apps_agent_feedback_status_changed';
 export const AI_APPS_AGENT_FEEDBACK_DENIED = 'ai_apps_agent_feedback_denied';
 
+/** Preview testing users (LAB-2743): active (non-revoked) users allowed per app. */
+export const AI_APPS_TESTING_USERS_MAX_PER_APP = 100;
+/** Default and maximum page size of the testing-user list. */
+export const AI_APPS_TESTING_USERS_PAGE_LIMIT = 100;
+/** Directory PostHog names for testing users, as named in the ticket (LAB-2743). */
+export const AI_APPS_TESTING_USER_CREATED = 'ai-apps-testing-user-created';
+export const AI_APPS_TESTING_USER_REVOKED = 'ai-apps-testing-user-revoked';
+
 /**
  * Public URL of THIS API's custom-event analytics endpoint
  * (`POST /v1/ai-apps/track`), written into the starter kit as
