@@ -2195,6 +2195,36 @@ export class AiAppsService {
   }
 
   /**
+   * Only what the requester submitted themselves, on any non-deleted app, in the
+   * same row shape as listAccessibleFeedback. Owning an app or being a directory
+   * admin adds nobody else's.
+   */
+  async listMyFeedback(
+    requesterUid: string
+  ): Promise<Array<WithMember<AiAppFeedback> & { appName: string; pinCount: number; commentCount: number }>> {
+    const feedback = await this.prisma.aiAppFeedback.findMany({
+      where: { memberUid: requesterUid },
+      orderBy: { createdAt: 'desc' },
+      include: { _count: { select: { pins: true, comments: true } } },
+    });
+    if (feedback.length === 0) {
+      return [];
+    }
+    const apps = await this.prisma.aiApp.findMany({
+      where: { uid: { in: Array.from(new Set(feedback.map((row) => row.appUid))) }, status: { not: 'DELETED' } },
+      select: { uid: true, name: true },
+    });
+    const appNameByUid = new Map(apps.map((app) => [app.uid, app.name]));
+    const withMembers = await this.withMember(feedback.filter((row) => appNameByUid.has(row.appUid)));
+    return withMembers.map(({ _count, ...row }) => ({
+      ...row,
+      appName: appNameByUid.get(row.appUid) ?? '',
+      pinCount: _count?.pins ?? 0,
+      commentCount: _count?.comments ?? 0,
+    }));
+  }
+
+  /**
    * Sets the shared review status on one feedback row. Any of NEW / VIEWED /
    * IMPLEMENTED is always allowed (skips and backwards moves included). Restricted
    * to the app's creator and directory admins; no notification is sent.

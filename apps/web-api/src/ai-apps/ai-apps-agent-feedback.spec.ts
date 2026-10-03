@@ -207,7 +207,7 @@ describe('AiAppsController feedback routes', () => {
     expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toEqual([AiAppTokenGuard]);
   });
 
-  it.each(['listFeedback', 'updateFeedbackStatus', 'listAccessibleFeedback'])(
+  it.each(['listFeedback', 'updateFeedbackStatus', 'listAccessibleFeedback', 'listMyFeedback'])(
     '%s: member route stays on member JWT + RBAC',
     (name) => {
       expect(Reflect.getMetadata(GUARDS_METADATA, proto[name])).toEqual([UserTokenCheckGuard, RbacGuard]);

@@ -278,6 +278,16 @@ export class AiAppsController {
     return this.aiAppsService.listAccessibleFeedback(memberUid);
   }
 
+  /** Only the caller's own feedback and comments, on any app, newest first. Read-only. */
+  @NoCache()
+  @Get('feedback/mine')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async listMyFeedback(@Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.listMyFeedback(memberUid);
+  }
+
   /**
    * Identity of the signed-in member ("member context"), consumed by deployed
    * AI apps for personalization. Unlike the other dashboard reads, the guard

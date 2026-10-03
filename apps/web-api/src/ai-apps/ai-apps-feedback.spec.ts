@@ -262,6 +262,37 @@ describe('AiAppsService feedback', () => {
     });
   });
 
+  describe('listMyFeedback', () => {
+    it('queries only rows the requester submitted, even for a directory admin', async () => {
+      const { service, prisma } = buildService();
+      prisma.member.findUnique.mockResolvedValue({ memberRoles: [{ name: 'DIRECTORYADMIN' }] });
+      await expect(service.listMyFeedback('admin-1')).resolves.toEqual([]);
+      expect(prisma.aiAppFeedback.findMany).toHaveBeenCalledWith({
+        where: { memberUid: 'admin-1' },
+        orderBy: { createdAt: 'desc' },
+        include: { _count: { select: { pins: true, comments: true } } },
+      });
+      expect(prisma.aiApp.findMany).not.toHaveBeenCalled();
+    });
+
+    it('tags rows with the app name and drops rows on deleted apps', async () => {
+      const { service, prisma } = buildService();
+      prisma.aiAppFeedback.findMany.mockResolvedValue([
+        { ...FEEDBACK, uid: 'fb-2', appUid: 'app-gone', kind: 'COMMENT' },
+        { ...FEEDBACK, status: 'IMPLEMENTED' },
+      ]);
+      prisma.aiApp.findMany.mockResolvedValue([{ uid: 'app-1', name: 'Alpha' }]);
+
+      const result = await service.listMyFeedback('member-1');
+      expect(prisma.aiApp.findMany).toHaveBeenCalledWith({
+        where: { uid: { in: ['app-gone', 'app-1'] }, status: { not: 'DELETED' } },
+        select: { uid: true, name: true },
+      });
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({ uid: 'fb-1', appName: 'Alpha', status: 'IMPLEMENTED' });
+    });
+  });
+
   describe('updateFeedbackStatus', () => {
     it('throws 404 when the app does not exist', async () => {
       const { service, prisma } = buildService();
