@@ -53,15 +53,6 @@ export const DemoDaysMenu = () => {
             </a>
           </Link>
         )}
-        {canViewTeamPitches && (
-          <Link href="/spv-spotlights" passHref>
-            <a className={s.menuItem}>
-              <PitchIcon />
-              <span className={s.menuItemLabel}>SPV Spotlights</span>
-              <CaretIcon />
-            </a>
-          </Link>
-        )}
       </div>
     </div>
   );

@@ -8,7 +8,6 @@ import {
   AI_APPS_APP_DOMAIN,
   AI_APPS_PORTAL_ORIGIN,
   AI_APPS_APP_SETTINGS_ENDPOINT,
-  AI_APPS_BRIDGE_SCRIPT_URL,
   AI_APPS_BUILD_LOGS_ENDPOINT,
   AI_APPS_CONNECT_ENDPOINT,
   AI_APPS_DEPLOY_ENDPOINT,
@@ -313,8 +312,7 @@ folder. Before any UI work, load the **pl-design-system** skill
     pass \`frameguard: false\` to turn it off.)
   - If you set a \`Content-Security-Policy\`, its \`frame-ancestors\` MUST include
     \`'self' ${AI_APPS_PORTAL_ORIGIN}\`. Never use
-    \`frame-ancestors 'none'\`. Its \`script-src\` must also allow
-    \`${AI_APPS_PORTAL_ORIGIN}\` for the LabOS bridge script (below).
+    \`frame-ancestors 'none'\`.
   - The default scaffold sends neither header, so it already embeds fine — this
     only matters once you add \`helmet\`, a CSP, or other security headers.
 - **Deep links and tab title.** The dashboard mirrors your current page in its
@@ -2473,7 +2471,7 @@ const port = process.env.PORT || 3000;
 app.get('/', (_req, res) => {
   res.send(\`
     <html>
-      <head><title>My PLN App</title><script src="${AI_APPS_BRIDGE_SCRIPT_URL}" defer></script></head>
+      <head><title>My PLN App</title></head>
       <body style="font-family: sans-serif; padding: 40px;">
         <h1>Hello from my PLN app</h1>
         <p>Edit app/server.js (or ask your AI agent to) and redeploy.</p>
