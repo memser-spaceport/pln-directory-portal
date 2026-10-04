@@ -294,25 +294,28 @@ describe('AiAppsStarterKitService buildZip', () => {
     expect(entries.get('README.md') as string).toContain('.claude/skills/app-feedback/');
   });
 
-  it('kit 1.16: teaches item kinds, pins, replies and the closing note, and that comments are public', () => {
+  it('kit 1.16: teaches written feedback, replies and the closing note, and never public comments', () => {
     expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.16');
     const skill = entries.get('.claude/skills/app-feedback/SKILL.md') as string;
     expect(skill).toContain('`kind: "FEEDBACK"`');
-    expect(skill).toContain('`kind: "COMMENT"`');
-    expect(skill).toContain('"pins": [');
+    expect(skill).toContain('"kind": "FEEDBACK"');
     expect(skill).toContain('"comments": [');
     expect(skill).toContain('"commentCount": 1');
     expect(skill).toContain('`kind: "CLOSING_NOTE"`');
     expect(skill).toContain('{"status":"IMPLEMENTED","note":');
     expect(skill).toContain('A `note` is accepted only with `IMPLEMENTED` (a 422 otherwise)');
-    expect(skill).toContain('**Comments and their closing notes are public.** Never quote private data');
+    expect(skill).toContain('notifies the person who reported it');
+    expect(skill).toContain('**Never quote private data in a note**');
+    expect(skill).toContain('read `null` as "not\n  said", not as bug or P2');
     expect(skill).toContain('A 404 on an\n  item means it was deleted');
     for (const path of ['CLAUDE.md', 'AGENTS.md']) {
       const instructions = entries.get(path) as string;
-      expect(instructions).toContain('(`FEEDBACK` or `COMMENT`)');
       expect(instructions).toContain('closing `note`');
       expect(instructions).toContain('never quote private data in a note');
       expect(instructions).toContain('`data-labos-mask`');
+    }
+    for (const doc of [skill, entries.get('CLAUDE.md') as string, entries.get('AGENTS.md') as string]) {
+      expect(doc).not.toMatch(/COMMENT|public comment|pin comments|pinned|"pins"|`pins`/);
     }
   });
 
