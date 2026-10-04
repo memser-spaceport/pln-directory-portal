@@ -261,11 +261,6 @@ short-lived deploy credential: you open a LabOS link, sign in, and approve. The
 credential is tied to your account, expires after about an hour, and is never
 written to disk — so this folder is safe to commit or share (it grants nothing on
 its own). Each new deploy session just asks you to approve again.
-
-## What's new in v1.16
-- Preview testing users: your agent can create name-only identities and mint
-  24-hour Preview session tokens for a load test. See
-  \`.claude/skills/preview-testing-users/SKILL.md\`.
 `;
   }
 

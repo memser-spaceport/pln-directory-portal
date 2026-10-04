@@ -533,7 +533,7 @@ describe('AiAppsStarterKitService buildZip', () => {
     expect(deploySkill).not.toContain('there is no deploy field for it');
   });
 
-  it('kit 1.16: ships a short Preview testing-users skill and mentions it in What\'s new', () => {
+  it('kit 1.16: ships a short Preview testing-users skill, listed in the kit README only', () => {
     expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.16');
     const skill = entries.get('.claude/skills/preview-testing-users/SKILL.md') as string;
     expect(skill).toContain('name: preview-testing-users');
@@ -546,9 +546,7 @@ describe('AiAppsStarterKitService buildZip', () => {
     expect(skill).toContain('"testing": true');
     expect(skill).not.toContain('Production URL');
     expect(skill.length).toBeLessThan(1800);
-    const readme = entries.get('README.md') as string;
-    expect(readme).toContain("What's new in v1.16");
-    expect(readme).toContain('.claude/skills/preview-testing-users/');
+    expect(entries.get('README.md') as string).toContain('.claude/skills/preview-testing-users/');
     for (const path of ['CLAUDE.md', 'AGENTS.md']) {
       expect(entries.get(path) as string).not.toContain('preview-testing-users');
     }
