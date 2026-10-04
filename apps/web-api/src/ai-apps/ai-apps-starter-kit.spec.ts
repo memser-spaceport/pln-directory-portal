@@ -547,6 +547,8 @@ describe('AiAppsStarterKitService buildZip', () => {
     expect(skill).toContain('/v1/ai-apps/{appUid}/agent/testing-users');
     expect(skill).toContain('/v1/ai-apps/{appUid}/agent/testing-users/sessions');
     expect(skill).toContain('"testing": true');
+    expect(skill).toContain('__Host-pln_app_session=<token>');
+    expect(skill).toContain('authToken=<token>');
     expect(skill).not.toContain('Production URL');
     expect(skill.length).toBeLessThan(1800);
     expect(entries.get('README.md') as string).toContain('.claude/skills/preview-testing-users/');

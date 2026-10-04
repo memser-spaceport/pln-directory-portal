@@ -8,7 +8,6 @@ import {
   AI_APPS_APP_DOMAIN,
   AI_APPS_PORTAL_ORIGIN,
   AI_APPS_APP_SETTINGS_ENDPOINT,
-  AI_APPS_BRIDGE_SCRIPT_URL,
   AI_APPS_BUILD_LOGS_ENDPOINT,
   AI_APPS_CONNECT_ENDPOINT,
   AI_APPS_DEPLOY_ENDPOINT,
@@ -1500,7 +1499,8 @@ curl -sS -X POST "${AI_APPS_TESTING_SESSIONS_ENDPOINT}" \\
 \`\`\`
 
 Replace \`{appUid}\` in those URLs. Show tokens once; never write them to disk.
-Cookie \`authToken=<token>\` on this app's Preview URL.
+On Preview set both (same token): \`__Host-pln_app_session=<token>\` (LabOS
+gate) and \`authToken=<token>\` (the app).
 
 \`GET /v1/ai-apps/me\` returns \`{ "testing": true, "member": { "uid", "name" } }\`.
 Real members omit \`testing\`. 403 = not this app's owner.
