@@ -29,6 +29,7 @@ describe('AiAppsStarterKitService buildZip', () => {
       '.claude/skills/pln-member-context/SKILL.md',
       '.claude/skills/app-analytics/SKILL.md',
       '.claude/skills/db-migration/SKILL.md',
+      '.claude/skills/preview-testing-users/SKILL.md',
       'pln-app.config.json',
     ]) {
       expect(entries.has(path)).toBe(true);
@@ -530,6 +531,27 @@ describe('AiAppsStarterKitService buildZip', () => {
     expect(deploySkill).toContain('-F "access=<OPEN or PRIVATE — first deploy only, see step 2; omit on redeploys>"');
     expect(deploySkill).toContain('-F "access=<OPEN or PRIVATE — first upload only, see step 2; omit afterwards>"');
     expect(deploySkill).not.toContain('there is no deploy field for it');
+  });
+
+  it('kit 1.16: ships a short Preview testing-users skill and mentions it in What\'s new', () => {
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.16');
+    const skill = entries.get('.claude/skills/preview-testing-users/SKILL.md') as string;
+    expect(skill).toContain('name: preview-testing-users');
+    expect(skill).toContain('Preview only');
+    expect(skill).toContain('Not Production');
+    expect(skill).toContain('24 hours');
+    expect(skill).toContain('x-app-token');
+    expect(skill).toContain('/v1/ai-apps/{appUid}/agent/testing-users');
+    expect(skill).toContain('/v1/ai-apps/{appUid}/agent/testing-users/sessions');
+    expect(skill).toContain('"testing": true');
+    expect(skill).not.toContain('Production URL');
+    expect(skill.length).toBeLessThan(1800);
+    const readme = entries.get('README.md') as string;
+    expect(readme).toContain("What's new in v1.16");
+    expect(readme).toContain('.claude/skills/preview-testing-users/');
+    for (const path of ['CLAUDE.md', 'AGENTS.md']) {
+      expect(entries.get(path) as string).not.toContain('preview-testing-users');
+    }
   });
 
   it('documents public endpoints and that the app must secure them (kit 1.13+)', () => {

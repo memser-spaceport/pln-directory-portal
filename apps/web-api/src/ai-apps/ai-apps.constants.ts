@@ -490,6 +490,13 @@ export const AI_APPS_TESTING_SESSION_MAX_MS = 24 * 60 * 60 * 1000;
 export const AI_APPS_TESTING_SESSION_MINTED = 'ai-apps-testing-session-minted';
 export const AI_APPS_TESTING_SESSION_USED = 'ai-apps-testing-session-used';
 
+/** Agent URL templates (LAB-2754). `{appUid}` is replaced from `pln-app.config.json`. */
+export const AI_APPS_TESTING_USERS_ENDPOINT =
+  process.env.AI_APPS_TESTING_USERS_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/agent/testing-users`;
+export const AI_APPS_TESTING_SESSIONS_ENDPOINT =
+  process.env.AI_APPS_TESTING_SESSIONS_ENDPOINT ||
+  `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/agent/testing-users/sessions`;
+
 /**
  * Public URL of THIS API's custom-event analytics endpoint
  * (`POST /v1/ai-apps/track`), written into the starter kit as

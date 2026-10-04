@@ -1,6 +1,7 @@
 // The service is a stub here; its real module, and the guards' imports, pull axios (ESM) that ts-jest cannot load.
 jest.mock('axios', () => ({ isAxiosError: jest.fn(() => false) }));
 jest.mock('./ai-apps-testing-users.service', () => ({ AiAppsTestingUsersService: jest.fn() }));
+jest.mock('./guards/ai-app-token.guard', () => ({ AiAppTokenGuard: jest.fn() }));
 
 import 'reflect-metadata';
 import { PATH_METADATA, METHOD_METADATA, GUARDS_METADATA } from '@nestjs/common/constants';
@@ -8,6 +9,7 @@ import { ForbiddenException, RequestMethod } from '@nestjs/common';
 import { AiAppsTestingUsersController } from './ai-apps-testing-users.controller';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { RbacGuard } from '../rbac/rbac.guard';
+import { AiAppTokenGuard } from './guards/ai-app-token.guard';
 import { RBAC_PERMISSIONS_KEY } from '../rbac/rbac.decorator';
 import { AI_APPS_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 
@@ -31,6 +33,17 @@ describe('AiAppsTestingUsersController routes', () => {
     expect(Reflect.getMetadata(METHOD_METADATA, handler)).toBe(method);
     expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toEqual([UserTokenCheckGuard, RbacGuard]);
     expect(Reflect.getMetadata(RBAC_PERMISSIONS_KEY, handler)).toEqual(permission);
+  });
+
+  it.each([
+    ['createTestingUsersFromAgent', RequestMethod.POST, ':uid/agent/testing-users'],
+    ['mintTestingSessionsFromAgent', RequestMethod.POST, ':uid/agent/testing-users/sessions'],
+  ])('%s: %s %s behind the deploy-token guard only', (name, method, path) => {
+    const handler = proto[name];
+    expect(Reflect.getMetadata(PATH_METADATA, handler)).toBe(path);
+    expect(Reflect.getMetadata(METHOD_METADATA, handler)).toBe(method);
+    expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toEqual([AiAppTokenGuard]);
+    expect(Reflect.getMetadata(RBAC_PERMISSIONS_KEY, handler)).toBeUndefined();
   });
 });
 
@@ -71,5 +84,22 @@ describe('AiAppsTestingUsersController handlers', () => {
     const { controller, service } = build();
     await expect(controller.listTestingUsers('app-1', {} as any, {})).rejects.toThrow(ForbiddenException);
     expect(service.list).not.toHaveBeenCalled();
+  });
+
+  it('agent create and mint use the deploy-token member and refuse another app\'s key', async () => {
+    const { controller, service } = build();
+    const req = { aiAppMemberUid: 'creator-1' };
+    await controller.createTestingUsersFromAgent('app-1', { count: 5 } as any, req);
+    await controller.mintTestingSessionsFromAgent('app-1', {} as any, req);
+    expect(service.create).toHaveBeenCalledWith('creator-1', 'app-1', 5);
+    expect(service.mintSessions).toHaveBeenCalledWith('creator-1', 'app-1', undefined);
+
+    await expect(
+      controller.createTestingUsersFromAgent('app-1', { count: 1 } as any, {
+        aiAppMemberUid: 'creator-1',
+        aiAppKeyScope: { appUid: 'other-app', environment: 'preview' },
+      })
+    ).rejects.toThrow(ForbiddenException);
+    expect(service.create).toHaveBeenCalledTimes(1);
   });
 });

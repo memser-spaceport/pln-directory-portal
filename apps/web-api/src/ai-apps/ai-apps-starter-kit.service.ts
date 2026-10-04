@@ -21,6 +21,8 @@ import {
   AI_APPS_RUNTIME_LOGS_ENDPOINT,
   AI_APPS_STARTER_KIT_VERSION,
   AI_APPS_TAGS_ENDPOINT,
+  AI_APPS_TESTING_SESSIONS_ENDPOINT,
+  AI_APPS_TESTING_USERS_ENDPOINT,
 } from './ai-apps.constants';
 import { AI_APPS_MAX_TAGS_PER_APP, AI_APPS_OTHER_TAG, AI_APPS_TAGS } from './ai-apps-tags';
 import { AI_APPS_MAX_PUBLIC_PATHS } from './ai-apps-public-paths';
@@ -55,6 +57,7 @@ export class AiAppsStarterKitService {
     add('.claude/skills/pln-member-context/SKILL.md', this.memberContextSkill());
     add('.claude/skills/app-analytics/SKILL.md', this.analyticsSkill());
     add('.claude/skills/db-migration/SKILL.md', this.dbMigrationSkill());
+    add('.claude/skills/preview-testing-users/SKILL.md', this.previewTestingUsersSkill());
     add('pln-app.config.json', this.configJson());
     add('styles/pln-theme.css', this.themeCss());
     add('styles/FONTS.md', this.fontsDoc());
@@ -131,6 +134,7 @@ to the Protocol Labs Network sandbox with a single instruction.
 - \`.claude/skills/db-migration/\` — for apps that already have their own database, how your
   agent migrates it — structure and, by default, your existing data — onto a
   PL-provisioned Postgres database.
+- \`.claude/skills/preview-testing-users/\` — Preview-only testing users and 24h session tokens for a load test.
 - \`pln-app.config.json\` — the LabOS connect + deploy endpoints (no secrets).
 - \`pl-design-system/\` — the **PL Design System**: ready-made React components
   (Button, EntityCard, PageShell, Table, Tabs, Tag, Badge, SearchInput, …),
@@ -257,6 +261,11 @@ short-lived deploy credential: you open a LabOS link, sign in, and approve. The
 credential is tied to your account, expires after about an hour, and is never
 written to disk — so this folder is safe to commit or share (it grants nothing on
 its own). Each new deploy session just asks you to approve again.
+
+## What's new in v1.16
+- Preview testing users: your agent can create name-only identities and mint
+  24-hour Preview session tokens for a load test. See
+  \`.claude/skills/preview-testing-users/SKILL.md\`.
 `;
   }
 
@@ -1483,6 +1492,41 @@ Custom events reuse the same \`trackEvent\` helper: \`trackEvent('clicked_export
   backend caps and drops oversized payloads silently.
 - This is the only analytics transport available to apps — don't add a
   PostHog SDK, autocapture, or any other analytics vendor directly.
+`;
+  }
+
+  private previewTestingUsersSkill(): string {
+    return `---
+name: preview-testing-users
+description: Create Preview-only testing users and mint 24h session tokens. Load only when the member asks for testing users, simulated sessions, or a Preview load test. Skip on a normal deploy.
+---
+
+# Preview testing users
+
+Preview only. Not Production. Tokens last 24 hours.
+
+Need \`appUid\` in \`pln-app.config.json\` and an \`${AI_APP_TOKEN_HEADER}\` from the
+**deploy-to-labs** connect flow (do not copy that flow here).
+
+\`\`\`bash
+# Create (1–100). 400 = no Preview or the 100-user cap.
+curl -sS -X POST "${AI_APPS_TESTING_USERS_ENDPOINT}" \\
+  -H "${AI_APP_TOKEN_HEADER}: <deployToken>" \\
+  -H "Content-Type: application/json" \\
+  -d '{"count":50}'
+
+# Mint tokens for every active testing user (omit uids). Shown once.
+curl -sS -X POST "${AI_APPS_TESTING_SESSIONS_ENDPOINT}" \\
+  -H "${AI_APP_TOKEN_HEADER}: <deployToken>" \\
+  -H "Content-Type: application/json" \\
+  -d '{}'
+\`\`\`
+
+Replace \`{appUid}\` in those URLs. Show tokens once; never write them to disk.
+Cookie \`authToken=<token>\` on this app's Preview URL.
+
+\`GET /v1/ai-apps/me\` returns \`{ "testing": true, "member": { "uid", "name" } }\`.
+Real members omit \`testing\`. 403 = not this app's owner.
 `;
   }
 

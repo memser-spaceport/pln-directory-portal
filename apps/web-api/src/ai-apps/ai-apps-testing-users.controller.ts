@@ -20,6 +20,7 @@ import { RequirePermissions } from '../rbac/rbac.decorator';
 import { RbacGuard } from '../rbac/rbac.guard';
 import { RbacService } from '../rbac/rbac.service';
 import { AI_APPS_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
+import { AiAppTokenGuard } from './guards/ai-app-token.guard';
 import { AiAppsTestingUsersService } from './ai-apps-testing-users.service';
 import {
   CreateAiAppTestingUsersDto,
@@ -65,6 +66,19 @@ export class AiAppsTestingUsersController {
     return this.testingUsersService.create(memberUid, uid, body.count);
   }
 
+  /** Agent path for create: same body as the member route, deploy-token auth. */
+  @NoCache()
+  @Post(':uid/agent/testing-users')
+  @UseGuards(AiAppTokenGuard)
+  @UsePipes(ZodValidationPipe)
+  async createTestingUsersFromAgent(
+    @Param('uid') uid: string,
+    @Body() body: CreateAiAppTestingUsersDto,
+    @Req() req: any
+  ) {
+    return this.testingUsersService.create(this.agentMemberUid(req, uid), uid, body.count);
+  }
+
   /** Mint one Preview session token per active testing user. Each token is returned once. */
   @NoCache()
   @Post(':uid/testing-users/sessions')
@@ -75,6 +89,20 @@ export class AiAppsTestingUsersController {
   async mintTestingSessions(@Param('uid') uid: string, @Body() body: MintAiAppTestingSessionsDto, @Req() req: any) {
     const memberUid = await this.resolveMemberUid(req);
     return this.testingUsersService.mintSessions(memberUid, uid, body.uids);
+  }
+
+  /** Agent path for mint: same body as the member route, deploy-token auth. */
+  @NoCache()
+  @Post(':uid/agent/testing-users/sessions')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AiAppTokenGuard)
+  @UsePipes(ZodValidationPipe)
+  async mintTestingSessionsFromAgent(
+    @Param('uid') uid: string,
+    @Body() body: MintAiAppTestingSessionsDto,
+    @Req() req: any
+  ) {
+    return this.testingUsersService.mintSessions(this.agentMemberUid(req, uid), uid, body.uids);
   }
 
   /** Revoke one testing user (idempotent; the row is kept with `revokedAt`). */
@@ -102,5 +130,17 @@ export class AiAppsTestingUsersController {
       }
     }
     throw new ForbiddenException('Could not resolve member for AI Apps request');
+  }
+
+  /** Deploy-token member, plus the same app-scope check agent feedback uses. */
+  private agentMemberUid(req: any, appUid: string): string {
+    if (req.aiAppKeyScope?.appUid && req.aiAppKeyScope.appUid !== appUid) {
+      throw new ForbiddenException('This deployment key cannot access that app');
+    }
+    const memberUid = req.aiAppMemberUid;
+    if (!memberUid) {
+      throw new ForbiddenException('Could not resolve member for AI Apps request');
+    }
+    return memberUid;
   }
 }
