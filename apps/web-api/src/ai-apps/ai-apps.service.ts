@@ -499,12 +499,16 @@ export class AiAppsService {
     token: string | undefined;
     /** Member of a verified app session token (the controller checked it against the request origin). */
     sessionMemberUid?: string;
+    /** Set for a testing session: the app is the token's audience, not the preview hostname. */
+    testingAppId?: string;
     anonId: string | undefined;
     event: string | undefined;
     properties: Record<string, unknown> | undefined;
     events: Array<{ event?: string; properties?: Record<string, unknown> }> | undefined;
   }): Promise<void> {
-    const app = await this.resolveAppFromOrigin(params.origin);
+    const app = params.testingAppId
+      ? await this.resolveLiveAppByAppId(params.testingAppId)
+      : await this.resolveAppFromOrigin(params.origin);
     if (!app) {
       return;
     }
@@ -519,7 +523,10 @@ export class AiAppsService {
     }
 
     const memberUid = params.sessionMemberUid ?? (await this.resolveOptionalMemberUid(params.token));
-    const distinctId = memberUid ?? (params.anonId && AI_APP_ANON_ID_REGEX.test(params.anonId) ? params.anonId : null);
+    const distinctId =
+      params.testingAppId && memberUid
+        ? `testing:${memberUid}`
+        : memberUid ?? (params.anonId && AI_APP_ANON_ID_REGEX.test(params.anonId) ? params.anonId : null);
     if (!distinctId) {
       return;
     }
@@ -532,6 +539,9 @@ export class AiAppsService {
     };
     if (memberUid) {
       attribution.memberUid = memberUid;
+    }
+    if (params.testingAppId) {
+      attribution.testingUser = true;
     }
 
     await Promise.all(
@@ -550,6 +560,23 @@ export class AiAppsService {
         });
       })
     );
+  }
+
+  /** Live app for a testing session's token audience. Same multi-row pick as the origin resolver. */
+  private async resolveLiveAppByAppId(appId: string): Promise<AiApp | null> {
+    const candidates = await this.prisma.aiApp.findMany({ where: { appId, status: { not: 'DELETED' } } });
+    if (!candidates.length) {
+      return null;
+    }
+    if (candidates.length === 1) {
+      return candidates[0];
+    }
+    this.logger.warn(`Multiple live AiApp rows found for appId=${appId}; using the most recently deployed`);
+    return candidates.reduce((latest, candidate) => {
+      const latestTime = (latest.lastDeployedAt ?? latest.updatedAt).getTime();
+      const candidateTime = (candidate.lastDeployedAt ?? candidate.updatedAt).getTime();
+      return candidateTime > latestTime ? candidate : latest;
+    });
   }
 
   /**

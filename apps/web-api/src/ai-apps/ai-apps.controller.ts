@@ -39,10 +39,11 @@ import { AiAppsService } from './ai-apps.service';
 import { AgentFeedbackDeniedInterceptor } from './agent-feedback-denied.interceptor';
 import { AiAppsAccessService } from './ai-apps-access.service';
 import { AiAppsConnectService } from './ai-apps-connect.service';
-import { AiAppsSessionService, isAiAppSessionToken } from './ai-apps-session.service';
+import { AiAppsSessionService, isAiAppSessionToken, isTestingSessionToken } from './ai-apps-session.service';
 import { AiAppsStarterKitService } from './ai-apps-starter-kit.service';
 import { AiAppTokenGuard } from './guards/ai-app-token.guard';
 import { AiAppMemberContextGuard } from './guards/ai-app-member-context.guard';
+import { AiAppMeRbacGuard } from './guards/ai-app-me-rbac.guard';
 import { DeployAppDto } from './dto/deploy-app.dto';
 import { RegisterDraftDto } from './dto/register-draft.dto';
 import { CreateAiAppDeployKeyDto, DeployDraftDto } from './dto/deploy-draft.dto';
@@ -78,6 +79,20 @@ import {
 import { AI_APPS_MAX_TAGS_PER_APP, AI_APPS_TAGS } from './ai-apps-tags';
 
 const READ = { anyOf: [AI_APPS_PERMISSIONS.READ, AI_APPS_PERMISSIONS.WRITE] };
+
+/** Member-context body for a testing user: the real shape, with nothing a name-only identity does not have. */
+export function testingUserMemberContext(user: { uid: string; name: string }) {
+  return {
+    member: {
+      uid: user.uid,
+      name: user.name,
+      image: null,
+      location: null,
+      skills: [] as string[],
+      teams: [] as { uid: string; name: string; role: string | null; mainTeam: boolean; teamLead: boolean }[],
+    },
+  };
+}
 const WRITE = { anyOf: [AI_APPS_PERMISSIONS.WRITE] };
 
 @ApiTags('AI Apps')
@@ -300,9 +315,12 @@ export class AiAppsController {
   @NoCache()
   @Throttle(AI_APPS_SIDECAR_THROTTLE_LIMIT, AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS)
   @Get('me')
-  @UseGuards(AiAppMemberContextGuard, RbacGuard)
+  @UseGuards(AiAppMemberContextGuard, AiAppMeRbacGuard)
   @RequirePermissions(READ)
   async getMemberContext(@Req() req: any) {
+    if (req.aiAppTestingUser) {
+      return testingUserMemberContext(req.aiAppTestingUser);
+    }
     const memberUid = await this.resolveMemberUid(req);
     return this.aiAppsService.getMemberContext(memberUid);
   }
@@ -330,6 +348,7 @@ export class AiAppsController {
       origin: req.headers.origin,
       token: isAiAppSessionToken(token) ? undefined : token,
       sessionMemberUid: session?.memberUid,
+      testingAppId: session?.testing ? session.appId : undefined,
       anonId: body.anonId,
       event: body.event,
       properties: body.properties as Record<string, unknown> | undefined,
@@ -360,8 +379,16 @@ export class AiAppsController {
     }
     const appSession = req.headers?.[AI_APP_SESSION_HEADER];
     if (typeof appSession === 'string' && appSession) {
-      const session = await this.sessionService.validate(query.appId, appSession);
+      // A testing session's first-use claim matches lastUsedAt to createdAt, so don't slide it before that.
+      const session = await this.sessionService.validate(
+        query.appId,
+        appSession,
+        isTestingSessionToken(appSession) ? { touch: false } : undefined
+      );
       if (!session) {
+        if (await this.sessionService.isLiveTestingSessionForOtherApp(appSession, query.appId)) {
+          throw new ForbiddenException({ allowed: false, reason: 'private' });
+        }
         throw new UnauthorizedException('Invalid or expired app session');
       }
       return this.accessService.checkAccess(
@@ -369,7 +396,10 @@ export class AiAppsController {
         query.appId,
         query.method,
         { app },
-        query.target ?? 'prod'
+        query.target ?? 'prod',
+        session.testing && session.sessionUid && session.createdAt
+          ? { sessionUid: session.sessionUid, createdAt: session.createdAt }
+          : undefined
       );
     }
     await validateUserAccessToken(req);

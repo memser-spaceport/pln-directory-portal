@@ -17,7 +17,7 @@ import { PATH_METADATA, METHOD_METADATA, GUARDS_METADATA } from '@nestjs/common/
 import { RequestMethod } from '@nestjs/common';
 import { AiAppsController } from './ai-apps.controller';
 import { AiAppMemberContextGuard } from './guards/ai-app-member-context.guard';
-import { RbacGuard } from '../rbac/rbac.guard';
+import { AiAppMeRbacGuard } from './guards/ai-app-me-rbac.guard';
 import { RBAC_PERMISSIONS_KEY } from '../rbac/rbac.decorator';
 import { AI_APPS_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { AI_APPS_SIDECAR_THROTTLE_LIMIT, AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS } from './ai-apps.constants';
@@ -46,13 +46,32 @@ describe('AiAppsController GET /me wiring', () => {
   });
 
   it('uses the member-context guard (app session or cookie-or-bearer LabOS token) plus RBAC', () => {
-    expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toEqual([AiAppMemberContextGuard, RbacGuard]);
+    expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toEqual([AiAppMemberContextGuard, AiAppMeRbacGuard]);
   });
 
   it('requires AI Apps read (or write) permission', () => {
     expect(Reflect.getMetadata(RBAC_PERMISSIONS_KEY, handler)).toEqual({
       anyOf: [AI_APPS_PERMISSIONS.READ, AI_APPS_PERMISSIONS.WRITE],
     });
+  });
+
+  it('returns a name-only member for a testing session and does not load a member', async () => {
+    const aiAppsService = { getMemberContext: jest.fn() };
+    const controller = new AiAppsController(
+      aiAppsService as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+    await expect(
+      controller.getMemberContext({ aiAppTestingUser: { uid: 'tu-1', name: 'Testing user 1' } })
+    ).resolves.toEqual({
+      member: { uid: 'tu-1', name: 'Testing user 1', image: null, location: null, skills: [], teams: [] },
+    });
+    expect(aiAppsService.getMemberContext).not.toHaveBeenCalled();
   });
 
   it('raises the IP throttle above the global 10/s so a sidecar burst does not 429', () => {

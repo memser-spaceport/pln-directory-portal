@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { AiApp, AiAppTestingUser, Prisma } from '@prisma/client';
 import { AnalyticsService } from '../analytics/service/analytics.service';
@@ -11,10 +12,13 @@ import { PrismaService } from '../shared/prisma.service';
 import { AiAppsService } from './ai-apps.service';
 import { AiAppsSessionService } from './ai-apps-session.service';
 import {
+  AI_APPS_TESTING_SESSION_MINTED,
+  AI_APPS_TESTING_SESSION_USED,
   AI_APPS_TESTING_USER_CREATED,
   AI_APPS_TESTING_USER_REVOKED,
   AI_APPS_TESTING_USERS_MAX_PER_APP,
   AI_APPS_TESTING_USERS_PAGE_LIMIT,
+  AiAppTargetEnvironment,
 } from './ai-apps.constants';
 
 /** One testing user as returned to the app's creator or a directory admin. */
@@ -37,8 +41,8 @@ export interface AiAppTestingUserList {
  * Preview testing users (LAB-2743): name-only identities an app's creator or a
  * directory admin creates for load tests on the app's Preview. They live in
  * their own table and never get a Member row, so member lists, search, digests
- * and exports never see them. Sessions for them are a separate ticket
- * (LAB-2744); its session check reads `revokedAt` through `findLive`.
+ * and exports never see them. Preview sessions (LAB-2744) are minted here;
+ * the access check reads `revokedAt` through `findLive`.
  */
 @Injectable()
 export class AiAppsTestingUsersService {
@@ -168,9 +172,91 @@ export class AiAppsTestingUsersService {
     return { uid: existing.uid, revoked: true, revokedAt };
   }
 
+  /**
+   * One token per active testing user, shown once. Omitted `uids` mints every active user of the app.
+   * A uid that is revoked or belongs to another app refuses the whole request.
+   */
+  async mintSessions(
+    requesterUid: string,
+    appUid: string,
+    uids?: string[]
+  ): Promise<{ items: { uid: string; name: string; token: string; expiresAt: Date }[] }> {
+    const app = await this.findManageableApp(requesterUid, appUid);
+    await this.assertHasPreview(app);
+    if (!app.appId) {
+      throw new BadRequestException('This app has no app id');
+    }
+    const requested = uids ? [...new Set(uids)] : undefined;
+    const active = await this.prisma.aiAppTestingUser.findMany({
+      where: {
+        appUid: app.uid,
+        revokedAt: null,
+        ...(requested ? { uid: { in: requested } } : {}),
+      },
+      orderBy: [{ createdAt: 'asc' }, { number: 'asc' }],
+    });
+    if (requested && active.length !== requested.length) {
+      throw new BadRequestException('One or more testing users are not active on this app');
+    }
+    const items: { uid: string; name: string; token: string; expiresAt: Date }[] = [];
+    for (const user of active) {
+      const grant = await this.sessionService.openTestingSession(user.uid, app.appId);
+      items.push({ uid: user.uid, name: user.name, token: grant.token, expiresAt: grant.expiresAt });
+    }
+    if (items.length) {
+      this.track(AI_APPS_TESTING_SESSION_MINTED, requesterUid, {
+        appUid: app.uid,
+        count: items.length,
+        memberUid: requesterUid,
+      });
+    }
+    return { items };
+  }
+
+  /**
+   * Preview gate for a testing session that `validate` already accepted for this app. A missing row is 401
+   * (revoked while the session row is still live); any target other than preview is 403, with no permission lookup.
+   * The first allow records `ai-apps-testing-session-used`.
+   */
+  async authorizePreviewSession(params: {
+    testingUserUid: string;
+    appUid: string;
+    target: AiAppTargetEnvironment;
+    sessionUid: string;
+    createdAt: Date;
+  }): Promise<{ allowed: true }> {
+    const live = await this.findLive(params.testingUserUid, params.appUid);
+    if (!live) {
+      throw new UnauthorizedException('Invalid or expired app session');
+    }
+    if (params.target !== 'preview') {
+      throw new ForbiddenException({ allowed: false, reason: 'private' });
+    }
+    if (await this.sessionService.claimFirstUse(params.sessionUid, params.createdAt)) {
+      this.track(AI_APPS_TESTING_SESSION_USED, `testing:${params.testingUserUid}`, {
+        appUid: params.appUid,
+        testingUserUid: params.testingUserUid,
+        memberUid: params.testingUserUid,
+      });
+    }
+    return { allowed: true };
+  }
+
   /** The active testing user `uid` of app `appUid`, or null. For the Preview session check (LAB-2744). */
   findLive(uid: string, appUid: string): Promise<AiAppTestingUser | null> {
     return this.prisma.aiAppTestingUser.findFirst({ where: { uid, appUid, revokedAt: null } });
+  }
+
+  /** The active testing user `uid` whose app's `appId` matches, or null. */
+  async findLiveForAppId(uid: string, appId: string): Promise<AiAppTestingUser | null> {
+    const user = await this.prisma.aiAppTestingUser.findFirst({ where: { uid, revokedAt: null } });
+    if (!user) return null;
+    const app = await this.prisma.aiApp.findUnique({
+      where: { uid: user.appUid },
+      select: { appId: true, status: true },
+    });
+    if (!app || app.status === 'DELETED' || app.appId !== appId) return null;
+    return user;
   }
 
   private async findManageableApp(requesterUid: string, appUid: string): Promise<AiApp> {

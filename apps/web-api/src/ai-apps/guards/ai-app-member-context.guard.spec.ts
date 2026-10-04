@@ -1,6 +1,7 @@
 jest.mock('axios', () => ({ post: jest.fn(), isAxiosError: jest.fn(() => false) }));
+jest.mock('../ai-apps-testing-users.service', () => ({ AiAppsTestingUsersService: jest.fn() }));
 
-import { UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import axios from 'axios';
 import * as jwt from 'jsonwebtoken';
 import { AiAppMemberContextGuard } from './ai-app-member-context.guard';
@@ -12,12 +13,24 @@ const context = (req: any) => ({ switchToHttp: () => ({ getRequest: () => req })
 
 function build(live = true) {
   const sessionService = {
-    authenticateAppRequest: jest.fn(async (_token: string, origin?: string) => {
+    authenticateAppRequest: jest.fn(async (_token: string, origin?: string): Promise<any> => {
       const ok = live && (!origin || origin === buildAppUrl('foo', 'prod') || origin === buildAppUrl('foo', 'preview'));
       return ok ? { memberUid: 'm-1', appId: 'foo' } : null;
     }),
   };
-  return { guard: new AiAppMemberContextGuard(sessionService as any), sessionService };
+  const testingUsersService = {
+    findLiveForAppId: jest.fn(
+      async (): Promise<{ uid: string; name: string } | null> => ({
+        uid: 'tu-1',
+        name: 'Testing user 1',
+      })
+    ),
+  };
+  return {
+    guard: new AiAppMemberContextGuard(sessionService as any, testingUsersService as any),
+    sessionService,
+    testingUsersService,
+  };
 }
 
 describe('AiAppMemberContextGuard', () => {
@@ -52,6 +65,41 @@ describe('AiAppMemberContextGuard', () => {
     const req = { headers: { authorization: `Bearer ${appToken('foo')}` }, cookies: {} };
     await expect(guard.canActivate(context(req))).rejects.toBeInstanceOf(UnauthorizedException);
     expect(mockedAxios.post).not.toHaveBeenCalled();
+  });
+
+  it('marks a testing session from the preview origin and skips a member lookup', async () => {
+    const { guard, sessionService, testingUsersService } = build();
+    sessionService.authenticateAppRequest.mockResolvedValue({
+      memberUid: 'tu-1',
+      appId: 'foo',
+      testing: true,
+    });
+    const req: any = {
+      headers: { authorization: `Bearer ${appToken('foo')}`, origin: buildAppUrl('foo', 'preview') },
+      cookies: {},
+    };
+    await expect(guard.canActivate(context(req))).resolves.toBe(true);
+    expect(req.aiAppTestingUser).toEqual({ uid: 'tu-1', name: 'Testing user 1' });
+    expect(req.memberUid).toBe('tu-1');
+    expect(testingUsersService.findLiveForAppId).toHaveBeenCalledWith('tu-1', 'foo');
+  });
+
+  it('403s a testing session presented from the production origin', async () => {
+    const { guard, sessionService } = build();
+    sessionService.authenticateAppRequest.mockResolvedValue({ memberUid: 'tu-1', appId: 'foo', testing: true });
+    const req = {
+      headers: { authorization: `Bearer ${appToken('foo')}`, origin: buildAppUrl('foo', 'prod') },
+      cookies: {},
+    };
+    await expect(guard.canActivate(context(req))).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('401s a testing session whose user is no longer live', async () => {
+    const { guard, sessionService, testingUsersService } = build();
+    sessionService.authenticateAppRequest.mockResolvedValue({ memberUid: 'tu-1', appId: 'foo', testing: true });
+    testingUsersService.findLiveForAppId.mockResolvedValue(null);
+    const req = { headers: { authorization: `Bearer ${appToken('foo')}` }, cookies: {} };
+    await expect(guard.canActivate(context(req))).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
   it('validates a LabOS token exactly as before (auth-service introspection)', async () => {

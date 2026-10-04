@@ -21,7 +21,11 @@ import { RbacGuard } from '../rbac/rbac.guard';
 import { RbacService } from '../rbac/rbac.service';
 import { AI_APPS_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { AiAppsTestingUsersService } from './ai-apps-testing-users.service';
-import { CreateAiAppTestingUsersDto, ListAiAppTestingUsersQueryDto } from './dto/testing-users.dto';
+import {
+  CreateAiAppTestingUsersDto,
+  ListAiAppTestingUsersQueryDto,
+  MintAiAppTestingSessionsDto,
+} from './dto/testing-users.dto';
 
 const READ = { anyOf: [AI_APPS_PERMISSIONS.READ, AI_APPS_PERMISSIONS.WRITE] };
 const WRITE = { anyOf: [AI_APPS_PERMISSIONS.WRITE] };
@@ -59,6 +63,18 @@ export class AiAppsTestingUsersController {
   async createTestingUsers(@Param('uid') uid: string, @Body() body: CreateAiAppTestingUsersDto, @Req() req: any) {
     const memberUid = await this.resolveMemberUid(req);
     return this.testingUsersService.create(memberUid, uid, body.count);
+  }
+
+  /** Mint one Preview session token per active testing user. Each token is returned once. */
+  @NoCache()
+  @Post(':uid/testing-users/sessions')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(WRITE)
+  @UsePipes(ZodValidationPipe)
+  async mintTestingSessions(@Param('uid') uid: string, @Body() body: MintAiAppTestingSessionsDto, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.testingUsersService.mintSessions(memberUid, uid, body.uids);
   }
 
   /** Revoke one testing user (idempotent; the row is kept with `revokedAt`). */

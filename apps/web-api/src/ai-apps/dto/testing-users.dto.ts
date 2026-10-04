@@ -9,6 +9,13 @@ export const CreateAiAppTestingUsersSchema = z.object({
 
 export class CreateAiAppTestingUsersDto extends createZodDto(CreateAiAppTestingUsersSchema) {}
 
+/** Body of `POST /v1/ai-apps/:uid/testing-users/sessions`. Omitted `uids` mints every active testing user. */
+export const MintAiAppTestingSessionsSchema = z.object({
+  uids: z.array(z.string().min(1).max(64)).min(1).max(AI_APPS_TESTING_USERS_MAX_PER_APP).optional(),
+});
+
+export class MintAiAppTestingSessionsDto extends createZodDto(MintAiAppTestingSessionsSchema) {}
+
 const positiveIntString = (max?: number) =>
   z
     .string()

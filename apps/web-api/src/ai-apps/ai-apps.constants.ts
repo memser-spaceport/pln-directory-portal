@@ -484,6 +484,11 @@ export const AI_APPS_TESTING_USERS_PAGE_LIMIT = 100;
 /** Directory PostHog names for testing users, as named in the ticket (LAB-2743). */
 export const AI_APPS_TESTING_USER_CREATED = 'ai-apps-testing-user-created';
 export const AI_APPS_TESTING_USER_REVOKED = 'ai-apps-testing-user-revoked';
+/** Absolute lifetime of a testing-user Preview session (LAB-2744). Not the sliding idle window real sessions use. */
+export const AI_APPS_TESTING_SESSION_MAX_MS = 24 * 60 * 60 * 1000;
+/** Directory PostHog names for testing-user Preview sessions (LAB-2744). */
+export const AI_APPS_TESTING_SESSION_MINTED = 'ai-apps-testing-session-minted';
+export const AI_APPS_TESTING_SESSION_USED = 'ai-apps-testing-session-used';
 
 /**
  * Public URL of THIS API's custom-event analytics endpoint

@@ -17,6 +17,8 @@ import { AiAppsSessionService } from './ai-apps-session.service';
 import { AiAppsAuthGateService } from './ai-apps-auth-gate.service';
 import { AiAppsStarterKitService } from './ai-apps-starter-kit.service';
 import { AiAppsTestingUsersService } from './ai-apps-testing-users.service';
+import { AiAppMeRbacGuard } from './guards/ai-app-me-rbac.guard';
+import { AiAppMemberContextGuard } from './guards/ai-app-member-context.guard';
 import { AiAppTokenGuard } from './guards/ai-app-token.guard';
 import { AgentFeedbackDeniedInterceptor } from './agent-feedback-denied.interceptor';
 
@@ -46,6 +48,8 @@ import { AgentFeedbackDeniedInterceptor } from './agent-feedback-denied.intercep
     AiAppsAuthGateService,
     AiAppsStarterKitService,
     AiAppsTestingUsersService,
+    AiAppMemberContextGuard,
+    AiAppMeRbacGuard,
     AiAppTokenGuard,
     AgentFeedbackDeniedInterceptor,
     AwsService,

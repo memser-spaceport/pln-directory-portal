@@ -1,4 +1,10 @@
-import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
 // The collaborators are passed in as stubs; their real modules pull axios (ESM) that ts-jest cannot load.
@@ -9,8 +15,10 @@ jest.mock('./ai-apps.service', () => ({ AiAppsService: jest.fn() }));
 jest.mock('./ai-apps-session.service', () => ({ AiAppsSessionService: jest.fn() }));
 
 import { AiAppsTestingUsersService } from './ai-apps-testing-users.service';
-import { CreateAiAppTestingUsersSchema } from './dto/testing-users.dto';
+import { CreateAiAppTestingUsersSchema, MintAiAppTestingSessionsSchema } from './dto/testing-users.dto';
 import {
+  AI_APPS_TESTING_SESSION_MINTED,
+  AI_APPS_TESTING_SESSION_USED,
   AI_APPS_TESTING_USER_CREATED,
   AI_APPS_TESTING_USER_REVOKED,
   AI_APPS_TESTING_USERS_MAX_PER_APP,
@@ -42,9 +50,14 @@ function buildService(
 ) {
   const rows: Row[] = opts.rows ?? [];
   let seq = rows.length;
-  const where = (args: any) => (row: Row) =>
-    (!args?.where?.appUid || row.appUid === args.where.appUid) &&
-    (args?.where?.revokedAt !== null || row.revokedAt === null);
+  const where = (args: any) => (row: Row) => {
+    const filter = args?.where ?? {};
+    if (filter.appUid && row.appUid !== filter.appUid) return false;
+    if (filter.uid?.in && !filter.uid.in.includes(row.uid)) return false;
+    if (typeof filter.uid === 'string' && row.uid !== filter.uid) return false;
+    if (filter.revokedAt === null && row.revokedAt !== null) return false;
+    return true;
+  };
   const table = {
     count: jest.fn(async (args: any) => rows.filter(where(args)).length),
     aggregate: jest.fn(async (args: any) => {
@@ -67,10 +80,7 @@ function buildService(
       return found.slice(skip, args.take ? skip + args.take : undefined);
     }),
     findUnique: jest.fn(async ({ where: w }: any) => rows.find((row) => row.uid === w.uid) ?? null),
-    findFirst: jest.fn(
-      async ({ where: w }: any) =>
-        rows.find((row) => row.uid === w.uid && row.appUid === w.appUid && row.revokedAt === null) ?? null
-    ),
+    findFirst: jest.fn(async ({ where: w }: any) => rows.find(where({ where: w })) ?? null),
     updateMany: jest.fn(async ({ where: w, data }: any) => {
       const hits = rows.filter((row) => row.uid === w.uid && row.revokedAt === null);
       hits.forEach((row) => (row.revokedAt = data.revokedAt));
@@ -92,7 +102,14 @@ function buildService(
       async (requesterUid: string, app: { memberUid: string }) => app.memberUid === requesterUid || !!opts.admin
     ),
   };
-  const sessionService = { revokeAllForMember: jest.fn().mockResolvedValue(0) };
+  const sessionService = {
+    revokeAllForMember: jest.fn().mockResolvedValue(0),
+    openTestingSession: jest.fn(async (uid: string) => ({
+      token: `token-${uid}`,
+      expiresAt: new Date('2026-10-05T00:00:00.000Z'),
+    })),
+    claimFirstUse: jest.fn().mockResolvedValue(true),
+  };
   const analytics = { trackEvent: jest.fn().mockResolvedValue(undefined) };
   const service = new AiAppsTestingUsersService(prisma, aiAppsService as any, sessionService as any, analytics as any);
   return { service, prisma, rows, table, member, aiAppsService, sessionService, analytics };
@@ -326,6 +343,110 @@ describe('AiAppsTestingUsersService', () => {
       await expect(service.findLive('seed-2', 'app-1')).resolves.toBeNull();
       await expect(service.findLive('seed-1', 'app-2')).resolves.toBeNull();
     });
+
+    it('findLiveForAppId matches the app id and ignores a revoked or deleted app', async () => {
+      const { service, prisma } = buildService({ rows: activeRows(1) });
+      await expect(service.findLiveForAppId('seed-1', 'demo')).resolves.toMatchObject({ uid: 'seed-1' });
+      await expect(service.findLiveForAppId('seed-1', 'other')).resolves.toBeNull();
+      prisma.aiApp.findUnique.mockResolvedValue({ ...APP, status: 'DELETED' });
+      await expect(service.findLiveForAppId('seed-1', 'demo')).resolves.toBeNull();
+    });
+  });
+
+  describe('mintSessions', () => {
+    it('mints one token per active testing user when no list is given, and leaves earlier tokens in place', async () => {
+      const { service, sessionService, analytics } = buildService({ rows: activeRows(2) });
+      const minted = await service.mintSessions('creator-1', 'app-1');
+      expect(minted.items.map((item) => item.uid)).toEqual(['seed-1', 'seed-2']);
+      expect(minted.items.map((item) => item.token)).toEqual(['token-seed-1', 'token-seed-2']);
+      expect(sessionService.revokeAllForMember).not.toHaveBeenCalled();
+
+      await service.mintSessions('creator-1', 'app-1', ['seed-2']);
+      expect(sessionService.openTestingSession).toHaveBeenCalledTimes(3);
+      expect(sessionService.revokeAllForMember).not.toHaveBeenCalled();
+      expect(analytics.trackEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: AI_APPS_TESTING_SESSION_MINTED,
+          distinctId: 'creator-1',
+          properties: expect.objectContaining({ appUid: 'app-1', count: 2, memberUid: 'creator-1' }),
+        })
+      );
+      expect(AI_APPS_TESTING_SESSION_MINTED).toBe('ai-apps-testing-session-minted');
+    });
+
+    it('400s a revoked or foreign uid and mints nothing', async () => {
+      const seeded = activeRows(1);
+      seeded.push({ ...activeRows(1)[0], uid: 'other-app', appUid: 'app-2', revokedAt: null });
+      seeded.push({ ...seeded[0], uid: 'revoked', revokedAt: new Date(1) });
+      const { service, sessionService } = buildService({ rows: seeded });
+      await expect(service.mintSessions('creator-1', 'app-1', ['revoked'])).rejects.toThrow(BadRequestException);
+      await expect(service.mintSessions('creator-1', 'app-1', ['other-app'])).rejects.toThrow(BadRequestException);
+      expect(sessionService.openTestingSession).not.toHaveBeenCalled();
+    });
+
+    it('403s a requester who is neither the creator nor a directory admin', async () => {
+      const { service, sessionService } = buildService({ rows: activeRows(1) });
+      await expect(service.mintSessions('stranger-1', 'app-1')).rejects.toThrow(ForbiddenException);
+      expect(sessionService.openTestingSession).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('authorizePreviewSession', () => {
+    const createdAt = new Date('2026-10-04T00:00:00Z');
+
+    it('allows preview without a member and records the first use once', async () => {
+      const { service, sessionService, analytics } = buildService({ rows: activeRows(1) });
+      sessionService.claimFirstUse.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+      await expect(
+        service.authorizePreviewSession({
+          testingUserUid: 'seed-1',
+          appUid: 'app-1',
+          target: 'preview',
+          sessionUid: 's-1',
+          createdAt,
+        })
+      ).resolves.toEqual({ allowed: true });
+      await service.authorizePreviewSession({
+        testingUserUid: 'seed-1',
+        appUid: 'app-1',
+        target: 'preview',
+        sessionUid: 's-1',
+        createdAt,
+      });
+      expect(analytics.trackEvent).toHaveBeenCalledTimes(1);
+      expect(analytics.trackEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: AI_APPS_TESTING_SESSION_USED,
+          distinctId: 'testing:seed-1',
+          properties: expect.objectContaining({ appUid: 'app-1', testingUserUid: 'seed-1' }),
+        })
+      );
+      expect(AI_APPS_TESTING_SESSION_USED).toBe('ai-apps-testing-session-used');
+    });
+
+    it('403s production and 401s a revoked testing user', async () => {
+      const seeded = activeRows(1);
+      const { service } = buildService({ rows: seeded });
+      await expect(
+        service.authorizePreviewSession({
+          testingUserUid: 'seed-1',
+          appUid: 'app-1',
+          target: 'prod',
+          sessionUid: 's-1',
+          createdAt,
+        })
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      seeded[0].revokedAt = new Date(1);
+      await expect(
+        service.authorizePreviewSession({
+          testingUserUid: 'seed-1',
+          appUid: 'app-1',
+          target: 'preview',
+          sessionUid: 's-1',
+          createdAt,
+        })
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+    });
   });
 });
 
@@ -333,6 +454,12 @@ describe('CreateAiAppTestingUsersSchema', () => {
   it('accepts whole numbers from 1 to 100', () => {
     expect(CreateAiAppTestingUsersSchema.parse({ count: 1 })).toEqual({ count: 1 });
     expect(CreateAiAppTestingUsersSchema.parse({ count: 100 })).toEqual({ count: 100 });
+  });
+
+  it('mint body accepts an omitted list and refuses an empty one', () => {
+    expect(MintAiAppTestingSessionsSchema.parse({})).toEqual({});
+    expect(MintAiAppTestingSessionsSchema.parse({ uids: ['tu-1'] })).toEqual({ uids: ['tu-1'] });
+    expect(MintAiAppTestingSessionsSchema.safeParse({ uids: [] }).success).toBe(false);
   });
 
   it.each([0, 101, 2.5, '5', undefined])('rejects count = %p', (count) => {

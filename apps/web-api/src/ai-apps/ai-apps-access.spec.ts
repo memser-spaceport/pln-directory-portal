@@ -190,7 +190,11 @@ function buildPrisma(apps: Row[] = [PRIVATE_APP, OPEN_APP], allowed: Row[] = [],
   return prisma;
 }
 
-function buildServices(prisma = buildPrisma(), membersWithAccess: string[] = [OWNER, VIEWER, ADMIN, 'friend-1']) {
+function buildServices(
+  prisma = buildPrisma(),
+  membersWithAccess: string[] = [OWNER, VIEWER, ADMIN, 'friend-1'],
+  extras?: { testingUsersService?: { authorizePreviewSession: jest.Mock } }
+) {
   const pushNotifications = { create: jest.fn().mockResolvedValue({}) };
   const aws = { uploadFileToS3: jest.fn().mockResolvedValue(undefined) };
   const aiAppsService = withInlineDeploys(
@@ -212,7 +216,13 @@ function buildServices(prisma = buildPrisma(), membersWithAccess: string[] = [OW
       allowed: membersWithAccess.includes(memberUid) && (code === 'ai_apps.read' || memberUid === OWNER),
     })),
   };
-  const accessService = new AiAppsAccessService(prisma, aiAppsService, rbacService as any, accessControl as any);
+  const accessService = new AiAppsAccessService(
+    prisma,
+    aiAppsService,
+    rbacService as any,
+    accessControl as any,
+    extras?.testingUsersService as any
+  );
   return { prisma, aiAppsService, accessService, pushNotifications, accessControl };
 }
 
@@ -781,6 +791,25 @@ describe('sidecar access check', () => {
     });
   });
 
+  it('a testing session skips the permission lookup', async () => {
+    const testingUsersService = { authorizePreviewSession: jest.fn().mockResolvedValue({ allowed: true }) };
+    const { accessService, accessControl } = buildServices(buildPrisma([PRIVATE_APP]), [OWNER], {
+      testingUsersService,
+    });
+    const createdAt = new Date(0);
+    await expect(
+      accessService.checkAccess('tu-1', 'secret-tool', 'GET', undefined, 'preview', { sessionUid: 's-1', createdAt })
+    ).resolves.toEqual({ allowed: true });
+    expect(testingUsersService.authorizePreviewSession).toHaveBeenCalledWith({
+      testingUserUid: 'tu-1',
+      appUid: 'app-private',
+      target: 'preview',
+      sessionUid: 's-1',
+      createdAt,
+    });
+    expect(accessControl.hasPermission).not.toHaveBeenCalled();
+  });
+
   it('deleted apps are ignored when resolving the appId', async () => {
     const { accessService, prisma } = buildServices();
     await accessService.checkAccess(VIEWER, 'secret-tool', 'GET').catch(() => undefined);
@@ -948,13 +977,26 @@ describe('sidecar access check with an app session (controller)', () => {
   const PUBLIC_PRIVATE_APP = { ...PRIVATE_APP, publicPaths: ['/api/*'] };
 
   /** Sessions are keyed `session:<appId>:<memberUid>` in this fake; anything else is invalid. */
-  function buildController(apps: Row[] = [PUBLIC_PRIVATE_APP, OPEN_APP]) {
-    const { accessService } = buildServices(buildPrisma(apps));
+  function buildController(
+    apps: Row[] = [PUBLIC_PRIVATE_APP, OPEN_APP],
+    testingUsersService?: { authorizePreviewSession: jest.Mock }
+  ) {
+    const { accessService } = buildServices(buildPrisma(apps), [OWNER, VIEWER, ADMIN, 'friend-1'], {
+      testingUsersService,
+    });
     const rbacService = { findMemberByEmail: jest.fn(async (email: string) => ({ uid: email.split('@')[0] })) };
     const sessionService = {
       validate: jest.fn(async (appId: string, token: string) => {
         const [kind, tokenAppId, memberUid] = token.split(':');
+        if (kind === 'testing') {
+          if (tokenAppId !== appId) return null;
+          return { memberUid, testing: true as const, sessionUid: `s-${memberUid}`, createdAt: new Date(0) };
+        }
         return kind === 'session' && tokenAppId === appId ? { memberUid } : null;
+      }),
+      isLiveTestingSessionForOtherApp: jest.fn(async (token: string, appId: string) => {
+        const [kind, tokenAppId] = token.split(':');
+        return kind === 'testing' && tokenAppId !== appId;
       }),
     };
     const controller = new AiAppsController(
@@ -1020,5 +1062,45 @@ describe('sidecar access check with an app session (controller)', () => {
       reason: 'public',
     });
     expect(sessionService.validate).not.toHaveBeenCalled();
+  });
+
+  it('lets a testing session open preview and 403s it on production or another app', async () => {
+    const testingUsersService = { authorizePreviewSession: jest.fn().mockResolvedValue({ allowed: true }) };
+    const { controller } = buildController([PUBLIC_PRIVATE_APP, OPEN_APP], testingUsersService);
+    await expect(
+      check(
+        controller,
+        { appId: 'secret-tool', path: '/x', target: 'preview' },
+        withSession('testing:secret-tool:tu-1')
+      )
+    ).resolves.toEqual({ allowed: true });
+    expect(testingUsersService.authorizePreviewSession).toHaveBeenCalledWith(
+      expect.objectContaining({ testingUserUid: 'tu-1', target: 'preview', appUid: 'app-private' })
+    );
+    expect(mockedAxios.post).not.toHaveBeenCalled();
+
+    testingUsersService.authorizePreviewSession.mockRejectedValue(
+      new ForbiddenException({ allowed: false, reason: 'private' })
+    );
+    await expect(
+      check(controller, { appId: 'secret-tool', path: '/x', target: 'prod' }, withSession('testing:secret-tool:tu-1'))
+    ).rejects.toMatchObject({ status: 403 });
+
+    await expect(
+      check(controller, { appId: 'open-tool', path: '/x', target: 'preview' }, withSession('testing:secret-tool:tu-1'))
+    ).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('401s a revoked or expired testing session', async () => {
+    const { controller, sessionService } = buildController();
+    sessionService.validate.mockResolvedValue(null);
+    sessionService.isLiveTestingSessionForOtherApp.mockResolvedValue(false);
+    await expect(
+      check(
+        controller,
+        { appId: 'secret-tool', path: '/x', target: 'preview' },
+        withSession('testing:secret-tool:tu-1')
+      )
+    ).rejects.toMatchObject({ status: 401 });
   });
 });

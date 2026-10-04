@@ -23,6 +23,7 @@ describe('AiAppsTestingUsersController routes', () => {
   it.each([
     ['listTestingUsers', RequestMethod.GET, ':uid/testing-users', READ],
     ['createTestingUsers', RequestMethod.POST, ':uid/testing-users', WRITE],
+    ['mintTestingSessions', RequestMethod.POST, ':uid/testing-users/sessions', WRITE],
     ['revokeTestingUser', RequestMethod.POST, ':uid/testing-users/:testingUserUid/revoke', WRITE],
   ])('%s: %s %s behind the member guard, RBAC and the expected permission', (name, method, path, permission) => {
     const handler = proto[name];
@@ -39,6 +40,7 @@ describe('AiAppsTestingUsersController handlers', () => {
       list: jest.fn().mockResolvedValue({ page: 1, limit: 100, total: 0, items: [] }),
       create: jest.fn().mockResolvedValue({ items: [] }),
       revoke: jest.fn().mockResolvedValue({ uid: 'tu-1', revoked: true, revokedAt: new Date(0) }),
+      mintSessions: jest.fn().mockResolvedValue({ items: [] }),
     };
     const rbac = { findMemberByEmail: jest.fn().mockResolvedValue({ uid: 'member-by-email' }) };
     const controller = new AiAppsTestingUsersController(service as any, rbac as any);
@@ -51,9 +53,11 @@ describe('AiAppsTestingUsersController handlers', () => {
     await controller.listTestingUsers('app-1', { page: 2, limit: 10 } as any, req);
     await controller.createTestingUsers('app-1', { count: 3 } as any, req);
     await controller.revokeTestingUser('app-1', 'tu-1', req);
+    await controller.mintTestingSessions('app-1', { uids: ['tu-1'] } as any, req);
     expect(service.list).toHaveBeenCalledWith('creator-1', 'app-1', { page: 2, limit: 10 });
     expect(service.create).toHaveBeenCalledWith('creator-1', 'app-1', 3);
     expect(service.revoke).toHaveBeenCalledWith('creator-1', 'app-1', 'tu-1');
+    expect(service.mintSessions).toHaveBeenCalledWith('creator-1', 'app-1', ['tu-1']);
   });
 
   it("falls back to the token's email to find the member", async () => {

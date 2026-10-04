@@ -311,6 +311,34 @@ describe('AiAppsService.trackAppEvent', () => {
       expect.objectContaining({ properties: expect.objectContaining({ appUid: 'app-uid-new' }) })
     );
   });
+
+  it('tags a testing session and resolves the app from the token, not the preview hostname', async () => {
+    const { service, prisma, analyticsService } = buildService();
+    prisma.aiApp.findMany.mockImplementation(async ({ where }: { where: { appId: string } }) =>
+      where.appId === 'demo' ? [APP] : []
+    );
+    await service.trackAppEvent({
+      origin: `https://demo-preview.${AI_APPS_APP_DOMAIN}`,
+      token: undefined,
+      sessionMemberUid: 'tu-1',
+      testingAppId: 'demo',
+      anonId: undefined,
+      event: 'clicked_button',
+      properties: { testingUser: false },
+      events: undefined,
+    });
+    expect(analyticsService.trackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        distinctId: 'testing:tu-1',
+        properties: expect.objectContaining({
+          testingUser: true,
+          memberUid: 'tu-1',
+          appId: 'demo',
+          appUid: 'app-uid-1',
+        }),
+      })
+    );
+  });
 });
 
 /**

@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { AiApp, AiAppAccess } from '@prisma/client';
 import { AiAppTargetEnvironment } from './ai-apps.constants';
 import { PrismaService } from '../shared/prisma.service';
@@ -7,6 +7,7 @@ import { AccessControlV2Service } from '../access-control-v2/services/access-con
 import { AI_APPS_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { memberHasAnyPermission } from '../rbac/rbac-permission-check';
 import { AiAppsService } from './ai-apps.service';
+import { AiAppsTestingUsersService } from './ai-apps-testing-users.service';
 import { AI_APPS_ACCESS_CANDIDATES_LIMIT } from './ai-apps.constants';
 import { assertValidPublicPaths, matchesPublicPath, samePublicPaths } from './ai-apps-public-paths';
 import { UpdateAiAppAccessDto, UpdateAiAppPublicPathsDto } from './dto/ai-app-access.dto';
@@ -66,7 +67,8 @@ export class AiAppsAccessService {
     private readonly prisma: PrismaService,
     private readonly aiAppsService: AiAppsService,
     private readonly rbacService: RbacService,
-    private readonly accessControlV2Service: AccessControlV2Service
+    private readonly accessControlV2Service: AccessControlV2Service,
+    @Optional() private readonly testingUsersService?: AiAppsTestingUsersService
   ) {}
 
   async getAccess(requesterUid: string, uid: string): Promise<AiAppAccessSettings> {
@@ -227,8 +229,22 @@ export class AiAppsAccessService {
     appId: string,
     method: string,
     prefetched?: { app: AiAppAccessCheckApp | null },
-    target: AiAppTargetEnvironment = 'prod'
+    target: AiAppTargetEnvironment = 'prod',
+    testing?: { sessionUid: string; createdAt: Date }
   ): Promise<AiAppAccessCheckResult> {
+    if (testing) {
+      const app = prefetched ? prefetched.app : await this.findAppForAccessCheck(appId);
+      if (!app || !this.testingUsersService) {
+        throw new ForbiddenException({ allowed: false, reason: 'private' });
+      }
+      return this.testingUsersService.authorizePreviewSession({
+        testingUserUid: requesterUid,
+        appUid: app.uid,
+        target,
+        sessionUid: testing.sessionUid,
+        createdAt: testing.createdAt,
+      });
+    }
     const readOnly = ['GET', 'HEAD'].includes(method.toUpperCase());
     const hasPermission = await memberHasAnyPermission(
       this.rbacService,
