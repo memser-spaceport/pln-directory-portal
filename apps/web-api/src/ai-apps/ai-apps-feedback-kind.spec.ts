@@ -160,6 +160,20 @@ describe('posting a comment', () => {
     expect(push.create).not.toHaveBeenCalled();
   });
 
+  it('the form’s kind and priority are stored as picked; without them nothing is written, not bug or P2', async () => {
+    const picked = buildService();
+    await picked.service.submitFeedback('member-1', 'app-1', '<p>Hi</p>', { reportKind: 'request', priority: 'P0' });
+    expect(picked.prisma.aiAppFeedback.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ reportKind: 'request', priority: 'P0' }),
+    });
+
+    const comment = buildService();
+    await comment.service.submitFeedback('member-1', 'app-1', '<p>Note</p>', { pins: [PIN], kind: 'COMMENT' });
+    const { data } = comment.prisma.aiAppFeedback.create.mock.calls[0][0];
+    expect(data).not.toHaveProperty('reportKind');
+    expect(data).not.toHaveProperty('priority');
+  });
+
   it('nothing is accepted for a deleted app, or while feedback is turned off', async () => {
     const deleted = buildService({ app: { ...APP, status: 'DELETED' } });
     await expect(deleted.service.submitFeedback('member-1', 'app-1', 'x')).rejects.toBeInstanceOf(NotFoundException);
@@ -342,6 +356,10 @@ describe('helpers and bodies', () => {
   it('kind is FEEDBACK or COMMENT; edits are trimmed and non-empty', () => {
     expect(SubmitFeedbackSchema.safeParse({ text: 'x', kind: 'COMMENT' }).success).toBe(true);
     expect(SubmitFeedbackSchema.safeParse({ text: 'x', kind: 'PUBLIC' }).success).toBe(false);
+    expect(SubmitFeedbackSchema.parse({ text: 'x' })).not.toHaveProperty('reportKind');
+    expect(SubmitFeedbackSchema.safeParse({ text: 'x', reportKind: 'chore', priority: 'P3' }).success).toBe(true);
+    expect(SubmitFeedbackSchema.safeParse({ text: 'x', reportKind: 'BUG' }).success).toBe(false);
+    expect(SubmitFeedbackSchema.safeParse({ text: 'x', priority: 'P4' }).success).toBe(false);
     expect(EditFeedbackNoteSchema.parse({ note: ' New ' })).toEqual({ note: 'New' });
     expect(EditFeedbackCommentSchema.safeParse({ text: '  ' }).success).toBe(false);
   });

@@ -604,7 +604,9 @@ PL Infra members can leave feedback on the app's LabOS page: **feedback**
 open the app). When the member asks you to "check feedback", "fix what people
 reported", or similar, load the **app-feedback** skill
 (\`.claude/skills/app-feedback/SKILL.md\`). In short: \`feedbackEndpoint\` lists
-every item — its \`kind\` (\`FEEDBACK\` or \`COMMENT\`), HTML text with screenshots
+every item — its \`kind\` (\`FEEDBACK\` or \`COMMENT\`), the reporter's
+\`reportKind\` (\`bug\`/\`request\`/\`question\`/\`chore\`) and \`priority\`
+(\`P0\`–\`P3\`), either of which may be \`null\`, HTML text with screenshots
 as image links, the pinned elements as \`pins\`, the replies under it as
 \`comments\`, and status \`NEW\`/\`VIEWED\`/\`IMPLEMENTED\` — with the same
 \`${AI_APP_TOKEN_HEADER}\` credential as deploys. \`feedbackStatusEndpoint\` marks an
@@ -1014,6 +1016,8 @@ Response rows, abridged (the PATCH returns one updated row, without \`pins\` and
     "uid": "fb_…",
     "appUid": "…",
     "kind": "COMMENT",
+    "reportKind": null,
+    "priority": null,
     "text": "<p>The label is cut off</p><p><img src=\\"https://…/crop.png\\" class=\\"ai-app-pin-crop\\"></p>",
     "status": "NEW",
     "createdAt": "2026-10-02T10:00:00.000Z",
@@ -1061,6 +1065,15 @@ Response rows, abridged (the PATCH returns one updated row, without \`pins\` and
   members (\`kind: "REPLY"\`) and earlier closing notes (\`kind: "CLOSING_NOTE"\`).
   Read it before acting — a reply often narrows the report or says it is
   already fixed. \`commentCount\` is how many there are.
+- \`reportKind\` and \`priority\` are what the reporter picked on the written
+  feedback form. \`reportKind\`: \`bug\`, \`request\`, \`question\` or \`chore\`.
+  \`priority\`: \`P0\` Blocking (nobody can work around this), \`P1\` Serious
+  (there is a workaround and it hurts), \`P2\` Normal (worth doing, not urgent),
+  \`P3\` Someday (a good idea with no clock on it). Either is \`null\` when it was
+  never set — comments, and feedback filed before the form asked — so read
+  \`null\` as "not said", not as bug or P2. Most reports arrive as bug/P2; weigh
+  the text more than these. They are separate from \`kind\`, which says where
+  the item came from, and you cannot change them.
 - \`editedAt\` is set when its author changed the text after posting; the
   current text is what counts.
 - \`member\` is who reported it (name only — there is no way to contact them

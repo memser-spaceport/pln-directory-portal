@@ -789,6 +789,8 @@ export class AiAppsController {
       pins: body.pins,
       context: body.context,
       kind: body.kind,
+      reportKind: body.reportKind,
+      priority: body.priority,
     });
   }
 

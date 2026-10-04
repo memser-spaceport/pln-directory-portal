@@ -24,6 +24,8 @@ import {
   AiAppFeedback,
   AiAppFeedbackComment,
   AiAppFeedbackItemKind,
+  AiAppFeedbackPriority,
+  AiAppFeedbackReportKind,
   AiAppFeedbackStatus,
   Prisma,
   PushNotificationCategory,
@@ -1879,7 +1881,13 @@ export class AiAppsService {
     memberUid: string,
     appUid: string,
     text: string,
-    extras: { pins?: FeedbackPinInput[]; context?: FeedbackContext; kind?: AiAppFeedbackItemKind } = {}
+    extras: {
+      pins?: FeedbackPinInput[];
+      context?: FeedbackContext;
+      kind?: AiAppFeedbackItemKind;
+      reportKind?: AiAppFeedbackReportKind;
+      priority?: AiAppFeedbackPriority;
+    } = {}
   ): Promise<WithMember<AiAppFeedback>> {
     const app = await this.prisma.aiApp.findUnique({ where: { uid: appUid } });
     if (!app || app.status === 'DELETED') {
@@ -1904,6 +1912,8 @@ export class AiAppsService {
         ...(extras.context ? { context: extras.context } : {}),
         ...(extras.pins?.length ? { pins: { create: extras.pins.map(toPinCreateData) } } : {}),
         ...(isComment ? { kind: 'COMMENT' as const } : {}),
+        ...(extras.reportKind ? { reportKind: extras.reportKind } : {}),
+        ...(extras.priority ? { priority: extras.priority } : {}),
       },
     });
     const [withAuthor] = await this.withMember([feedback]);

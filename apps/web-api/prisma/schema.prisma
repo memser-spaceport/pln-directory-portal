@@ -4013,6 +4013,12 @@ model AiAppFeedback {
   /// app's viewers). Rows from before this column are FEEDBACK: they were left
   /// under the "only the author and admins see it" promise.
   kind      AiAppFeedbackItemKind @default(FEEDBACK)
+  /// What the reporter says it is, picked on the written form. Null when it was
+  /// not sent: comments, older clients, and every row from before the column.
+  reportKind AiAppFeedbackReportKind?
+  /// How much it matters to the reporter, picked on the written form. Null under
+  /// the same rules as `reportKind`; never backfilled.
+  priority  AiAppFeedbackPriority?
   createdAt DateTime            @default(now())
   /// Set when the author edits a COMMENT's note; null until then.
   editedAt  DateTime?
@@ -4031,6 +4037,20 @@ model AiAppFeedback {
 enum AiAppFeedbackItemKind {
   FEEDBACK
   COMMENT
+}
+
+enum AiAppFeedbackReportKind {
+  bug
+  request
+  question
+  chore
+}
+
+enum AiAppFeedbackPriority {
+  P0
+  P1
+  P2
+  P3
 }
 
 /// A reply in a feedback item's conversation (flat, oldest first). Who may read

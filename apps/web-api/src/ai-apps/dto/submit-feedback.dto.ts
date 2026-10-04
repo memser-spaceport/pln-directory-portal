@@ -106,6 +106,13 @@ export const SubmitFeedbackSchema = z.object({
    * Omitted means FEEDBACK, so a client that predates comments stays private.
    */
   kind: z.enum(['FEEDBACK', 'COMMENT']).optional(),
+  /**
+   * The reporter's kind and priority from the written form. Omitted means
+   * stored empty — never defaulted to bug / P2 — so comments and older clients
+   * leave them null.
+   */
+  reportKind: z.enum(['bug', 'request', 'question', 'chore']).optional(),
+  priority: z.enum(['P0', 'P1', 'P2', 'P3']).optional(),
 });
 
 export type FeedbackPinInput = z.infer<typeof FeedbackPinInputSchema>;
