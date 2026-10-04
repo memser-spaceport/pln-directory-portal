@@ -80,9 +80,10 @@ import { AI_APPS_MAX_TAGS_PER_APP, AI_APPS_TAGS } from './ai-apps-tags';
 
 const READ = { anyOf: [AI_APPS_PERMISSIONS.READ, AI_APPS_PERMISSIONS.WRITE] };
 
-/** Member-context body for a testing user: the real shape, with nothing a name-only identity does not have. */
+/** Member-context body for a testing user: the real shape, plus `testing: true`. Real members omit the flag. */
 export function testingUserMemberContext(user: { uid: string; name: string }) {
   return {
+    testing: true as const,
     member: {
       uid: user.uid,
       name: user.name,

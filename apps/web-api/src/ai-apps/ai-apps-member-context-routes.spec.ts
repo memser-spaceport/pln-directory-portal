@@ -69,6 +69,7 @@ describe('AiAppsController GET /me wiring', () => {
     await expect(
       controller.getMemberContext({ aiAppTestingUser: { uid: 'tu-1', name: 'Testing user 1' } })
     ).resolves.toEqual({
+      testing: true,
       member: { uid: 'tu-1', name: 'Testing user 1', image: null, location: null, skills: [], teams: [] },
     });
     expect(aiAppsService.getMemberContext).not.toHaveBeenCalled();
