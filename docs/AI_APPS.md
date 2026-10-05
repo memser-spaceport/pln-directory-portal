@@ -122,6 +122,8 @@ The `deployToken` is held in agent memory only and never written into the kit, s
 | GET    | `/v1/ai-apps/:uid/agent/feedback` | `AiAppTokenGuard` (`x-app-token`) | — (token = member, **owner only**; a deployment key only for its own app, prod or preview) | Agent feedback list: every row, newest first, stored HTML `text` verbatim (screenshots are `<img>` links) + `member { uid, name, image }`; optional `?status=` (case-insensitive, 400 otherwise); not paginated |
 | PATCH  | `/v1/ai-apps/:uid/agent/feedback/:feedbackUid` | `AiAppTokenGuard` (`x-app-token`) | — (same scope as the agent list) | Agent status update: `{ status: 'VIEWED' \| 'IMPLEMENTED' }` (`NEW` → 422 from the validation pipe; reopening is member-only); 404 for a row of another app |
 | GET    | `/v1/ai-apps/starter-kit/download` | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.write`   | Stream the starter-kit ZIP (no token inside) |
+| GET    | `/v1/ai-apps/starter-kit/version` | none (open)                 | —                 | `{ version, whatsNew }` for the live kit; nothing else (kits ≥1.17 check it at the start of a chat) |
+| GET    | `/v1/ai-apps/starter-kit/update` | `AiAppTokenGuard` (`x-app-token`) | — (`ai_apps.write` was checked when the connect session was approved) | Kit-update ZIP: every kit file minus `app/`, plus the manifest; records `KIT_DOWNLOADED` with `(agent update)` |
 | POST   | `/v1/ai-apps/connect`            | none (agent)                  | —                 | Start a connect session; returns `connectUrl`/`userCode`/`pollToken` |
 | POST   | `/v1/ai-apps/connect/poll`       | none (agent, `pollToken` in body) | —             | Poll a session; returns the `deployToken` once `APPROVED` |
 | GET    | `/v1/ai-apps/connect/:uid`       | `UserTokenCheckGuard`         | —                 | Connect-session display info for the LabOS page (no secrets) |
@@ -1030,6 +1032,7 @@ CLAUDE.md / AGENTS.md                          agent build + deploy instructions
 .claude/skills/pln-member-context/SKILL.md     how the app gets the signed-in member's identity
 .claude/skills/db-migration/SKILL.md           migrate an existing DB onto PLN Postgres — schema + data by default (kits ≥1.8)
 .claude/skills/app-analytics/SKILL.md          baseline + custom PostHog events; route sync for subpage deep links (≥1.10; pathname + query, never the hash, addressed to the dashboard origin ≥1.12)
+.claude/skills/kit-update/SKILL.md             offer + apply newer kit versions, kit files only, after the member's yes (kits ≥1.17)
 pln-app.config.json                            connect/deploy/draft/metadata/logs/feedback/member-context endpoints
                                                (+ appId, appUid, approved appName/appDescription,
                                                 database provisioning choice ≥1.6) — NO token
@@ -1037,9 +1040,22 @@ pl-design-system/                              curated PL Design System (files, 
 styles/pln-theme.css                           minimal CSS-variable fallback (plain-HTML apps)
 styles/FONTS.md                                Inter font guidance
 app/                                           minimal runnable Node/Express scaffold
+.pln-kit/manifest.json                         SHA-256 of every kit-managed file (kits ≥1.17)
 ```
 
-The kit deliberately exposes **no internal PLN APIs** — only the connect, deploy, draft, metadata, logs, and member-context endpoints — and **no token**.
+The kit deliberately exposes **no internal PLN APIs** — only the connect, deploy, draft, metadata, logs, member-context and kit version/update endpoints — and **no token**.
+
+### Kit updates (kits ≥1.17)
+
+The agent in an existing kit offers newer kit versions itself (LAB-2723):
+
+- **Check.** `CLAUDE.md`/`AGENTS.md` tell the agent to `GET` `kitVersionEndpoint` once at the start of a chat (no token) and compare `version` with the config's `kitVersion` as integers per segment. It offers the update only when the live version is newer and isn't `declinedKitVersion`. A failed check is silent.
+- **Consent.** Nothing is downloaded or changed without the member's yes. A "no" writes `declinedKitVersion` into `pln-app.config.json`, so that version isn't offered again; a newer one is. Asking to "update the kit" always runs the flow.
+- **Download.** `kitUpdateEndpoint` needs the deploy credential (`AiAppTokenGuard`), so a member without a valid token approves a connect session first. The ZIP is `buildUpdateZip()`: the full kit minus `app/`.
+- **Local edits.** Every kit ships `.pln-kit/manifest.json` (`{ kitVersion, files: { path: sha256 } }`, excluding `app/` and `pln-app.config.json`). The `kit-update` skill compares local files with the installed manifest, lists add/update/remove, names locally edited files and asks a second time before overwriting them.
+- **Config merge.** New kit-owned keys (endpoints, `kitVersion`, `notes`) win; `appId`, `appUid`, `appName`, `appDescription`, `appTags`, `database` and unknown local keys are kept; `declinedKitVersion` is dropped. The new manifest is written last.
+
+`kitFiles()` in `AiAppsStarterKitService` is the single list behind the full ZIP, the update ZIP and the manifest — add any new kit file there, never straight into a ZIP. When bumping the version, replace `AI_APPS_STARTER_KIT_WHATS_NEW` (it describes only the current version). Kits up to 1.16 have no check, so their members still update by downloading from LabOS.
 
 ### Bundled PL Design System
 
@@ -1098,6 +1114,7 @@ UI work and follows `AGENTS.md` / `CLAUDE.md` for deploy, secrets, and iframe ru
 | `AI_APPS_DEPLOY_POLL_INTERVAL_SEC` | `10` | `pollIntervalSec` returned with every `202` deploy response |
 | `AI_APPS_DEPLOYMENT_STATUS_ENDPOINT` | _derived from `AI_APPS_BASE_URL`_ | Optional override of the status URL template (`{appUid}`/`{deploymentId}`), returned filled in as `statusEndpoint` and shipped in the kit config |
 | `AI_APPS_ANALYTICS_ENDPOINT` | _derived from `AI_APPS_BASE_URL`_ | Optional override for the `POST /v1/ai-apps/track` URL written into the kit as `analyticsEndpoint` — see "Product analytics for deployed apps" above |
+| `AI_APPS_KIT_VERSION_ENDPOINT` / `AI_APPS_KIT_UPDATE_ENDPOINT` | _derived from `AI_APPS_BASE_URL`_ | Optional overrides for the `starter-kit/version` and `starter-kit/update` URLs written into the kit as `kitVersionEndpoint`/`kitUpdateEndpoint` |
 
 S3 uploads reuse the shared `AwsService`, so the standard `AWS_REGION` / `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` credentials must also be present. Product analytics reuses the existing `POSTHOG_API_KEY` / `POSTHOG_HOST` (see `AnalyticsService`) — no separate PostHog project or key.
 

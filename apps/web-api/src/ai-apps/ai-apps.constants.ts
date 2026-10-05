@@ -11,7 +11,18 @@
  */
 
 /** Starter kit version shown in the README, ZIP filename, and LabOS UI. Bump when the kit contents or flow change. */
-export const AI_APPS_STARTER_KIT_VERSION = '1.16';
+export const AI_APPS_STARTER_KIT_VERSION = '1.17';
+
+/**
+ * Member-readable notes for the CURRENT kit version, served by the open
+ * `GET /v1/ai-apps/starter-kit/version` so an agent can summarize an update
+ * before offering it. Replace (don't append) when bumping the version.
+ */
+export const AI_APPS_STARTER_KIT_WHATS_NEW: string[] = [
+  'Your agent now checks for starter-kit updates at the start of a chat and offers to apply them, only after you say yes.',
+  'Updates change only kit files (agent instructions, skills, design system, styles), never your app code in app/.',
+  'Kit files you edited yourself are listed before anything is overwritten.',
+];
 
 /** Max members on one private app's whitelist (the owner and directory admins never count). */
 export const AI_APPS_MAX_ALLOWED_MEMBERS = 200;
@@ -505,6 +516,16 @@ export const AI_APPS_TESTING_SESSIONS_ENDPOINT =
  */
 export const AI_APPS_ANALYTICS_ENDPOINT =
   process.env.AI_APPS_ANALYTICS_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/track`;
+
+/**
+ * Kit self-update endpoints, written into the starter kit as
+ * `kitVersionEndpoint` (open: live version + what's new) and
+ * `kitUpdateEndpoint` (deploy-token auth: the kit files minus `app/`).
+ */
+export const AI_APPS_KIT_VERSION_ENDPOINT =
+  process.env.AI_APPS_KIT_VERSION_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/starter-kit/version`;
+export const AI_APPS_KIT_UPDATE_ENDPOINT =
+  process.env.AI_APPS_KIT_UPDATE_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/starter-kit/update`;
 
 /**
  * Event-name hygiene for `POST /v1/ai-apps/track`: every event lands in the
