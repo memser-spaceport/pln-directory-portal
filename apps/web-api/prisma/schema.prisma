@@ -3940,6 +3940,15 @@ model AiAppTestingUser {
   @@index([appUid])
 }
 
+/// AI Apps starter kit versions already announced to AI Apps access holders (LAB-2721). The unique version is the
+/// at-most-once guard: on a production API start, only the instance whose insert succeeds sends the broadcast.
+model AiAppStarterKitAnnouncement {
+  id        Int      @id @default(autoincrement())
+  /// AI_APPS_STARTER_KIT_VERSION at the time of the broadcast, e.g. "1.16".
+  version   String   @unique
+  createdAt DateTime @default(now())
+}
+
 /// Auth gate (sidecar) version running for one target of an app. Kept outside AiApp/AiAppTarget so a platform
 /// refresh never bumps their updatedAt ("Last updated" in LabOS) or reaches API responses.
 model AiAppAuthGate {

@@ -614,7 +614,14 @@ export const AI_APPS_NOTIFICATION_TRIGGERS = {
   FEEDBACK_REPLY: 'feedback_reply',
   FEEDBACK_SHIPPED: 'feedback_shipped',
   COMMENT_NEW: 'comment_new',
+  STARTER_KIT_UPDATED: 'starter_kit_updated',
 } as const;
+
+/**
+ * Where the starter kit update notification opens: the AI Apps list with the Add your AI App modal open (the
+ * frontend's AiAppsPage reads `dialog=addAiApp`). Relative, like `aiAppDetailPath`.
+ */
+export const AI_APPS_ADD_APP_DIALOG_PATH = '/pl-infra/ai-apps?dialog=addAiApp';
 
 /** FEEDBACK (the written form) or COMMENT (pinned in the live app) — the notification's noun follows it. */
 type FeedbackItemKindName = 'FEEDBACK' | 'COMMENT';
@@ -650,6 +657,11 @@ export const AI_APPS_NOTIFICATION_MESSAGES = {
     const what = toSubmitter ? `your ${noun}` : `a ${noun} you replied to`;
     return { title: `Shipped: ${what} on ${appName}`, description: feedbackNotificationExcerpt(note) };
   },
+  starterKitUpdated: (version: string) => ({
+    title: 'AI Apps',
+    description: `AI Apps Starter Kit — updated to v${version}. Review what's new!`,
+    linkText: 'Get the starter kit →',
+  }),
   commentNew: (appName: string, authorName: string | null, note: string) => ({
     title: `New comment on ${appName}`,
     description: feedbackNotificationExcerpt(`${authorName ?? 'A member'}: ${note}`),
