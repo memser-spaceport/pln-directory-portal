@@ -29,8 +29,6 @@ type TemplateKey =
 const TEMPLATE_LABELS: { key: TemplateKey; label: string }[] = [
   { key: 'invitePreapproved', label: 'Invite, pre-approved' },
   { key: 'followUpPreapproved', label: 'Follow-up, pre-approved' },
-  { key: 'inviteOutreach', label: 'Invite, outreach' },
-  { key: 'followUpOutreach', label: 'Follow-up, outreach' },
   { key: 'approved', label: 'Application approved' },
   { key: 'opened', label: 'Spotlight is open' },
 ];
@@ -922,7 +920,6 @@ const SpvSpotlightDetailPage = () => {
                   [
                     ['applications', 'Applications', requests.length],
                     ['investors', 'Investors', investors.length],
-                    ['outreach', 'Outreach', outreach.length],
                     ['founders', 'Founders', founders.length],
                     ['templates', 'Templates', null],
                   ] as const
