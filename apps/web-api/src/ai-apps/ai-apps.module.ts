@@ -7,6 +7,7 @@ import { RbacModule } from '../rbac/rbac.module';
 import { SharedModule } from '../shared/shared.module';
 import { AwsService } from '../utils/aws/aws.service';
 import { AiAppsController } from './ai-apps.controller';
+import { AiAppsTestingUsersController } from './ai-apps-testing-users.controller';
 import { AiAppsService } from './ai-apps.service';
 import { AiAppsDeployProcessor } from './ai-apps-deploy.processor';
 import { AI_APPS_DEPLOY_QUEUE } from './ai-apps.constants';
@@ -15,6 +16,9 @@ import { AiAppsConnectService } from './ai-apps-connect.service';
 import { AiAppsSessionService } from './ai-apps-session.service';
 import { AiAppsAuthGateService } from './ai-apps-auth-gate.service';
 import { AiAppsStarterKitService } from './ai-apps-starter-kit.service';
+import { AiAppsTestingUsersService } from './ai-apps-testing-users.service';
+import { AiAppMeRbacGuard } from './guards/ai-app-me-rbac.guard';
+import { AiAppMemberContextGuard } from './guards/ai-app-member-context.guard';
 import { AiAppTokenGuard } from './guards/ai-app-token.guard';
 import { AgentFeedbackDeniedInterceptor } from './agent-feedback-denied.interceptor';
 
@@ -34,7 +38,7 @@ import { AgentFeedbackDeniedInterceptor } from './agent-feedback-denied.intercep
       settings: { lockDuration: 20000, maxStalledCount: 2 },
     }),
   ],
-  controllers: [AiAppsController],
+  controllers: [AiAppsController, AiAppsTestingUsersController],
   providers: [
     AiAppsService,
     AiAppsDeployProcessor,
@@ -43,6 +47,9 @@ import { AgentFeedbackDeniedInterceptor } from './agent-feedback-denied.intercep
     AiAppsSessionService,
     AiAppsAuthGateService,
     AiAppsStarterKitService,
+    AiAppsTestingUsersService,
+    AiAppMemberContextGuard,
+    AiAppMeRbacGuard,
     AiAppTokenGuard,
     AgentFeedbackDeniedInterceptor,
     AwsService,

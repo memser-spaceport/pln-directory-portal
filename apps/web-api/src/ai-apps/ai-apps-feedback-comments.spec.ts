@@ -171,6 +171,7 @@ describe('AiAppsService feedback conversation', () => {
       expect(recipientsOf(quiet.push)).toEqual(['creator-1']);
 
       const involved = buildService({ earlier: [{ memberUid: 'admin-1' }] });
+      involved.prisma.member.findUnique.mockResolvedValue(ADMIN);
       await involved.service.addFeedbackComment('member-1', 'app-1', 'fb-1', 'Still broken');
       expect(recipientsOf(involved.push)).toEqual(['admin-1', 'creator-1']);
     });

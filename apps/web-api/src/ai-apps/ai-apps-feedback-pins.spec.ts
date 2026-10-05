@@ -174,8 +174,25 @@ describe('feedback pins', () => {
       await expect(service.listAppFeedbackPins('admin-1', 'app-1')).resolves.toEqual([]);
     });
 
-    it('refuses any other member', async () => {
+    it('gives any other viewer every comment, and only their own feedback', async () => {
       const { service, prisma } = buildService();
+      await service.listAppFeedbackPins('member-1', 'app-1');
+      expect(prisma.aiAppFeedbackPin.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            feedback: {
+              appUid: 'app-1',
+              OR: [{ kind: 'COMMENT' }, { memberUid: 'member-1' }],
+              status: { not: 'IMPLEMENTED' },
+            },
+          },
+        })
+      );
+    });
+
+    it('refuses a member who may not open a private app', async () => {
+      const { service, prisma } = buildService();
+      prisma.aiApp.findUnique.mockResolvedValue({ ...APP, access: 'PRIVATE' });
       await expect(service.listAppFeedbackPins('member-1', 'app-1')).rejects.toBeInstanceOf(ForbiddenException);
       expect(prisma.aiAppFeedbackPin.findMany).not.toHaveBeenCalled();
     });

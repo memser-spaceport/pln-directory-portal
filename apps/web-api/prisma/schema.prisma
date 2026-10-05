@@ -3921,6 +3921,25 @@ model AiAppSessionCode {
   @@index([expiresAt])
 }
 
+/// A Preview-only testing identity for one AI App (LAB-2743). Never a Member row: member lists, search, digests
+/// and exports read the Member table only. Kept until revoked; revoking keeps the row with `revokedAt` set.
+model AiAppTestingUser {
+  id           Int       @id @default(autoincrement())
+  uid          String    @unique @default(cuid())
+  /// AiApp.uid (no FK relation, matching the other AI App tables).
+  appUid       String
+  /// "Testing user <number>"; numbers continue per app and are never reused (revoked users included).
+  number       Int
+  name         String
+  /// Member uid of the app creator or directory admin who created it.
+  createdByUid String
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@unique([appUid, number])
+  @@index([appUid])
+}
+
 /// Auth gate (sidecar) version running for one target of an app. Kept outside AiApp/AiAppTarget so a platform
 /// refresh never bumps their updatedAt ("Last updated" in LabOS) or reaches API responses.
 model AiAppAuthGate {
@@ -3976,10 +3995,11 @@ enum AiAppFeedbackStatus {
   IMPLEMENTED
 }
 
-/// Free-text feedback left by a PL Infra member on an app's detail page. A
-/// member may submit multiple entries per app. Readable only by the app's
-/// creator and directory admins (enforced in the service). Status is shared
-/// across all viewers; only the creator or a directory admin may change it.
+/// What a member left on an app's detail page, more than once per app if they
+/// like. A FEEDBACK item (the written form) is readable by the app's creator,
+/// directory admins and its author; a COMMENT (pinned in the live app) by
+/// anyone who may open the app (enforced in the service). Status is shared;
+/// only the creator or a directory admin may change it.
 model AiAppFeedback {
   id        Int                 @id @default(autoincrement())
   uid       String              @unique @default(cuid())
@@ -3989,7 +4009,19 @@ model AiAppFeedback {
   memberUid String
   text      String
   status    AiAppFeedbackStatus @default(NEW)
+  /// FEEDBACK (private to the creator and admins) or COMMENT (public to the
+  /// app's viewers). Rows from before this column are FEEDBACK: they were left
+  /// under the "only the author and admins see it" promise.
+  kind      AiAppFeedbackItemKind @default(FEEDBACK)
+  /// What the reporter says it is, picked on the written form. Null when it was
+  /// not sent: comments, older clients, and every row from before the column.
+  reportKind AiAppFeedbackReportKind?
+  /// How much it matters to the reporter, picked on the written form. Null under
+  /// the same rules as `reportKind`; never backfilled.
+  priority  AiAppFeedbackPriority?
   createdAt DateTime            @default(now())
+  /// Set when the author edits a COMMENT's note; null until then.
+  editedAt  DateTime?
   /// Where and on what the feedback was left: env, app path, LabOS URL, the app
   /// frame's viewport, pixel ratio, touch, user agent, bridge capabilities.
   /// Null on feedback filed before it was captured.
@@ -3999,10 +4031,31 @@ model AiAppFeedback {
 
   @@index([appUid])
   @@index([memberUid])
+  @@index([appUid, kind])
 }
 
-/// A reply in a feedback item's conversation (flat, oldest first). Participants:
-/// the app's creator, directory admins, and the member who left the feedback.
+enum AiAppFeedbackItemKind {
+  FEEDBACK
+  COMMENT
+}
+
+enum AiAppFeedbackReportKind {
+  bug
+  request
+  question
+  chore
+}
+
+enum AiAppFeedbackPriority {
+  P0
+  P1
+  P2
+  P3
+}
+
+/// A reply in a feedback item's conversation (flat, oldest first). Who may read
+/// and write follows the item: anyone who may open the app for a COMMENT; the
+/// app's creator, directory admins and the item's author for FEEDBACK.
 /// A CLOSING_NOTE is the agent's one line when it marks the item IMPLEMENTED,
 /// stored as written by the app's creator (the agent acts for them).
 model AiAppFeedbackComment {
@@ -4015,6 +4068,8 @@ model AiAppFeedbackComment {
   text        String
   kind        AiAppFeedbackCommentKind @default(REPLY)
   createdAt   DateTime                 @default(now())
+  /// Set when its author edits it; null until then.
+  editedAt    DateTime?
 
   @@index([feedbackUid, createdAt])
 }

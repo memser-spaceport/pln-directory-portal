@@ -11,7 +11,7 @@
  */
 
 /** Starter kit version shown in the README, ZIP filename, and LabOS UI. Bump when the kit contents or flow change. */
-export const AI_APPS_STARTER_KIT_VERSION = '1.15';
+export const AI_APPS_STARTER_KIT_VERSION = '1.16';
 
 /** Max members on one private app's whitelist (the owner and directory admins never count). */
 export const AI_APPS_MAX_ALLOWED_MEMBERS = 200;
@@ -477,6 +477,26 @@ export const AI_APPS_AGENT_FEEDBACK_LISTED = 'ai_apps_agent_feedback_listed';
 export const AI_APPS_AGENT_FEEDBACK_STATUS_CHANGED = 'ai_apps_agent_feedback_status_changed';
 export const AI_APPS_AGENT_FEEDBACK_DENIED = 'ai_apps_agent_feedback_denied';
 
+/** Preview testing users (LAB-2743): active (non-revoked) users allowed per app. */
+export const AI_APPS_TESTING_USERS_MAX_PER_APP = 100;
+/** Default and maximum page size of the testing-user list. */
+export const AI_APPS_TESTING_USERS_PAGE_LIMIT = 100;
+/** Directory PostHog names for testing users, as named in the ticket (LAB-2743). */
+export const AI_APPS_TESTING_USER_CREATED = 'ai-apps-testing-user-created';
+export const AI_APPS_TESTING_USER_REVOKED = 'ai-apps-testing-user-revoked';
+/** Absolute lifetime of a testing-user Preview session (LAB-2744). Not the sliding idle window real sessions use. */
+export const AI_APPS_TESTING_SESSION_MAX_MS = 24 * 60 * 60 * 1000;
+/** Directory PostHog names for testing-user Preview sessions (LAB-2744). */
+export const AI_APPS_TESTING_SESSION_MINTED = 'ai-apps-testing-session-minted';
+export const AI_APPS_TESTING_SESSION_USED = 'ai-apps-testing-session-used';
+
+/** Agent URL templates (LAB-2754). `{appUid}` is replaced from `pln-app.config.json`. */
+export const AI_APPS_TESTING_USERS_ENDPOINT =
+  process.env.AI_APPS_TESTING_USERS_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/agent/testing-users`;
+export const AI_APPS_TESTING_SESSIONS_ENDPOINT =
+  process.env.AI_APPS_TESTING_SESSIONS_ENDPOINT ||
+  `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/agent/testing-users/sessions`;
+
 /**
  * Public URL of THIS API's custom-event analytics endpoint
  * (`POST /v1/ai-apps/track`), written into the starter kit as
@@ -593,7 +613,11 @@ export const AI_APPS_NOTIFICATION_TRIGGERS = {
   ACCESS_GRANTED: 'access_granted',
   FEEDBACK_REPLY: 'feedback_reply',
   FEEDBACK_SHIPPED: 'feedback_shipped',
+  COMMENT_NEW: 'comment_new',
 } as const;
+
+/** FEEDBACK (the written form) or COMMENT (pinned in the live app) — the notification's noun follows it. */
+type FeedbackItemKindName = 'FEEDBACK' | 'COMMENT';
 
 /**
  * All user-facing AI Apps deploy notification copy lives here so a wording
@@ -616,29 +640,51 @@ export const AI_APPS_NOTIFICATION_MESSAGES = {
     title: `${appName} was shared with you`,
     description: `${ownerName ?? 'Its owner'} gave you access to this private AI App.`,
   }),
-  feedbackReply: (appName: string, text: string, toSubmitter: boolean) => ({
-    title: toSubmitter ? `New reply on your feedback · ${appName}` : `New reply on feedback · ${appName}`,
-    description: feedbackNotificationExcerpt(text),
-  }),
-  feedbackShipped: (appName: string, note: string) => ({
-    title: `Shipped: your feedback on ${appName}`,
-    description: feedbackNotificationExcerpt(note),
+  feedbackReply: (appName: string, text: string, toSubmitter: boolean, kind: FeedbackItemKindName = 'FEEDBACK') => {
+    const noun = kind === 'COMMENT' ? 'comment' : 'feedback';
+    const on = toSubmitter ? `your ${noun}` : kind === 'COMMENT' ? 'a comment' : 'feedback';
+    return { title: `New reply on ${on} · ${appName}`, description: feedbackNotificationExcerpt(text) };
+  },
+  feedbackShipped: (appName: string, note: string, kind: FeedbackItemKindName = 'FEEDBACK', toSubmitter = true) => {
+    const noun = kind === 'COMMENT' ? 'comment' : 'feedback';
+    const what = toSubmitter ? `your ${noun}` : `a ${noun} you replied to`;
+    return { title: `Shipped: ${what} on ${appName}`, description: feedbackNotificationExcerpt(note) };
+  },
+  commentNew: (appName: string, authorName: string | null, note: string) => ({
+    title: `New comment on ${appName}`,
+    description: feedbackNotificationExcerpt(`${authorName ?? 'A member'}: ${note}`),
   }),
 } as const;
 
-/** The start of a reply, for a bell notification's one-line description. */
+/** The start of a reply or note, for a bell notification's one-line description. HTML is flattened to text. */
 export function feedbackNotificationExcerpt(text: string, max = 140): string {
-  const flat = text.replace(/\s+/g, ' ').trim();
+  const flat = text
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
   return flat.length > max ? `${flat.slice(0, max - 1).trimEnd()}…` : flat;
 }
 
 /**
  * Where a feedback notification opens. A pinned item opens the app with comment
  * mode on and that pin's thread open; a whole-app item (no pin) has nothing to
- * open on the page, so it opens the Feedback list with the item selected.
+ * open on the page, so it opens the Feedback list with the item selected. A
+ * COMMENT always opens the app: its readers are the app's viewers, and the
+ * Feedback list is the creator's.
  */
-export function aiAppFeedbackPath(appUid: string, feedbackUid: string, hasPins: boolean): string {
-  return hasPins
+export function aiAppFeedbackPath(
+  appUid: string,
+  feedbackUid: string,
+  hasPins: boolean,
+  kind: FeedbackItemKindName = 'FEEDBACK'
+): string {
+  return hasPins || kind === 'COMMENT'
     ? `${aiAppDetailPath(appUid)}?feedback=${encodeURIComponent(feedbackUid)}`
     : `/pl-infra/ai-apps/feedback?item=${encodeURIComponent(feedbackUid)}`;
 }

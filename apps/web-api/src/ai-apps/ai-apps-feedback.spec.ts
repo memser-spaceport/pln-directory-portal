@@ -67,13 +67,13 @@ describe('AiAppsService feedback', () => {
       await expect(service.submitFeedback('member-1', 'missing', 'hi')).rejects.toBeInstanceOf(NotFoundException);
     });
 
-    it('still stores feedback when LabOS feedback is turned off on the app', async () => {
+    it('refuses new feedback while LabOS feedback is turned off on the app', async () => {
       const { service, prisma } = buildService();
       prisma.aiApp.findUnique.mockResolvedValue({ ...APP, feedbackEnabled: false });
-      await service.submitFeedback('member-1', 'app-1', 'from the list');
-      expect(prisma.aiAppFeedback.create).toHaveBeenCalledWith({
-        data: { appUid: 'app-1', memberUid: 'member-1', text: 'from the list' },
-      });
+      await expect(service.submitFeedback('member-1', 'app-1', 'from the list')).rejects.toBeInstanceOf(
+        ForbiddenException
+      );
+      expect(prisma.aiAppFeedback.create).not.toHaveBeenCalled();
     });
 
     it('stores feedback for any member and allows repeat submissions', async () => {
@@ -259,6 +259,37 @@ describe('AiAppsService feedback', () => {
         include: { _count: { select: { pins: true, comments: true } } },
       });
       expect(result.map((row) => row.appName)).toEqual(['Beta', 'Alpha']);
+    });
+  });
+
+  describe('listMyFeedback', () => {
+    it('queries only rows the requester submitted, even for a directory admin', async () => {
+      const { service, prisma } = buildService();
+      prisma.member.findUnique.mockResolvedValue({ memberRoles: [{ name: 'DIRECTORYADMIN' }] });
+      await expect(service.listMyFeedback('admin-1')).resolves.toEqual([]);
+      expect(prisma.aiAppFeedback.findMany).toHaveBeenCalledWith({
+        where: { memberUid: 'admin-1' },
+        orderBy: { createdAt: 'desc' },
+        include: { _count: { select: { pins: true, comments: true } } },
+      });
+      expect(prisma.aiApp.findMany).not.toHaveBeenCalled();
+    });
+
+    it('tags rows with the app name and drops rows on deleted apps', async () => {
+      const { service, prisma } = buildService();
+      prisma.aiAppFeedback.findMany.mockResolvedValue([
+        { ...FEEDBACK, uid: 'fb-2', appUid: 'app-gone', kind: 'COMMENT' },
+        { ...FEEDBACK, status: 'IMPLEMENTED' },
+      ]);
+      prisma.aiApp.findMany.mockResolvedValue([{ uid: 'app-1', name: 'Alpha' }]);
+
+      const result = await service.listMyFeedback('member-1');
+      expect(prisma.aiApp.findMany).toHaveBeenCalledWith({
+        where: { uid: { in: ['app-gone', 'app-1'] }, status: { not: 'DELETED' } },
+        select: { uid: true, name: true },
+      });
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({ uid: 'fb-1', appName: 'Alpha', status: 'IMPLEMENTED' });
     });
   });
 

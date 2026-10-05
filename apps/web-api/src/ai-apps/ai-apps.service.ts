@@ -23,6 +23,9 @@ import {
   AiAppEventType,
   AiAppFeedback,
   AiAppFeedbackComment,
+  AiAppFeedbackItemKind,
+  AiAppFeedbackPriority,
+  AiAppFeedbackReportKind,
   AiAppFeedbackStatus,
   Prisma,
   PushNotificationCategory,
@@ -40,6 +43,7 @@ import { assertValidPublicPaths, samePublicPaths } from './ai-apps-public-paths'
 import {
   MAX_PINS_PER_RESPONSE,
   PIN_PUBLIC_SELECT,
+  rebuildCommentText,
   toPinCreateData,
   type OverlayFeedbackPin,
   type PublicFeedbackPin,
@@ -292,8 +296,18 @@ type AiAppMember = { uid: string; name: string; image: string | null };
 type FeedbackWithPins = AiAppFeedback & { pins: PublicFeedbackPin[]; commentCount: number };
 
 /** A reply or closing note as the API returns it (before `memberUid` becomes `member`). */
-type FeedbackComment = Pick<AiAppFeedbackComment, 'uid' | 'text' | 'kind' | 'createdAt' | 'memberUid'>;
-const COMMENT_PUBLIC_SELECT = { uid: true, text: true, kind: true, createdAt: true, memberUid: true } as const;
+type FeedbackComment = Pick<AiAppFeedbackComment, 'uid' | 'text' | 'kind' | 'createdAt' | 'editedAt' | 'memberUid'>;
+const COMMENT_PUBLIC_SELECT = {
+  uid: true,
+  text: true,
+  kind: true,
+  createdAt: true,
+  editedAt: true,
+  memberUid: true,
+} as const;
+
+/** What the read rules need to know about an item. */
+type FeedbackItemAccess = Pick<AiAppFeedback, 'uid' | 'appUid' | 'memberUid' | 'kind'>;
 
 /** Most comments one feedback item may hold, so a runaway client or agent can't fill the table. */
 export const MAX_COMMENTS_PER_FEEDBACK = 200;
@@ -487,12 +501,16 @@ export class AiAppsService {
     token: string | undefined;
     /** Member of a verified app session token (the controller checked it against the request origin). */
     sessionMemberUid?: string;
+    /** Set for a testing session: the app is the token's audience, not the preview hostname. */
+    testingAppId?: string;
     anonId: string | undefined;
     event: string | undefined;
     properties: Record<string, unknown> | undefined;
     events: Array<{ event?: string; properties?: Record<string, unknown> }> | undefined;
   }): Promise<void> {
-    const app = await this.resolveAppFromOrigin(params.origin);
+    const app = params.testingAppId
+      ? await this.resolveLiveAppByAppId(params.testingAppId)
+      : await this.resolveAppFromOrigin(params.origin);
     if (!app) {
       return;
     }
@@ -507,7 +525,10 @@ export class AiAppsService {
     }
 
     const memberUid = params.sessionMemberUid ?? (await this.resolveOptionalMemberUid(params.token));
-    const distinctId = memberUid ?? (params.anonId && AI_APP_ANON_ID_REGEX.test(params.anonId) ? params.anonId : null);
+    const distinctId =
+      params.testingAppId && memberUid
+        ? `testing:${memberUid}`
+        : memberUid ?? (params.anonId && AI_APP_ANON_ID_REGEX.test(params.anonId) ? params.anonId : null);
     if (!distinctId) {
       return;
     }
@@ -520,6 +541,9 @@ export class AiAppsService {
     };
     if (memberUid) {
       attribution.memberUid = memberUid;
+    }
+    if (params.testingAppId) {
+      attribution.testingUser = true;
     }
 
     await Promise.all(
@@ -538,6 +562,23 @@ export class AiAppsService {
         });
       })
     );
+  }
+
+  /** Live app for a testing session's token audience. Same multi-row pick as the origin resolver. */
+  private async resolveLiveAppByAppId(appId: string): Promise<AiApp | null> {
+    const candidates = await this.prisma.aiApp.findMany({ where: { appId, status: { not: 'DELETED' } } });
+    if (!candidates.length) {
+      return null;
+    }
+    if (candidates.length === 1) {
+      return candidates[0];
+    }
+    this.logger.warn(`Multiple live AiApp rows found for appId=${appId}; using the most recently deployed`);
+    return candidates.reduce((latest, candidate) => {
+      const latestTime = (latest.lastDeployedAt ?? latest.updatedAt).getTime();
+      const candidateTime = (candidate.lastDeployedAt ?? candidate.updatedAt).getTime();
+      return candidateTime > latestTime ? candidate : latest;
+    });
   }
 
   /**
@@ -1831,18 +1872,33 @@ export class AiAppsService {
    * `pins` and `context` are optional (older clients send neither). Pins are
    * created in the same statement as the feedback, so a submission is stored
    * whole or not at all.
+   *
+   * `kind` COMMENT is a public comment pinned in the live app: exactly one pin,
+   * and the app's creator is told about it. Omitted means FEEDBACK (private).
+   * Nothing is accepted while the creator has feedback turned off.
    */
   async submitFeedback(
     memberUid: string,
     appUid: string,
     text: string,
-    extras: { pins?: FeedbackPinInput[]; context?: FeedbackContext } = {}
+    extras: {
+      pins?: FeedbackPinInput[];
+      context?: FeedbackContext;
+      kind?: AiAppFeedbackItemKind;
+      reportKind?: AiAppFeedbackReportKind;
+      priority?: AiAppFeedbackPriority;
+    } = {}
   ): Promise<WithMember<AiAppFeedback>> {
     const app = await this.prisma.aiApp.findUnique({ where: { uid: appUid } });
-    if (!app) {
+    if (!app || app.status === 'DELETED') {
       throw new NotFoundException(`AI App not found: ${appUid}`);
     }
     await this.assertCanViewApp(memberUid, app);
+    this.assertFeedbackOpen(app);
+    const isComment = extras.kind === 'COMMENT';
+    if (isComment && extras.pins?.length !== 1) {
+      throw new BadRequestException('A comment points at exactly one element (one pin)');
+    }
     const withoutDataUris = text.replace(/<img\b[^>]*\bsrc=["']data:[^"']+["'][^>]*>/gi, '');
     const sanitized = DOMPurify.sanitize(withoutDataUris);
     if (isBlankFeedbackHtml(sanitized)) {
@@ -1855,9 +1911,30 @@ export class AiAppsService {
         text: sanitized,
         ...(extras.context ? { context: extras.context } : {}),
         ...(extras.pins?.length ? { pins: { create: extras.pins.map(toPinCreateData) } } : {}),
+        ...(isComment ? { kind: 'COMMENT' as const } : {}),
+        ...(extras.reportKind ? { reportKind: extras.reportKind } : {}),
+        ...(extras.priority ? { priority: extras.priority } : {}),
       },
     });
-    return (await this.withMember([feedback]))[0];
+    const [withAuthor] = await this.withMember([feedback]);
+    if (isComment && app.memberUid !== memberUid) {
+      await this.notifyFeedbackConversation(app, { ...feedback, hasPins: true }, app.memberUid, {
+        ...AI_APPS_NOTIFICATION_MESSAGES.commentNew(
+          app.name,
+          withAuthor.member?.name ?? null,
+          extras.pins?.[0]?.note || sanitized
+        ),
+        trigger: AI_APPS_NOTIFICATION_TRIGGERS.COMMENT_NEW,
+      });
+    }
+    return withAuthor;
+  }
+
+  /** New items and replies are refused while the app's creator has LabOS feedback turned off (reads stay open). */
+  private assertFeedbackOpen(app: Pick<AiApp, 'feedbackEnabled'>): void {
+    if (app.feedbackEnabled === false) {
+      throw new ForbiddenException('Feedback is turned off for this app');
+    }
   }
 
   /**
@@ -1924,13 +2001,32 @@ export class AiAppsService {
       });
       const feedback = await this.prisma.aiAppFeedback.findUnique({
         where: { uid: feedbackUid },
-        select: { memberUid: true, _count: { select: { pins: true } } },
+        select: { uid: true, appUid: true, memberUid: true, kind: true, _count: { select: { pins: true } } },
       });
-      if (feedback && feedback.memberUid !== app.memberUid) {
-        await this.notifyFeedbackConversation(app, feedbackUid, feedback._count.pins > 0, feedback.memberUid, {
-          ...AI_APPS_NOTIFICATION_MESSAGES.feedbackShipped(app.name, note),
-          trigger: AI_APPS_NOTIFICATION_TRIGGERS.FEEDBACK_SHIPPED,
-        });
+      if (feedback) {
+        /* A comment's closing note reaches everyone in its thread; feedback's, only its author. */
+        const recipients = new Set([feedback.memberUid]);
+        if (feedback.kind === 'COMMENT') {
+          const repliers = await this.prisma.aiAppFeedbackComment.findMany({
+            where: { feedbackUid, kind: 'REPLY' },
+            select: { memberUid: true },
+          });
+          repliers.forEach((r) => recipients.add(r.memberUid));
+        }
+        recipients.delete(app.memberUid);
+        const item = { ...feedback, hasPins: feedback._count.pins > 0 };
+        for (const recipientUid of recipients) {
+          if (!(await this.canReadItem(recipientUid, app, feedback))) continue;
+          await this.notifyFeedbackConversation(app, item, recipientUid, {
+            ...AI_APPS_NOTIFICATION_MESSAGES.feedbackShipped(
+              app.name,
+              note,
+              feedback.kind,
+              recipientUid === feedback.memberUid
+            ),
+            trigger: AI_APPS_NOTIFICATION_TRIGGERS.FEEDBACK_SHIPPED,
+          });
+        }
       }
     }
     this.trackAgentFeedback(AI_APPS_AGENT_FEEDBACK_STATUS_CHANGED, requesterUid, {
@@ -1998,10 +2094,11 @@ export class AiAppsService {
   }
 
   /**
-   * Every pin on the app's feedback, for the live-app overlay. Creator and
-   * directory admins only. Pins of IMPLEMENTED feedback are left out unless
-   * asked for ("Show resolved"); `env` narrows to one environment, and both are
-   * returned when it is omitted (the overlay labels the other one).
+   * Pins for the live-app overlay. The app's creator and directory admins get
+   * every item's; anyone else who may open the app gets every COMMENT's plus
+   * their own FEEDBACK's — never another member's private feedback. Pins of
+   * IMPLEMENTED items are left out unless asked for; `env` narrows to one
+   * environment, and both are returned when it is omitted.
    */
   async listAppFeedbackPins(
     requesterUid: string,
@@ -2012,13 +2109,15 @@ export class AiAppsService {
     if (!app || app.status === 'DELETED') {
       throw new NotFoundException(`AI App not found: ${appUid}`);
     }
-    if (!(await this.isCreatorOrDirectoryAdmin(requesterUid, app))) {
-      throw new ForbiddenException('Only the app creator or a directory admin can view feedback');
+    const seesAll = await this.isCreatorOrDirectoryAdmin(requesterUid, app);
+    if (!seesAll) {
+      await this.assertCanViewApp(requesterUid, app);
     }
     return this.queryOverlayPins({
       appUid: app.uid,
       env: options.env,
       excludeStatus: options.includeResolved ? undefined : 'IMPLEMENTED',
+      ...(seesAll ? {} : { visibleTo: requesterUid }),
     });
   }
 
@@ -2036,9 +2135,14 @@ export class AiAppsService {
     return this.queryOverlayPins({ appUid: app.uid, memberUid: requesterUid });
   }
 
+  /**
+   * `visibleTo` is the read rule for a viewer who isn't the creator or an
+   * admin: COMMENT items, plus that viewer's own FEEDBACK.
+   */
   private async queryOverlayPins(filter: {
     appUid: string;
     memberUid?: string;
+    visibleTo?: string;
     env?: 'prod' | 'preview';
     excludeStatus?: AiAppFeedbackStatus;
   }): Promise<OverlayFeedbackPin[]> {
@@ -2048,6 +2152,7 @@ export class AiAppsService {
         feedback: {
           appUid: filter.appUid,
           ...(filter.memberUid ? { memberUid: filter.memberUid } : {}),
+          ...(filter.visibleTo ? { OR: [{ kind: 'COMMENT' as const }, { memberUid: filter.visibleTo }] } : {}),
           ...(filter.excludeStatus ? { status: { not: filter.excludeStatus } } : {}),
         },
       },
@@ -2057,7 +2162,9 @@ export class AiAppsService {
           select: {
             uid: true,
             status: true,
+            kind: true,
             createdAt: true,
+            editedAt: true,
             memberUid: true,
             _count: { select: { comments: true } },
           },
@@ -2125,6 +2232,36 @@ export class AiAppsService {
   }
 
   /**
+   * Only what the requester submitted themselves, on any non-deleted app, in the
+   * same row shape as listAccessibleFeedback. Owning an app or being a directory
+   * admin adds nobody else's.
+   */
+  async listMyFeedback(
+    requesterUid: string
+  ): Promise<Array<WithMember<AiAppFeedback> & { appName: string; pinCount: number; commentCount: number }>> {
+    const feedback = await this.prisma.aiAppFeedback.findMany({
+      where: { memberUid: requesterUid },
+      orderBy: { createdAt: 'desc' },
+      include: { _count: { select: { pins: true, comments: true } } },
+    });
+    if (feedback.length === 0) {
+      return [];
+    }
+    const apps = await this.prisma.aiApp.findMany({
+      where: { uid: { in: Array.from(new Set(feedback.map((row) => row.appUid))) }, status: { not: 'DELETED' } },
+      select: { uid: true, name: true },
+    });
+    const appNameByUid = new Map(apps.map((app) => [app.uid, app.name]));
+    const withMembers = await this.withMember(feedback.filter((row) => appNameByUid.has(row.appUid)));
+    return withMembers.map(({ _count, ...row }) => ({
+      ...row,
+      appName: appNameByUid.get(row.appUid) ?? '',
+      pinCount: _count?.pins ?? 0,
+      commentCount: _count?.comments ?? 0,
+    }));
+  }
+
+  /**
    * Sets the shared review status on one feedback row. Any of NEW / VIEWED /
    * IMPLEMENTED is always allowed (skips and backwards moves included). Restricted
    * to the app's creator and directory admins; no notification is sent.
@@ -2148,8 +2285,9 @@ export class AiAppsService {
   // ── Feedback conversation (phase 2): replies under each item ─────────────
 
   /**
-   * The item's conversation, oldest first. Participants only: the app's
-   * creator, directory admins, and the member who left the feedback.
+   * The item's conversation, oldest first. A COMMENT's is readable by anyone
+   * who may open the app; FEEDBACK's by the app's creator, directory admins and
+   * the item's author.
    */
   async listFeedbackComments(
     requesterUid: string,
@@ -2166,10 +2304,10 @@ export class AiAppsService {
   }
 
   /**
-   * A reply from a participant. Tells everyone else in the conversation: the
-   * member who left the feedback and the app's creator always, an admin only
-   * once they have written in it (admins see every app; every thread would be
-   * noise). A failed notification never fails the reply.
+   * A reply from anyone who may read the item. Tells everyone else in the
+   * conversation who can still read it: the item's author and the app's
+   * creator always, anyone else (an admin, another viewer) once they have
+   * written in it. A failed notification never fails the reply.
    */
   async addFeedbackComment(
     requesterUid: string,
@@ -2178,6 +2316,7 @@ export class AiAppsService {
     text: string
   ): Promise<WithMember<FeedbackComment>> {
     const { app, feedback } = await this.findFeedbackConversation(requesterUid, appUid, feedbackUid);
+    this.assertFeedbackOpen(app);
     const earlier = await this.prisma.aiAppFeedbackComment.findMany({
       where: { feedbackUid: feedback.uid },
       select: { memberUid: true },
@@ -2192,13 +2331,105 @@ export class AiAppsService {
 
     const recipients = new Set([feedback.memberUid, app.memberUid, ...earlier.map((c) => c.memberUid)]);
     recipients.delete(requesterUid);
+    const item = { ...feedback, hasPins: feedback._count.pins > 0 };
     for (const recipientUid of recipients) {
-      await this.notifyFeedbackConversation(app, feedback.uid, feedback._count.pins > 0, recipientUid, {
-        ...AI_APPS_NOTIFICATION_MESSAGES.feedbackReply(app.name, text, recipientUid === feedback.memberUid),
+      if (!(await this.canReadItem(recipientUid, app, feedback))) continue;
+      await this.notifyFeedbackConversation(app, item, recipientUid, {
+        ...AI_APPS_NOTIFICATION_MESSAGES.feedbackReply(
+          app.name,
+          text,
+          recipientUid === feedback.memberUid,
+          feedback.kind
+        ),
         trigger: AI_APPS_NOTIFICATION_TRIGGERS.FEEDBACK_REPLY,
       });
     }
     return (await this.withMember([comment]))[0];
+  }
+
+  /** A reply's new text. Its author only, while they can still read the item. */
+  async editFeedbackComment(
+    requesterUid: string,
+    appUid: string,
+    feedbackUid: string,
+    commentUid: string,
+    text: string
+  ): Promise<WithMember<FeedbackComment>> {
+    const { feedback } = await this.findFeedbackConversation(requesterUid, appUid, feedbackUid);
+    const comment = await this.prisma.aiAppFeedbackComment.findUnique({
+      where: { uid: commentUid },
+      select: { uid: true, memberUid: true, feedbackUid: true },
+    });
+    if (!comment || comment.feedbackUid !== feedback.uid) {
+      throw new NotFoundException(`Feedback reply not found: ${commentUid}`);
+    }
+    if (comment.memberUid !== requesterUid) {
+      throw new ForbiddenException('Only its author can edit a reply');
+    }
+    const updated = await this.prisma.aiAppFeedbackComment.update({
+      where: { uid: comment.uid },
+      data: { text, editedAt: new Date() },
+      select: COMMENT_PUBLIC_SELECT,
+    });
+    return (await this.withMember([updated]))[0];
+  }
+
+  /**
+   * A COMMENT's new note, by its author while they can still open the app. The
+   * item's text is rebuilt from it (keeping the screenshot) and the pin's note
+   * set to it in one transaction, so the two never disagree. FEEDBACK items
+   * can't be edited.
+   */
+  async editFeedbackNote(
+    requesterUid: string,
+    appUid: string,
+    feedbackUid: string,
+    note: string
+  ): Promise<WithMember<AiAppFeedback>> {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid: appUid } });
+    if (!app || app.status === 'DELETED') {
+      throw new NotFoundException(`AI App not found: ${appUid}`);
+    }
+    const feedback = await this.prisma.aiAppFeedback.findUnique({ where: { uid: feedbackUid } });
+    if (!feedback || feedback.appUid !== app.uid) {
+      throw new NotFoundException(`AI App feedback not found: ${feedbackUid}`);
+    }
+    if (feedback.memberUid !== requesterUid) {
+      throw new ForbiddenException('Only its author can edit a comment');
+    }
+    if (feedback.kind !== 'COMMENT') {
+      throw new ForbiddenException('Only comments can be edited');
+    }
+    await this.assertCanViewApp(requesterUid, app);
+    const text = DOMPurify.sanitize(rebuildCommentText(note, feedback.text));
+    const [updated] = await this.prisma.$transaction([
+      this.prisma.aiAppFeedback.update({ where: { uid: feedback.uid }, data: { text, editedAt: new Date() } }),
+      this.prisma.aiAppFeedbackPin.updateMany({ where: { feedbackUid: feedback.uid }, data: { note } }),
+    ]);
+    return (await this.withMember([updated]))[0];
+  }
+
+  /**
+   * Removes an item with its pins and replies (they cascade). Its author may;
+   * so may a directory admin (moderation). The app's creator may not delete
+   * other people's items.
+   */
+  async deleteFeedbackItem(requesterUid: string, appUid: string, feedbackUid: string): Promise<void> {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid: appUid } });
+    if (!app || app.status === 'DELETED') {
+      throw new NotFoundException(`AI App not found: ${appUid}`);
+    }
+    const feedback = await this.prisma.aiAppFeedback.findUnique({
+      where: { uid: feedbackUid },
+      select: { uid: true, appUid: true, memberUid: true },
+    });
+    if (!feedback || feedback.appUid !== app.uid) {
+      throw new NotFoundException(`AI App feedback not found: ${feedbackUid}`);
+    }
+    if (feedback.memberUid !== requesterUid && !(await this.isRequesterDirectoryAdmin(requesterUid))) {
+      throw new ForbiddenException('Only its author or a directory admin can delete it');
+    }
+    await this.prisma.aiAppFeedback.delete({ where: { uid: feedback.uid } });
   }
 
   /** Removes a reply. Its author may; so may a directory admin (moderation). */
@@ -2232,36 +2463,50 @@ export class AiAppsService {
     }
     const feedback = await this.prisma.aiAppFeedback.findUnique({
       where: { uid: feedbackUid },
-      select: { uid: true, appUid: true, memberUid: true, _count: { select: { pins: true } } },
+      select: { uid: true, appUid: true, memberUid: true, kind: true, _count: { select: { pins: true } } },
     });
     if (!feedback || feedback.appUid !== app.uid) {
       throw new NotFoundException(`AI App feedback not found: ${feedbackUid}`);
     }
-    const isParticipant =
-      feedback.memberUid === requesterUid ||
-      app.memberUid === requesterUid ||
-      (await this.isRequesterDirectoryAdmin(requesterUid));
-    if (!isParticipant) {
+    if (!(await this.canReadItem(requesterUid, app, feedback))) {
       throw new ForbiddenException(
-        'Only the app creator, a directory admin, or the member who left this feedback can see its replies'
+        feedback.kind === 'COMMENT'
+          ? 'This AI App is private'
+          : 'Only the app creator, a directory admin, or the member who left this feedback can see its replies'
       );
     }
     return { app, feedback };
   }
 
+  /**
+   * The read rule, checked on every request (and for every notification): a
+   * COMMENT by anyone who may open the app; FEEDBACK by its author, the app's
+   * creator and directory admins.
+   */
+  private async canReadItem(
+    memberUid: string,
+    app: Pick<AiApp, 'uid' | 'memberUid' | 'access'>,
+    item: Pick<FeedbackItemAccess, 'memberUid' | 'kind'>
+  ): Promise<boolean> {
+    if (item.kind === 'COMMENT') {
+      return this.canViewApp(memberUid, app);
+    }
+    return item.memberUid === memberUid || this.isCreatorOrDirectoryAdmin(memberUid, app);
+  }
+
   private async notifyFeedbackConversation(
     app: Pick<AiApp, 'uid' | 'name'>,
-    feedbackUid: string,
-    hasPins: boolean,
+    item: { uid: string; kind: AiAppFeedbackItemKind; hasPins: boolean },
     recipientUid: string,
     message: { title: string; description: string; trigger: string }
   ): Promise<void> {
     const { trigger, ...copy } = message;
+    const feedbackUid = item.uid;
     try {
       await this.pushNotifications.create({
         category: PushNotificationCategory.AI_APP,
         ...copy,
-        link: aiAppFeedbackPath(app.uid, feedbackUid, hasPins),
+        link: aiAppFeedbackPath(app.uid, feedbackUid, item.hasPins, item.kind),
         recipientUid,
         isPublic: false,
         metadata: { eventType: 'ai_app_feedback', appUid: app.uid, feedbackUid, trigger },

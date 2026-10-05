@@ -29,6 +29,7 @@ describe('AiAppsStarterKitService buildZip', () => {
       '.claude/skills/pln-member-context/SKILL.md',
       '.claude/skills/app-analytics/SKILL.md',
       '.claude/skills/db-migration/SKILL.md',
+      '.claude/skills/preview-testing-users/SKILL.md',
       'pln-app.config.json',
     ]) {
       expect(entries.has(path)).toBe(true);
@@ -141,7 +142,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('kit 1.15: deploys answer 202 and the agent polls statusEndpoint for the real outcome', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.15');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.16');
     const config = JSON.parse(entries.get('pln-app.config.json') as string);
     expect(config.statusEndpoint).toContain('/v1/ai-apps/{appUid}/deployments/{deploymentId}');
     expect(config.notes).toContain('poll statusEndpoint');
@@ -178,7 +179,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('kit 1.14: member context comes from same-origin /_pln/me, with the Bearer fallback for older gates', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.15');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.16');
     const skill = entries.get('.claude/skills/pln-member-context/SKILL.md') as string;
     expect(skill).toContain("fetch('/_pln/me', { credentials: 'same-origin' })");
     expect(skill).toContain('res.status === 404');
@@ -273,9 +274,9 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('kit 1.15: writes the feedback endpoint templates and teaches the feedback flow', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.15');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.16');
     const config = JSON.parse(entries.get('pln-app.config.json') as string);
-    expect(config.kitVersion).toBe('1.15');
+    expect(config.kitVersion).toBe('1.16');
     expect(config.feedbackEndpoint).toContain('/v1/ai-apps/{appUid}/agent/feedback');
     expect(config.feedbackStatusEndpoint).toContain('/v1/ai-apps/{appUid}/agent/feedback/{feedbackUid}');
 
@@ -291,6 +292,31 @@ describe('AiAppsStarterKitService buildZip', () => {
       expect(entries.get(path) as string).toContain('## Member feedback');
     }
     expect(entries.get('README.md') as string).toContain('.claude/skills/app-feedback/');
+  });
+
+  it('kit 1.16: teaches written feedback, replies and the closing note, and never public comments', () => {
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.16');
+    const skill = entries.get('.claude/skills/app-feedback/SKILL.md') as string;
+    expect(skill).toContain('`kind: "FEEDBACK"`');
+    expect(skill).toContain('"kind": "FEEDBACK"');
+    expect(skill).toContain('"comments": [');
+    expect(skill).toContain('"commentCount": 1');
+    expect(skill).toContain('`kind: "CLOSING_NOTE"`');
+    expect(skill).toContain('{"status":"IMPLEMENTED","note":');
+    expect(skill).toContain('A `note` is accepted only with `IMPLEMENTED` (a 422 otherwise)');
+    expect(skill).toContain('notifies the person who reported it');
+    expect(skill).toContain('**Never quote private data in a note**');
+    expect(skill).toContain('read `null` as "not\n  said", not as bug or P2');
+    expect(skill).toContain('A 404 on an\n  item means it was deleted');
+    for (const path of ['CLAUDE.md', 'AGENTS.md']) {
+      const instructions = entries.get(path) as string;
+      expect(instructions).toContain('closing `note`');
+      expect(instructions).toContain('never quote private data in a note');
+      expect(instructions).toContain('`data-labos-mask`');
+    }
+    for (const doc of [skill, entries.get('CLAUDE.md') as string, entries.get('AGENTS.md') as string]) {
+      expect(doc).not.toMatch(/COMMENT|public comment|pin comments|pinned|"pins"|`pins`/);
+    }
   });
 
   it('writes the log endpoint templates into the config and teaches the logs flow', () => {
@@ -491,7 +517,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('defaults apps to all PL Infra members and asks about private access before the first deploy (kit 1.13+)', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.15');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.16');
     const readme = entries.get('README.md') as string;
     expect(readme).toContain('New apps are open to **all PL Infra members**');
     expect(readme).toContain('**Manage access**');
@@ -510,8 +536,29 @@ describe('AiAppsStarterKitService buildZip', () => {
     expect(deploySkill).not.toContain('there is no deploy field for it');
   });
 
+  it('kit 1.16: ships a short Preview testing-users skill, listed in the kit README only', () => {
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.16');
+    const skill = entries.get('.claude/skills/preview-testing-users/SKILL.md') as string;
+    expect(skill).toContain('name: preview-testing-users');
+    expect(skill).toContain('Preview only');
+    expect(skill).toContain('Not Production');
+    expect(skill).toContain('24 hours');
+    expect(skill).toContain('x-app-token');
+    expect(skill).toContain('/v1/ai-apps/{appUid}/agent/testing-users');
+    expect(skill).toContain('/v1/ai-apps/{appUid}/agent/testing-users/sessions');
+    expect(skill).toContain('"testing": true');
+    expect(skill).toContain('__Host-pln_app_session=<token>');
+    expect(skill).toContain('authToken=<token>');
+    expect(skill).not.toContain('Production URL');
+    expect(skill.length).toBeLessThan(1800);
+    expect(entries.get('README.md') as string).toContain('.claude/skills/preview-testing-users/');
+    for (const path of ['CLAUDE.md', 'AGENTS.md']) {
+      expect(entries.get(path) as string).not.toContain('preview-testing-users');
+    }
+  });
+
   it('documents public endpoints and that the app must secure them (kit 1.13+)', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.15');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.16');
     const deploySkill = entries.get('.claude/skills/deploy-to-labs/SKILL.md') as string;
     expect(deploySkill).toContain('## Public endpoints (paths without LabOS sign-in)');
     expect(deploySkill).toContain(

@@ -89,6 +89,19 @@ describe('AiAppsService agent feedback', () => {
       });
     });
 
+    it('returns kind and priority on every row, null where they were never set', async () => {
+      const { service, prisma } = buildService();
+      prisma.aiAppFeedback.findMany.mockResolvedValue([
+        { ...ROWS[0], kind: 'FEEDBACK', reportKind: 'bug', priority: 'P1' },
+        { ...ROWS[1], kind: 'FEEDBACK', reportKind: null, priority: null },
+      ]);
+      const result = await service.listAgentFeedback('owner-1', 'app-1');
+      expect(result.map(({ kind, reportKind, priority }) => ({ kind, reportKind, priority }))).toEqual([
+        { kind: 'FEEDBACK', reportKind: 'bug', priority: 'P1' },
+        { kind: 'FEEDBACK', reportKind: null, priority: null },
+      ]);
+    });
+
     it('returns an empty list for an app without feedback', async () => {
       const { service, prisma } = buildService();
       prisma.aiAppFeedback.findMany.mockResolvedValue([]);
@@ -207,7 +220,7 @@ describe('AiAppsController feedback routes', () => {
     expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toEqual([AiAppTokenGuard]);
   });
 
-  it.each(['listFeedback', 'updateFeedbackStatus', 'listAccessibleFeedback'])(
+  it.each(['listFeedback', 'updateFeedbackStatus', 'listAccessibleFeedback', 'listMyFeedback'])(
     '%s: member route stays on member JWT + RBAC',
     (name) => {
       expect(Reflect.getMetadata(GUARDS_METADATA, proto[name])).toEqual([UserTokenCheckGuard, RbacGuard]);

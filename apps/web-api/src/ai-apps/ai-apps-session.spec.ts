@@ -6,7 +6,12 @@ jest.mock('./ai-apps.constants', () => ({
 import { BadRequestException } from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
 import { AiAppsSessionService, isAiAppSessionToken } from './ai-apps-session.service';
-import { AI_APPS_SESSION_IDLE_MS, AI_APPS_SESSION_TOUCH_MS, buildAppUrl } from './ai-apps.constants';
+import {
+  AI_APPS_SESSION_IDLE_MS,
+  AI_APPS_SESSION_TOUCH_MS,
+  AI_APPS_TESTING_SESSION_MAX_MS,
+  buildAppUrl,
+} from './ai-apps.constants';
 
 const claimsOf = (token: string) => JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
 
@@ -159,5 +164,50 @@ describe('AiAppsSessionService', () => {
   it('does not treat a LabOS token as an app session token', () => {
     expect(isAiAppSessionToken(jwt.sign({ iss: 'https://auth.os.pl.xyz', sub: 'x' }, 'k'))).toBe(false);
     expect(isAiAppSessionToken('not-a-jwt')).toBe(false);
+  });
+
+  it('mints a testing session that dies 24h after creation even when it is used, without reading a member', async () => {
+    const { service, prisma, sessions } = build();
+    jest.useFakeTimers('modern');
+    jest.setSystemTime(new Date('2026-10-04T00:00:00Z'));
+    const first = await service.openTestingSession('tu-1', 'foo');
+    const second = await service.openTestingSession('tu-1', 'foo');
+
+    expect(prisma.member.findUnique).not.toHaveBeenCalled();
+    expect(claimsOf(first.token)).toEqual(
+      expect.objectContaining({ iss: 'pln-ai-apps-session', aud: 'foo', uid: 'tu-1', email: null, testing: true })
+    );
+    expect(first.expiresAt.getTime() - Date.now()).toBe(AI_APPS_TESTING_SESSION_MAX_MS);
+    expect(sessions[0].idleExpiresAt).toEqual(sessions[0].expiresAt);
+
+    jest.setSystemTime(Date.now() + AI_APPS_TESTING_SESSION_MAX_MS - 1000);
+    const live = await service.validate('foo', first.token, { touch: false });
+    expect(live).toMatchObject({ memberUid: 'tu-1', testing: true });
+    expect(await service.validate('foo', second.token, { touch: false })).toMatchObject({ memberUid: 'tu-1' });
+
+    jest.setSystemTime(Date.now() + 1001);
+    expect(await service.validate('foo', first.token)).toBeNull();
+    expect(await service.isLiveTestingSessionForOtherApp(first.token, 'bar')).toBe(false);
+  });
+
+  it('treats a live testing token for another app as a hard deny, and a member token as not', async () => {
+    const { service } = build();
+    const { token } = await service.openTestingSession('tu-1', 'foo');
+    expect(await service.isLiveTestingSessionForOtherApp(token, 'bar')).toBe(true);
+    expect(await service.isLiveTestingSessionForOtherApp(token, 'foo')).toBe(false);
+    expect(await service.validate('bar', token)).toBeNull();
+
+    const member = await service.exchangeToken('m-1', 'foo');
+    expect(await service.isLiveTestingSessionForOtherApp(member.token, 'bar')).toBe(false);
+  });
+
+  it('records the first use of a testing session once', async () => {
+    const { service } = build();
+    const { token } = await service.openTestingSession('tu-1', 'foo');
+    const session = await service.validate('foo', token, { touch: false });
+    expect(session?.testing && session.sessionUid && session.createdAt).toBeTruthy();
+    if (!session?.sessionUid || !session.createdAt) return;
+    expect(await service.claimFirstUse(session.sessionUid, session.createdAt)).toBe(true);
+    expect(await service.claimFirstUse(session.sessionUid, session.createdAt)).toBe(false);
   });
 });

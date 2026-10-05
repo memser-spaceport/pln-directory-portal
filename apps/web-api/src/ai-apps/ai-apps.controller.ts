@@ -39,10 +39,11 @@ import { AiAppsService } from './ai-apps.service';
 import { AgentFeedbackDeniedInterceptor } from './agent-feedback-denied.interceptor';
 import { AiAppsAccessService } from './ai-apps-access.service';
 import { AiAppsConnectService } from './ai-apps-connect.service';
-import { AiAppsSessionService, isAiAppSessionToken } from './ai-apps-session.service';
+import { AiAppsSessionService, isAiAppSessionToken, isTestingSessionToken } from './ai-apps-session.service';
 import { AiAppsStarterKitService } from './ai-apps-starter-kit.service';
 import { AiAppTokenGuard } from './guards/ai-app-token.guard';
 import { AiAppMemberContextGuard } from './guards/ai-app-member-context.guard';
+import { AiAppMeRbacGuard } from './guards/ai-app-me-rbac.guard';
 import { DeployAppDto } from './dto/deploy-app.dto';
 import { RegisterDraftDto } from './dto/register-draft.dto';
 import { CreateAiAppDeployKeyDto, DeployDraftDto } from './dto/deploy-draft.dto';
@@ -56,7 +57,7 @@ import {
 import { AiAppsAuthGateService } from './ai-apps-auth-gate.service';
 import { PollConnectDto } from './dto/poll-connect.dto';
 import { SubmitFeedbackDto } from './dto/submit-feedback.dto';
-import { CreateFeedbackCommentDto } from './dto/feedback-comment.dto';
+import { CreateFeedbackCommentDto, EditFeedbackCommentDto, EditFeedbackNoteDto } from './dto/feedback-comment.dto';
 import { AgentUpdateFeedbackStatusDto, UpdateFeedbackStatusDto } from './dto/update-feedback-status.dto';
 import { UpdateAppMetadataDto } from './dto/update-app-metadata.dto';
 import { TrackEventDto } from './dto/track-event.dto';
@@ -78,6 +79,21 @@ import {
 import { AI_APPS_MAX_TAGS_PER_APP, AI_APPS_TAGS } from './ai-apps-tags';
 
 const READ = { anyOf: [AI_APPS_PERMISSIONS.READ, AI_APPS_PERMISSIONS.WRITE] };
+
+/** Member-context body for a testing user: the real shape, plus `testing: true`. Real members omit the flag. */
+export function testingUserMemberContext(user: { uid: string; name: string }) {
+  return {
+    testing: true as const,
+    member: {
+      uid: user.uid,
+      name: user.name,
+      image: null,
+      location: null,
+      skills: [] as string[],
+      teams: [] as { uid: string; name: string; role: string | null; mainTeam: boolean; teamLead: boolean }[],
+    },
+  };
+}
 const WRITE = { anyOf: [AI_APPS_PERMISSIONS.WRITE] };
 
 @ApiTags('AI Apps')
@@ -278,6 +294,16 @@ export class AiAppsController {
     return this.aiAppsService.listAccessibleFeedback(memberUid);
   }
 
+  /** Only the caller's own feedback and comments, on any app, newest first. Read-only. */
+  @NoCache()
+  @Get('feedback/mine')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async listMyFeedback(@Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.listMyFeedback(memberUid);
+  }
+
   /**
    * Identity of the signed-in member ("member context"), consumed by deployed
    * AI apps for personalization. Unlike the other dashboard reads, the guard
@@ -290,9 +316,12 @@ export class AiAppsController {
   @NoCache()
   @Throttle(AI_APPS_SIDECAR_THROTTLE_LIMIT, AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS)
   @Get('me')
-  @UseGuards(AiAppMemberContextGuard, RbacGuard)
+  @UseGuards(AiAppMemberContextGuard, AiAppMeRbacGuard)
   @RequirePermissions(READ)
   async getMemberContext(@Req() req: any) {
+    if (req.aiAppTestingUser) {
+      return testingUserMemberContext(req.aiAppTestingUser);
+    }
     const memberUid = await this.resolveMemberUid(req);
     return this.aiAppsService.getMemberContext(memberUid);
   }
@@ -320,6 +349,7 @@ export class AiAppsController {
       origin: req.headers.origin,
       token: isAiAppSessionToken(token) ? undefined : token,
       sessionMemberUid: session?.memberUid,
+      testingAppId: session?.testing ? session.appId : undefined,
       anonId: body.anonId,
       event: body.event,
       properties: body.properties as Record<string, unknown> | undefined,
@@ -350,8 +380,16 @@ export class AiAppsController {
     }
     const appSession = req.headers?.[AI_APP_SESSION_HEADER];
     if (typeof appSession === 'string' && appSession) {
-      const session = await this.sessionService.validate(query.appId, appSession);
+      // A testing session's first-use claim matches lastUsedAt to createdAt, so don't slide it before that.
+      const session = await this.sessionService.validate(
+        query.appId,
+        appSession,
+        isTestingSessionToken(appSession) ? { touch: false } : undefined
+      );
       if (!session) {
+        if (await this.sessionService.isLiveTestingSessionForOtherApp(appSession, query.appId)) {
+          throw new ForbiddenException({ allowed: false, reason: 'private' });
+        }
         throw new UnauthorizedException('Invalid or expired app session');
       }
       return this.accessService.checkAccess(
@@ -359,7 +397,10 @@ export class AiAppsController {
         query.appId,
         query.method,
         { app },
-        query.target ?? 'prod'
+        query.target ?? 'prod',
+        session.testing && session.sessionUid && session.createdAt
+          ? { sessionUid: session.sessionUid, createdAt: session.createdAt }
+          : undefined
       );
     }
     await validateUserAccessToken(req);
@@ -744,7 +785,13 @@ export class AiAppsController {
   @UsePipes(ZodValidationPipe)
   async submitFeedback(@Param('uid') uid: string, @Body() body: SubmitFeedbackDto, @Req() req: any) {
     const memberUid = await this.resolveMemberUid(req);
-    return this.aiAppsService.submitFeedback(memberUid, uid, body.text, { pins: body.pins, context: body.context });
+    return this.aiAppsService.submitFeedback(memberUid, uid, body.text, {
+      pins: body.pins,
+      context: body.context,
+      kind: body.kind,
+      reportKind: body.reportKind,
+      priority: body.priority,
+    });
   }
 
   /**
@@ -858,6 +905,57 @@ export class AiAppsController {
   ): Promise<void> {
     const memberUid = await this.resolveMemberUid(req);
     await this.aiAppsService.deleteFeedbackComment(memberUid, uid, feedbackUid, commentUid);
+  }
+
+  /** Edit a reply's text: its author only (checked in the service). */
+  @NoCache()
+  @Patch(':uid/feedback/:feedbackUid/comments/:commentUid')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  @UsePipes(ZodValidationPipe)
+  async editFeedbackComment(
+    @Param('uid') uid: string,
+    @Param('feedbackUid') feedbackUid: string,
+    @Param('commentUid') commentUid: string,
+    @Body() body: EditFeedbackCommentDto,
+    @Req() req: any
+  ) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.editFeedbackComment(memberUid, uid, feedbackUid, commentUid, body.text);
+  }
+
+  /**
+   * Edit a COMMENT's note: its author only. Distinct from the status PATCH on
+   * `:uid/feedback/:feedbackUid` — different body, different permission.
+   */
+  @NoCache()
+  @Patch(':uid/feedback/:feedbackUid/note')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  @UsePipes(ZodValidationPipe)
+  async editFeedbackNote(
+    @Param('uid') uid: string,
+    @Param('feedbackUid') feedbackUid: string,
+    @Body() body: EditFeedbackNoteDto,
+    @Req() req: any
+  ) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.editFeedbackNote(memberUid, uid, feedbackUid, body.note);
+  }
+
+  /** Delete an item with its pins and replies: its author, or a directory admin. */
+  @NoCache()
+  @Delete(':uid/feedback/:feedbackUid')
+  @HttpCode(204)
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async deleteFeedbackItem(
+    @Param('uid') uid: string,
+    @Param('feedbackUid') feedbackUid: string,
+    @Req() req: any
+  ): Promise<void> {
+    const memberUid = await this.resolveMemberUid(req);
+    await this.aiAppsService.deleteFeedbackItem(memberUid, uid, feedbackUid);
   }
 
   /**

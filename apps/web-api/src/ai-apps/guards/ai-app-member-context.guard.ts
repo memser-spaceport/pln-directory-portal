@@ -1,7 +1,9 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { validateUserAccessToken } from '../../guards/user-access-token-validate.guard';
 import { extractTokenFromRequest } from '../../utils/auth';
 import { AiAppsSessionService, isAiAppSessionToken } from '../ai-apps-session.service';
+import { AiAppsTestingUsersService } from '../ai-apps-testing-users.service';
+import { buildAppUrl } from '../ai-apps.constants';
 
 /**
  * Identity for the app-facing member-context route. An app session token (what deployed apps hold once their auth
@@ -10,15 +12,31 @@ import { AiAppsSessionService, isAiAppSessionToken } from '../ai-apps-session.se
  */
 @Injectable()
 export class AiAppMemberContextGuard implements CanActivate {
-  constructor(private readonly sessionService: AiAppsSessionService) {}
+  constructor(
+    private readonly sessionService: AiAppsSessionService,
+    private readonly testingUsersService: AiAppsTestingUsersService
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest();
     const token = extractTokenFromRequest(req);
     if (isAiAppSessionToken(token)) {
-      const session = await this.sessionService.authenticateAppRequest(token as string, req.headers?.origin);
+      const origin = req.headers?.origin as string | undefined;
+      const session = await this.sessionService.authenticateAppRequest(token as string, origin);
       if (!session) {
         throw new UnauthorizedException('Invalid or expired app session');
+      }
+      if (session.testing) {
+        if (origin && origin !== buildAppUrl(session.appId, 'preview')) {
+          throw new ForbiddenException('Testing sessions are only valid on Preview');
+        }
+        const live = await this.testingUsersService.findLiveForAppId(session.memberUid, session.appId);
+        if (!live) {
+          throw new UnauthorizedException('Invalid or expired app session');
+        }
+        req.memberUid = live.uid;
+        req.aiAppTestingUser = { uid: live.uid, name: live.name };
+        return true;
       }
       req.memberUid = session.memberUid;
       return true;
