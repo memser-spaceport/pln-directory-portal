@@ -222,3 +222,45 @@ export const TeamInterestStatusSchema = z.object({
 });
 
 export type TeamInterestStatus = z.infer<typeof TeamInterestStatusSchema>;
+
+/** Match labels for a suggested candidate. Weaker matches are never returned. */
+export const SuggestedCandidateLabelSchema = z.enum(['STRONG_MATCH', 'GOOD_MATCH']);
+
+export type SuggestedCandidateLabel = z.infer<typeof SuggestedCandidateLabelSchema>;
+
+export const SuggestedCandidateCriterionSchema = z.object({
+  criterion: z.string(),
+  matched: z.boolean(),
+});
+
+export const SuggestedCandidateSchema = z.object({
+  rank: z.number().int().min(1),
+  label: SuggestedCandidateLabelSchema,
+  /** Share of the role's criteria the member matched, 0..1. */
+  score: z.number().min(0).max(1),
+  member: z.object({
+    uid: z.string(),
+    name: z.string(),
+    imageUrl: z.string().nullable(),
+    role: z.string().nullable(),
+    profileUrl: z.string(),
+  }),
+  /** The role's criteria in order, each marked matched or not for this member. */
+  criteria: z.array(SuggestedCandidateCriterionSchema),
+});
+
+export type SuggestedCandidate = z.infer<typeof SuggestedCandidateSchema>;
+
+/**
+ * At most five suggested members for one live role, best match first. Not a
+ * paged list: the cap is the product rule, so there is no page or limit.
+ * Empty for a role that is not live or has not been computed yet.
+ */
+export const SuggestedCandidatesResponseSchema = z.object({
+  jobUid: z.string(),
+  criteria: z.array(z.string()),
+  computedAt: z.string().nullable(),
+  items: z.array(SuggestedCandidateSchema),
+});
+
+export type SuggestedCandidatesResponse = z.infer<typeof SuggestedCandidatesResponseSchema>;

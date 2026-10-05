@@ -1,9 +1,17 @@
 // The @ai-sdk/* packages ship untranspiled ESM this jest config can't parse;
 // resolution logic under test never reaches them.
 jest.mock('@ai-sdk/openai', () => ({
-  openai: Object.assign(jest.fn(), { responses: jest.fn(), tools: { webSearchPreview: jest.fn(() => ({})) } }),
+  openai: Object.assign(jest.fn(), {
+    responses: jest.fn(),
+    textEmbeddingModel: jest.fn((id: string) => ({ embeddingModel: `openai:${id}` })),
+    tools: { webSearchPreview: jest.fn(() => ({})) },
+  }),
 }));
-jest.mock('@ai-sdk/google', () => ({ google: jest.fn() }));
+jest.mock('@ai-sdk/google', () => ({
+  google: Object.assign(jest.fn(), {
+    textEmbeddingModel: jest.fn((id: string) => ({ embeddingModel: `google:${id}` })),
+  }),
+}));
 jest.mock('@ai-sdk/anthropic', () => ({ anthropic: jest.fn(), createAnthropic: jest.fn() }));
 
 import { createAnthropic } from '@ai-sdk/anthropic';
@@ -152,4 +160,33 @@ describe('AiProviderService provider resolution', () => {
     process.env[FEATURE_VAR] = 'gemini';
     expect(service.getWebSearchTool(FEATURE_VAR, { fallbackProvider: 'openai' })).toEqual({});
   });
+});
+
+describe('AiProviderService embedding model', () => {
+  const ORIGINAL_ENV = process.env;
+
+  beforeEach(() => {
+    process.env = { ...ORIGINAL_ENV };
+  });
+
+  afterAll(() => {
+    process.env = ORIGINAL_ENV;
+  });
+
+  it('embeds with OpenAI when the provider is openai', () => {
+    process.env.AI_PROVIDER = 'openai';
+    const { model, name } = new AiProviderService().getEmbeddingModel();
+    expect(name).toBe('openai/text-embedding-3-small');
+    expect(model).toEqual({ embeddingModel: 'openai:text-embedding-3-small' });
+  });
+
+  it.each(['gemini', 'anthropic'])(
+    'embeds with Gemini when the provider is %s (Anthropic has no embedding API)',
+    (provider) => {
+      process.env.AI_PROVIDER = provider;
+      const { model, name } = new AiProviderService().getEmbeddingModel();
+      expect(name).toBe('gemini/text-embedding-004');
+      expect(model).toEqual({ embeddingModel: 'google:text-embedding-004' });
+    }
+  );
 });

@@ -19,6 +19,7 @@ import { JobOpeningsQueryService } from './job-openings-query.service';
 import { JobOpeningsReferralService } from './job-openings-referral.service';
 import { JobOpeningsSavedService } from './job-openings-saved.service';
 import { JobOpeningsSignUpService } from './job-openings-sign-up.service';
+import { JobOpeningsSuggestedCandidatesService } from './job-openings-suggested-candidates.service';
 
 const server = initNestServer(apiJobOpenings);
 
@@ -31,7 +32,8 @@ export class JobOpeningsController {
     private readonly jobOpeningsSignUpService: JobOpeningsSignUpService,
     private readonly jobOpeningsInterestService: JobOpeningsInterestService,
     private readonly jobOpeningsSavedService: JobOpeningsSavedService,
-    private readonly jobOpeningsForYouService: JobOpeningsForYouService
+    private readonly jobOpeningsForYouService: JobOpeningsForYouService,
+    private readonly jobOpeningsSuggestedCandidatesService: JobOpeningsSuggestedCandidatesService
   ) {}
 
   @Api(server.route.getJobs)
@@ -115,6 +117,13 @@ export class JobOpeningsController {
   @NoCache()
   async getMySavedJobs(@Req() request: Request & { userEmail?: string }) {
     return this.jobOpeningsSavedService.listMine(request.userEmail);
+  }
+
+  @Api(server.route.getSuggestedCandidates)
+  @UseGuards(UserAuthValidateGuard)
+  @NoCache()
+  async getSuggestedCandidates(@Req() request: Request & { userEmail?: string }) {
+    return this.jobOpeningsSuggestedCandidatesService.listForRole(request.params.uid, request.userEmail);
   }
 
   @Api(server.route.getJob)

@@ -10,6 +10,7 @@ jest.mock('./job-openings-sign-up.service', () => ({ JobOpeningsSignUpService: c
 jest.mock('./job-openings-interest.service', () => ({ JobOpeningsInterestService: class {} }));
 jest.mock('./job-openings-saved.service', () => ({ JobOpeningsSavedService: class {} }));
 jest.mock('./job-openings-for-you.service', () => ({ JobOpeningsForYouService: class {} }));
+jest.mock('./job-openings-suggested-candidates.service', () => ({ JobOpeningsSuggestedCandidatesService: class {} }));
 
 import { RequestMethod } from '@nestjs/common';
 import { GUARDS_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
@@ -36,6 +37,7 @@ describe('saved jobs routes', () => {
       {} as never,
       {} as never,
       saved as unknown as JobOpeningsSavedService,
+      {} as never,
       {} as never
     );
   });

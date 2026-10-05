@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { LanguageModel } from 'ai';
+import { EmbeddingModel, LanguageModel } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { google } from '@ai-sdk/google';
 import { anthropic, createAnthropic, AnthropicProvider } from '@ai-sdk/anthropic';
@@ -9,6 +9,9 @@ import { anthropicAuth } from './anthropic-auth';
 export type AiProviderType = 'openai' | 'gemini' | 'anthropic';
 
 const VALID_PROVIDERS: ReadonlySet<AiProviderType> = new Set(['openai', 'gemini', 'anthropic']);
+
+const OPENAI_EMBEDDING_MODEL = 'text-embedding-3-small';
+const GEMINI_EMBEDDING_MODEL = 'text-embedding-004';
 
 type OpusThinkingBlock =
   | { type: 'thinking'; thinking: string; signature: string }
@@ -380,6 +383,22 @@ export class AiProviderService {
         ...(options?.userLocation && { userLocation: options.userLocation }),
       }),
     };
+  }
+
+  /**
+   * Returns a text embedding model on the already-configured keys.
+   *
+   * OpenAI and Gemini embed with their own models. Anthropic has no embedding
+   * API, so an `anthropic` provider embeds with Gemini (GOOGLE_GENERATIVE_AI_API_KEY).
+   * `name` identifies the model, so stored vectors from another model are not
+   * compared with new ones.
+   */
+  getEmbeddingModel(featureProviderEnvVar?: string): { model: EmbeddingModel<string>; name: string } {
+    const provider = this.resolveProvider(featureProviderEnvVar);
+    if (provider === 'openai') {
+      return { model: openai.textEmbeddingModel(OPENAI_EMBEDDING_MODEL), name: `openai/${OPENAI_EMBEDDING_MODEL}` };
+    }
+    return { model: google.textEmbeddingModel(GEMINI_EMBEDDING_MODEL), name: `gemini/${GEMINI_EMBEDDING_MODEL}` };
   }
 
   /**

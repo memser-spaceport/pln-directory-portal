@@ -10,6 +10,9 @@ import { JobOpeningsApplicationService } from './job-openings-application.servic
 import { JobOpeningsInterestService } from './job-openings-interest.service';
 import { JobOpeningsSavedService } from './job-openings-saved.service';
 import { JobOpeningsSignUpService } from './job-openings-sign-up.service';
+import { JobOpeningsSuggestedCandidatesService } from './job-openings-suggested-candidates.service';
+import { JobOpeningsSuggestedCandidatesComputeService } from './job-openings-suggested-candidates-compute.service';
+import { JobOpeningsSuggestedCandidatesJob } from './job-openings-suggested-candidates.job';
 import { SharedModule } from '../shared/shared.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { MembersModule } from '../members/members.module';
@@ -18,12 +21,7 @@ import { JobOpeningsIntegrationController } from './job-openings-integration.con
 import { JobOpeningsIntegrationService } from './job-openings-integration.service';
 
 @Module({
-  imports: [
-    SharedModule,
-    NotificationsModule,
-    forwardRef(() => MembersModule),
-    IntegrationKeysModule,
-  ],
+  imports: [SharedModule, NotificationsModule, forwardRef(() => MembersModule), IntegrationKeysModule],
   controllers: [JobOpeningsController, JobOpeningsServiceController, JobOpeningsIntegrationController],
   providers: [
     JobOpeningsQueryService,
@@ -36,6 +34,9 @@ import { JobOpeningsIntegrationService } from './job-openings-integration.servic
     JobOpeningsSignUpService,
     JobOpeningsInterestService,
     JobOpeningsSavedService,
+    JobOpeningsSuggestedCandidatesService,
+    JobOpeningsSuggestedCandidatesComputeService,
+    JobOpeningsSuggestedCandidatesJob,
   ],
   exports: [JobOpeningsQueryService, JobOpeningsService, JobOpeningsEnrichmentService],
 })

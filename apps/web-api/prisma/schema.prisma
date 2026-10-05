@@ -286,6 +286,8 @@ model Member {
   savedJobOpenings          SavedJobOpening[]
   teamInterests             TeamInterest[]
   jobCandidateViews         JobCandidateView[]
+  matchEmbedding            MemberMatchEmbedding?
+  suggestedForJobOpenings   JobOpeningSuggestedCandidate[]
   integrationKeysCreated    IntegrationKey[]        @relation("IntegrationKeyCreatedBy")
   roadmapItemsCreated       RoadmapItem[]           @relation("roadmapItemCreatedBy")
   roadmapItemsPromoted      RoadmapItem[]           @relation("roadmapItemPromotedBy")
@@ -2465,6 +2467,8 @@ model JobOpening {
   applications    JobApplication[]
   interests       JobOpeningInterest[]
   savedBy         SavedJobOpening[]
+  candidateSuggestionSet JobOpeningCandidateSuggestionSet?
+  suggestedCandidates    JobOpeningSuggestedCandidate[]
 
   @@index([status])
   @@index([companyName])
@@ -2647,6 +2651,60 @@ model JobCandidateView {
 
   @@unique([memberUid, kind, rowUid])
   @@index([rowUid])
+  @@index([memberUid])
+}
+
+/// A member's profile text as an embedding vector, for matching members to job
+/// openings (suggested candidates). `contentHash` is the hash of the text that
+/// was embedded, so a refresh only re-embeds members whose profile changed.
+/// Stored as a plain float array: the database has no vector extension, and
+/// similarity is computed in the API over the eligible pool.
+model MemberMatchEmbedding {
+  id          Int      @id @default(autoincrement())
+  memberUid   String   @unique
+  member      Member   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  model       String
+  contentHash String
+  vector      Float[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+/// The criteria and computation stamp for one job opening's suggested
+/// candidates. One row per opening; replaced on every recompute.
+model JobOpeningCandidateSuggestionSet {
+  id            Int        @id @default(autoincrement())
+  jobOpeningUid String     @unique
+  jobOpening    JobOpening @relation(fields: [jobOpeningUid], references: [uid], onDelete: Cascade)
+  /// 4-6 short checkable statements generated from the role's text.
+  criteria      String[]
+  /// Hash of the role text the criteria came from; a change triggers a recompute.
+  sourceHash    String
+  computedAt    DateTime
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+/// One suggested member for a job opening, best match first by `rank`.
+model JobOpeningSuggestedCandidate {
+  id              Int        @id @default(autoincrement())
+  uid             String     @unique @default(cuid())
+  jobOpeningUid   String
+  jobOpening      JobOpening @relation(fields: [jobOpeningUid], references: [uid], onDelete: Cascade)
+  memberUid       String
+  member          Member     @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  /// 1-based position, 1 = best match.
+  rank            Int
+  /// Share of the role's criteria the member matched, 0..1.
+  score           Float
+  /// STRONG_MATCH or GOOD_MATCH; weaker matches are never stored.
+  label           String
+  /// [{ criterion, matched }] in the role's criteria order.
+  criteriaResults Json
+  createdAt       DateTime   @default(now())
+
+  @@unique([jobOpeningUid, memberUid])
+  @@index([jobOpeningUid, rank])
   @@index([memberUid])
 }
 

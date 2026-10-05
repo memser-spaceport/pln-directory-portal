@@ -13,6 +13,7 @@ import {
   MarkTeamInterestSchema,
   SavedJobsListResponseSchema,
   SavedJobStatusSchema,
+  SuggestedCandidatesResponseSchema,
   TeamInterestStatusSchema,
 } from '../schema/job-opening';
 import {
@@ -179,6 +180,15 @@ export const apiJobOpenings = contract.router({
       200: SavedJobStatusSchema,
     },
     summary: "Remove the current member's save of a job opening (idempotent)",
+  },
+  getSuggestedCandidates: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/job-openings/:uid/suggested-candidates`,
+    pathParams: z.object({ uid: z.string() }),
+    responses: {
+      200: SuggestedCandidatesResponseSchema,
+    },
+    summary: "Top suggested members for a live role; the hiring team's members and Directory admins only",
   },
   getJob: {
     method: 'GET',
