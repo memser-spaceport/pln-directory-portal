@@ -9,7 +9,7 @@ jest.mock('./job-openings-query.service', () => ({
   ],
 }));
 
-import { JobOpeningStatus } from '@prisma/client';
+import { JobOpeningStatus, Prisma } from '@prisma/client';
 import { embed, embedMany, generateObject } from 'ai';
 import type { AiProviderService } from '../shared/ai-provider.service';
 import { PrismaService } from '../shared/prisma.service';
@@ -69,13 +69,20 @@ describe('JobOpeningsSuggestedCandidatesComputeService', () => {
   const candidateDeleteMany = jest.fn((args) => ({ op: 'candidate.deleteMany', args }));
   const candidateCreateMany = jest.fn((args) => ({ op: 'candidate.createMany', args }));
   const setDeleteMany = jest.fn((args) => ({ op: 'set.deleteMany', args }));
+  const setUpdateMany = jest.fn();
+  const setCreate = jest.fn();
   const embeddingUpsert = jest.fn((args) => ({ op: 'embedding.upsert', args }));
   const transaction = jest.fn();
 
   const prismaMock = {
     member: { findMany: memberFindMany },
     jobOpening: { findMany: jobOpeningFindMany },
-    jobOpeningCandidateSuggestionSet: { upsert: setUpsert, deleteMany: setDeleteMany },
+    jobOpeningCandidateSuggestionSet: {
+      upsert: setUpsert,
+      deleteMany: setDeleteMany,
+      updateMany: setUpdateMany,
+      create: setCreate,
+    },
     jobOpeningSuggestedCandidate: { deleteMany: candidateDeleteMany, createMany: candidateCreateMany },
     memberMatchEmbedding: { upsert: embeddingUpsert },
     $transaction: transaction,
@@ -100,6 +107,8 @@ describe('JobOpeningsSuggestedCandidatesComputeService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     transaction.mockImplementation(async (ops) => ops.map(() => ({ count: 0 })));
+    setUpdateMany.mockResolvedValue({ count: 1 });
+    setCreate.mockResolvedValue({});
     embedMock.mockResolvedValue({ embedding: [1, 0] });
     embedManyMock.mockImplementation(async ({ values }) => ({ embeddings: values.map(() => [0.5, 0.5]) }));
     checkAnswers = {};
@@ -237,6 +246,31 @@ describe('JobOpeningsSuggestedCandidatesComputeService', () => {
       );
       expect(setUpsert).toHaveBeenCalledTimes(1);
       expect(setUpsert.mock.calls[0][0].where).toEqual({ jobOpeningUid: 'new' });
+    });
+
+    it('skips a role another instance already claimed', async () => {
+      const now = new Date('2026-10-05T12:00:00Z');
+      const stamp = new Date('2026-10-04T10:00:00Z');
+      const stale = role({
+        uid: 'stale',
+        candidateSuggestionSet: { criteria: CRITERIA, sourceHash: 'x', computedAt: stamp },
+      });
+      jobOpeningFindMany.mockResolvedValue([stale, role({ uid: 'new' })]);
+      memberFindMany.mockResolvedValue([member({ uid: 'm1', vector: [] })]);
+      setUpdateMany.mockResolvedValue({ count: 0 });
+      setCreate.mockRejectedValue(new Prisma.PrismaClientKnownRequestError('dup', 'P2002', '4.4.0'));
+
+      const summary = await service.refreshDue(now);
+
+      expect(setUpdateMany).toHaveBeenCalledWith({
+        where: { jobOpeningUid: 'stale', computedAt: stamp },
+        data: { computedAt: now, sourceHash: '' },
+      });
+      expect(setCreate).toHaveBeenCalledWith({
+        data: { jobOpeningUid: 'new', criteria: [], sourceHash: '', computedAt: now },
+      });
+      expect(summary).toMatchObject({ roles: 2, computed: 0, skipped: 2, failed: 0 });
+      expect(setUpsert).not.toHaveBeenCalled();
     });
 
     it('keeps going when one role fails', async () => {

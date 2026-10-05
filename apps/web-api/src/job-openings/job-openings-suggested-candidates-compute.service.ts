@@ -130,6 +130,10 @@ export class JobOpeningsSuggestedCandidatesComputeService {
 
     for (const role of due) {
       try {
+        if (!(await this.claimRole(role, now))) {
+          summary.skipped += 1;
+          continue;
+        }
         await this.computeForRole(role, pool, now);
         summary.computed += 1;
       } catch (error) {
@@ -138,6 +142,33 @@ export class JobOpeningsSuggestedCandidatesComputeService {
       }
     }
     return summary;
+  }
+
+  /**
+   * Claims a due role so that only one API instance computes it: an
+   * optimistic update on the stamp this run read (or a placeholder insert for
+   * a role never computed). Losing the race means another instance has it.
+   * The claim blanks `sourceHash`, so a compute that then fails is due again
+   * on the next run instead of a day later.
+   */
+  async claimRole(role: LiveRole, now: Date): Promise<boolean> {
+    const set = role.candidateSuggestionSet;
+    if (set) {
+      const { count } = await this.prisma.jobOpeningCandidateSuggestionSet.updateMany({
+        where: { jobOpeningUid: role.uid, computedAt: set.computedAt },
+        data: { computedAt: now, sourceHash: '' },
+      });
+      return count === 1;
+    }
+    try {
+      await this.prisma.jobOpeningCandidateSuggestionSet.create({
+        data: { jobOpeningUid: role.uid, criteria: [], sourceHash: '', computedAt: now },
+      });
+      return true;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return false;
+      throw error;
+    }
   }
 
   /** One role: criteria, similarity shortlist, criteria check, stored top matches. */

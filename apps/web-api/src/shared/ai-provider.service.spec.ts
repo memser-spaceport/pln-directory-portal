@@ -9,7 +9,9 @@ jest.mock('@ai-sdk/openai', () => ({
 }));
 jest.mock('@ai-sdk/google', () => ({
   google: Object.assign(jest.fn(), {
-    textEmbeddingModel: jest.fn((id: string) => ({ embeddingModel: `google:${id}` })),
+    textEmbeddingModel: jest.fn((id: string, settings?: { outputDimensionality?: number }) => ({
+      embeddingModel: `google:${id}:${settings?.outputDimensionality}`,
+    })),
   }),
 }));
 jest.mock('@ai-sdk/anthropic', () => ({ anthropic: jest.fn(), createAnthropic: jest.fn() }));
@@ -185,8 +187,8 @@ describe('AiProviderService embedding model', () => {
     (provider) => {
       process.env.AI_PROVIDER = provider;
       const { model, name } = new AiProviderService().getEmbeddingModel();
-      expect(name).toBe('gemini/text-embedding-004');
-      expect(model).toEqual({ embeddingModel: 'google:text-embedding-004' });
+      expect(name).toBe('gemini/gemini-embedding-001@768');
+      expect(model).toEqual({ embeddingModel: 'google:gemini-embedding-001:768' });
     }
   );
 });

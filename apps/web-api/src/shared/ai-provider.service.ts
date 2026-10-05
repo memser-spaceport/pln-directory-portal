@@ -11,7 +11,9 @@ export type AiProviderType = 'openai' | 'gemini' | 'anthropic';
 const VALID_PROVIDERS: ReadonlySet<AiProviderType> = new Set(['openai', 'gemini', 'anthropic']);
 
 const OPENAI_EMBEDDING_MODEL = 'text-embedding-3-small';
-const GEMINI_EMBEDDING_MODEL = 'text-embedding-004';
+const GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
+/** gemini-embedding-001 defaults to 3072 dimensions; 768 keeps stored vectors small. */
+const GEMINI_EMBEDDING_DIMENSIONS = 768;
 
 type OpusThinkingBlock =
   | { type: 'thinking'; thinking: string; signature: string }
@@ -398,7 +400,10 @@ export class AiProviderService {
     if (provider === 'openai') {
       return { model: openai.textEmbeddingModel(OPENAI_EMBEDDING_MODEL), name: `openai/${OPENAI_EMBEDDING_MODEL}` };
     }
-    return { model: google.textEmbeddingModel(GEMINI_EMBEDDING_MODEL), name: `gemini/${GEMINI_EMBEDDING_MODEL}` };
+    return {
+      model: google.textEmbeddingModel(GEMINI_EMBEDDING_MODEL, { outputDimensionality: GEMINI_EMBEDDING_DIMENSIONS }),
+      name: `gemini/${GEMINI_EMBEDDING_MODEL}@${GEMINI_EMBEDDING_DIMENSIONS}`,
+    };
   }
 
   /**
