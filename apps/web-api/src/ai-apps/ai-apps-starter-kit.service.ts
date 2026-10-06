@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import AdmZip from 'adm-zip';
+import { createHash } from 'crypto';
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import { join } from 'path';
 import {
@@ -16,6 +17,8 @@ import {
   AI_APPS_DRAFT_ENDPOINT,
   AI_APPS_FEEDBACK_ENDPOINT,
   AI_APPS_FEEDBACK_STATUS_ENDPOINT,
+  AI_APPS_KIT_UPDATE_ENDPOINT,
+  AI_APPS_KIT_VERSION_ENDPOINT,
   AI_APPS_ME_ENDPOINT,
   AI_APPS_METADATA_ENDPOINT,
   AI_APPS_RUNTIME_LOGS_ENDPOINT,
@@ -30,6 +33,22 @@ import { AI_APPS_MAX_PUBLIC_PATHS } from './ai-apps-public-paths';
 /** Curated PL Design System folder, shipped as files inside the starter kit. */
 const DESIGN_SYSTEM_DIR = 'pl-design-system';
 
+const KIT_CONFIG_PATH = 'pln-app.config.json';
+export const KIT_MANIFEST_PATH = '.pln-kit/manifest.json';
+
+/** The `app/` scaffold is a starting point the member then owns; kit updates never ship it. */
+const isMemberAppPath = (path: string) => path.startsWith('app/');
+
+interface KitFile {
+  path: string;
+  data: Buffer;
+}
+
+export interface KitManifest {
+  kitVersion: string;
+  files: Record<string, string>;
+}
+
 /**
  * Builds the "AI Apps" starter kit ZIP a member downloads and unpacks into their
  * AI coding tool (Claude Code, Cursor, …). It carries deploy instructions for the
@@ -42,9 +61,44 @@ const DESIGN_SYSTEM_DIR = 'pl-design-system';
 export class AiAppsStarterKitService {
   private readonly logger = new Logger(AiAppsStarterKitService.name);
 
+  /** The full kit a member downloads from LabOS: every kit file, the `app/` scaffold, and the manifest. */
   buildZip(): Buffer {
+    return this.pack(this.kitFiles());
+  }
+
+  /**
+   * The kit-update bundle an agent downloads into an existing project: the same
+   * files as {@link buildZip} minus the `app/` scaffold, which is member code.
+   */
+  buildUpdateZip(): Buffer {
+    return this.pack(this.kitFiles().filter((file) => !isMemberAppPath(file.path)));
+  }
+
+  /**
+   * `.pln-kit/manifest.json`: SHA-256 of every kit-managed file, so an agent can
+   * tell which kit files the member edited before an update overwrites them.
+   * `app/` and `pln-app.config.json` belong to the member and are not listed.
+   */
+  buildManifest(files: KitFile[] = this.kitFiles()): KitManifest {
+    const hashes: Record<string, string> = {};
+    for (const file of files) {
+      if (isMemberAppPath(file.path) || file.path === KIT_CONFIG_PATH) continue;
+      hashes[file.path] = createHash('sha256').update(file.data).digest('hex');
+    }
+    return { kitVersion: AI_APPS_STARTER_KIT_VERSION, files: hashes };
+  }
+
+  private pack(files: KitFile[]): Buffer {
     const zip = new AdmZip();
-    const add = (path: string, content: string) => zip.addFile(path, Buffer.from(content, 'utf8'));
+    for (const file of files) zip.addFile(file.path, file.data);
+    zip.addFile(KIT_MANIFEST_PATH, Buffer.from(`${JSON.stringify(this.buildManifest(files), null, 2)}\n`, 'utf8'));
+    return zip.toBuffer();
+  }
+
+  /** Every file the kit ships, design system included. The single list the full ZIP, update ZIP and manifest share. */
+  private kitFiles(): KitFile[] {
+    const files: KitFile[] = [];
+    const add = (path: string, content: string) => files.push({ path, data: Buffer.from(content, 'utf8') });
 
     add('README.md', this.readme());
     add('CLAUDE.md', this.agentInstructions());
@@ -58,7 +112,8 @@ export class AiAppsStarterKitService {
     add('.claude/skills/app-analytics/SKILL.md', this.analyticsSkill());
     add('.claude/skills/db-migration/SKILL.md', this.dbMigrationSkill());
     add('.claude/skills/preview-testing-users/SKILL.md', this.previewTestingUsersSkill());
-    add('pln-app.config.json', this.configJson());
+    add('.claude/skills/kit-update/SKILL.md', this.kitUpdateSkill());
+    add(KIT_CONFIG_PATH, this.configJson());
     add('styles/pln-theme.css', this.themeCss());
     add('styles/FONTS.md', this.fontsDoc());
     add('app/server.js', this.appServer());
@@ -66,9 +121,9 @@ export class AiAppsStarterKitService {
     add('app/Dockerfile', this.appDockerfile());
     add('app/.dockerignore', 'node_modules\nnpm-debug.log\n');
 
-    this.addDesignSystem(zip);
+    this.addDesignSystem(files);
 
-    return zip.toBuffer();
+    return files;
   }
 
   /**
@@ -89,24 +144,24 @@ export class AiAppsStarterKitService {
    * Embed the curated design-system tree as normal files under `pl-design-system/`
    * in the kit (no nested zip). Missing asset must never break the kit download.
    */
-  private addDesignSystem(zip: AdmZip): void {
+  private addDesignSystem(files: KitFile[]): void {
     const root = this.designSystemDirPath();
     if (!existsSync(root)) {
       this.logger.warn(`PL Design System folder not found at ${root}; shipping starter kit without it.`);
       return;
     }
-    this.addDirectoryToZip(zip, root, DESIGN_SYSTEM_DIR);
+    this.addDirectory(files, root, DESIGN_SYSTEM_DIR);
   }
 
-  private addDirectoryToZip(zip: AdmZip, absDir: string, zipPrefix: string): void {
+  private addDirectory(files: KitFile[], absDir: string, zipPrefix: string): void {
     for (const name of readdirSync(absDir)) {
       if (name === '.DS_Store') continue;
       const abs = join(absDir, name);
       const entry = join(zipPrefix, name);
       if (statSync(abs).isDirectory()) {
-        this.addDirectoryToZip(zip, abs, entry);
+        this.addDirectory(files, abs, entry);
       } else {
-        zip.addFile(entry.replace(/\\/g, '/'), readFileSync(abs));
+        files.push({ path: entry.replace(/\\/g, '/'), data: readFileSync(abs) });
       }
     }
   }
@@ -135,6 +190,10 @@ to the Protocol Labs Network sandbox with a single instruction.
   agent migrates it — structure and, by default, your existing data — onto a
   PL-provisioned Postgres database.
 - \`.claude/skills/preview-testing-users/\` — Preview-only testing users and 24h session tokens for a load test.
+- \`.claude/skills/kit-update/\` — how your agent offers and applies newer kit
+  versions (kit files only, never your app code, and only after you say yes).
+- \`.pln-kit/manifest.json\` — a fingerprint of every kit file, so a kit update
+  can tell which kit files you changed yourself. Leave it in place.
 - \`pln-app.config.json\` — the LabOS connect + deploy endpoints (no secrets).
 - \`pl-design-system/\` — the **PL Design System**: ready-made React components
   (Button, EntityCard, PageShell, Table, Tabs, Tag, Badge, SearchInput, …),
@@ -144,6 +203,14 @@ to the Protocol Labs Network sandbox with a single instruction.
   that don't use React, plus font guidance.
 - \`app/\` — a minimal runnable Node app to start from (its \`server.js\`,
   \`package.json\`, and \`Dockerfile\` are placeholders you can replace).
+
+## Kit updates
+When a newer starter kit is live, your agent tells you at the start of a chat
+and asks whether to apply it. Say yes and it updates the kit files (agent
+instructions, skills, design system, styles) — never your app code in \`app/\`
+— and lists any kit files you edited yourself before overwriting them. Say no
+and it won't ask about that version again. You can always ask it to "update
+the kit".
 
 ## How to use
 1. Unzip this folder and open it in Claude Code (or your AI tool of choice).
@@ -275,6 +342,18 @@ markdown under \`.claude/skills/<name>/SKILL.md\`. Claude Code discovers them
 automatically; if you are a different agent (Codex, Cursor, etc.), just READ
 the referenced file whenever these instructions say to "load a skill" — they
 are ordinary docs, not Claude-specific magic.
+
+## Kit updates
+Once per chat, at the start, check whether a newer starter kit is live:
+\`GET\` the \`kitVersionEndpoint\` from \`pln-app.config.json\` (no token needed)
+and compare its \`version\` with the config's \`kitVersion\`, number by number.
+If it is newer and not the config's \`declinedKitVersion\`, tell the member an
+update is available, summarize its \`whatsNew\`, and ask whether to download
+and apply it — then load the **kit-update** skill
+(\`.claude/skills/kit-update/SKILL.md\`). Never download or change kit files
+without the member's yes. If the check fails, say nothing about it and carry
+on — it must never hold up what the member asked for. If the member asks to
+update the kit themselves, run the kit-update skill even for a declined version.
 
 ## Building the app
 - All application code lives in the \`app/\` directory.
@@ -619,7 +698,8 @@ logs, write it to a file, or commit it; if a deploy returns 401 (expired), just
 run the connect flow again to get a fresh one.
 
 Do not ask for or use any internal PLN APIs — only the connect, deploy, logs,
-feedback, and member-context endpoints in the config are available to you.
+feedback, member-context, and kit version/update endpoints in the config are
+available to you.
 `;
   }
 
@@ -1468,6 +1548,108 @@ Custom events reuse the same \`trackEvent\` helper: \`trackEvent('clicked_export
   backend caps and drops oversized payloads silently.
 - This is the only analytics transport available to apps — don't add a
   PostHog SDK, autocapture, or any other analytics vendor directly.
+`;
+  }
+
+  private kitUpdateSkill(): string {
+    return `---
+name: kit-update
+description: Offer and apply a newer PLN AI Apps starter kit to this project — kit files only (agent instructions, skills, design system, styles), never the member's app code. Use when the start-of-chat version check finds a newer kit, or when the member asks to update the kit.
+---
+
+# Updating the starter kit
+
+The member's project started from a starter kit. Newer kit versions bring new
+agent instructions and skills. This skill replaces **kit files only**, and only
+after the member says yes. Their app code in \`app/\` is never touched.
+
+## 1. Check the live version
+\`\`\`bash
+curl -sS "${AI_APPS_KIT_VERSION_ENDPOINT}"
+# → { "version": "1.18", "whatsNew": ["…", "…"] }
+\`\`\`
+(The URL is \`kitVersionEndpoint\` in \`pln-app.config.json\`; no token needed.)
+
+Compare \`version\` with the config's \`kitVersion\` **number by number**: split
+on \`.\` and compare each part as an integer (\`1.17\` is newer than \`1.9\` —
+never compare them as strings). A missing or unreadable local \`kitVersion\`
+counts as older. Any non-200 or network error: stop here and say nothing.
+
+- **Not newer** → say nothing about updates.
+- **Newer, and equal to \`declinedKitVersion\`** in the config → say nothing;
+  the member already said no to this version. (Offer again only once an even
+  newer version is live.)
+- **Newer otherwise** → tell the member, in plain words, that kit
+  \`<version>\` is available, summarize \`whatsNew\`, and ask whether to download
+  and apply it. Mention that their app code won't change.
+
+**If the member asks to update the kit themselves**, skip the
+\`declinedKitVersion\` rule and go to step 2 for the live version.
+
+## If the member says no
+Set \`"declinedKitVersion": "<version>"\` in \`pln-app.config.json\` and change
+nothing else. Don't bring it up again in this chat.
+
+## 2. Get a token and download (only after a yes)
+The download needs the same \`${AI_APP_TOKEN_HEADER}\` credential as deploys. Reuse
+a still-valid deploy token from this chat if you have one; otherwise follow
+step 3 of the **deploy-to-labs** skill ("Get a deploy token via LabOS") and tell
+the member the approval is for downloading the kit update. Do not copy that flow
+here.
+
+\`\`\`bash
+mkdir -p /tmp/pln-kit-update && cd /tmp/pln-kit-update
+curl -sS -f -o kit-update.zip -H "${AI_APP_TOKEN_HEADER}: <deployToken>" "${AI_APPS_KIT_UPDATE_ENDPOINT}"
+unzip -o -q kit-update.zip -d new
+\`\`\`
+(The URL is \`kitUpdateEndpoint\` in the config.) Unpack it **outside** the
+project. A \`401\` means the token expired — reconnect and retry.
+
+## 3. Work out what will change
+- **New manifest:** \`new/${KIT_MANIFEST_PATH}\` lists every kit file with its SHA-256.
+- **Installed manifest:** \`${KIT_MANIFEST_PATH}\` in the project (kits older than 1.17
+  don't have one).
+
+For every path in the new manifest:
+- doesn't exist locally → **add**;
+- identical to the new file → skip;
+- local SHA-256 equals the **installed** manifest's hash → **update**
+  (the member never edited it);
+- otherwise → **locally edited** (with no installed manifest, every existing
+  file that differs from the new one counts as locally edited).
+
+For every path in the installed manifest that is **not** in the new one:
+**remove** it if its local hash still matches the installed manifest; if it
+was edited, keep it and report it.
+
+## 4. Confirm, then apply
+Show the member the list (add / update / remove), and ask once. If anything is
+**locally edited**, name each of those files, say their edits will be
+overwritten, offer to keep a copy as \`<file>.local-backup\`, and get an explicit
+second yes before overwriting them. If they want to keep an edited file as is,
+leave it out.
+
+Then:
+1. Copy the approved files from \`new/\` into the project (create folders as
+   needed) and delete the approved removals.
+2. Merge \`pln-app.config.json\`: start from \`new/pln-app.config.json\`; put back
+   the local values of \`appId\`, \`appUid\`, \`appName\`, \`appDescription\`,
+   \`appTags\` and \`database\`; copy any other local key the new config doesn't
+   have; drop \`declinedKitVersion\`. Endpoints, \`deployTokenHeader\`,
+   \`kitVersion\` and \`notes\` always take the new values.
+3. Write \`new/${KIT_MANIFEST_PATH}\` to \`${KIT_MANIFEST_PATH}\` **last** — if
+   anything fails before this, the next check offers the update again.
+4. Delete \`/tmp/pln-kit-update\` and tell the member which version they're on now
+   and what changed.
+
+## Rules
+- Never touch \`app/\` or any file that isn't in a kit manifest (the member's
+  own skills, notes, etc. stay as they are).
+- Never download or change kit files without the member's explicit yes for
+  that version.
+- Never write the deploy token to a file or print it.
+- Reload the updated \`CLAUDE.md\`/\`AGENTS.md\` and skills before doing more
+  work in this chat — the instructions you were following may have changed.
 `;
   }
 
@@ -2381,6 +2563,8 @@ Once the code and migrations are ready:
         appSettingsUrl: AI_APPS_APP_SETTINGS_ENDPOINT,
         memberContextEndpoint: AI_APPS_ME_ENDPOINT,
         analyticsEndpoint: AI_APPS_ANALYTICS_ENDPOINT,
+        kitVersionEndpoint: AI_APPS_KIT_VERSION_ENDPOINT,
+        kitUpdateEndpoint: AI_APPS_KIT_UPDATE_ENDPOINT,
         deployTokenHeader: AI_APP_TOKEN_HEADER,
         kitVersion: AI_APPS_STARTER_KIT_VERSION,
         appId: '',
@@ -2390,7 +2574,7 @@ Once the code and migrations are ready:
         appTags: [],
         database: null,
         notes:
-          'No token is stored here. At deploy time the agent runs the LabOS connect flow (see .claude/skills/deploy-to-labs) to get a short-lived deploy token. Set appId to a stable lowercase slug on first deploy and reuse it. appName/appDescription/appTags hold the member-APPROVED display metadata (see .claude/skills/app-metadata; appTags are slugs from the fixed list in that skill, also served live at tagsEndpoint) — redeploys resend them verbatim. After the first deploy, save the response uid as appUid; metadataEndpoint, buildLogsEndpoint, runtimeLogsEndpoint, and appSettingsUrl are templates where {appUid} is replaced with it (appSettingsUrl opens the member-facing Deployment settings modal to update secrets & redeploy; the logs endpoints serve the build and runtime logs — see .claude/skills/app-logs). A deploy answers 202 while the build runs in the background: poll statusEndpoint ({appUid} and {deploymentId} replaced — the deploy response also returns it filled in, and {deploymentId} may be "latest") until it reports READY or ERROR (see the deploy skill). If the app needs runtime secrets, register it via draftEndpoint instead of deploying (see the deploy skill). database is null unless the member has opted into a PLN-provisioned database — once they do, set it to {"enabled":true,"type":"postgres"} and resend it verbatim on every deploy/draft call (see the deploy skill\'s "Apps that want a provisioned database"); a bring-your-own database is a regular runtime secret instead and never goes in this field. analyticsEndpoint takes usage events — baseline events (opened/error/closed) are wired into every app by default, custom events are added on request (no auth required, no deploy token) — see .claude/skills/app-analytics.',
+          'No token is stored here. At deploy time the agent runs the LabOS connect flow (see .claude/skills/deploy-to-labs) to get a short-lived deploy token. Set appId to a stable lowercase slug on first deploy and reuse it. appName/appDescription/appTags hold the member-APPROVED display metadata (see .claude/skills/app-metadata; appTags are slugs from the fixed list in that skill, also served live at tagsEndpoint) — redeploys resend them verbatim. After the first deploy, save the response uid as appUid; metadataEndpoint, buildLogsEndpoint, runtimeLogsEndpoint, and appSettingsUrl are templates where {appUid} is replaced with it (appSettingsUrl opens the member-facing Deployment settings modal to update secrets & redeploy; the logs endpoints serve the build and runtime logs — see .claude/skills/app-logs). A deploy answers 202 while the build runs in the background: poll statusEndpoint ({appUid} and {deploymentId} replaced — the deploy response also returns it filled in, and {deploymentId} may be "latest") until it reports READY or ERROR (see the deploy skill). If the app needs runtime secrets, register it via draftEndpoint instead of deploying (see the deploy skill). database is null unless the member has opted into a PLN-provisioned database — once they do, set it to {"enabled":true,"type":"postgres"} and resend it verbatim on every deploy/draft call (see the deploy skill\'s "Apps that want a provisioned database"); a bring-your-own database is a regular runtime secret instead and never goes in this field. analyticsEndpoint takes usage events — baseline events (opened/error/closed) are wired into every app by default, custom events are added on request (no auth required, no deploy token) — see .claude/skills/app-analytics. kitVersionEndpoint (no token) reports the live kit version; kitUpdateEndpoint (deploy token) serves the kit files without app/ — see .claude/skills/kit-update. declinedKitVersion is added by the agent only when the member declines an offered kit version.',
       },
       null,
       2

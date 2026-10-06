@@ -1,6 +1,7 @@
 import AdmZip from 'adm-zip';
+import { createHash } from 'crypto';
 
-import { AiAppsStarterKitService } from './ai-apps-starter-kit.service';
+import { AiAppsStarterKitService, KIT_MANIFEST_PATH } from './ai-apps-starter-kit.service';
 import { AI_APPS_BRIDGE_SCRIPT_URL, AI_APPS_PORTAL_ORIGIN, AI_APPS_STARTER_KIT_VERSION } from './ai-apps.constants';
 
 describe('AiAppsStarterKitService buildZip', () => {
@@ -142,7 +143,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('kit 1.15: deploys answer 202 and the agent polls statusEndpoint for the real outcome', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.16');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.17');
     const config = JSON.parse(entries.get('pln-app.config.json') as string);
     expect(config.statusEndpoint).toContain('/v1/ai-apps/{appUid}/deployments/{deploymentId}');
     expect(config.notes).toContain('poll statusEndpoint');
@@ -179,7 +180,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('kit 1.14: member context comes from same-origin /_pln/me, with the Bearer fallback for older gates', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.16');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.17');
     const skill = entries.get('.claude/skills/pln-member-context/SKILL.md') as string;
     expect(skill).toContain("fetch('/_pln/me', { credentials: 'same-origin' })");
     expect(skill).toContain('res.status === 404');
@@ -274,9 +275,9 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('kit 1.15: writes the feedback endpoint templates and teaches the feedback flow', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.16');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.17');
     const config = JSON.parse(entries.get('pln-app.config.json') as string);
-    expect(config.kitVersion).toBe('1.16');
+    expect(config.kitVersion).toBe('1.17');
     expect(config.feedbackEndpoint).toContain('/v1/ai-apps/{appUid}/agent/feedback');
     expect(config.feedbackStatusEndpoint).toContain('/v1/ai-apps/{appUid}/agent/feedback/{feedbackUid}');
 
@@ -295,7 +296,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('kit 1.16: teaches written feedback, replies and the closing note, and never public comments', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.16');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.17');
     const skill = entries.get('.claude/skills/app-feedback/SKILL.md') as string;
     expect(skill).toContain('`kind: "FEEDBACK"`');
     expect(skill).toContain('"kind": "FEEDBACK"');
@@ -517,7 +518,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('defaults apps to all PL Infra members and asks about private access before the first deploy (kit 1.13+)', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.16');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.17');
     const readme = entries.get('README.md') as string;
     expect(readme).toContain('New apps are open to **all PL Infra members**');
     expect(readme).toContain('**Manage access**');
@@ -537,7 +538,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('kit 1.16: ships a short Preview testing-users skill, listed in the kit README only', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.16');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.17');
     const skill = entries.get('.claude/skills/preview-testing-users/SKILL.md') as string;
     expect(skill).toContain('name: preview-testing-users');
     expect(skill).toContain('Preview only');
@@ -558,7 +559,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('documents public endpoints and that the app must secure them (kit 1.13+)', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.16');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.17');
     const deploySkill = entries.get('.claude/skills/deploy-to-labs/SKILL.md') as string;
     expect(deploySkill).toContain('## Public endpoints (paths without LabOS sign-in)');
     expect(deploySkill).toContain(
@@ -573,5 +574,124 @@ describe('AiAppsStarterKitService buildZip', () => {
     for (const path of ['CLAUDE.md', 'AGENTS.md']) {
       expect(entries.get(path) as string).toContain('LabOS does NOT authenticate public\n   paths');
     }
+  });
+});
+
+describe('AiAppsStarterKitService kit manifest + update ZIP', () => {
+  const service = new AiAppsStarterKitService();
+  const readZip = (buffer: Buffer) =>
+    new Map(
+      new AdmZip(buffer)
+        .getEntries()
+        .filter((e) => !e.isDirectory)
+        .map((e) => [e.entryName, e.getData()] as [string, Buffer])
+    );
+  const sha256 = (data: Buffer) => createHash('sha256').update(data).digest('hex');
+
+  let full: Map<string, Buffer>;
+  let update: Map<string, Buffer>;
+
+  beforeAll(() => {
+    full = readZip(service.buildZip());
+    update = readZip(service.buildUpdateZip());
+  });
+
+  it('ships a manifest whose hashes match the shipped bytes', () => {
+    const manifest = JSON.parse((full.get(KIT_MANIFEST_PATH) as Buffer).toString('utf8'));
+    expect(manifest.kitVersion).toBe(AI_APPS_STARTER_KIT_VERSION);
+    expect(Object.keys(manifest.files).length).toBeGreaterThan(10);
+    expect(manifest.files['CLAUDE.md']).toBeDefined();
+    for (const [path, hash] of Object.entries(manifest.files)) {
+      expect(full.has(path)).toBe(true);
+      expect(sha256(full.get(path) as Buffer)).toBe(hash);
+    }
+  });
+
+  it('leaves member-owned paths (app/, config, the manifest itself) out of the manifest', () => {
+    const manifest = JSON.parse((full.get(KIT_MANIFEST_PATH) as Buffer).toString('utf8'));
+    const paths = Object.keys(manifest.files);
+    expect(paths.some((p) => p.startsWith('app/'))).toBe(false);
+    expect(paths).not.toContain('pln-app.config.json');
+    expect(paths).not.toContain(KIT_MANIFEST_PATH);
+  });
+
+  it('update ZIP = every non-app/ kit file, with the same manifest', () => {
+    expect(full.has('app/server.js')).toBe(true);
+    expect([...update.keys()].some((p) => p.startsWith('app/'))).toBe(false);
+    for (const path of full.keys()) {
+      if (path.startsWith('app/')) continue;
+      expect(update.has(path)).toBe(true);
+    }
+    expect(update.has('pln-app.config.json')).toBe(true);
+    expect((update.get(KIT_MANIFEST_PATH) as Buffer).toString('utf8')).toBe(
+      (full.get(KIT_MANIFEST_PATH) as Buffer).toString('utf8')
+    );
+  });
+});
+
+describe('AiAppsStarterKitService kit 1.17: agent-offered kit updates', () => {
+  let entries: Map<string, string>;
+
+  beforeAll(() => {
+    const zip = new AdmZip(new AiAppsStarterKitService().buildZip());
+    entries = new Map(
+      zip
+        .getEntries()
+        .filter((e) => !e.isDirectory)
+        .map((e) => [e.entryName, e.getData().toString('utf8')])
+    );
+  });
+
+  it('writes both kit endpoints into the config and never ships declinedKitVersion', () => {
+    const config = JSON.parse(entries.get('pln-app.config.json') as string);
+    expect(config.kitVersionEndpoint).toContain('/v1/ai-apps/starter-kit/version');
+    expect(config.kitUpdateEndpoint).toContain('/v1/ai-apps/starter-kit/update');
+    expect(config).not.toHaveProperty('declinedKitVersion');
+    expect(config.notes).toContain('kit-update');
+  });
+
+  it('tells the agent in CLAUDE.md/AGENTS.md to check once per chat, quietly, and never update without a yes', () => {
+    for (const path of ['CLAUDE.md', 'AGENTS.md']) {
+      const text = entries.get(path) as string;
+      expect(text).toContain('## Kit updates');
+      expect(text).toContain('kitVersionEndpoint');
+      expect(text).toContain('declinedKitVersion');
+      expect(text).toContain("without the member's yes");
+      expect(text).toContain('say nothing about it');
+      expect(text).toContain('.claude/skills/kit-update/SKILL.md');
+    }
+  });
+
+  it('ships the kit-update skill with the comparison, decline, consent, merge and app/ rules', () => {
+    const skill = entries.get('.claude/skills/kit-update/SKILL.md') as string;
+    expect(skill).toContain('name: kit-update');
+    // Numeric comparison, not string comparison.
+    expect(skill).toContain('`1.17` is newer than `1.9`');
+    // Decline rule + explicit-request override.
+    expect(skill).toContain('"declinedKitVersion": "<version>"');
+    expect(skill).toContain('If the member asks to update the kit themselves');
+    // Token via the deploy skill's connect step, not a copy of it.
+    expect(skill).toContain('step 3 of the **deploy-to-labs** skill');
+    // Local-edit detection through the manifest, second confirmation, backups.
+    expect(skill).toContain(KIT_MANIFEST_PATH);
+    expect(skill).toContain('**locally edited**');
+    expect(skill).toContain('explicit\nsecond yes');
+    expect(skill).toContain('.local-backup');
+    // Config merge keeps member-owned keys.
+    for (const key of ['appId', 'appUid', 'appName', 'appDescription', 'appTags', 'database']) {
+      expect(skill).toContain(`\`${key}\``);
+    }
+    expect(skill).toContain('drop `declinedKitVersion`');
+    // Never app code.
+    expect(skill).toContain('Never touch `app/`');
+    // Manifest written last so a half-applied update is offered again.
+    expect(skill).toContain('**last**');
+  });
+
+  it('lists the kit-update skill and the manifest in the README', () => {
+    const readme = entries.get('README.md') as string;
+    expect(readme).toContain('.claude/skills/kit-update/');
+    expect(readme).toContain('.pln-kit/manifest.json');
+    expect(readme).toContain('## Kit updates');
   });
 });
