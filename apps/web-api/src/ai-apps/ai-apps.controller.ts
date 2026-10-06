@@ -75,6 +75,7 @@ import {
   AI_APPS_SIDECAR_THROTTLE_LIMIT,
   AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS,
   AI_APPS_STARTER_KIT_VERSION,
+  AI_APPS_STARTER_KIT_WHATS_NEW,
 } from './ai-apps.constants';
 import { AI_APPS_MAX_TAGS_PER_APP, AI_APPS_TAGS } from './ai-apps-tags';
 
@@ -1038,6 +1039,37 @@ export class AiAppsController {
     res.set({
       'Content-Type': 'application/zip',
       'Content-Disposition': `attachment; filename="pln-ai-apps-starter-kit-v${AI_APPS_STARTER_KIT_VERSION}.zip"`,
+      'Content-Length': zip.length.toString(),
+    });
+    res.send(zip);
+  }
+
+  /**
+   * Live starter-kit version + what's new. Open (no token) so the agent in an
+   * existing kit can check at the start of any chat; carries no endpoints,
+   * member data or kit contents.
+   */
+  @NoCache()
+  @Get('starter-kit/version')
+  getStarterKitVersion() {
+    return { version: AI_APPS_STARTER_KIT_VERSION, whatsNew: AI_APPS_STARTER_KIT_WHATS_NEW };
+  }
+
+  /**
+   * Kit-update bundle for the agent in an existing kit: every kit file minus the
+   * `app/` scaffold, plus the manifest. Same agent credential as deploy, so a
+   * member without a valid token approves a connect session in LabOS first.
+   */
+  @NoCache()
+  @Get('starter-kit/update')
+  @UseGuards(AiAppTokenGuard)
+  async downloadStarterKitUpdate(@Req() req: any, @Res() res: Response) {
+    const zip = this.starterKitService.buildUpdateZip();
+    await this.aiAppsService.logKitUpdateDownloaded(req.aiAppMemberUid);
+
+    res.set({
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="pln-ai-apps-starter-kit-update-v${AI_APPS_STARTER_KIT_VERSION}.zip"`,
       'Content-Length': zip.length.toString(),
     });
     res.send(zip);

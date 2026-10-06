@@ -1838,6 +1838,13 @@ export class AiAppsService {
     await this.recordEvent('KIT_DOWNLOADED', memberUid, { message: `Starter kit v${AI_APPS_STARTER_KIT_VERSION}` });
   }
 
+  /** An agent pulled the kit-update bundle into an existing project. */
+  async logKitUpdateDownloaded(memberUid: string): Promise<void> {
+    await this.recordEvent('KIT_DOWNLOADED', memberUid, {
+      message: `Starter kit v${AI_APPS_STARTER_KIT_VERSION} (agent update)`,
+    });
+  }
+
   /**
    * Event log (audit feed) — newest first, optionally scoped to one app
    * (callers check access to that app first). The unscoped feed leaves out

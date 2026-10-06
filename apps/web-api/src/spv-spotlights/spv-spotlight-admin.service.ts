@@ -499,47 +499,8 @@ export class SpvSpotlightAdminService {
     return openNoticeCounts(recipients);
   }
 
-  async sendOpenNotice(uid: string, includeAlreadySent: boolean, participantUids?: string[]) {
-    const spotlight = await this.prisma.spvSpotlight.findUnique({
-      where: { uid },
-      include: { team: { select: { name: true } } },
-    });
-    if (!spotlight) {
-      throw new NotFoundException('SPV spotlight not found');
-    }
-    const templates = asEmailTemplates(spotlight.emailTemplates, spotlight.title);
-    const recipients = await this.openNoticeRecipients(uid, participantUids);
-    const targets = recipients.filter((recipient) => includeAlreadySent || !recipient.sent);
-    let sent = 0;
-    let errors = 0;
-    for (const recipient of targets) {
-      try {
-        await this.mailer.send({
-          spotlight: this.mailContext(spotlight),
-          template: templates.opened,
-          to: recipient.email,
-          memberUid: recipient.memberUid,
-          memberName: recipient.name,
-          extra: recipient.variables,
-        });
-        if (recipient.participantUid) {
-          await this.prisma.spvSpotlightParticipant.update({
-            where: { uid: recipient.participantUid },
-            data: { openNoticeSentAt: new Date(), openNoticeSentCount: { increment: 1 } },
-          });
-        }
-        if (recipient.requestUid) {
-          await this.prisma.spvAccessRequest.update({
-            where: { uid: recipient.requestUid },
-            data: { openNoticeSentAt: new Date(), openNoticeSentCount: { increment: 1 } },
-          });
-        }
-        sent += 1;
-      } catch {
-        errors += 1;
-      }
-    }
-    return { summary: { totalEligible: targets.length, sent, skipped: recipients.length - targets.length, errors } };
+  async sendOpenNotice(_uid: string, _includeAlreadySent: boolean, _participantUids?: string[]) {
+    throw new BadRequestException('Open notice emails are disabled');
   }
 
   async exportLoginLinks(uid: string) {
