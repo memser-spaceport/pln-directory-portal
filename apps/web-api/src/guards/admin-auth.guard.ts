@@ -2,6 +2,7 @@ import { CanActivate, ExecutionContext, ForbiddenException, Injectable, Unauthor
 import { JwtService } from '../utils/jwt/jwt.service';
 import {
   ADMIN_PERMISSIONS,
+  AI_APPS_PERMISSIONS,
   DEMODAY_PERMISSIONS,
   MEMBER_PERMISSIONS,
   TEAM_MEMBERSHIP_PERMISSIONS,
@@ -73,6 +74,25 @@ export class AdminAuthGuard extends BaseAdminAuthGuard {
 
   protected getAllowedPermissions(): string[] {
     return [ADMIN_PERMISSIONS.DIRECTORY_FULL];
+  }
+}
+
+/**
+ * Guard for Back Office AI App resource management.
+ * Allows full Directory admins or users with the dedicated
+ * ai_apps.resources.manage permission.
+ */
+@Injectable()
+export class AiAppsResourcesAdminAuthGuard extends BaseAdminAuthGuard {
+  constructor(jwtService: JwtService) {
+    super(jwtService);
+  }
+
+  protected getAllowedPermissions(): string[] {
+    return [
+      ADMIN_PERMISSIONS.DIRECTORY_FULL,
+      AI_APPS_PERMISSIONS.RESOURCES_MANAGE,
+    ];
   }
 }
 

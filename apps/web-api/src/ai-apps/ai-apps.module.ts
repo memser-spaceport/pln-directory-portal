@@ -6,6 +6,8 @@ import { PushNotificationsModule } from '../push-notifications/push-notification
 import { RbacModule } from '../rbac/rbac.module';
 import { SharedModule } from '../shared/shared.module';
 import { AwsService } from '../utils/aws/aws.service';
+import { JwtService } from '../utils/jwt/jwt.service';
+import { AiAppsResourcesAdminAuthGuard } from '../guards/admin-auth.guard';
 import { AiAppsController } from './ai-apps.controller';
 import { AiAppsTestingUsersController } from './ai-apps-testing-users.controller';
 import { AiAppsService } from './ai-apps.service';
@@ -45,6 +47,8 @@ import { AiAppResourcesService } from './ai-app-resources.service';
   providers: [
     AiAppsService,
     AiAppResourcesService,
+    AiAppsResourcesAdminAuthGuard,
+    JwtService,
     AiAppsDeployProcessor,
     AiAppsAccessService,
     AiAppsConnectService,
