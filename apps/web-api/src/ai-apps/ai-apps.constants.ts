@@ -681,8 +681,8 @@ export const AI_APPS_NOTIFICATION_MESSAGES = {
     description: feedbackNotificationExcerpt(`${authorName ?? 'A member'}: ${note}`),
   }),
   starterKitUpdated: (version: string) => ({
-    title: 'AI Apps',
-    description: `AI Apps Starter Kit — updated to v${version}. Review what's new!`,
+    title: `Starter Kit v${version} is out`,
+    description: "See what's new and download the latest kit — or ask your agent to update an existing one.",
     linkText: 'Get the starter kit →',
   }),
 } as const;

@@ -63,8 +63,8 @@ describe('AiAppsKitUpdateNotificationService', () => {
     expect(notificationCreate).toHaveBeenCalledTimes(1);
     expect(notificationCreate).toHaveBeenCalledWith({
       category: PushNotificationCategory.AI_APP,
-      title: 'AI Apps',
-      description: "AI Apps Starter Kit — updated to v1.17. Review what's new!",
+      title: 'Starter Kit v1.17 is out',
+      description: "See what's new and download the latest kit — or ask your agent to update an existing one.",
       linkText: 'Get the starter kit →',
       link: '/pl-infra/ai-apps?dialog=addAiApp',
       isPublic: false,
