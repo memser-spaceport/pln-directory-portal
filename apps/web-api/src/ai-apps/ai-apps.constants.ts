@@ -624,6 +624,9 @@ export function aiAppDetailPath(appUid: string): string {
   return `/pl-infra/ai-apps/${appUid}`;
 }
 
+/** The AI Apps list with the "Add your AI App" (starter kit) modal open — LabOS `AiAppsPage` reads `dialog=addAiApp`. */
+export const AI_APPS_ADD_APP_DIALOG_PATH = '/pl-infra/ai-apps?dialog=addAiApp';
+
 /**
  * `metadata.trigger` values stamped on each AI Apps bell notification —
  * mirrors the roadmap module's convention for one category covering several
@@ -636,6 +639,7 @@ export const AI_APPS_NOTIFICATION_TRIGGERS = {
   FEEDBACK_REPLY: 'feedback_reply',
   FEEDBACK_SHIPPED: 'feedback_shipped',
   COMMENT_NEW: 'comment_new',
+  STARTER_KIT_UPDATED: 'starter_kit_updated',
 } as const;
 
 /** FEEDBACK (the written form) or COMMENT (pinned in the live app) — the notification's noun follows it. */
@@ -675,6 +679,11 @@ export const AI_APPS_NOTIFICATION_MESSAGES = {
   commentNew: (appName: string, authorName: string | null, note: string) => ({
     title: `New comment on ${appName}`,
     description: feedbackNotificationExcerpt(`${authorName ?? 'A member'}: ${note}`),
+  }),
+  starterKitUpdated: (version: string) => ({
+    title: 'AI Apps',
+    description: `AI Apps Starter Kit — updated to v${version}. Review what's new!`,
+    linkText: 'Get the starter kit →',
   }),
 } as const;
 

@@ -964,7 +964,7 @@ Both are seeded in migration `20260623120000_ai_apps` and attached to the **PL I
 
 ## Deploy lifecycle bell notifications
 
-Three in-app (bell) notifications, all category `AI_APP` (added in migration
+In-app (bell) notifications, all category `AI_APP` (added in migration
 `20260811120000_add_ai_app_notification_category`), distinguished by
 `metadata.trigger` — the same one-category-many-triggers convention the roadmap
 module uses for `GANTRY`. The category is deliberately generic (not
@@ -1010,7 +1010,23 @@ of growing a new category per event:
     hostnames, which are manager-only (see `AiAppDeploymentInfo.failureReason` above);
     the owner sees the real reason on the linked app page, not in the bell body.
 
-Both link to the app's LabOS detail page (`/pl-infra/ai-apps/{appUid}`, a
+- **Starter kit update** (`trigger: 'starter_kit_updated'`) — broadcast to everyone
+  holding `ai_apps.read` OR `ai_apps.write` when the kit this environment serves gets a
+  newer version. See `AiAppsKitUpdateNotificationService`.
+  - Runs once per API start (`onApplicationBootstrap`, not awaited, never fails startup).
+  - The stored `starter_kit_updated` notifications are the record of what was announced:
+    `AI_APPS_STARTER_KIT_VERSION` is sent only when it is newer than every
+    `metadata.version` among them, so a restart or a rollback sends nothing.
+  - The check and the send run in one transaction holding a Postgres advisory lock
+    (`pg_advisory_xact_lock`), so API instances starting together send one notification.
+    A failed send stores nothing, and the next start retries.
+  - Every environment announces the version it serves, to its own members.
+  - Copy: title "AI Apps", body "AI Apps Starter Kit — updated to v{version}. Review
+    what's new!", CTA "Get the starter kit →". It links to
+    `/pl-infra/ai-apps?dialog=addAiApp` (`AI_APPS_ADD_APP_DIALOG_PATH`), which opens the
+    Add your AI App modal with the kit version and What's new.
+
+The app notifications link to the app's LabOS detail page (`/pl-infra/ai-apps/{appUid}`, a
 frontend-relative path — see `aiAppDetailPath` in `ai-apps.constants.ts`). Copy lives
 in `AI_APPS_NOTIFICATION_MESSAGES` (`ai-apps.constants.ts`) so a wording change is a
 one-file swap. Notification failures are logged and swallowed — never breaking the
