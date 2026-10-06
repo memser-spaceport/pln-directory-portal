@@ -6,6 +6,8 @@ import { PushNotificationsModule } from '../push-notifications/push-notification
 import { RbacModule } from '../rbac/rbac.module';
 import { SharedModule } from '../shared/shared.module';
 import { AwsService } from '../utils/aws/aws.service';
+import { JwtService } from '../utils/jwt/jwt.service';
+import { AiAppsResourcesAdminAuthGuard } from '../guards/admin-auth.guard';
 import { AiAppsController } from './ai-apps.controller';
 import { AiAppsTestingUsersController } from './ai-apps-testing-users.controller';
 import { AiAppsService } from './ai-apps.service';
@@ -23,6 +25,9 @@ import { AiAppMemberContextGuard } from './guards/ai-app-member-context.guard';
 import { AiAppTokenGuard } from './guards/ai-app-token.guard';
 import { AgentFeedbackDeniedInterceptor } from './agent-feedback-denied.interceptor';
 
+import { AiAppResourcesController } from './ai-app-resources.controller';
+import { AiAppResourcesService } from './ai-app-resources.service';
+
 @Module({
   imports: [
     SharedModule,
@@ -39,9 +44,12 @@ import { AgentFeedbackDeniedInterceptor } from './agent-feedback-denied.intercep
       settings: { lockDuration: 20000, maxStalledCount: 2 },
     }),
   ],
-  controllers: [AiAppsController, AiAppsTestingUsersController],
+  controllers: [AiAppsController, AiAppsTestingUsersController, AiAppResourcesController],
   providers: [
     AiAppsService,
+    AiAppResourcesService,
+    AiAppsResourcesAdminAuthGuard,
+    JwtService,
     AiAppsDeployProcessor,
     AiAppsAccessService,
     AiAppsConnectService,
