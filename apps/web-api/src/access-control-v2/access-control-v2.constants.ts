@@ -53,6 +53,8 @@ export const AI_APPS_PERMISSIONS = {
   READ: 'ai_apps.read',
   /** Download the starter kit and deploy apps */
   WRITE: 'ai_apps.write',
+  /** Manage per-app CPU and memory overrides in Back Office */
+  RESOURCES_MANAGE: 'ai_apps.resources.manage',
 } as const;
 
 // ── ATS (PL hiring) ───────────────────────────────────────────────────────
@@ -253,6 +255,7 @@ export const ALL_PERMISSION_CODES = [
   // AI Apps
   AI_APPS_PERMISSIONS.READ,
   AI_APPS_PERMISSIONS.WRITE,
+  AI_APPS_PERMISSIONS.RESOURCES_MANAGE,
 
   // ATS
   ATS_PERMISSIONS.USER,

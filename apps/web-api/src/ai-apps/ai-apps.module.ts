@@ -22,6 +22,9 @@ import { AiAppMemberContextGuard } from './guards/ai-app-member-context.guard';
 import { AiAppTokenGuard } from './guards/ai-app-token.guard';
 import { AgentFeedbackDeniedInterceptor } from './agent-feedback-denied.interceptor';
 
+import { AiAppResourcesController } from './ai-app-resources.controller';
+import { AiAppResourcesService } from './ai-app-resources.service';
+
 @Module({
   imports: [
     SharedModule,
@@ -38,9 +41,10 @@ import { AgentFeedbackDeniedInterceptor } from './agent-feedback-denied.intercep
       settings: { lockDuration: 20000, maxStalledCount: 2 },
     }),
   ],
-  controllers: [AiAppsController, AiAppsTestingUsersController],
+  controllers: [AiAppsController, AiAppsTestingUsersController, AiAppResourcesController],
   providers: [
     AiAppsService,
+    AiAppResourcesService,
     AiAppsDeployProcessor,
     AiAppsAccessService,
     AiAppsConnectService,
