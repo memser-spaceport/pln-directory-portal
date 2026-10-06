@@ -63,4 +63,9 @@ describe('PlInfraMembersServiceController', () => {
     await expect(controller.list({ limit: '5000' })).rejects.toBeInstanceOf(BadRequestException);
     expect(listMembers).not.toHaveBeenCalled();
   });
+
+  it.each(['0x2', '1e3', ' 5', '-1', '2.5'])('rejects a non-decimal page value %p', async (page) => {
+    await expect(controller.list({ page })).rejects.toBeInstanceOf(BadRequestException);
+    expect(listMembers).not.toHaveBeenCalled();
+  });
 });

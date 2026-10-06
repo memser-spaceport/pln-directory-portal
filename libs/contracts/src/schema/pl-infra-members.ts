@@ -3,7 +3,13 @@ import { z } from 'zod';
 export const PL_INFRA_MEMBERS_DEFAULT_LIMIT = 500;
 export const PL_INFRA_MEMBERS_MAX_LIMIT = 1000;
 
-const toNumber = (value: unknown) => (value === undefined || value === '' ? undefined : Number(value));
+// Plain positive decimal digits only; anything else is left as-is and fails validation.
+const toNumber = (value: unknown) =>
+  value === undefined || value === ''
+    ? undefined
+    : typeof value === 'string' && /^\d+$/.test(value)
+    ? Number(value)
+    : value;
 
 export const PlInfraMembersQuerySchema = z.object({
   page: z.preprocess(toNumber, z.number().int().min(1).default(1)),

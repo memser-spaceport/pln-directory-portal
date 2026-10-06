@@ -109,7 +109,7 @@ describe('PlInfraMembersService', () => {
   it('throws a clear error when the PL Infra policy does not exist', async () => {
     getPolicy.mockRejectedValue(new NotFoundException(`Policy not found: ${PL_INFRA_POLICY_CODE}`));
 
-    await expect(service.listMembers({ page: 1, limit: 500 })).rejects.toBeInstanceOf(InternalServerErrorException);
+    await expect(service.listMembers({ page: 1, limit: 500 })).rejects.toThrow('PL Infra policy is not configured');
   });
 
   it('tracks one mcp-pl-infra-list-read event per successful read', async () => {

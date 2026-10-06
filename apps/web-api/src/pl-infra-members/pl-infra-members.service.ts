@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import { PlInfraMembersQuery, PlInfraMembersResponse } from 'libs/contracts/src/schema/pl-infra-members';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
@@ -28,6 +28,9 @@ export class PlInfraMembersService {
     } catch (error) {
       // Never answer with an empty list on failure: the gateway would lock everyone out.
       this.logger.error(`Failed to load PL Infra user list (${PL_INFRA_POLICY_CODE})`, error);
+      if (error instanceof NotFoundException) {
+        throw new InternalServerErrorException(`PL Infra policy is not configured: ${PL_INFRA_POLICY_CODE}`);
+      }
       throw new InternalServerErrorException('PL Infra user list is unavailable');
     }
 
@@ -45,7 +48,7 @@ export class PlInfraMembersService {
         properties: { page, limit, total: result.total, returned: result.items.length },
       });
     } catch (error) {
-      this.logger.warn(`Failed to track ${ANALYTICS_EVENTS.MCP.PL_INFRA_LIST_READ}`);
+      this.logger.warn(`Failed to track ${ANALYTICS_EVENTS.MCP.PL_INFRA_LIST_READ}`, error);
     }
 
     return result;
