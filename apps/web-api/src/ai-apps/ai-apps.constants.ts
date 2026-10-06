@@ -22,6 +22,7 @@ export const AI_APPS_STARTER_KIT_WHATS_NEW: string[] = [
   'Your agent now checks for starter-kit updates at the start of a chat and offers to apply them, only after you say yes.',
   'Updates change only kit files (agent instructions, skills, design system, styles), never your app code in app/.',
   'Kit files you edited yourself are listed before anything is overwritten.',
+  'If your agent loses track of a LabOS approval mid-way, it now picks it back up instead of asking you to approve again.',
 ];
 
 /** Max members on one private app's whitelist (the owner and directory admins never count). */

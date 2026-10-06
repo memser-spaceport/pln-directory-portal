@@ -88,10 +88,10 @@ The starter kit no longer ships a long-lived token. When the agent needs to depl
 
 1. **Start** — the agent POSTs `/v1/ai-apps/connect` (no auth). The backend creates an `AiAppConnectSession` (`PENDING`, ~10 min TTL) and returns `sessionId`, a human-readable `userCode`, a `connectUrl` (the LabOS approval page), a secret `pollToken`, and `pollIntervalSec`.
 2. **Approve** — the member opens `connectUrl` in LabOS (`/pl-infra/ai-apps/connect?session=<sessionId>`), signs in, confirms the `userCode` matches what the agent shows, and clicks **Approve**. The page calls `POST /v1/ai-apps/connect/:uid/approve`. The handler resolves the member and checks `ai_apps.write`: on success it mints a short-lived `deployToken` (~60 min) bound to the session (`APPROVED`); without the permission it marks the session `DENIED`. Both outcomes are written to the audit log (`CONNECT_APPROVED` / `CONNECT_DENIED`).
-3. **Collect** — the agent polls `POST /v1/ai-apps/connect/poll` with its `pollToken`. While `PENDING` it keeps polling; on `APPROVED` it receives the `deployToken` (+ `deployTokenExpiresAt`); on `DENIED`/`EXPIRED` it stops.
+3. **Collect** — the agent polls `POST /v1/ai-apps/connect/poll` with its `pollToken`. While `PENDING` it keeps polling; on `APPROVED` it receives the `deployToken` (+ `deployTokenExpiresAt`); on `DENIED`/`EXPIRED` it stops. Polling an `APPROVED` session keeps returning the same `deployToken` until it expires, so kits ≥1.17 (LAB-2784) tell an agent whose polling was interrupted to re-poll with the `pollToken` it already holds and start a new session only on `expired`/`denied` or an already-expired `deployTokenExpiresAt` — the member doesn't approve twice. Don't make the poll consume the token on first read (`ai-apps-connect-poll.spec.ts`).
 4. **Deploy** — the agent uses the `deployToken` in `x-app-token` for `POST /v1/ai-apps/deploy`. It may redeploy until the token expires; afterwards it reconnects to mint a new one.
 
-The `deployToken` is held in agent memory only and never written into the kit, so the starter-kit folder grants nothing on its own.
+The `pollToken` and `deployToken` are held in agent memory only and never written into the kit, so the starter-kit folder grants nothing on its own.
 
 ## Endpoints
 

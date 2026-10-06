@@ -695,3 +695,48 @@ describe('AiAppsStarterKitService kit 1.17: agent-offered kit updates', () => {
     expect(readme).toContain('## Kit updates');
   });
 });
+
+describe('AiAppsStarterKitService kit 1.17: resume an interrupted connect', () => {
+  let entries: Map<string, string>;
+
+  beforeAll(() => {
+    const zip = new AdmZip(new AiAppsStarterKitService().buildZip());
+    entries = new Map(
+      zip
+        .getEntries()
+        .filter((e) => !e.isDirectory)
+        .map((e) => [e.entryName, e.getData().toString('utf8')])
+    );
+  });
+
+  it('tells the deploy skill to re-poll with the existing pollToken before starting a new session', () => {
+    const skill = entries.get('.claude/skills/deploy-to-labs/SKILL.md') as string;
+    expect(skill).toContain('**If polling was interrupted**');
+    expect(skill).toContain('poll once more with it before anything else');
+    // An approved session can hand back a deploy token that already expired.
+    expect(skill).toContain('`deployTokenExpiresAt` is\n        still in the future');
+    expect(skill).toContain('`expired` → start a new session (step 3a)');
+    expect(skill).toContain('`denied` → stop and tell the member');
+  });
+
+  it('keeps the pollToken in memory only, like the deploy token', () => {
+    const skill = entries.get('.claude/skills/deploy-to-labs/SKILL.md') as string;
+    expect(skill).toContain('Hold `pollToken` and `deployToken` **in memory only**');
+    expect(skill).toContain('Polling the\n   `pollToken` returns a deploy token');
+    const config = JSON.parse(entries.get('pln-app.config.json') as string);
+    expect(config).not.toHaveProperty('pollToken');
+  });
+
+  it('carries the re-poll rule in CLAUDE.md and AGENTS.md', () => {
+    for (const path of ['CLAUDE.md', 'AGENTS.md']) {
+      const text = entries.get(path) as string;
+      expect(text).toContain('re-poll with the same `pollToken` before starting a new\n   session');
+      expect(text).toContain('Keep the `pollToken` and the token **in memory only**');
+    }
+  });
+
+  it('still sends the kit-update skill through the deploy skill connect step', () => {
+    const skill = entries.get('.claude/skills/kit-update/SKILL.md') as string;
+    expect(skill).toContain('step 3 of the **deploy-to-labs** skill');
+  });
+});

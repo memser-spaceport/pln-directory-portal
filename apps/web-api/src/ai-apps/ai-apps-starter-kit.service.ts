@@ -633,9 +633,11 @@ follow "Apps that need secrets" above instead of deploying directly. In short:
 3. **Get a deploy token via LabOS (the connect flow).** There is no token in the
    kit. POST to \`connectEndpoint\` to start a connect session, give the member the
    returned \`connectUrl\` + confirmation \`userCode\` to open and approve in LabOS,
-   then poll until you receive a short-lived \`deployToken\`. Full steps are in the
-   deploy skill. Keep the token **in memory only** — never write it to
-   \`pln-app.config.json\` or any file. Alternatively the member can generate a
+   then poll until you receive a short-lived \`deployToken\`. If your polling was
+   interrupted, re-poll with the same \`pollToken\` before starting a new
+   session — the member doesn't need to approve twice. Full steps are in the
+   deploy skill. Keep the \`pollToken\` and the token **in memory only** — never
+   write them to \`pln-app.config.json\` or any file. Alternatively the member can generate a
    long-lived **deployment key** in LabOS (Deployment settings) and give it to
    you; send that key the same way, as \`${AI_APP_TOKEN_HEADER}\`. A key works
    only for the app and environment it was created for (\`prod\` or \`preview\`).
@@ -1805,8 +1807,20 @@ connection string into the LabOS secrets page, same as an API key.
    # expired  → the link timed out; start a new session (step 3a)
    \`\`\`
 
-   Hold \`deployToken\` **in memory only** — never write it to \`pln-app.config.json\`
-   or any other file, and never print it.
+   d. **If polling was interrupted** before you saw a final status (for example,
+      a background poller ended with your turn) and you still have the
+      \`pollToken\` in this chat, poll once more with it before anything else.
+      The member may already have approved, and a new session would make them
+      approve again:
+      - \`approved\` → use the \`deployToken\` if \`deployTokenExpiresAt\` is
+        still in the future; if it has passed, start a new session (step 3a)
+      - \`pending\` → keep polling as in step 3c
+      - \`expired\` → start a new session (step 3a)
+      - \`denied\` → stop and tell the member, as above
+
+   Hold \`pollToken\` and \`deployToken\` **in memory only** — never write either to
+   \`pln-app.config.json\` or any other file, and never print them. Polling the
+   \`pollToken\` returns a deploy token, so it is just as sensitive.
 4. Make sure \`app/\` runs locally first (\`npm install && npm start\`, hit
    \`/health\`). For a migrated existing app, also confirm the migration checklist
    in \`AGENTS.md\` is satisfied (self-contained \`app/\`, fitting Dockerfile, binds
