@@ -11,8 +11,17 @@ export function resourcesToForm(response: AiAppResourcesResponse | undefined): {
   values: AiAppResourceValues;
   isOverride: boolean;
 } {
-  if (response?.override) {
-    return { values: { ...response.override }, isOverride: true };
+  const override = response?.override;
+  if (override) {
+    return {
+      values: {
+        cpuRequest: override.cpuRequest ?? '',
+        cpuLimit: override.cpuLimit ?? '',
+        memoryRequest: override.memoryRequest ?? '',
+        memoryLimit: override.memoryLimit ?? '',
+      },
+      isOverride: true,
+    };
   }
   return { values: { ...DEFAULT_AI_APP_RESOURCES }, isOverride: false };
 }
@@ -24,6 +33,17 @@ export function trimResourceValues(values: AiAppResourceValues): AiAppResourceVa
     memoryRequest: values.memoryRequest.trim(),
     memoryLimit: values.memoryLimit.trim(),
   };
+}
+
+export function isSameResourceValues(a: AiAppResourceValues, b: AiAppResourceValues): boolean {
+  const left = trimResourceValues(a);
+  const right = trimResourceValues(b);
+  return (
+    left.cpuRequest === right.cpuRequest &&
+    left.cpuLimit === right.cpuLimit &&
+    left.memoryRequest === right.memoryRequest &&
+    left.memoryLimit === right.memoryLimit
+  );
 }
 
 export function hasEmptyResourceValue(values: AiAppResourceValues): boolean {

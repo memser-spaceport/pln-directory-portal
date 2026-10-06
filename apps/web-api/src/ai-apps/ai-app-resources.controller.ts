@@ -16,6 +16,7 @@ import {
   AiAppEnvironmentSchema,
   UpdateAiAppResourcesDto,
 } from './dto/ai-app-resources.dto';
+import { NoCache } from '../decorators/no-cache.decorator';
 
 @Controller('v1/admin/ai-app-resources')
 @UseGuards(AiAppsResourcesAdminAuthGuard)
@@ -24,11 +25,13 @@ export class AiAppResourcesController {
     private readonly resources: AiAppResourcesService,
   ) {}
 
+  @NoCache()
   @Get()
   list() {
     return this.resources.list();
   }
 
+  @NoCache()
   @Get(':appId')
   get(
     @Param('appId') appId: string,

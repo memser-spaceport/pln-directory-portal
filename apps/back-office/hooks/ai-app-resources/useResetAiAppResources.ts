@@ -13,13 +13,17 @@ export function useResetAiAppResources() {
   return useMutation({
     mutationFn: (params: ResetAiAppResourcesParams) => resetAiAppResources(params),
     onSuccess: (_, variables) =>
-      queryClient.invalidateQueries({
-        queryKey: [
-          AiAppResourcesQueryKeys.GET_AI_APP_RESOURCES,
-          variables.authToken,
-          variables.appId,
-          variables.environment,
-        ],
-      }),
+      Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: [
+            AiAppResourcesQueryKeys.GET_AI_APP_RESOURCES,
+            variables.authToken,
+            variables.appId,
+            variables.environment,
+          ],
+        }),
+        // A resource change can redeploy the app, so its status in the list can change too.
+        queryClient.invalidateQueries({ queryKey: [AiAppResourcesQueryKeys.GET_AI_APPS_LIST, variables.authToken] }),
+      ]),
   });
 }

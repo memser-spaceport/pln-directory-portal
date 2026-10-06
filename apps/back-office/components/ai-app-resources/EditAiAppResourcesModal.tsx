@@ -11,6 +11,7 @@ import { AiAppResourceValues, AiAppTarget } from '../../screens/ai-app-resources
 import {
   getApiErrorMessage,
   hasEmptyResourceValue,
+  isSameResourceValues,
   resourcesToForm,
   trimResourceValues,
 } from '../../screens/ai-app-resources/utils';
@@ -32,6 +33,8 @@ export const EditAiAppResourcesModal: React.FC<EditAiAppResourcesModalProps> = (
 
   const { values: loadedValues, isOverride } = resourcesToForm(data);
   const isBusy = updateMutation.isLoading || resetMutation.isLoading;
+  const isUnchanged = !!form && isSameResourceValues(form, loadedValues);
+  const saveDisabled = isBusy || isFetching || !form || isUnchanged;
 
   // Fill the form from the latest GET response (initial load, and again after save/reset).
   useEffect(() => {
@@ -50,7 +53,7 @@ export const EditAiAppResourcesModal: React.FC<EditAiAppResourcesModalProps> = (
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!target || !form || isBusy) return;
+    if (!target || !form || saveDisabled) return;
 
     if (hasEmptyResourceValue(form)) {
       setFormError('All four fields are required.');
@@ -112,7 +115,7 @@ export const EditAiAppResourcesModal: React.FC<EditAiAppResourcesModalProps> = (
         <div className="px-6 py-6">
           {isLoading && <p className="text-sm text-gray-500">Loading resources...</p>}
 
-          {isError && !isLoading && (
+          {isError && !data && (
             <div className="space-y-3">
               <p className="text-sm text-red-600">
                 {getApiErrorMessage(error, 'Failed to load resources for this app.')}
@@ -222,10 +225,10 @@ export const EditAiAppResourcesModal: React.FC<EditAiAppResourcesModalProps> = (
               <button
                 type="submit"
                 form="edit-ai-app-resources-form"
-                disabled={isBusy || !form}
+                disabled={saveDisabled}
                 className={clsx(
                   'inline-flex items-center rounded-lg border border-transparent px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors',
-                  isBusy || !form ? 'cursor-not-allowed bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'
+                  saveDisabled ? 'cursor-not-allowed bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'
                 )}
               >
                 {updateMutation.isLoading ? 'Saving...' : 'Save'}

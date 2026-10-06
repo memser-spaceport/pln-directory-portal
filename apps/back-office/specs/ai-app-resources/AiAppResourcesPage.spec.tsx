@@ -99,6 +99,14 @@ describe('AI Apps Resources page', () => {
     expect(mockReplace).toHaveBeenCalledWith('/access-denied');
   });
 
+  it('redirects when the login cookie has no user data', () => {
+    mockUseAuth.mockReturnValue({ user: null, isLoading: false, hasPermission: () => false });
+    const { container } = renderWithClient(<AiAppResourcesPage />);
+
+    expect(container.innerHTML).toBe('');
+    expect(mockReplace).toHaveBeenCalledWith('/access-denied');
+  });
+
   it('lists every app per environment and opens the editor for the exact app and environment', async () => {
     asUser(['ai_apps.resources.manage']);
     mockList.mockResolvedValue(apps);

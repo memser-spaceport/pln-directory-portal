@@ -35,7 +35,7 @@ const StatusBadge = ({ status }: { status: string | null }) => (
 
 const AiAppResourcesPage = () => {
   const router = useRouter();
-  const { hasPermission, isLoading, user } = useAuth();
+  const { hasPermission, isLoading } = useAuth();
   const [authToken] = useCookie('plnadmin');
   const [editTarget, setEditTarget] = useState<AiAppTarget | null>(null);
 
@@ -59,10 +59,10 @@ const AiAppResourcesPage = () => {
   }, [authToken, router]);
 
   useEffect(() => {
-    if (!isLoading && user && !canManage) {
+    if (authToken && !isLoading && !canManage) {
       router.replace('/access-denied');
     }
-  }, [isLoading, user, canManage, router]);
+  }, [authToken, isLoading, canManage, router]);
 
   if (!canManage) {
     return null;

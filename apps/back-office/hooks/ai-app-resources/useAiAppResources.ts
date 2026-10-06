@@ -17,5 +17,7 @@ export function useAiAppResources(params: { authToken: string | undefined; targe
     enabled: !!authToken && !!target,
     // Always read the current value when the dialog opens; it is the source of truth after save/reset.
     staleTime: 0,
+    // A focus refetch would refill the form and drop unsaved edits.
+    refetchOnWindowFocus: false,
   });
 }

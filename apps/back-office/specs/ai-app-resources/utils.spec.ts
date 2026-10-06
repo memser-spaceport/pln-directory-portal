@@ -3,6 +3,7 @@ import {
   getApiErrorMessage,
   getHostUrl,
   hasEmptyResourceValue,
+  isSameResourceValues,
   resourcesToForm,
   trimResourceValues,
 } from '../../screens/ai-app-resources/utils';
@@ -56,6 +57,27 @@ describe('ai-app-resources utils', () => {
       memoryLimit: '',
     });
     expect(hasEmptyResourceValue({ ...values, memoryLimit: '1Gi' })).toBe(false);
+  });
+
+  it('fills missing override fields with empty strings', () => {
+    const partial = { cpuRequest: '1', cpuLimit: '2' } as unknown as {
+      cpuRequest: string;
+      cpuLimit: string;
+      memoryRequest: string;
+      memoryLimit: string;
+    };
+    expect(resourcesToForm({ appId: 'a', environment: 'prod', override: partial }).values).toEqual({
+      cpuRequest: '1',
+      cpuLimit: '2',
+      memoryRequest: '',
+      memoryLimit: '',
+    });
+  });
+
+  it('compares values after trimming', () => {
+    const values = { cpuRequest: '30m', cpuLimit: '300m', memoryRequest: '64Mi', memoryLimit: '384Mi' };
+    expect(isSameResourceValues({ ...values, cpuRequest: ' 30m ' }, values)).toBe(true);
+    expect(isSameResourceValues({ ...values, cpuLimit: '1' }, values)).toBe(false);
   });
 
   describe('getApiErrorMessage', () => {

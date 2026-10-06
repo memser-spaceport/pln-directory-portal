@@ -58,6 +58,20 @@ describe('EditAiAppResourcesModal', () => {
     expect(screen.queryByText('Reset to defaults')).toBeNull();
   });
 
+  it('keeps save disabled until a value changes, so the defaults are not saved as an override by accident', async () => {
+    mockFetch.mockResolvedValue({ appId: 'pl-marketing-os', environment: 'preview', override: null });
+    renderModal();
+    await screen.findByText('Using default resources');
+
+    const save = screen.getByText('Save') as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.click(save);
+    expect(mockUpdate).not.toHaveBeenCalled();
+
+    fireEvent.change(input('cpuLimit'), { target: { value: '500m' } });
+    expect(save.disabled).toBe(false);
+  });
+
   it('shows the override values and marks them as a custom override', async () => {
     mockFetch.mockResolvedValue({ appId: 'pl-marketing-os', environment: 'preview', override });
     renderModal();
