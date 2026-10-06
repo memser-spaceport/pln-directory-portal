@@ -500,6 +500,7 @@ export class SpvSpotlightAdminService {
   }
 
   async sendOpenNotice(uid: string, includeAlreadySent: boolean, participantUids?: string[]) {
+    throw new BadRequestException('Open notice emails are disabled');
     const spotlight = await this.prisma.spvSpotlight.findUnique({
       where: { uid },
       include: { team: { select: { name: true } } },
