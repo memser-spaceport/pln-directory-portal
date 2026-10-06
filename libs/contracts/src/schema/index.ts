@@ -51,3 +51,4 @@ export * from './network-overview';
 export * from './roadmap';
 export * from './follow';
 export * from './feed';
+export * from './pl-infra-members';
