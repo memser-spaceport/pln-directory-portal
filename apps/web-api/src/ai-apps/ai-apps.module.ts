@@ -18,6 +18,7 @@ import { AiAppsConnectService } from './ai-apps-connect.service';
 import { AiAppsSessionService } from './ai-apps-session.service';
 import { AiAppsAuthGateService } from './ai-apps-auth-gate.service';
 import { AiAppsStarterKitService } from './ai-apps-starter-kit.service';
+import { AiAppsKitUpdateNotificationService } from './ai-apps-kit-update-notification.service';
 import { AiAppsTestingUsersService } from './ai-apps-testing-users.service';
 import { AiAppMeRbacGuard } from './guards/ai-app-me-rbac.guard';
 import { AiAppMemberContextGuard } from './guards/ai-app-member-context.guard';
@@ -55,6 +56,7 @@ import { AiAppResourcesService } from './ai-app-resources.service';
     AiAppsSessionService,
     AiAppsAuthGateService,
     AiAppsStarterKitService,
+    AiAppsKitUpdateNotificationService,
     AiAppsTestingUsersService,
     AiAppMemberContextGuard,
     AiAppMeRbacGuard,
