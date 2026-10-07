@@ -65,7 +65,7 @@ describe('AiAppsKitUpdateNotificationService', () => {
       category: PushNotificationCategory.AI_APP,
       title: 'Starter Kit v1.17 is out',
       description: "See what's new and download the latest kit — or ask your agent to update an existing one.",
-      linkText: 'Get the starter kit →',
+      linkText: 'Get the starter kit',
       link: '/pl-infra/ai-apps?dialog=addAiApp',
       isPublic: false,
       requiredPermissions: ['ai_apps.read', 'ai_apps.write'],

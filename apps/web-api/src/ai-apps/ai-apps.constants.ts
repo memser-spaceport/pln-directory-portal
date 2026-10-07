@@ -683,7 +683,7 @@ export const AI_APPS_NOTIFICATION_MESSAGES = {
   starterKitUpdated: (version: string) => ({
     title: `Starter Kit v${version} is out`,
     description: "See what's new and download the latest kit — or ask your agent to update an existing one.",
-    linkText: 'Get the starter kit →',
+    linkText: 'Get the starter kit',
   }),
 } as const;
 
