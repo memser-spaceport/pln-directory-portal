@@ -27,3 +27,6 @@ export function mcpConsentUrl(): string {
   const web = (process.env.WEB_UI_BASE_URL || '').replace(/\/+$/, '');
   return `${web}/mcp/authorize`;
 }
+
+/** AI Apps feedback tools that change data; `mcp-tool-invoked` counts them as writes. */
+export const AI_APP_FEEDBACK_WRITE_TOOLS = ['update_ai_app_feedback_status'];

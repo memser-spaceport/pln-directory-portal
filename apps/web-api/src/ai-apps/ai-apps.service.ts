@@ -2046,6 +2046,76 @@ export class AiAppsService {
     return updated;
   }
 
+  /**
+   * The member's own apps for the Directory MCP: only apps they created, newest
+   * first. Directory admins get no extra apps here (LabOS keeps that view).
+   */
+  async listOwnAppsForMcp(
+    memberUid: string
+  ): Promise<Array<Pick<AiApp, 'uid' | 'appId' | 'name' | 'status' | 'feedbackEnabled' | 'createdAt' | 'updatedAt'>>> {
+    return this.prisma.aiApp.findMany({
+      where: { memberUid, status: { not: 'DELETED' } },
+      orderBy: { updatedAt: 'desc' },
+      select: { uid: true, appId: true, name: true, status: true, feedbackEnabled: true, createdAt: true, updatedAt: true },
+    });
+  }
+
+  /**
+   * One page of an app's feedback for the Directory MCP, newest first, with
+   * pins and the conversation. Creator-only: a directory admin who did not
+   * create the app gets the same error as a missing app.
+   */
+  async listFeedbackForMcp(
+    memberUid: string,
+    appUid: string,
+    filter: { status?: AiAppFeedbackStatus; from?: Date; to?: Date; limit: number; offset: number }
+  ): Promise<{
+    items: Array<WithMember<FeedbackWithPins> & { comments?: Array<WithMember<FeedbackComment>> }>;
+    total: number;
+  }> {
+    const app = await this.findMcpFeedbackApp(memberUid, appUid);
+    const createdAt =
+      filter.from || filter.to
+        ? { ...(filter.from ? { gte: filter.from } : {}), ...(filter.to ? { lte: filter.to } : {}) }
+        : undefined;
+    const [items, total] = await Promise.all([
+      this.queryFeedback(app.uid, filter.status, {
+        withComments: true,
+        createdAt,
+        skip: filter.offset,
+        take: filter.limit,
+      }),
+      this.prisma.aiAppFeedback.count({
+        where: { appUid: app.uid, ...(filter.status ? { status: filter.status } : {}), ...(createdAt ? { createdAt } : {}) },
+      }),
+    ]);
+    return { items, total };
+  }
+
+  /**
+   * Sets VIEWED or IMPLEMENTED on one item for the Directory MCP, with the same
+   * closing-note behavior as the agent API. Creator-only, as the list.
+   */
+  async updateFeedbackStatusForMcp(
+    memberUid: string,
+    appUid: string,
+    feedbackUid: string,
+    status: Extract<AiAppFeedbackStatus, 'VIEWED' | 'IMPLEMENTED'>,
+    note?: string
+  ): Promise<WithMember<AiAppFeedback>> {
+    await this.findMcpFeedbackApp(memberUid, appUid);
+    return this.updateAgentFeedbackStatus(memberUid, appUid, feedbackUid, status, undefined, note);
+  }
+
+  /** Missing, deleted and not-yours all read the same, so the MCP never confirms that another member's app exists. */
+  private async findMcpFeedbackApp(memberUid: string, appUid: string): Promise<AiApp> {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid: appUid } });
+    if (!app || app.status === 'DELETED' || app.memberUid !== memberUid) {
+      throw new NotFoundException(`AI App not found among your apps: ${appUid}`);
+    }
+    return app;
+  }
+
   private trackAgentFeedback(name: string, distinctId: string, properties: Record<string, unknown>): void {
     void this.analyticsService.trackEvent({ name, distinctId, properties });
   }
@@ -2069,11 +2139,22 @@ export class AiAppsService {
   private async queryFeedback(
     appUid: string,
     status?: AiAppFeedbackStatus,
-    options: { withComments?: boolean } = {}
+    options: {
+      withComments?: boolean;
+      createdAt?: { gte?: Date; lte?: Date };
+      skip?: number;
+      take?: number;
+    } = {}
   ): Promise<Array<WithMember<FeedbackWithPins> & { comments?: Array<WithMember<FeedbackComment>> }>> {
     const feedback = await this.prisma.aiAppFeedback.findMany({
-      where: status ? { appUid, status } : { appUid },
+      where: {
+        appUid,
+        ...(status ? { status } : {}),
+        ...(options.createdAt ? { createdAt: options.createdAt } : {}),
+      },
       orderBy: { createdAt: 'desc' },
+      ...(options.skip !== undefined ? { skip: options.skip } : {}),
+      ...(options.take !== undefined ? { take: options.take } : {}),
       include: {
         pins: { select: PIN_PUBLIC_SELECT, orderBy: { n: 'asc' } },
         _count: { select: { comments: true } },
