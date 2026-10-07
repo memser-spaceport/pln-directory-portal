@@ -1,8 +1,9 @@
 import { AnalyticsService } from '../analytics/service/analytics.service';
 import { ANALYTICS_EVENTS } from '../utils/constants';
+import { AI_APP_FEEDBACK_WRITE_TOOLS } from './mcp.constants';
 import type { McpTokenActor } from './mcp-oauth.service';
 
-const MCP_WRITE_TOOLS = new Set(['submit_warm_path_feedback', 'submit_warm_path_note']);
+const MCP_WRITE_TOOLS = new Set(['submit_warm_path_feedback', 'submit_warm_path_note', ...AI_APP_FEEDBACK_WRITE_TOOLS]);
 
 export type McpToolOperation = 'read' | 'write';
 
@@ -84,6 +85,25 @@ export function buildMcpToolAnalyticsProperties(
     case 'search_forum_threads':
       props.limit = numberProp(result?.limit) ?? numberProp(args.limit);
       props.resultCount = countOf(result?.results);
+      break;
+    case 'list_my_ai_apps':
+      props.resultCount = countOf(result?.apps);
+      break;
+    case 'list_ai_app_feedback':
+      props.appUid = stringProp(args.appUid);
+      props.status = stringProp(args.status);
+      props.limit = numberProp(result?.limit) ?? numberProp(args.limit);
+      props.offset = numberProp(result?.offset) ?? numberProp(args.offset);
+      props.resultCount = countOf(result?.items);
+      if (typeof result?.total === 'number') {
+        props.total = result.total;
+      }
+      break;
+    case 'update_ai_app_feedback_status':
+      props.appUid = stringProp(args.appUid);
+      props.feedbackUid = stringProp(args.feedbackUid);
+      props.status = stringProp(args.status);
+      props.hasNote = Boolean(stringProp(args.note));
       break;
     case 'get_member':
     case 'get_team':

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AccessControlV2Module } from '../access-control-v2/access-control-v2.module';
+import { AiAppsModule } from '../ai-apps/ai-apps.module';
 import { MasterProfileModule } from '../master-profile/master-profile.module';
 import { MembersModule } from '../members/members.module';
 import { TeamsModule } from '../teams/teams.module';
@@ -26,6 +27,7 @@ import { McpController } from './mcp.controller';
     ProjectsModule,
     PLEventsModule,
     SearchModule,
+    AiAppsModule,
   ],
   controllers: [McpOAuthController, McpAuthorizationsController, McpController],
   providers: [McpOAuthService],
