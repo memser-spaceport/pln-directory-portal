@@ -64,6 +64,6 @@ import { AiAppResourcesService } from './ai-app-resources.service';
     AgentFeedbackDeniedInterceptor,
     AwsService,
   ],
-  exports: [AiAppsService],
+  exports: [AiAppsService, AiAppsAccessService, AiAppsSessionService],
 })
 export class AiAppsModule {}

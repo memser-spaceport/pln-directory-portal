@@ -3890,19 +3890,25 @@ model AiAppDeployKey {
 /// App-scoped member session for one deployed AI App (LAB-2695). The token handed to the app is a signed JWT bound to
 /// `appId`; only its sha256 is stored, and every use is validated here (idle timeout, absolute expiry, revocation).
 model AiAppSession {
-  id            Int       @id @default(autoincrement())
-  uid           String    @unique @default(cuid())
-  appId         String
-  memberUid     String
-  tokenHash     String    @unique
-  createdAt     DateTime  @default(now())
-  lastUsedAt    DateTime  @default(now())
-  idleExpiresAt DateTime
-  expiresAt     DateTime
-  revokedAt     DateTime?
+  id                   Int       @id @default(autoincrement())
+  uid                  String    @unique @default(cuid())
+  appId                String
+  memberUid            String
+  tokenHash            String    @unique
+  createdAt            DateTime  @default(now())
+  lastUsedAt           DateTime  @default(now())
+  idleExpiresAt        DateTime
+  expiresAt            DateTime
+  revokedAt            DateTime?
+  /// True when an agent minted this session (LAB-2763). Browser sessions stay false.
+  isAgent              Boolean   @default(false)
+  /// McpAuthorization.uid that minted an agent session. Null for a browser session.
+  /// LAB-2764 ends these sessions from this column. Revoke does not use it yet.
+  mcpAuthorizationUid  String?
 
   @@index([memberUid, revokedAt])
   @@index([expiresAt])
+  @@index([mcpAuthorizationUid])
 }
 
 /// One-time code LabOS mints for the app-session sign-in round trip; redeemable once, for the same appId + target,

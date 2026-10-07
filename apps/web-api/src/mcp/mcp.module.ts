@@ -10,6 +10,8 @@ import { SearchModule } from '../search/search.module';
 import { RbacModule } from '../rbac/rbac.module';
 import { SharedModule } from '../shared/shared.module';
 import { WarmIntrosV2Module } from '../warm-intros-v2/warm-intros-v2.module';
+import { McpAppSessionService } from './mcp-app-session.service';
+import { McpAppSessionsController } from './mcp-app-sessions.controller';
 import { McpAuthorizationsController } from './mcp-authorizations.controller';
 import { McpOAuthController } from './mcp-oauth.controller';
 import { McpOAuthService } from './mcp-oauth.service';
@@ -29,7 +31,7 @@ import { McpController } from './mcp.controller';
     SearchModule,
     AiAppsModule,
   ],
-  controllers: [McpOAuthController, McpAuthorizationsController, McpController],
-  providers: [McpOAuthService],
+  controllers: [McpOAuthController, McpAuthorizationsController, McpAppSessionsController, McpController],
+  providers: [McpOAuthService, McpAppSessionService],
 })
 export class McpModule {}

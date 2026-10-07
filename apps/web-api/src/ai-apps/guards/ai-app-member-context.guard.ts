@@ -39,6 +39,9 @@ export class AiAppMemberContextGuard implements CanActivate {
         return true;
       }
       req.memberUid = session.memberUid;
+      if (session.isAgent) {
+        req.aiAppAgent = true;
+      }
       return true;
     }
     await validateUserAccessToken(req);
