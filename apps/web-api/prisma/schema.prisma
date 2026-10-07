@@ -4573,3 +4573,62 @@ model McpAuthCode {
 
   @@index([expiresAt])
 }
+
+/// One UTC calendar day of suggested-candidate matching.
+model JobMatchRun {
+  uid         String            @id @default(cuid())
+  runDate     DateTime          @unique @db.Date
+  status      JobMatchRunStatus @default(RUNNING)
+  /// Held by the worker. A stale timestamp means the previous worker died and a rerun may claim the row.
+  lockedUntil DateTime?
+  error       String?
+  startedAt   DateTime          @default(now())
+  finishedAt  DateTime?
+  rows        JobMatchRow[]
+}
+
+enum JobMatchRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum JobMatchKind {
+  TEAM
+  ROLE
+  SCORE
+  CRITERIA
+  SUGGESTION
+}
+
+enum JobMatchLabel {
+  STRONG
+  GOOD
+}
+
+/// Resume state and stored results.
+/// TEAM: team finished. ROLE: role finished. SCORE: member fits in payload.
+/// CRITERIA: cached criteria in payload, keyed by roleTextHash.
+/// SUGGESTION: one of the top 5. Marked criteria live in payload.
+/// Unused key columns are empty strings so one unique index covers every kind.
+model JobMatchRow {
+  uid          String         @id @default(cuid())
+  runUid       String
+  run          JobMatchRun    @relation(fields: [runUid], references: [uid], onDelete: Cascade)
+  teamUid      String         @default("")
+  roleUid      String         @default("")
+  memberUid    String         @default("")
+  roleTextHash String         @default("")
+  kind         JobMatchKind
+  rank         Int?
+  fit          Int?
+  label        JobMatchLabel?
+  blurb        String?
+  payload      Json?
+  createdAt    DateTime       @default(now())
+
+  @@unique([kind, runUid, teamUid, roleUid, memberUid, roleTextHash])
+  @@index([runUid, teamUid, kind])
+  @@index([kind, roleUid, createdAt])
+  @@index([kind, roleUid, roleTextHash])
+}
