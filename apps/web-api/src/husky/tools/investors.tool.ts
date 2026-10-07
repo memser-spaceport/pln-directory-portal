@@ -4,11 +4,8 @@ import { tool, CoreTool } from 'ai';
 import { z } from 'zod';
 import { LogService } from '../../shared/log.service';
 import { PrismaService } from '../../shared/prisma.service';
-import { RbacService } from '../../rbac/rbac.service';
-import { INVESTOR_DB_VIEW_PERMISSIONS } from '../../rbac/rbac.constants';
-import { memberHasAnyPermission } from '../../rbac/rbac-permission-check';
-import { AccessControlV2Service } from '../../access-control-v2/services/access-control-v2.service';
 import { HuskyAuthContext } from './husky-auth-context';
+import { InvestorDbAccess } from './investor-db-access';
 import {
   fuzzyMatches,
   fuzzySqlContainsCondition,
@@ -16,6 +13,8 @@ import {
   searchTerms,
   tokenize,
 } from './fuzzy-match.util';
+
+export const INVESTOR_PROFILES_TOOL_NAME = 'getInvestorProfiles';
 
 const MAX_RESULTS = 15;
 // Only used when there is no free-text search: a small buffer above MAX_RESULTS to absorb the
@@ -48,35 +47,21 @@ type InvestorProfileRow = Prisma.InvestorProfileGetPayload<{
 
 @Injectable()
 export class InvestorsTool {
-  constructor(
-    private logger: LogService,
-    private prisma: PrismaService,
-    private rbacService: RbacService,
-    private accessControlV2Service: AccessControlV2Service
-  ) {}
+  constructor(private logger: LogService, private prisma: PrismaService, private investorDbAccess: InvestorDbAccess) {}
 
   getTool(auth: HuskyAuthContext): CoreTool {
     return tool({
       description:
-        'Search the Investor DB for angels and funds by investment focus, startup stage they invest in, fund type, or typical check size. Only returns data when the signed-in user has Investor DB access; unavailable to everyone else.',
+        'Search the self-reported investor profiles that network members and teams fill in on their own LabOS profile (investment focus, startup stages they invest in, fund types, typical check size). This is NOT the Investor DB — use getInvestorDb for that. Only returns data when the signed-in user has Investor DB access; unavailable to everyone else.',
       parameters: InvestorsToolParams,
       execute: (args) => this.execute(args, auth),
     });
   }
 
   private async execute(args: z.infer<typeof InvestorsToolParams>, auth: HuskyAuthContext) {
-    if (!auth.memberUid) {
-      return 'User is not logged in, so Investor DB data is unavailable.';
-    }
-
-    const allowed = await memberHasAnyPermission(
-      this.rbacService,
-      this.accessControlV2Service,
-      auth.memberUid,
-      INVESTOR_DB_VIEW_PERMISSIONS
-    );
-    if (!allowed) {
-      return 'The signed-in user does not have Investor DB access, so investor data is unavailable.';
+    const access = await this.investorDbAccess.check(auth, INVESTOR_PROFILES_TOOL_NAME);
+    if (!access.allowed) {
+      return access.message;
     }
 
     this.logger.info(`Getting investors for args: ${JSON.stringify(args)}`);

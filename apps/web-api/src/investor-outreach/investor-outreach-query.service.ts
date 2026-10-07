@@ -22,7 +22,7 @@ import {
   isAllowedStageFocus,
   INVESTOR_OUTREACH_SECTOR_TAGS,
 } from './investor-outreach.vocab';
-import { buildInvestorTextSearch } from './investor-text-search.util';
+import { buildInvestorTextSearch, buildSectorTagsCondition } from './investor-text-search.util';
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 50;
@@ -204,18 +204,9 @@ export class InvestorOutreachQueryService {
     const enrichmentStatus = enumFilter(query.enrichmentStatus, isAllowedEnrichmentStatus);
     if (enrichmentStatus) conditions.push({ enrichmentStatus: { in: enrichmentStatus } });
 
-    // sectorTags is stored as a comma-separated string. Match each requested tag as a discrete token
-    // (delimited by commas or string edges) to avoid substring collisions inside the CSV value.
     const sectorTags = parseCsv(query.sectorTags).filter((t) => SECTOR_TAG_SET.has(t));
     if (sectorTags.length) {
-      conditions.push({
-        OR: sectorTags.flatMap((tag) => [
-          { sectorTags: tag },
-          { sectorTags: { startsWith: `${tag},` } },
-          { sectorTags: { endsWith: `,${tag}` } },
-          { sectorTags: { contains: `,${tag},` } },
-        ]),
-      });
+      conditions.push(buildSectorTagsCondition(sectorTags));
     }
 
     if (query.geoFocus && query.geoFocus.trim()) {

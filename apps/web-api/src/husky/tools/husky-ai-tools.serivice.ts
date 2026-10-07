@@ -12,6 +12,8 @@ import { InvestorsTool } from './investors.tool';
 import { JobOpeningsTool } from './job-openings.tool';
 import { NewsTool } from './news.tool';
 import { DemoDayTool } from './demo-day.tool';
+import { InvestorDbTool } from './investor-db.tool';
+import { WarmIntrosTool } from './warm-intros.tool';
 import { HuskyAuthContext } from './husky-auth-context';
 
 /**
@@ -32,7 +34,9 @@ export class HuskyAiToolsService implements OnModuleInit {
     private investorsTool: InvestorsTool,
     private jobOpeningsTool: JobOpeningsTool,
     private newsTool: NewsTool,
-    private demoDayTool: DemoDayTool
+    private demoDayTool: DemoDayTool,
+    private investorDbTool: InvestorDbTool,
+    private warmIntrosTool: WarmIntrosTool
   ) {}
 
   async onModuleInit() {
@@ -49,7 +53,9 @@ export class HuskyAiToolsService implements OnModuleInit {
       getFocusAreas: this.focusAreasTool.getTool(),
       getAsks: this.asksTool.getTool(),
       getForumPosts: this.forumTool.getTool(isLoggedIn),
-      getInvestors: this.investorsTool.getTool(auth),
+      getInvestorProfiles: this.investorsTool.getTool(auth),
+      getInvestorDb: this.investorDbTool.getTool(auth),
+      getWarmIntros: this.warmIntrosTool.getTool(auth),
       getJobOpenings: this.jobOpeningsTool.getTool(),
       getTeamNews: this.newsTool.getTool(auth),
       getDemoDayTeams: this.demoDayTool.getTool(),

@@ -1,15 +1,12 @@
 // `ai` pulls in untranspiled ESM this jest config can't parse; `tool()` just needs to hand
 // back its config object so `getTool()` yields something with a callable `execute`.
 jest.mock('ai', () => ({ tool: (config: any) => config }));
-jest.mock('../../rbac/rbac-permission-check', () => ({ memberHasAnyPermission: jest.fn() }));
 
 import { InvestorsTool } from './investors.tool';
-import { memberHasAnyPermission } from '../../rbac/rbac-permission-check';
 
 describe('InvestorsTool', () => {
   const logger = { error: jest.fn(), info: jest.fn() };
-  const rbacService = {} as any;
-  const accessControlV2Service = {} as any;
+  const investorDbAccess = { check: jest.fn() };
   const auth = { isLoggedIn: true, memberUid: 'member-1' };
 
   function profile(overrides: Partial<Record<string, unknown>> = {}) {
@@ -31,7 +28,7 @@ describe('InvestorsTool', () => {
     const queryRaw = jest.fn();
     const findMany = jest.fn();
     const prisma = { investorProfile: { findMany }, $queryRaw: queryRaw } as any;
-    const tool = new InvestorsTool(logger as any, prisma, rbacService, accessControlV2Service);
+    const tool = new InvestorsTool(logger as any, prisma, investorDbAccess as any);
     return { tool, queryRaw, findMany };
   }
 
@@ -45,7 +42,7 @@ describe('InvestorsTool', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    (memberHasAnyPermission as jest.Mock).mockResolvedValue(true);
+    investorDbAccess.check.mockResolvedValue({ allowed: true });
   });
 
   it('resolves matching uids via raw SQL, then fetches only those profiles', async () => {
@@ -237,5 +234,20 @@ describe('InvestorsTool', () => {
 
     expect(findMany).toHaveBeenCalledTimes(1);
     expect(findMany.mock.calls[0][0].where.typicalCheckSize).toEqual({ not: null, gte: 10000 });
+  });
+
+  it('returns the gate message, under its own tool name, without touching the database when access is denied', async () => {
+    const { tool, queryRaw, findMany } = setup();
+    investorDbAccess.check.mockResolvedValue({
+      allowed: false,
+      message: 'The signed-in user does not have Investor DB access, so investor data is unavailable.',
+    });
+
+    const result = await execute(tool, { search: 'neuro' });
+
+    expect(result).toBe('The signed-in user does not have Investor DB access, so investor data is unavailable.');
+    expect(investorDbAccess.check).toHaveBeenCalledWith(auth, 'getInvestorProfiles');
+    expect(queryRaw).not.toHaveBeenCalled();
+    expect(findMany).not.toHaveBeenCalled();
   });
 });

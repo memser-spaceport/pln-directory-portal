@@ -1,4 +1,4 @@
-import { buildInvestorTextSearch } from './investor-text-search.util';
+import { buildInvestorTextSearch, buildSectorTagsCondition } from './investor-text-search.util';
 
 describe('buildInvestorTextSearch', () => {
   it('returns empty for blank query', () => {
@@ -65,5 +65,22 @@ describe('buildInvestorTextSearch', () => {
         },
       ],
     });
+  });
+});
+
+describe('buildSectorTagsCondition', () => {
+  it('matches each tag as a whole CSV token at either edge or in the middle', () => {
+    expect(buildSectorTagsCondition(['desci'])).toEqual({
+      OR: [
+        { sectorTags: 'desci' },
+        { sectorTags: { startsWith: 'desci,' } },
+        { sectorTags: { endsWith: ',desci' } },
+        { sectorTags: { contains: ',desci,' } },
+      ],
+    });
+  });
+
+  it('ORs several tags together', () => {
+    expect(buildSectorTagsCondition(['ai', 'crypto']).OR).toHaveLength(8);
   });
 });
