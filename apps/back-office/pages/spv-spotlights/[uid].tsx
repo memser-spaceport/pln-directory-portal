@@ -29,7 +29,11 @@ type TemplateKey =
 const TEMPLATE_LABELS: { key: TemplateKey; label: string }[] = [
   { key: 'invitePreapproved', label: 'Invite, pre-approved' },
   { key: 'followUpPreapproved', label: 'Follow-up, pre-approved' },
+  { key: 'opened', label: 'Spotlight is open' },
 ];
+
+// Gated model: investors are invited as pre-approved only. Kept so outreach can come back.
+const OUTREACH_UI_ENABLED = false;
 
 const BUILT_IN_TOKENS = ['investorName', 'investorEmail', 'spotlightTitle', 'spotlightLink', 'teamName', 'supportEmail'];
 
@@ -569,6 +573,7 @@ const SpvSpotlightDetailPage = () => {
     );
   const isReachable = (participant: Participant) => participant.access !== 'RESTRICTED' && !!participant.member.email;
   const eligibleRecipients = inviteRecipients.filter(isReachable);
+  const openNoticeRecipients = investors.filter(isReachable);
   const kindRecipients = bulkSend?.kind === 'open-notice' ? investors : inviteRecipients;
   const eligibleUidSet = new Set(kindRecipients.filter(isReachable).map((participant) => participant.uid));
   const sendTargets =
@@ -896,6 +901,16 @@ const SpvSpotlightDetailPage = () => {
                         >
                           Send Follow-ups to All
                         </button>
+                        {tab === 'investors' && (
+                          <button
+                            type="button"
+                            onClick={() => openBulkSend('open-notice', 'all')}
+                            disabled={!openNoticeRecipients.length}
+                            className={clsx(s.editButton, 'disabled:cursor-not-allowed disabled:opacity-50')}
+                          >
+                            Email that spotlight is open
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -970,6 +985,15 @@ const SpvSpotlightDetailPage = () => {
                   >
                     Send Follow-up to Selected
                   </button>
+                  {tab === 'investors' && (
+                    <button
+                      type="button"
+                      onClick={() => openBulkSend('open-notice', 'selected')}
+                      className={clsx(s.editButton, 'px-3 py-1.5')}
+                    >
+                      Send Open Notice to Selected
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={removeSelected}
@@ -1135,7 +1159,8 @@ const SpvSpotlightDetailPage = () => {
                             Grant access
                           </button>
                         )}
-                        {canMutateTeamPitches &&
+                        {OUTREACH_UI_ENABLED &&
+                          canMutateTeamPitches &&
                           tab === 'investors' &&
                           participant.cohort === 'PRE_APPROVED' &&
                           participant.accessRequestStatus !== 'APPROVED' && (
@@ -1233,6 +1258,7 @@ const SpvSpotlightDetailPage = () => {
         spotlightUid={uid}
         defaultType={tab === 'founders' ? 'FOUNDER' : 'INVESTOR'}
         defaultCohort={tab === 'outreach' ? 'OUTREACH' : 'PRE_APPROVED'}
+        showCohort={OUTREACH_UI_ENABLED}
         onAdded={() => loadParticipants()}
       />
       <TeamPitchConfirmModal
