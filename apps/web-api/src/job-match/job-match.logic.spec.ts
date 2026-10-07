@@ -142,6 +142,28 @@ describe('job match logic', () => {
     expect(labelFor(GOOD_FIT - 1)).toBeNull();
   });
 
+  it('ranks an interested member first on a tie and marks each row (LAB-2788)', () => {
+    const fits = new Map<string, Record<string, number>>([
+      ['m-a', { 'role-1': 70 }],
+      ['m-b', { 'role-1': 70 }],
+      ['m-c', { 'role-1': 90 }],
+      ['m-low', { 'role-1': 40 }],
+    ]);
+    const top = selectTop([...fits.keys()], fits, 'role-1', new Set(['m-b', 'm-low']));
+    expect(top.map((row) => row.memberUid)).toEqual(['m-c', 'm-b', 'm-a']);
+    expect(top.map((row) => row.interested)).toEqual([false, true, false]);
+  });
+
+  it('keeps the old order when nobody is interested (LAB-2788)', () => {
+    const fits = new Map<string, Record<string, number>>([
+      ['m-b', { 'role-1': 70 }],
+      ['m-a', { 'role-1': 70 }],
+    ]);
+    const top = selectTop([...fits.keys()], fits, 'role-1');
+    expect(top.map((row) => row.memberUid)).toEqual(['m-a', 'm-b']);
+    expect(top.every((row) => row.interested === false)).toBe(true);
+  });
+
   it('plans a same-day resume around finished teams, roles, and member scores', () => {
     const done = planTeamWork({
       teamFinished: true,

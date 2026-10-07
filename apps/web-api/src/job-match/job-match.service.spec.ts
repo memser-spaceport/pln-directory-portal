@@ -68,6 +68,7 @@ describe('JobMatchService', () => {
         label: 'STRONG',
         blurb: 'Knows Go.',
         payload: [{ text: 'Go', matched: true }],
+        interested: true,
       },
     ]);
     memberFindMany.mockResolvedValue([
@@ -86,6 +87,7 @@ describe('JobMatchService', () => {
           rank: 1,
           blurb: 'Knows Go.',
           criteria: [{ text: 'Go', matched: true }],
+          interested: true,
         },
       ],
     });

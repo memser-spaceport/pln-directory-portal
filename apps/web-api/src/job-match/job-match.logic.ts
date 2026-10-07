@@ -56,6 +56,8 @@ export type RankedCandidate = {
   memberUid: string;
   fit: number;
   label: MatchLabel;
+  /** The member said they are interested in this role or in its team (LAB-2788). */
+  interested: boolean;
 };
 
 export function utcRunDate(now = new Date()): Date {
@@ -306,19 +308,23 @@ export function labelFor(fit: number): MatchLabel | null {
   return null;
 }
 
+/** Highest fit first; on equal fit an interested member ranks first, then by uid. */
 export function selectTop(
   memberUids: string[],
   fitsByMember: Map<string, Record<string, number>>,
-  roleUid: string
+  roleUid: string,
+  interestedUids: ReadonlySet<string> = new Set()
 ): RankedCandidate[] {
   return memberUids
     .map((memberUid) => {
       const fit = fitsByMember.get(memberUid)?.[roleUid] ?? 0;
       const label = labelFor(fit);
-      return label ? { memberUid, fit, label } : null;
+      return label ? { memberUid, fit, label, interested: interestedUids.has(memberUid) } : null;
     })
     .filter((row): row is RankedCandidate => row !== null)
-    .sort((a, b) => b.fit - a.fit || a.memberUid.localeCompare(b.memberUid))
+    .sort(
+      (a, b) => b.fit - a.fit || Number(b.interested) - Number(a.interested) || a.memberUid.localeCompare(b.memberUid)
+    )
     .slice(0, TOP_N);
 }
 

@@ -4625,6 +4625,8 @@ model JobMatchRow {
   label        JobMatchLabel?
   blurb        String?
   payload      Json?
+  /// SUGGESTION rows: the member said they are interested in the role or in its team (LAB-2788).
+  interested   Boolean        @default(false)
   createdAt    DateTime       @default(now())
 
   @@unique([kind, runUid, teamUid, roleUid, memberUid, roleTextHash])
