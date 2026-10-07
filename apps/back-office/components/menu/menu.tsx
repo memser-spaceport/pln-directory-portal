@@ -5,6 +5,8 @@ import { useAuth } from '../../context/auth-context';
 import { IrlGatheringMenu } from './components/IrlGatheringMenu/IrlGatheringMenu';
 import { DealsMenu } from './components/DealsMenu/DealsMenu';
 import { FounderGuidesMenu } from './components/FounderGuidesMenu/FounderGuidesMenu';
+import { AiAppResourcesMenu } from './components/AiAppResourcesMenu/AiAppResourcesMenu';
+import { canManageAiAppResources } from '../../screens/ai-app-resources/utils';
 
 export function Menu() {
   const { isDirectoryAdmin, canViewDemoDays, hasPermission } = useAuth();
@@ -19,6 +21,7 @@ export function Menu() {
       {isDirectoryAdmin && <IrlGatheringMenu />}
       {isDirectoryAdmin && <DealsMenu />}
       {isDirectoryAdmin && <FounderGuidesMenu />}
+      {canManageAiAppResources(hasPermission) && <AiAppResourcesMenu />}
     </ul>
   );
 }

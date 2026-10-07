@@ -2,7 +2,7 @@ import { ChangeEvent, useEffect, useState } from 'react';
 import { InputField } from '@protocol-labs-network/ui';
 import { useRouter } from 'next/router';
 import { ReactComponent as Building } from '/public/assets/icons/building.svg';
-import APP_CONSTANTS, { ADMIN_PERMISSIONS } from '../utils/constants';
+import APP_CONSTANTS, { ADMIN_PERMISSIONS, AI_APPS_PERMISSIONS } from '../utils/constants';
 import { parseCookies } from 'nookies';
 import Loader from '../components/common/loader';
 import { ReactComponent as LogoImage } from '/public/assets/images/Back_office_Logo.svg';
@@ -32,6 +32,10 @@ function getDefaultRedirect(user: AdminUser | null): string {
     permissions.some((permission) => permission.startsWith('demoday.admin.'));
   if (isDemoDayAdmin) {
     return '/demo-days';
+  }
+
+  if (permissions.includes(AI_APPS_PERMISSIONS.RESOURCES_MANAGE)) {
+    return '/ai-app-resources';
   }
 
   // admin.tools.access means the user may enter Back Office,
