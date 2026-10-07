@@ -8,6 +8,7 @@ jest.mock('../access-control-v2/services/access-control-v2.service', () => ({
 import { InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
+import { PrismaService } from '../shared/prisma.service';
 import { ANALYTICS_EVENTS } from '../utils/constants';
 import { PL_INFRA_POLICY_CODE } from './pl-infra-members.constants';
 import { PlInfraMembersService } from './pl-infra-members.service';
@@ -30,15 +31,51 @@ const policy = (assignments: ReturnType<typeof assignment>[]) => ({
 describe('PlInfraMembersService', () => {
   const getPolicy = jest.fn();
   const trackEvent = jest.fn();
+  const memberFindMany = jest.fn();
+  let deletedUids: string[];
   let service: PlInfraMembersService;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    deletedUids = [];
     trackEvent.mockResolvedValue(undefined);
+    // Echo back the requested uids that are not soft-deleted, like `where: { uid: { in }, deletedAt: null }`.
+    memberFindMany.mockImplementation(async ({ where }: { where: { uid: { in: string[] } } }) =>
+      where.uid.in.filter((uid) => !deletedUids.includes(uid)).map((uid) => ({ uid }))
+    );
     service = new PlInfraMembersService(
       { getPolicy } as unknown as AccessControlV2Service,
-      { trackEvent } as unknown as AnalyticsService
+      { trackEvent } as unknown as AnalyticsService,
+      { member: { findMany: memberFindMany } } as unknown as PrismaService
     );
+  });
+
+  it('drops soft-deleted members from the list and the total', async () => {
+    getPolicy.mockResolvedValue(policy([assignment('m1', 'Ada'), assignment('m2', 'Gone'), assignment('m3', 'Grace')]));
+    deletedUids = ['m2'];
+
+    const result = await service.listMembers({ page: 1, limit: 500 });
+
+    expect(memberFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { uid: { in: ['m1', 'm2', 'm3'] }, deletedAt: null } })
+    );
+    expect(result).toEqual({
+      page: 1,
+      limit: 500,
+      total: 2,
+      items: [
+        { memberUid: 'm1', name: 'Ada' },
+        { memberUid: 'm3', name: 'Grace' },
+      ],
+    });
+  });
+
+  it('throws a clear error, never a partial list, when the soft-delete check fails', async () => {
+    getPolicy.mockResolvedValue(policy([assignment('m1', 'Ada')]));
+    memberFindMany.mockRejectedValue(new Error('connection refused'));
+
+    await expect(service.listMembers({ page: 1, limit: 500 })).rejects.toBeInstanceOf(InternalServerErrorException);
+    expect(trackEvent).not.toHaveBeenCalled();
   });
 
   it('returns the members holding the PL Infra policy, read from the admin policy view', async () => {
