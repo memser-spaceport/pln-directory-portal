@@ -4,6 +4,7 @@ jest.mock('./pl-infra-members.service', () => ({
 
 import { BadRequestException, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
+import { Reflector } from '@nestjs/core';
 import { ServiceAuthGuard } from '../guards/service-auth.guard';
 import { PlInfraMembersServiceController } from './pl-infra-members-service.controller';
 import { PlInfraMembersService } from './pl-infra-members.service';
@@ -25,6 +26,16 @@ describe('PlInfraMembersServiceController', () => {
   it('is protected by the existing service-to-service guard', () => {
     const guards = Reflect.getMetadata(GUARDS_METADATA, PlInfraMembersServiceController);
     expect(guards).toContain(ServiceAuthGuard);
+  });
+
+  it('opts the list route out of the global response cache with @NoCache()', () => {
+    const handler = PlInfraMembersServiceController.prototype.list;
+    // Same lookup MyCacheInterceptor.isRequestCacheable performs.
+    const ignoreCaching = new Reflector().getAllAndOverride('ignoreCaching', [
+      handler,
+      PlInfraMembersServiceController,
+    ]);
+    expect(ignoreCaching).toBe(true);
   });
 
   describe('ServiceAuthGuard on this route', () => {
