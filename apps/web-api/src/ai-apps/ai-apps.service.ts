@@ -2056,7 +2056,15 @@ export class AiAppsService {
     return this.prisma.aiApp.findMany({
       where: { memberUid, status: { not: 'DELETED' } },
       orderBy: { updatedAt: 'desc' },
-      select: { uid: true, appId: true, name: true, status: true, feedbackEnabled: true, createdAt: true, updatedAt: true },
+      select: {
+        uid: true,
+        appId: true,
+        name: true,
+        status: true,
+        feedbackEnabled: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
   }
 
@@ -2086,7 +2094,11 @@ export class AiAppsService {
         take: filter.limit,
       }),
       this.prisma.aiAppFeedback.count({
-        where: { appUid: app.uid, ...(filter.status ? { status: filter.status } : {}), ...(createdAt ? { createdAt } : {}) },
+        where: {
+          appUid: app.uid,
+          ...(filter.status ? { status: filter.status } : {}),
+          ...(createdAt ? { createdAt } : {}),
+        },
       }),
     ]);
     return { items, total };
