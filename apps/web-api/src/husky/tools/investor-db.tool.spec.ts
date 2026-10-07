@@ -194,6 +194,7 @@ describe('InvestorDbTool', () => {
     expect(result).toContain('Fund Thesis: Backs decentralized science protocols.');
     expect(result).toContain('Check Size Range: 100-500K');
     expect(result).toContain('Sectors: desci, biotech');
+    expect(result).toContain('Engagement Tier: T2, clicked recent outreach');
     expect(result).toContain('Proximity Code: JB+1A');
     expect(result).toContain('Warm Path: Yes');
     expect(result).not.toContain('@');

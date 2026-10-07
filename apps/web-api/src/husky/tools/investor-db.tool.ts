@@ -27,6 +27,13 @@ const MIN_SUBSTRING_TOKEN_LENGTH = 3;
 
 const SECTOR_TAG_SET = new Set<string>(INVESTOR_OUTREACH_SECTOR_TAGS);
 
+const ENGAGEMENT_TIER_LABELS: Record<string, string> = {
+  T1_registered: 'T1, registered for Demo Day',
+  T2_clicked: 'T2, clicked recent outreach',
+  T3_opened: 'T3, opened recent outreach',
+  T4_cold: 'T4, cold',
+};
+
 /** Investor DB drawer on the `/investors` page (All Investors list with this investor selected). */
 export function investorDbPath(investorId: string): string {
   return `/investors?mode=list&investorId=${encodeURIComponent(investorId)}`;
@@ -224,7 +231,7 @@ export class InvestorDbTool {
                 Sectors: ${shown(sectors)}
                 Geo Focus: ${shown(record.geoFocus)}
                 Investor Type: ${shown(record.investorType)}
-                Engagement Tier: ${shown(record.engagementTier)}
+                Engagement Tier: ${ENGAGEMENT_TIER_LABELS[record.engagementTier] ?? shown(record.engagementTier)}
                 Proximity Code: ${shown(proximity)}
                 Warm Path: ${record.hasPath ? 'Yes' : 'No computed warm path'}`;
   }

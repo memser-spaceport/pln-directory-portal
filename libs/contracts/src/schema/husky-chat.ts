@@ -39,7 +39,7 @@ export const HuskyFeedbackSchema = z.object({
 export const HuskySourceRefSchema = z.object({
   index: z.number().int().positive(),
   title: z.string(),
-  type: z.enum(['team', 'member', 'news', 'job', 'project', 'event', 'forum', 'external']),
+  type: z.enum(['team', 'member', 'news', 'job', 'project', 'event', 'forum', 'investor', 'warm_intro', 'external']),
   directoryLink: z.string().optional(),
   externalUrl: z.string().optional(),
 });

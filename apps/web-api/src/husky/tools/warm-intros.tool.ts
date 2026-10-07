@@ -210,14 +210,22 @@ export class WarmIntrosTool {
       stageFocus,
     });
 
-    if (result.candidates.length === 0) {
+    // The ranking keeps any co-investor or engaged investor regardless of sector, which suits a
+    // portfolio team's page. For a sector question with no team, an investor outside that sector
+    // is not an answer, so only sector matches are kept.
+    const candidates =
+      !teamId && sectorTags.length
+        ? result.candidates.filter((candidate) => candidate.investor.sectorTags.some((tag) => sectorTags.includes(tag)))
+        : result.candidates;
+
+    if (candidates.length === 0) {
       return `No warm intro candidates found${resolvedTeamName ? ` for ${resolvedTeamName}` : ''}.`;
     }
 
-    const shown = result.candidates.slice(0, MAX_CANDIDATES);
+    const shown = candidates.slice(0, MAX_CANDIDATES);
     const header = `${resolvedTeamName ? `Warm intro candidates for ${resolvedTeamName}. ` : ''}Showing ${
       shown.length
-    } of ${result.total} ranked candidates.\n\n`;
+    } of ${candidates.length} ranked candidates.\n\n`;
     return header + shown.map((candidate) => this.formatCandidate(candidate)).join('\n\n');
   }
 

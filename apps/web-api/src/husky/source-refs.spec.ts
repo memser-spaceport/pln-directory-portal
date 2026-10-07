@@ -117,4 +117,52 @@ LinkedIn: https://www.linkedin.com/in/grace`,
       },
     ]);
   });
+
+  it('resolves investor and warm intro citations to their in-product paths even when the model makes them absolute', () => {
+    const { sourceRefs } = buildSourceRefs({
+      content:
+        'Mira [1](https://directory.protocol.ai/investors?mode=list&investorId=inv-mira) can be reached via Shawn [2](/investors?mode=warm-intros-v2&wi2_q=Mira%20Kowalczyk).',
+      toolResults: `Investor DB record: Mira Kowalczyk [InvestorLink](/investors?mode=list&investorId=inv-mira)
+                Firm: Cortex Frontier Fund
+
+Warm intro: Mira Kowalczyk (General Partner, Cortex Frontier Fund) [WarmIntroLink](/investors?mode=warm-intros-v2&wi2_q=Mira%20Kowalczyk)
+                Path 1: PL+1A, score 82%, direct PL connection`,
+    });
+
+    expect(sourceRefs).toEqual([
+      {
+        index: 1,
+        title: 'Mira Kowalczyk',
+        type: 'investor',
+        directoryLink: '/investors?mode=list&investorId=inv-mira',
+      },
+      {
+        index: 2,
+        title: 'Mira Kowalczyk (General Partner, Cortex Frontier Fund)',
+        type: 'warm_intro',
+        directoryLink: '/investors?mode=warm-intros-v2&wi2_q=Mira%20Kowalczyk',
+      },
+    ]);
+  });
+
+  it('resolves an uncited LLM source to the in-product path it names', () => {
+    const { sourceRefs } = buildSourceRefs({
+      content: 'Mira is reachable [1](/investors?mode=warm-intros-v2&wi2_q=Mira).',
+      toolResults: `Warm intro: Mira [WarmIntroLink](/investors?mode=warm-intros-v2&wi2_q=Mira)
+
+Warm intro: Devin Okafor [WarmIntroLink](/investors?mode=warm-intros-v2&wi2_q=Devin%20Okafor)`,
+      llmSources: [
+        '/investors?mode=warm-intros-v2&wi2_q=Mira',
+        'https://directory.protocol.ai/investors?mode=warm-intros-v2&wi2_q=Devin%20Okafor',
+      ],
+    });
+
+    expect(sourceRefs[1]).toEqual({
+      index: 2,
+      title: 'Devin Okafor',
+      type: 'warm_intro',
+      directoryLink: '/investors?mode=warm-intros-v2&wi2_q=Devin%20Okafor',
+    });
+    expect(sourceRefs).toHaveLength(2);
+  });
 });

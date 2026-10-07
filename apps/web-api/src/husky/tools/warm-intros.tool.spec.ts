@@ -30,7 +30,14 @@ describe('WarmIntrosTool', () => {
 
   function candidate(overrides: Partial<Record<string, unknown>> = {}) {
     return {
-      investor: { investorId: 'inv-1', firstName: 'Ada', lastName: 'Lovelace', firm: 'Analytical', title: 'GP' },
+      investor: {
+        investorId: 'inv-1',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        firm: 'Analytical',
+        title: 'GP',
+        sectorTags: ['desci', 'ai'],
+      },
       tier: 'co_invested',
       fitScore: 60,
       reason: 'Co-invested on Acme',
@@ -218,6 +225,46 @@ describe('WarmIntrosTool', () => {
         stageFocus: 'seed',
       });
       expect(result).toContain('Showing 1 of 1 ranked candidates.');
+    });
+
+    it('keeps only sector matches for a sector question without a team', async () => {
+      const { tool, investorOutreachQueryService } = setup();
+      investorOutreachQueryService.findWarmIntros.mockResolvedValue({
+        team: undefined,
+        total: 2,
+        candidates: [
+          candidate({
+            investor: { investorId: 'inv-c', firstName: 'Clara', lastName: 'Climate', sectorTags: ['climate'] },
+          }),
+          candidate({
+            investor: { investorId: 'inv-g', firstName: 'Gus', lastName: 'Gaming', sectorTags: ['gaming'] },
+          }),
+        ],
+      });
+
+      const result = await execute(tool, { sectorTags: ['climate'], stageFocus: 'pre-seed' });
+
+      expect(result).toContain('Showing 1 of 1 ranked candidates.');
+      expect(result).toContain('Clara Climate');
+      expect(result).not.toContain('Gus Gaming');
+    });
+
+    it('keeps the full ranking for a team, where co-investors in other sectors still count', async () => {
+      const { tool, teamFindFirst, investorOutreachQueryService } = setup();
+      teamFindFirst.mockResolvedValue({ uid: 'team-1', name: 'Acme', portfolioMeta: { id: 1 } });
+      investorOutreachQueryService.findWarmIntros.mockResolvedValue({
+        team: undefined,
+        total: 1,
+        candidates: [
+          candidate({
+            investor: { investorId: 'inv-g', firstName: 'Gus', lastName: 'Gaming', sectorTags: ['gaming'] },
+          }),
+        ],
+      });
+
+      const result = await execute(tool, { teamName: 'Acme', sectorTags: ['climate'] });
+
+      expect(result).toContain('Gus Gaming');
     });
 
     it('does not rank when the criteria are all outside the vocabulary', async () => {
