@@ -29,12 +29,15 @@ type AiAppSessionClaims = {
   exp: number;
   /** Set only for a testing-user Preview session (LAB-2744). */
   testing?: true;
+  /** Set only for a session an agent minted (LAB-2763). Apps read this claim. */
+  isAgent?: true;
 };
 
-/** A live session. Real member sessions are exactly `{ memberUid }`; testing sessions add the claim metadata. */
+/** A live session. Real member sessions are exactly `{ memberUid }`; testing and agent sessions add the claim. */
 export type AiAppValidatedSession = {
   memberUid: string;
   testing?: true;
+  isAgent?: true;
   sessionUid?: string;
   createdAt?: Date;
   lastUsedAt?: Date;
@@ -124,6 +127,15 @@ export class AiAppsSessionService {
   }
 
   /**
+   * Opens a session for a member an agent is acting as (LAB-2763). Same lifetime as a browser session.
+   * `mcpAuthorizationUid` is stored for LAB-2764 and is not put in the token.
+   */
+  async openAgentSession(memberUid: string, appId: string, mcpAuthorizationUid: string): Promise<AiAppSessionGrant> {
+    this.assertEnabled();
+    return this.openSession(memberUid, appId, { mcpAuthorizationUid });
+  }
+
+  /**
    * One Preview session for a testing user. Absolute 24h lifetime (idle capped at the same instant), no member
    * lookup, and a `testing` claim so the access check can refuse Production. Minting again does not revoke this one.
    */
@@ -159,7 +171,11 @@ export class AiAppsSessionService {
     return { token, expiresAt };
   }
 
-  private async openSession(memberUid: string, appId: string): Promise<AiAppSessionGrant> {
+  private async openSession(
+    memberUid: string,
+    appId: string,
+    agent?: { mcpAuthorizationUid: string }
+  ): Promise<AiAppSessionGrant> {
     const member = await this.prisma.member.findUnique({ where: { uid: memberUid }, select: { email: true } });
     const now = Date.now();
     const expiresAt = new Date(now + AI_APPS_SESSION_MAX_MS);
@@ -170,6 +186,7 @@ export class AiAppsSessionService {
       uid: memberUid,
       email: member?.email ?? null,
       jti,
+      ...(agent ? { isAgent: true as const } : {}),
     };
     const token = jwt.sign({ ...claims, exp: Math.floor(expiresAt.getTime() / 1000) }, AI_APPS_SESSION_SECRET, {
       algorithm: 'HS256',
@@ -182,6 +199,8 @@ export class AiAppsSessionService {
         tokenHash: sha256(token),
         idleExpiresAt: new Date(Math.min(now + AI_APPS_SESSION_IDLE_MS, expiresAt.getTime())),
         expiresAt,
+        isAgent: !!agent,
+        mcpAuthorizationUid: agent?.mcpAuthorizationUid,
       },
     });
     return { token, expiresAt };
@@ -231,6 +250,9 @@ export class AiAppsSessionService {
         createdAt: row.createdAt,
         lastUsedAt: row.lastUsedAt,
       };
+    }
+    if (row.isAgent) {
+      return { memberUid: row.memberUid, isAgent: true };
     }
     return { memberUid: row.memberUid };
   }

@@ -324,7 +324,11 @@ export class AiAppsController {
       return testingUserMemberContext(req.aiAppTestingUser);
     }
     const memberUid = await this.resolveMemberUid(req);
-    return this.aiAppsService.getMemberContext(memberUid);
+    const context = await this.aiAppsService.getMemberContext(memberUid);
+    if (!req.aiAppAgent) {
+      return context;
+    }
+    return { isAgent: true as const, ...context };
   }
 
   /**
