@@ -79,6 +79,7 @@ import { TeamHiringModule } from './team-hiring/team-hiring.module';
 import { JobAlertsModule } from './job-alerts/job-alerts.module';
 import { TeamNewsModule } from './team-news/team-news.module';
 import { NetworkOverviewModule } from './network-overview/network-overview.module';
+import { PlInfraMembersModule } from './pl-infra-members/pl-infra-members.module';
 import { FeedModule } from './feed/feed.module';
 import { FollowsModule } from './follows/follows.module';
 import { InvestorOutreachModule } from './investor-outreach/investor-outreach.module';
@@ -191,6 +192,7 @@ import { McpModule } from './mcp/mcp.module';
     JobAlertsModule,
     TeamNewsModule,
     NetworkOverviewModule,
+    PlInfraMembersModule,
     FeedModule,
     FollowsModule,
     InvestorOutreachModule,

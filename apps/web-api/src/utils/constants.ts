@@ -350,6 +350,7 @@ export const ANALYTICS_EVENTS = {
   },
   MCP: {
     TOOL_INVOKED: 'mcp-tool-invoked',
+    PL_INFRA_LIST_READ: 'mcp-pl-infra-list-read',
   },
   JOB_BOARD: {
     APPLICATION_RECORDED: 'job-application-recorded',
