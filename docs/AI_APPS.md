@@ -1022,7 +1022,7 @@ of growing a new category per event:
     A failed send stores nothing, and the next start retries.
   - Every environment announces the version it serves, to its own members.
   - Copy: title "Starter Kit v{version} is out", body "See what's new and download the
-    latest kit — or ask your agent to update an existing one.", CTA "Get the starter kit →". It links to
+    latest kit — or ask your agent to update an existing one.", CTA "Get the starter kit". It links to
     `/pl-infra/ai-apps?dialog=addAiApp` (`AI_APPS_ADD_APP_DIALOG_PATH`), which opens the
     Add your AI App modal with the kit version and What's new.
 
