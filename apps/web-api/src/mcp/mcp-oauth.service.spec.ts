@@ -1,4 +1,8 @@
-import { ForbiddenException } from '@nestjs/common';
+jest.mock('../analytics/service/analytics.service', () => ({
+  AnalyticsService: jest.fn(),
+}));
+
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { McpOAuthService } from './mcp-oauth.service';
 import { hashSecret, pkceS256Challenge } from './mcp.crypto';
 
@@ -25,7 +29,7 @@ function buildService(
       findUnique: jest.fn(),
       findFirst: jest.fn(),
       findMany: jest.fn(),
-      update: jest.fn().mockResolvedValue({}),
+      update: jest.fn().mockResolvedValue({ memberUid: MEMBER.uid }),
     },
     mcpAuthCode: {
       create: jest.fn().mockResolvedValue({}),
@@ -33,13 +37,18 @@ function buildService(
       update: jest.fn().mockResolvedValue({}),
     },
     member: { findUnique: jest.fn().mockResolvedValue(MEMBER) },
+    $transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma)),
     ...overrides.prisma,
   };
   const accessControl = {
     hasPermission: jest.fn().mockResolvedValue({ allowed: overrides.access?.allowed ?? true }),
   };
-  const service = new McpOAuthService(prisma as any, accessControl as any);
-  return { service, prisma, accessControl };
+  const appSessions = {
+    revokeAgentSessionsForAuthorization: jest.fn().mockResolvedValue(0),
+  };
+  const analytics = { trackEvent: jest.fn().mockResolvedValue(undefined) };
+  const service = new McpOAuthService(prisma as any, accessControl as any, appSessions as any, analytics as any);
+  return { service, prisma, accessControl, appSessions, analytics };
 }
 
 describe('McpOAuthService', () => {
@@ -171,17 +180,60 @@ describe('McpOAuthService', () => {
   });
 
   it('stops authenticating an access token after revoke', async () => {
-    const { service, prisma } = buildService();
+    const { service, prisma, appSessions, analytics } = buildService();
     const token = 'mcp_at_live';
     prisma.mcpAuthorization.findFirst.mockResolvedValue({ uid: 'auth-1', revokedAt: null });
+    appSessions.revokeAgentSessionsForAuthorization.mockResolvedValue(2);
     await service.revokeToken(token);
+    expect(prisma.$transaction).toHaveBeenCalled();
     expect(prisma.mcpAuthorization.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ revokedAt: expect.any(Date), accessTokenHash: null }),
       })
     );
+    expect(appSessions.revokeAgentSessionsForAuthorization).toHaveBeenCalledWith('auth-1', prisma);
+    expect(analytics.trackEvent).toHaveBeenCalledWith({
+      name: 'mcp-app-session-revoked',
+      distinctId: MEMBER.uid,
+      properties: { memberUid: MEMBER.uid, authorizationUid: 'auth-1', count: 2 },
+    });
 
     prisma.mcpAuthorization.findUnique.mockResolvedValue(null);
     await expect(service.authenticateAccessToken(token)).rejects.toThrow('Invalid MCP token');
+  });
+
+  it('records a revoke event when the authorization has no agent sessions', async () => {
+    const { service, prisma, appSessions, analytics } = buildService();
+    prisma.mcpAuthorization.findFirst.mockResolvedValue({ uid: 'auth-1', memberUid: MEMBER.uid, revokedAt: null });
+    appSessions.revokeAgentSessionsForAuthorization.mockResolvedValue(0);
+
+    await expect(service.revokeAuthorizationForMember(MEMBER.uid, 'auth-1')).resolves.toEqual({ ok: true });
+    expect(analytics.trackEvent).toHaveBeenCalledTimes(1);
+    expect(analytics.trackEvent).toHaveBeenCalledWith({
+      name: 'mcp-app-session-revoked',
+      distinctId: MEMBER.uid,
+      properties: { memberUid: MEMBER.uid, authorizationUid: 'auth-1', count: 0 },
+    });
+  });
+
+  it('still revokes when the revoke event fails', async () => {
+    const { service, prisma, analytics } = buildService();
+    prisma.mcpAuthorization.findFirst.mockResolvedValue({ uid: 'auth-1', memberUid: MEMBER.uid, revokedAt: null });
+    analytics.trackEvent.mockRejectedValue(new Error('posthog down'));
+
+    await expect(service.revokeAuthorizationForMember(MEMBER.uid, 'auth-1')).resolves.toEqual({ ok: true });
+    expect(prisma.mcpAuthorization.update).toHaveBeenCalled();
+  });
+
+  it('refuses an access token whose authorization is already revoked', async () => {
+    const { service, prisma } = buildService();
+    prisma.mcpAuthorization.findUnique.mockResolvedValue({
+      uid: 'auth-1',
+      revokedAt: new Date(),
+      accessExpiresAt: new Date(Date.now() + 60_000),
+      member: MEMBER,
+    });
+
+    await expect(service.authenticateAccessToken('mcp_at_live')).rejects.toBeInstanceOf(UnauthorizedException);
   });
 });

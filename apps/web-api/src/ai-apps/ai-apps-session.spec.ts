@@ -231,6 +231,22 @@ describe('AiAppsSessionService', () => {
     expect(JSON.stringify(sessions)).not.toContain(agent.token);
   });
 
+  it('ends agent sessions for one MCP authorization and leaves browser and other-agent sessions', async () => {
+    const { service } = build();
+    const browser = await service.exchangeToken('m-1', 'foo');
+    const agent = await service.openAgentSession('m-1', 'foo', 'auth-1');
+    const otherApp = await service.openAgentSession('m-1', 'bar', 'auth-1');
+    const otherAuth = await service.openAgentSession('m-1', 'foo', 'auth-2');
+
+    expect(await service.revokeAgentSessionsForAuthorization('auth-1')).toBe(2);
+    expect(await service.validate('foo', agent.token)).toBeNull();
+    expect(await service.authenticateAppRequest(agent.token, undefined)).toBeNull();
+    expect(await service.validate('bar', otherApp.token)).toBeNull();
+    expect(await service.validate('foo', browser.token)).toEqual({ memberUid: 'm-1' });
+    expect(await service.validate('foo', otherAuth.token)).toEqual({ memberUid: 'm-1', isAgent: true });
+    expect(await service.revokeAgentSessionsForAuthorization('auth-1')).toBe(0);
+  });
+
   it('records the first use of a testing session once', async () => {
     const { service } = build();
     const { token } = await service.openTestingSession('tu-1', 'foo');

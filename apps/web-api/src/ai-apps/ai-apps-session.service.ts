@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { Prisma } from '@prisma/client';
 import { createHash, randomBytes } from 'crypto';
 import * as jwt from 'jsonwebtoken';
 import { PrismaService } from '../shared/prisma.service';
@@ -313,6 +314,18 @@ export class AiAppsSessionService {
   async revokeAllForMember(memberUid: string): Promise<number> {
     const result = await this.prisma.aiAppSession.updateMany({
       where: { memberUid, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    return result.count;
+  }
+
+  /** Ends live agent sessions minted by one MCP authorization (LAB-2764). Browser sessions stay. */
+  async revokeAgentSessionsForAuthorization(
+    mcpAuthorizationUid: string,
+    db: PrismaService | Prisma.TransactionClient = this.prisma
+  ): Promise<number> {
+    const result = await db.aiAppSession.updateMany({
+      where: { mcpAuthorizationUid, isAgent: true, revokedAt: null },
       data: { revokedAt: new Date() },
     });
     return result.count;
