@@ -48,7 +48,18 @@ describe('AiAppMemberContextGuard', () => {
     };
     await expect(guard.canActivate(context(req))).resolves.toBe(true);
     expect(req.memberUid).toBe('m-1');
+    expect(req.aiAppAgent).toBeUndefined();
     expect(mockedAxios.post).not.toHaveBeenCalled();
+  });
+
+  it('marks an agent session so member context can expose the flag', async () => {
+    const { guard, sessionService } = build();
+    sessionService.authenticateAppRequest.mockResolvedValue({ memberUid: 'm-1', appId: 'foo', isAgent: true });
+    const req: any = { headers: { authorization: `Bearer ${appToken('foo')}` }, cookies: {} };
+    await expect(guard.canActivate(context(req))).resolves.toBe(true);
+    expect(req.memberUid).toBe('m-1');
+    expect(req.aiAppAgent).toBe(true);
+    expect(req.aiAppTestingUser).toBeUndefined();
   });
 
   it('401s an app session presented from another app’s origin', async () => {

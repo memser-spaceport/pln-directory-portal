@@ -2,7 +2,7 @@ import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
 import { coerceAppTarget } from '../ai-apps.constants';
 
-const AppIdSchema = z
+export const AppIdSchema = z
   .string()
   .min(1)
   .max(100)
