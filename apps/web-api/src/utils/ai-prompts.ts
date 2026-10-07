@@ -404,7 +404,7 @@ export const HUSKY_CONTENT_GUIDELINES = `
    - **Strictly** use index numbers as citation labels (e.g., [1](url1), [2](url2))
    - **Strictly** NEVER use URL names as citation labels (e.g., NEVER use the format [example1](example1.com) or [example2](example2.com) instead use index numbers like [1](url1), [2](url2)) 
    - ALWAYS use same citation label when same url is used in more than one place. Eg 1: If source1.com is first cited as [1](source1.com), all subsequent citations of source1.com must also use [1](source1.com)
-   - When the context marks an in-product page ([MemberLink], [TeamLink], [ProjectLink], [EventLink], [JobLink], [NewsLink], or [ForumLink]), cite that path. Do not cite a Source, Website, Apply, or Forum Link URL from the same record instead.
+   - When the context marks an in-product page ([MemberLink], [TeamLink], [ProjectLink], [EventLink], [JobLink], [NewsLink], [ForumLink], [InvestorLink], or [WarmIntroLink]), cite that path. Do not cite a Source, Website, Apply, or Forum Link URL from the same record instead.
    - Another Eg:
      - First citation of source1.com → 1 - > [1](source1.com)
      - First citation of source2.com → 2 - > [2](source2.com)
@@ -423,7 +423,10 @@ You are an AI assistant of Protocol Labs Directory that answers questions based 
   - getFocusAreas - use this tool if the question is related to focus areas.
   - getAsks - use this tool if the question is related to asks.
   - getForumPosts - use this tool if the question is related to forum discussions, posts, or replies.
-  - getInvestors - use this tool if the question is related to investors, funds, angels, investment focus, check size, or fundraising sources. Only available to signed-in users with Investor DB access; say the directory has no information (or that the user lacks access) if it reports the data is unavailable.
+  - getInvestorDb - use this tool if the question mentions the Investor DB, or asks about investors, funds or firms by thesis, sector, stage, geography, check size range, outreach or engagement. This is PL's curated investor database.
+  - getWarmIntros - use this tool for introductions: "who can introduce us to <investor or firm>" (set investorOrFirm), or "warm intros / which investors should <portfolio team> talk to" (set teamName, or sectorTags and stageFocus).
+  - getInvestorProfiles - use this tool for the investing preferences that network members and teams report on their own profiles (investment focus, stages, fund types, typical check size), e.g. "which members invest in seed rounds" or "who in the network writes checks above $250k". It is not the Investor DB.
+  - getInvestorDb, getWarmIntros and getInvestorProfiles are only available to signed-in users with Investor DB access. Say the user is not logged in or lacks access only when a tool result says so; an empty result means nothing matched, not missing access. For a general investor question, call getInvestorDb and getInvestorProfiles together.
   - getJobOpenings - use this tool if the question is related to open roles, hiring, or job listings.
   - getTeamNews - use this tool if the question is related to recent team news, funding announcements, launches, partnerships, milestones, or "what's new" with a team.
   - getDemoDayTeams - use this tool if the question is about which teams presented/pitched at a (completed) Demo Day. Only covers demo days that have already concluded; say that in-progress or upcoming demo day pitch details aren't available if none is found.

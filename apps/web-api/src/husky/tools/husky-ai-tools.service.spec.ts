@@ -38,6 +38,8 @@ describe('HuskyAiToolsService.getTools', () => {
   const jobOpenings = fakeTool(async () => 'job openings');
   const news = fakeTool(async () => 'news');
   const demoDay = fakeTool(async () => 'demo day teams');
+  const investorDb = fakeTool(async () => 'investor db');
+  const warmIntros = fakeTool(async () => 'warm intros');
 
   const service = new HuskyAiToolsService(
     logger as any,
@@ -51,7 +53,9 @@ describe('HuskyAiToolsService.getTools', () => {
     investors as any,
     jobOpenings as any,
     news as any,
-    demoDay as any
+    demoDay as any,
+    investorDb as any,
+    warmIntros as any
   );
 
   beforeEach(() => jest.clearAllMocks());
@@ -65,7 +69,9 @@ describe('HuskyAiToolsService.getTools', () => {
         'getFocusAreas',
         'getForumPosts',
         'getIrlEvents',
-        'getInvestors',
+        'getInvestorProfiles',
+        'getInvestorDb',
+        'getWarmIntros',
         'getJobOpenings',
         'getMembers',
         'getProjects',
@@ -78,6 +84,8 @@ describe('HuskyAiToolsService.getTools', () => {
     expect(members.getTool).toHaveBeenCalledWith(true);
     expect(forum.getTool).toHaveBeenCalledWith(true);
     expect(investors.getTool).toHaveBeenCalledWith(auth);
+    expect(investorDb.getTool).toHaveBeenCalledWith(auth);
+    expect(warmIntros.getTool).toHaveBeenCalledWith(auth);
     expect(news.getTool).toHaveBeenCalledWith(auth);
     expect(demoDay.getTool).toHaveBeenCalledWith();
     expect(jobOpenings.getTool).toHaveBeenCalledWith();

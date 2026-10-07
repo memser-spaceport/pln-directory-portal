@@ -11,6 +11,6 @@ import { AccessControlV2Module } from '../access-control-v2/access-control-v2.mo
   imports: [SharedModule, RbacModule, AccessControlV2Module],
   controllers: [InvestorOutreachServiceController, InvestorOutreachController],
   providers: [InvestorOutreachService, InvestorOutreachQueryService],
-  exports: [InvestorOutreachService],
+  exports: [InvestorOutreachService, InvestorOutreachQueryService],
 })
 export class InvestorOutreachModule {}
