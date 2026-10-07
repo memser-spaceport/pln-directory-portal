@@ -112,6 +112,7 @@ const policies: PolicySeed[] = [
       'oh.demand.write',
       'ai_apps.read',
       'ai_apps.write',
+      'mcp.connect',
     ],
   },
   {
