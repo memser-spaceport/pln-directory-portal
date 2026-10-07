@@ -1,6 +1,9 @@
-import { BadRequestException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
+import { AiAppsSessionService } from '../ai-apps/ai-apps-session.service';
+import { AnalyticsService } from '../analytics/service/analytics.service';
+import { ANALYTICS_EVENTS } from '../utils/constants';
 import {
   MCP_ACCESS_TOKEN_TTL_SEC,
   MCP_AUTH_CODE_TTL_MS,
@@ -63,7 +66,14 @@ type TokenInput = {
 
 @Injectable()
 export class McpOAuthService {
-  constructor(private readonly prisma: PrismaService, private readonly accessControl: AccessControlV2Service) {}
+  private readonly logger = new Logger(McpOAuthService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly accessControl: AccessControlV2Service,
+    private readonly appSessions: AiAppsSessionService,
+    private readonly analytics: AnalyticsService
+  ) {}
 
   protectedResourceMetadata() {
     const resource = mcpResourceUrl();
@@ -376,15 +386,30 @@ export class McpOAuthService {
   }
 
   private async revokeAuthorization(uid: string) {
-    await this.prisma.mcpAuthorization.update({
-      where: { uid },
-      data: {
-        revokedAt: new Date(),
-        accessTokenHash: null,
-        refreshTokenHash: null,
-        accessExpiresAt: null,
-      },
+    const { memberUid, ended } = await this.prisma.$transaction(async (tx) => {
+      const authorization = await tx.mcpAuthorization.update({
+        where: { uid },
+        data: {
+          revokedAt: new Date(),
+          accessTokenHash: null,
+          refreshTokenHash: null,
+          accessExpiresAt: null,
+        },
+        select: { memberUid: true },
+      });
+      const ended = await this.appSessions.revokeAgentSessionsForAuthorization(uid, tx);
+      return { memberUid: authorization.memberUid, ended };
     });
+
+    try {
+      await this.analytics.trackEvent({
+        name: ANALYTICS_EVENTS.MCP.APP_SESSION_REVOKED,
+        distinctId: memberUid,
+        properties: { memberUid, authorizationUid: uid, count: ended },
+      });
+    } catch (error) {
+      this.logger.warn(`Failed to track ${ANALYTICS_EVENTS.MCP.APP_SESSION_REVOKED}`, error);
+    }
   }
 
   private assertResource(resource?: string) {
