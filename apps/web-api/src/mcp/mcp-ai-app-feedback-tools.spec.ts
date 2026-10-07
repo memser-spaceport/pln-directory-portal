@@ -148,6 +148,24 @@ describe('MCP AI App feedback tools', () => {
       expect(result.nextOffset).toBeNull();
     });
 
+    it('treats a date-only to as the end of that UTC day', async () => {
+      const { tool, prisma } = buildTools();
+      await tool('list_ai_app_feedback').execute(ctx('owner-1'), {
+        appUid: 'app-1',
+        from: '2026-10-07',
+        to: '2026-10-07',
+      });
+
+      expect(prisma.aiAppFeedback.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            appUid: 'app-1',
+            createdAt: { gte: new Date('2026-10-07T00:00:00.000Z'), lte: new Date('2026-10-07T23:59:59.999Z') },
+          },
+        })
+      );
+    });
+
     it('rejects a bad date', async () => {
       const { tool } = buildTools();
       await expect(

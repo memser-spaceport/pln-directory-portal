@@ -21,12 +21,18 @@ function clampLimit(value: unknown): number {
   return Math.min(Math.max(Math.trunc(num), 1), FEEDBACK_LIMIT_MAX);
 }
 
-function dateArg(value: unknown, name: string): Date | undefined {
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** A bare `YYYY-MM-DD` is a whole UTC day: `from` starts at its first millisecond, `to` ends at its last. */
+function dateArg(value: unknown, name: 'from' | 'to'): Date | undefined {
   const raw = stringArg(value);
   if (!raw) return undefined;
   const date = new Date(raw);
   if (Number.isNaN(date.getTime())) {
     throw new BadRequestException(`${name} must be an ISO 8601 date or date-time`);
+  }
+  if (name === 'to' && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return new Date(date.getTime() + DAY_MS - 1);
   }
   return date;
 }
@@ -65,7 +71,10 @@ export function aiAppFeedbackTools(aiApps: AiAppsService): McpToolDef[] {
           .optional()
           .describe('Only items with this status: NEW, VIEWED or IMPLEMENTED'),
         from: z.string().optional().describe('Only items created at or after this ISO 8601 date or date-time'),
-        to: z.string().optional().describe('Only items created at or before this ISO 8601 date or date-time'),
+        to: z
+          .string()
+          .optional()
+          .describe('Only items created at or before this ISO 8601 date-time, or during this date (UTC)'),
         limit: z.number().int().min(1).max(FEEDBACK_LIMIT_MAX).optional().describe('Max items (default 20, max 50)'),
         offset: z.number().int().min(0).optional().describe('Pagination offset (use nextOffset from the last page)'),
       },
