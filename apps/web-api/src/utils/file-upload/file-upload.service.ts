@@ -31,7 +31,7 @@ export class FileUploadService {
   }
 
   private makeFileObjects(files: Array<Express.Multer.File>) {
-    return files.map((file) => new File([file.buffer], `${file.originalname}`));
+    return files.map((file) => new File([new Uint8Array(file.buffer)], `${file.originalname}`));
   }
 
   private encryptFiles(files: Array<Express.Multer.File>) {
