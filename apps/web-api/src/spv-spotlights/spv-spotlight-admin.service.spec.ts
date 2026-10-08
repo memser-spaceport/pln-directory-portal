@@ -11,8 +11,29 @@ jest.mock('../auth/auth.service', () => ({
 }));
 
 describe('SpvSpotlightAdminService organization and rejection', () => {
+  const provisionedMember = {
+    memberUid: 'mem_1',
+    isNewUser: false,
+    willBeTeamLead: false,
+    summaryDelta: { createdUsers: 0, updatedUsers: 1, createdTeams: 0, updatedMemberships: 0, promotedToLead: 0 },
+  };
+  const provisionInvestorFromBulkRow = jest.fn();
+
+  beforeEach(() => {
+    provisionInvestorFromBulkRow.mockReset().mockResolvedValue(provisionedMember);
+  });
+
   function serviceWith(prisma: Record<string, unknown>) {
-    return new SpvSpotlightAdminService(prisma as never, { send: jest.fn(), loginLink: jest.fn() } as never);
+    const prismaWithTransaction: Record<string, unknown> = {
+      member: { findFirst: jest.fn().mockResolvedValue(null) },
+      ...prisma,
+      $transaction: (run: (tx: unknown) => unknown) => run(prismaWithTransaction),
+    };
+    return new SpvSpotlightAdminService(
+      prismaWithTransaction as never,
+      { send: jest.fn(), loginLink: jest.fn() } as never,
+      { provisionInvestorFromBulkRow } as never
+    );
   }
 
   it('clears an open or rejected application when the email is imported as pre-approved', async () => {
@@ -60,16 +81,13 @@ describe('SpvSpotlightAdminService organization and rejection', () => {
 
     const result = await service.addParticipantsBulk('spv_1', 'OUTREACH', [{ email: 'ada@example.com' }]);
 
-    expect(result).toEqual({ created: 0, updated: 0, skipped: 1 });
+    expect(result).toMatchObject({ created: 0, updated: 0, skipped: 1 });
     expect(update).not.toHaveBeenCalled();
   });
 
   it('creates outreach investors without auto-approve on login', async () => {
-    const memberCreate = jest.fn().mockResolvedValue({ uid: 'mem_1' });
     const prisma = {
       spvSpotlight: { findUnique: jest.fn().mockResolvedValue({ uid: 'spv_1' }) },
-      member: { findFirst: jest.fn().mockResolvedValue(null), create: memberCreate },
-      policy: { findUnique: jest.fn().mockResolvedValue(null) },
       spvSpotlightParticipant: {
         findUnique: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({}),
@@ -77,9 +95,14 @@ describe('SpvSpotlightAdminService organization and rejection', () => {
       spvAccessRequest: { deleteMany: jest.fn() },
     };
 
-    await serviceWith(prisma).addParticipantsBulk('spv_1', 'OUTREACH', [{ email: 'ada@example.com' }]);
+    const service = serviceWith(prisma);
+    jest
+      .spyOn(service as unknown as { upsertInvestorMember: () => Promise<{ uid: string }> }, 'upsertInvestorMember')
+      .mockResolvedValue({ uid: 'mem_1' });
 
-    expect(memberCreate.mock.calls[0][0].data.approveOnLogin).toBe(false);
+    await service.addParticipantsBulk('spv_1', 'OUTREACH', [{ email: 'ada@example.com' }]);
+
+    expect(provisionInvestorFromBulkRow.mock.calls[0][4]).toMatchObject({ useApproveOnLogin: false });
   });
 
   it('does not clear a rejection for an outreach import', async () => {
@@ -100,6 +123,75 @@ describe('SpvSpotlightAdminService organization and rejection', () => {
     await service.addParticipantsBulk('spv_1', 'OUTREACH', [{ email: 'ada@example.com' }]);
 
     expect(deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('provisions the member profile and organization team from the uploaded row', async () => {
+    const create = jest.fn().mockResolvedValue({});
+    const prisma = {
+      spvSpotlight: { findUnique: jest.fn().mockResolvedValue({ uid: 'spv_1' }) },
+      spvSpotlightParticipant: { findUnique: jest.fn().mockResolvedValue(null), create },
+      spvAccessRequest: { deleteMany: jest.fn() },
+    };
+    provisionInvestorFromBulkRow.mockResolvedValue({
+      ...provisionedMember,
+      orgTeamUid: 'team_1',
+      summaryDelta: { ...provisionedMember.summaryDelta, createdTeams: 1 },
+    });
+    const service = serviceWith(prisma);
+    jest
+      .spyOn(service as unknown as { upsertInvestorMember: () => Promise<{ uid: string }> }, 'upsertInvestorMember')
+      .mockResolvedValue({ uid: 'mem_1' });
+
+    const result = await service.addParticipantsBulk('spv_1', 'PRE_APPROVED', [
+      {
+        email: 'Ada@Example.com',
+        name: 'Ada',
+        organization: 'Acme Ventures',
+        investmentType: 'FUND',
+        emailTemplateVariables: { firm: 'Acme' },
+      },
+    ]);
+
+    expect(provisionInvestorFromBulkRow.mock.calls[0][1]).toMatchObject({
+      email: 'ada@example.com',
+      name: 'Ada',
+      organization: 'Acme Ventures',
+      investmentType: 'FUND',
+    });
+    expect(provisionInvestorFromBulkRow.mock.calls[0][1]).not.toHaveProperty('emailTemplateVariables');
+    expect(provisionInvestorFromBulkRow.mock.calls[0][4]).toMatchObject({ useApproveOnLogin: true });
+    expect(create.mock.calls[0][0].data.emailTemplateVariables).toEqual({ firm: 'Acme' });
+    expect(result.created).toBe(1);
+    expect(result.summary).toMatchObject({ total: 1, updatedUsers: 1, createdTeams: 1, errors: 0 });
+    expect(result.rows[0]).toMatchObject({ email: 'ada@example.com', status: 'success', teamId: 'team_1' });
+  });
+
+  it('reports a failed row and keeps processing the rest', async () => {
+    const prisma = {
+      spvSpotlight: { findUnique: jest.fn().mockResolvedValue({ uid: 'spv_1' }) },
+      spvSpotlightParticipant: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({}),
+      },
+      spvAccessRequest: { deleteMany: jest.fn() },
+    };
+    provisionInvestorFromBulkRow
+      .mockRejectedValueOnce(new Error('Telegram handle taken'))
+      .mockResolvedValueOnce(provisionedMember);
+    const service = serviceWith(prisma);
+    jest
+      .spyOn(service as unknown as { upsertInvestorMember: () => Promise<{ uid: string }> }, 'upsertInvestorMember')
+      .mockResolvedValue({ uid: 'mem_1' });
+
+    const result = await service.addParticipantsBulk('spv_1', 'PRE_APPROVED', [
+      { email: 'bad@example.com', name: 'Bad' },
+      { email: 'good@example.com', name: 'Good' },
+    ]);
+
+    expect(result.created).toBe(1);
+    expect(result.summary).toMatchObject({ total: 2, errors: 1 });
+    expect(result.rows.map((row) => row.status)).toEqual(['error', 'success']);
+    expect(result.rows[0].message).toBe('Telegram handle taken');
   });
 
   it('refuses a second spotlight for the same team', async () => {
@@ -196,7 +288,7 @@ describe('approve access request', () => {
       },
     };
     const send = jest.fn();
-    const service = new SpvSpotlightAdminService(prisma as never, { send, loginLink: jest.fn() } as never);
+    const service = new SpvSpotlightAdminService(prisma as never, { send, loginLink: jest.fn() } as never, {} as never);
 
     await service.approveAccessRequest('spv_1', 'req_1');
 
@@ -213,7 +305,11 @@ describe('approve access request', () => {
 
 describe('investor lists', () => {
   function serviceWith(prisma: Record<string, unknown>) {
-    return new SpvSpotlightAdminService(prisma as never, { send: jest.fn(), loginLink: jest.fn() } as never);
+    return new SpvSpotlightAdminService(
+      prisma as never,
+      { send: jest.fn(), loginLink: jest.fn() } as never,
+      {} as never
+    );
   }
 
   it('returns each participant with their application status', async () => {

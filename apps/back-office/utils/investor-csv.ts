@@ -17,10 +17,11 @@ export type ParsedInvestorParticipant = {
   secRulesAccepted?: boolean | null;
   makeTeamLead?: boolean;
   willBeTeamLead?: boolean;
+  extraColumns?: Record<string, string>;
   errors?: string[];
 };
 
-export type InvestorParticipantForApi = Omit<ParsedInvestorParticipant, 'willBeTeamLead' | 'errors'>;
+export type InvestorParticipantForApi = Omit<ParsedInvestorParticipant, 'willBeTeamLead' | 'errors' | 'extraColumns'>;
 
 const headerAliases = {
   email: ['email', 'e-mail', 'email_address'],
@@ -276,6 +277,13 @@ export const parseInvestorCsv = (
 
     const willBeTeamLead = Boolean(organization || makeTeamLead);
 
+    const extraColumns: Record<string, string> = {};
+    rawHeaders.forEach((header, index) => {
+      if (header && !(normalizedHeaders[index] in headerAliases) && values[index]) {
+        extraColumns[header] = values[index];
+      }
+    });
+
     if (email) {
       participants.push({
         email,
@@ -292,6 +300,7 @@ export const parseInvestorCsv = (
         secRulesAccepted,
         makeTeamLead,
         willBeTeamLead,
+        ...(Object.keys(extraColumns).length > 0 ? { extraColumns } : {}),
         errors: rowErrors.length > 0 ? rowErrors : undefined,
       });
     }
@@ -301,7 +310,7 @@ export const parseInvestorCsv = (
 };
 
 export const toInvestorParticipantsForApi = (participants: ParsedInvestorParticipant[]): InvestorParticipantForApi[] =>
-  participants.map(({ willBeTeamLead, errors, ...participant }) => participant);
+  participants.map(({ willBeTeamLead, errors, extraColumns, ...participant }) => participant);
 
 export const downloadInvestorCsvTemplate = (filename = 'participants_template.csv') => {
   const headers = [
