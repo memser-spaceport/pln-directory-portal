@@ -75,6 +75,25 @@ describe('AiAppsController GET /me wiring', () => {
     expect(aiAppsService.getMemberContext).not.toHaveBeenCalled();
   });
 
+  it('adds isAgent for an agent session and omits it for a browser session', async () => {
+    const member = { uid: 'm-1', name: 'Ada' };
+    const aiAppsService = { getMemberContext: jest.fn().mockResolvedValue({ member }) };
+    const controller = new AiAppsController(
+      aiAppsService as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+    await expect(controller.getMemberContext({ memberUid: 'm-1', aiAppAgent: true })).resolves.toEqual({
+      isAgent: true,
+      member,
+    });
+    await expect(controller.getMemberContext({ memberUid: 'm-1' })).resolves.toEqual({ member });
+  });
+
   it('raises the IP throttle above the global 10/s so a sidecar burst does not 429', () => {
     expect(Reflect.getMetadata(THROTTLER_LIMIT, handler)).toBe(AI_APPS_SIDECAR_THROTTLE_LIMIT);
     expect(Reflect.getMetadata(THROTTLER_TTL, handler)).toBe(AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS);

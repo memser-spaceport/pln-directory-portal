@@ -3,11 +3,18 @@ import {
   MemberApprovalState,
   Prisma,
   SpvInvestorCohort,
+  Team,
   TeamPitchParticipantAccess,
   TeamPitchParticipantType,
   TeamPitchStatus,
 } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
+import { InvestorBulkProvisionService } from '../investors/investor-bulk-provision.service';
+import {
+  InvestorBulkParticipantInput,
+  InvestorBulkRowResult,
+  InvestorBulkSummary,
+} from '../investors/investor-bulk.types';
 import { upsertPolicyAssignmentByCode } from '../demo-days/demo-day-investor-policy.util';
 import {
   asStringRecord,
@@ -28,9 +35,18 @@ import { SpvSpotlightMailer } from './spv-spotlight-mailer';
 
 type MediaInput = { imageUid: string; alt: string; fit?: 'cover' | 'contain' };
 
+type BulkParticipantInput = Omit<InvestorBulkParticipantInput, 'name'> & {
+  name?: string;
+  emailTemplateVariables?: Record<string, string>;
+};
+
 @Injectable()
 export class SpvSpotlightAdminService {
-  constructor(private readonly prisma: PrismaService, private readonly mailer: SpvSpotlightMailer) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mailer: SpvSpotlightMailer,
+    private readonly investorBulkProvisionService: InvestorBulkProvisionService
+  ) {}
 
   async list(query: { search?: string; status?: TeamPitchStatus }) {
     return this.prisma.spvSpotlight.findMany({
@@ -79,6 +95,7 @@ export class SpvSpotlightAdminService {
     replyToEmail?: string | null;
     docSendUrl?: string | null;
     summary?: string | null;
+    closesAt?: string | null;
     media?: MediaInput[];
   }) {
     const team = await this.prisma.team.findUnique({
@@ -107,6 +124,7 @@ export class SpvSpotlightAdminService {
         replyToEmail: normalizeOptionalTrimmed(input.replyToEmail) ?? null,
         docSendUrl: normalizeOptionalTrimmed(input.docSendUrl) ?? null,
         summary: normalizeOptionalTrimmed(input.summary && replaceNbsp(input.summary)) ?? null,
+        closesAt: input.closesAt ? new Date(input.closesAt) : null,
         emailTemplates: asEmailTemplates(null, title),
       },
     });
@@ -130,6 +148,7 @@ export class SpvSpotlightAdminService {
       replyToEmail?: string | null;
       docSendUrl?: string | null;
       summary?: string | null;
+      closesAt?: string | null;
       media?: MediaInput[];
     }
   ) {
@@ -165,6 +184,7 @@ export class SpvSpotlightAdminService {
         ...(input.summary !== undefined
           ? { summary: normalizeOptionalTrimmed(input.summary && replaceNbsp(input.summary)) ?? null }
           : {}),
+        ...(input.closesAt !== undefined ? { closesAt: input.closesAt ? new Date(input.closesAt) : null } : {}),
       },
     });
     if (input.media) {
@@ -232,16 +252,31 @@ export class SpvSpotlightAdminService {
     if (!participant) {
       throw new NotFoundException('Participant not found');
     }
-    if (data.cohort === 'PRE_APPROVED') {
+    const typeChanged = data.type !== undefined && data.type !== participant.type;
+    const nextCohort =
+      data.cohort !== undefined
+        ? data.cohort
+        : !typeChanged
+        ? participant.cohort
+        : data.type === 'FOUNDER'
+        ? null
+        : SpvInvestorCohort.PRE_APPROVED;
+    if (nextCohort === 'PRE_APPROVED' && (data.cohort === 'PRE_APPROVED' || typeChanged)) {
       await this.clearOpenApplications(spotlightUid, participant.memberUid);
       await this.enableApproveOnLogin(participant.memberUid);
     }
-    const typeDefaults =
-      data.type === undefined || data.type === participant.type
-        ? {}
-        : data.type === 'FOUNDER'
-        ? { cohort: null, access: defaultAccessForParticipantType('FOUNDER'), teamUid: spotlight.teamUid }
-        : { cohort: SpvInvestorCohort.OUTREACH, access: defaultAccessForParticipantType('INVESTOR'), teamUid: null };
+    if (typeChanged && data.type === 'INVESTOR') {
+      await upsertPolicyAssignmentByCode(this.prisma, participant.memberUid, 'investor_pl');
+    }
+    const typeDefaults = !typeChanged
+      ? {}
+      : data.type === 'FOUNDER'
+      ? { cohort: null, access: defaultAccessForParticipantType('FOUNDER'), teamUid: spotlight.teamUid }
+      : {
+          cohort: nextCohort,
+          access: defaultAccessForParticipantType('INVESTOR'),
+          teamUid: null,
+        };
     return this.prisma.spvSpotlightParticipant.update({
       where: { uid: participantUid },
       data: {
@@ -368,56 +403,116 @@ export class SpvSpotlightAdminService {
     });
   }
 
-  async addParticipantsBulk(
-    spotlightUid: string,
-    cohort: SpvInvestorCohort,
-    participants: { email: string; name?: string; emailTemplateVariables?: Record<string, string> }[]
-  ) {
+  async addParticipantsBulk(spotlightUid: string, cohort: SpvInvestorCohort, participants: BulkParticipantInput[]) {
     const spotlight = await this.requireSpotlight(spotlightUid);
+    const approveOnLogin = cohort === 'PRE_APPROVED';
+    const caches = { teamCache: new Map<string, Team>(), telegramOwnerCache: new Map<string, string | null>() };
+    const summary: InvestorBulkSummary = {
+      total: participants.length,
+      createdUsers: 0,
+      updatedUsers: 0,
+      createdTeams: 0,
+      updatedMemberships: 0,
+      promotedToLead: 0,
+      errors: 0,
+    };
+    const rows: InvestorBulkRowResult[] = [];
     let created = 0;
     let updated = 0;
     let skipped = 0;
-    for (const row of participants) {
-      const email = normalizeEmail(row.email);
-      const member = await this.upsertInvestorMember(email, row.name?.trim() || email, cohort === 'PRE_APPROVED');
-      const existing = await this.prisma.spvSpotlightParticipant.findUnique({
-        where: { spvSpotlightUid_memberUid: { spvSpotlightUid: spotlight.uid, memberUid: member.uid } },
-      });
-      if (existing?.type === 'INVESTOR' && existing.cohort === 'PRE_APPROVED' && cohort === 'OUTREACH') {
-        skipped += 1;
-        continue;
-      }
-      const variables = row.emailTemplateVariables ?? null;
-      if (existing) {
-        await this.prisma.spvSpotlightParticipant.update({
-          where: { uid: existing.uid },
-          data: {
-            cohort,
-            type: 'INVESTOR',
-            ...(variables
-              ? { emailTemplateVariables: { ...asStringRecord(existing.emailTemplateVariables), ...variables } }
-              : {}),
-          },
+    for (const { emailTemplateVariables, ...profile } of participants) {
+      const email = normalizeEmail(profile.email);
+      const rowResult: InvestorBulkRowResult = {
+        email,
+        name: profile.name?.trim() || email,
+        organization: profile.organization,
+        organizationEmail: profile.organizationEmail,
+        role: profile.role,
+        makeTeamLead: profile.makeTeamLead,
+        willBeTeamLead: false,
+        status: 'success',
+      };
+      try {
+        const existingMember = await this.prisma.member.findFirst({
+          where: { email: { equals: email, mode: 'insensitive' } },
+          include: { investorProfile: true, teamMemberRoles: true },
         });
-        updated += 1;
-      } else {
-        await this.prisma.spvSpotlightParticipant.create({
-          data: {
-            spvSpotlightUid: spotlight.uid,
-            memberUid: member.uid,
-            type: 'INVESTOR',
-            access: 'VIEW',
-            cohort,
-            ...(variables ? { emailTemplateVariables: variables } : {}),
-          },
+        const name = profile.name?.trim() || existingMember?.name || email;
+        const provisioned = await this.prisma.$transaction((tx) =>
+          this.investorBulkProvisionService.provisionInvestorFromBulkRow(
+            tx,
+            { ...profile, email, name },
+            existingMember ?? undefined,
+            caches,
+            { useApproveOnLogin: approveOnLogin, memberCreationReason: 'Auto-created for SPV Spotlight participant' }
+          )
+        );
+        summary.createdUsers += provisioned.summaryDelta.createdUsers;
+        summary.updatedUsers += provisioned.summaryDelta.updatedUsers;
+        summary.createdTeams += provisioned.summaryDelta.createdTeams;
+        summary.updatedMemberships += provisioned.summaryDelta.updatedMemberships;
+        summary.promotedToLead += provisioned.summaryDelta.promotedToLead;
+        Object.assign(rowResult, {
+          name,
+          twitterHandler: provisioned.normalizedTwitter,
+          linkedinHandler: provisioned.normalizedLinkedin,
+          telegramHandler: provisioned.normalizedTelegram,
+          willBeTeamLead: provisioned.willBeTeamLead,
+          userId: provisioned.memberUid,
+          teamId: provisioned.orgTeamUid,
         });
-        created += 1;
-      }
-      if (cohort === 'PRE_APPROVED') {
-        await this.clearOpenApplications(spotlight.uid, member.uid);
+
+        const member = await this.upsertInvestorMember(email, name, approveOnLogin);
+        const existing = await this.prisma.spvSpotlightParticipant.findUnique({
+          where: { spvSpotlightUid_memberUid: { spvSpotlightUid: spotlight.uid, memberUid: member.uid } },
+        });
+        if (existing?.type === 'INVESTOR' && existing.cohort === 'PRE_APPROVED' && cohort === 'OUTREACH') {
+          skipped += 1;
+          rowResult.message = 'Already pre-approved, participant left unchanged';
+          rows.push(rowResult);
+          continue;
+        }
+        const variables = emailTemplateVariables ?? null;
+        if (existing) {
+          await this.prisma.spvSpotlightParticipant.update({
+            where: { uid: existing.uid },
+            data: {
+              cohort,
+              type: 'INVESTOR',
+              ...(variables
+                ? { emailTemplateVariables: { ...asStringRecord(existing.emailTemplateVariables), ...variables } }
+                : {}),
+            },
+          });
+          updated += 1;
+        } else {
+          await this.prisma.spvSpotlightParticipant.create({
+            data: {
+              spvSpotlightUid: spotlight.uid,
+              memberUid: member.uid,
+              type: 'INVESTOR',
+              access: 'VIEW',
+              cohort,
+              ...(variables ? { emailTemplateVariables: variables } : {}),
+            },
+          });
+          created += 1;
+        }
+        if (cohort === 'PRE_APPROVED') {
+          await this.clearOpenApplications(spotlight.uid, member.uid);
+        }
+        rows.push(rowResult);
+      } catch (error) {
+        caches.teamCache.clear();
+        summary.errors += 1;
+        rows.push({
+          ...rowResult,
+          status: 'error',
+          message: error instanceof Error ? error.message : 'Unknown error occurred',
+        });
       }
     }
-    return { created, updated, skipped };
+    return { created, updated, skipped, summary, rows };
   }
 
   async listAccessRequests(uid: string) {

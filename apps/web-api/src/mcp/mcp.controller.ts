@@ -22,6 +22,8 @@ import { TeamsService } from '../teams/teams.service';
 import { ProjectsService } from '../projects/projects.service';
 import { PLEventsService } from '../pl-events/pl-events.service';
 import { SearchService } from '../search/search.service';
+import { AiAppsService } from '../ai-apps/ai-apps.service';
+import { aiAppFeedbackTools } from './mcp-ai-app-feedback-tools';
 import { trackMcpToolInvocation } from './mcp-analytics';
 import { directoryTools } from './mcp-directory-tools';
 import { McpOAuthService } from './mcp-oauth.service';
@@ -41,6 +43,7 @@ export class McpController {
     private readonly projects: ProjectsService,
     private readonly plEvents: PLEventsService,
     private readonly search: SearchService,
+    private readonly aiApps: AiAppsService,
     private readonly analytics: AnalyticsService
   ) {}
 
@@ -70,6 +73,7 @@ export class McpController {
       WHOAMI_TOOL,
       ...warmIntroTools(this.masterProfiles, this.warmIntros),
       ...directoryTools(this.members, this.teams, this.projects, this.plEvents, this.search),
+      ...aiAppFeedbackTools(this.aiApps),
     ]);
 
     const server = new McpServer({ name: 'LabOS', version: '1.0.0' });

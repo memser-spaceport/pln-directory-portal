@@ -201,6 +201,52 @@ describe('AiAppsSessionService', () => {
     expect(await service.isLiveTestingSessionForOtherApp(member.token, 'bar')).toBe(false);
   });
 
+  it('mints an agent session with the browser lifetime, an agent claim, and the MCP authorization id', async () => {
+    const { service, sessions } = build();
+    jest.useFakeTimers('modern');
+    jest.setSystemTime(new Date('2026-10-07T12:00:00Z'));
+    const browser = await service.exchangeToken('m-1', 'foo');
+    const agent = await service.openAgentSession('m-1', 'foo', 'auth-1');
+
+    expect(agent.expiresAt.getTime()).toBe(browser.expiresAt.getTime());
+    expect(sessions[1].idleExpiresAt.getTime()).toBe(sessions[0].idleExpiresAt.getTime());
+    expect(sessions[0].isAgent).toBe(false);
+    expect(sessions[0].mcpAuthorizationUid).toBeUndefined();
+    expect(sessions[1].isAgent).toBe(true);
+    expect(sessions[1].mcpAuthorizationUid).toBe('auth-1');
+    expect(claimsOf(agent.token)).toEqual(
+      expect.objectContaining({
+        iss: 'pln-ai-apps-session',
+        aud: 'foo',
+        uid: 'm-1',
+        email: 'ada@example.com',
+        isAgent: true,
+      })
+    );
+    expect(claimsOf(agent.token)).not.toHaveProperty('mcpAuthorizationUid');
+    expect(claimsOf(browser.token).isAgent).toBeUndefined();
+    expect(await service.validate('foo', agent.token)).toEqual({ memberUid: 'm-1', isAgent: true });
+    expect(await service.validate('bar', agent.token)).toBeNull();
+    expect(await service.validate('foo', browser.token)).toEqual({ memberUid: 'm-1' });
+    expect(JSON.stringify(sessions)).not.toContain(agent.token);
+  });
+
+  it('ends agent sessions for one MCP authorization and leaves browser and other-agent sessions', async () => {
+    const { service } = build();
+    const browser = await service.exchangeToken('m-1', 'foo');
+    const agent = await service.openAgentSession('m-1', 'foo', 'auth-1');
+    const otherApp = await service.openAgentSession('m-1', 'bar', 'auth-1');
+    const otherAuth = await service.openAgentSession('m-1', 'foo', 'auth-2');
+
+    expect(await service.revokeAgentSessionsForAuthorization('auth-1')).toBe(2);
+    expect(await service.validate('foo', agent.token)).toBeNull();
+    expect(await service.authenticateAppRequest(agent.token, undefined)).toBeNull();
+    expect(await service.validate('bar', otherApp.token)).toBeNull();
+    expect(await service.validate('foo', browser.token)).toEqual({ memberUid: 'm-1' });
+    expect(await service.validate('foo', otherAuth.token)).toEqual({ memberUid: 'm-1', isAgent: true });
+    expect(await service.revokeAgentSessionsForAuthorization('auth-1')).toBe(0);
+  });
+
   it('records the first use of a testing session once', async () => {
     const { service } = build();
     const { token } = await service.openTestingSession('tu-1', 'foo');

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AccessControlV2Module } from '../access-control-v2/access-control-v2.module';
+import { AiAppsModule } from '../ai-apps/ai-apps.module';
 import { MasterProfileModule } from '../master-profile/master-profile.module';
 import { MembersModule } from '../members/members.module';
 import { TeamsModule } from '../teams/teams.module';
@@ -9,6 +10,8 @@ import { SearchModule } from '../search/search.module';
 import { RbacModule } from '../rbac/rbac.module';
 import { SharedModule } from '../shared/shared.module';
 import { WarmIntrosV2Module } from '../warm-intros-v2/warm-intros-v2.module';
+import { McpAppSessionService } from './mcp-app-session.service';
+import { McpAppSessionsController } from './mcp-app-sessions.controller';
 import { McpAuthorizationsController } from './mcp-authorizations.controller';
 import { McpOAuthController } from './mcp-oauth.controller';
 import { McpOAuthService } from './mcp-oauth.service';
@@ -26,8 +29,9 @@ import { McpController } from './mcp.controller';
     ProjectsModule,
     PLEventsModule,
     SearchModule,
+    AiAppsModule,
   ],
-  controllers: [McpOAuthController, McpAuthorizationsController, McpController],
-  providers: [McpOAuthService],
+  controllers: [McpOAuthController, McpAuthorizationsController, McpAppSessionsController, McpController],
+  providers: [McpOAuthService, McpAppSessionService],
 })
 export class McpModule {}

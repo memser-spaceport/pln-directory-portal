@@ -8,6 +8,9 @@ import { FocusAreasTool } from './focus-areas.tool';
 import { AsksTool } from './asks.tool';
 import { ForumTool } from './forum.tool';
 import { InvestorsTool } from './investors.tool';
+import { InvestorDbTool } from './investor-db.tool';
+import { InvestorDbAccess } from './investor-db-access';
+import { WarmIntrosTool } from './warm-intros.tool';
 import { JobOpeningsTool } from './job-openings.tool';
 import { NewsTool } from './news.tool';
 import { DemoDayTool } from './demo-day.tool';
@@ -19,6 +22,8 @@ import { TeamNewsModule } from '../../team-news/team-news.module';
 import { DemoDaysModule } from '../../demo-days/demo-days.module';
 import { PLEventsModule } from '../../pl-events/pl-events.module';
 import { MembersModule } from '../../members/members.module';
+import { InvestorOutreachModule } from '../../investor-outreach/investor-outreach.module';
+import { WarmIntrosV2Module } from '../../warm-intros-v2/warm-intros-v2.module';
 
 @Module({
   imports: [
@@ -30,6 +35,8 @@ import { MembersModule } from '../../members/members.module';
     DemoDaysModule,
     PLEventsModule,
     MembersModule,
+    InvestorOutreachModule,
+    WarmIntrosV2Module,
   ],
   providers: [
     HuskyAiToolsService,
@@ -41,6 +48,9 @@ import { MembersModule } from '../../members/members.module';
     AsksTool,
     ForumTool,
     InvestorsTool,
+    InvestorDbAccess,
+    InvestorDbTool,
+    WarmIntrosTool,
     JobOpeningsTool,
     NewsTool,
     DemoDayTool,

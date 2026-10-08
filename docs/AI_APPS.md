@@ -88,10 +88,10 @@ The starter kit no longer ships a long-lived token. When the agent needs to depl
 
 1. **Start** — the agent POSTs `/v1/ai-apps/connect` (no auth). The backend creates an `AiAppConnectSession` (`PENDING`, ~10 min TTL) and returns `sessionId`, a human-readable `userCode`, a `connectUrl` (the LabOS approval page), a secret `pollToken`, and `pollIntervalSec`.
 2. **Approve** — the member opens `connectUrl` in LabOS (`/pl-infra/ai-apps/connect?session=<sessionId>`), signs in, confirms the `userCode` matches what the agent shows, and clicks **Approve**. The page calls `POST /v1/ai-apps/connect/:uid/approve`. The handler resolves the member and checks `ai_apps.write`: on success it mints a short-lived `deployToken` (~60 min) bound to the session (`APPROVED`); without the permission it marks the session `DENIED`. Both outcomes are written to the audit log (`CONNECT_APPROVED` / `CONNECT_DENIED`).
-3. **Collect** — the agent polls `POST /v1/ai-apps/connect/poll` with its `pollToken`. While `PENDING` it keeps polling; on `APPROVED` it receives the `deployToken` (+ `deployTokenExpiresAt`); on `DENIED`/`EXPIRED` it stops.
+3. **Collect** — the agent polls `POST /v1/ai-apps/connect/poll` with its `pollToken`. While `PENDING` it keeps polling; on `APPROVED` it receives the `deployToken` (+ `deployTokenExpiresAt`); on `DENIED`/`EXPIRED` it stops. Polling an `APPROVED` session keeps returning the same `deployToken` until it expires, so kits ≥1.17 (LAB-2784) tell an agent whose polling was interrupted to re-poll with the `pollToken` it already holds and start a new session only on `expired`/`denied` or an already-expired `deployTokenExpiresAt` — the member doesn't approve twice. Don't make the poll consume the token on first read (`ai-apps-connect-poll.spec.ts`).
 4. **Deploy** — the agent uses the `deployToken` in `x-app-token` for `POST /v1/ai-apps/deploy`. It may redeploy until the token expires; afterwards it reconnects to mint a new one.
 
-The `deployToken` is held in agent memory only and never written into the kit, so the starter-kit folder grants nothing on its own.
+The `pollToken` and `deployToken` are held in agent memory only and never written into the kit, so the starter-kit folder grants nothing on its own.
 
 ## Endpoints
 
@@ -122,6 +122,8 @@ The `deployToken` is held in agent memory only and never written into the kit, s
 | GET    | `/v1/ai-apps/:uid/agent/feedback` | `AiAppTokenGuard` (`x-app-token`) | — (token = member, **owner only**; a deployment key only for its own app, prod or preview) | Agent feedback list: every row, newest first, stored HTML `text` verbatim (screenshots are `<img>` links) + `member { uid, name, image }`; optional `?status=` (case-insensitive, 400 otherwise); not paginated |
 | PATCH  | `/v1/ai-apps/:uid/agent/feedback/:feedbackUid` | `AiAppTokenGuard` (`x-app-token`) | — (same scope as the agent list) | Agent status update: `{ status: 'VIEWED' \| 'IMPLEMENTED' }` (`NEW` → 422 from the validation pipe; reopening is member-only); 404 for a row of another app |
 | GET    | `/v1/ai-apps/starter-kit/download` | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.write`   | Stream the starter-kit ZIP (no token inside) |
+| GET    | `/v1/ai-apps/starter-kit/version` | none (open)                 | —                 | `{ version, whatsNew }` for the live kit; nothing else (kits ≥1.17 check it at the start of a chat) |
+| GET    | `/v1/ai-apps/starter-kit/update` | `AiAppTokenGuard` (`x-app-token`) | — (`ai_apps.write` was checked when the connect session was approved) | Kit-update ZIP: every kit file minus `app/`, plus the manifest; records `KIT_DOWNLOADED` with `(agent update)` |
 | POST   | `/v1/ai-apps/connect`            | none (agent)                  | —                 | Start a connect session; returns `connectUrl`/`userCode`/`pollToken` |
 | POST   | `/v1/ai-apps/connect/poll`       | none (agent, `pollToken` in body) | —             | Poll a session; returns the `deployToken` once `APPROVED` |
 | GET    | `/v1/ai-apps/connect/:uid`       | `UserTokenCheckGuard`         | —                 | Connect-session display info for the LabOS page (no secrets) |
@@ -962,7 +964,7 @@ Both are seeded in migration `20260623120000_ai_apps` and attached to the **PL I
 
 ## Deploy lifecycle bell notifications
 
-Three in-app (bell) notifications, all category `AI_APP` (added in migration
+In-app (bell) notifications, all category `AI_APP` (added in migration
 `20260811120000_add_ai_app_notification_category`), distinguished by
 `metadata.trigger` — the same one-category-many-triggers convention the roadmap
 module uses for `GANTRY`. The category is deliberately generic (not
@@ -1008,7 +1010,23 @@ of growing a new category per event:
     hostnames, which are manager-only (see `AiAppDeploymentInfo.failureReason` above);
     the owner sees the real reason on the linked app page, not in the bell body.
 
-Both link to the app's LabOS detail page (`/pl-infra/ai-apps/{appUid}`, a
+- **Starter kit update** (`trigger: 'starter_kit_updated'`) — broadcast to everyone
+  holding `ai_apps.read` OR `ai_apps.write` when the kit this environment serves gets a
+  newer version. See `AiAppsKitUpdateNotificationService`.
+  - Runs once per API start (`onApplicationBootstrap`, not awaited, never fails startup).
+  - The stored `starter_kit_updated` notifications are the record of what was announced:
+    `AI_APPS_STARTER_KIT_VERSION` is sent only when it is newer than every
+    `metadata.version` among them, so a restart or a rollback sends nothing.
+  - The check and the send run in one transaction holding a Postgres advisory lock
+    (`pg_advisory_xact_lock`), so API instances starting together send one notification.
+    A failed send stores nothing, and the next start retries.
+  - Every environment announces the version it serves, to its own members.
+  - Copy: title "Starter Kit v{version} is out", body "See what's new and download the
+    latest kit — or ask your agent to update an existing one.", CTA "Get the starter kit". It links to
+    `/pl-infra/ai-apps?dialog=addAiApp` (`AI_APPS_ADD_APP_DIALOG_PATH`), which opens the
+    Add your AI App modal with the kit version and What's new.
+
+The app notifications link to the app's LabOS detail page (`/pl-infra/ai-apps/{appUid}`, a
 frontend-relative path — see `aiAppDetailPath` in `ai-apps.constants.ts`). Copy lives
 in `AI_APPS_NOTIFICATION_MESSAGES` (`ai-apps.constants.ts`) so a wording change is a
 one-file swap. Notification failures are logged and swallowed — never breaking the
@@ -1030,6 +1048,7 @@ CLAUDE.md / AGENTS.md                          agent build + deploy instructions
 .claude/skills/pln-member-context/SKILL.md     how the app gets the signed-in member's identity
 .claude/skills/db-migration/SKILL.md           migrate an existing DB onto PLN Postgres — schema + data by default (kits ≥1.8)
 .claude/skills/app-analytics/SKILL.md          baseline + custom PostHog events; route sync for subpage deep links (≥1.10; pathname + query, never the hash, addressed to the dashboard origin ≥1.12)
+.claude/skills/kit-update/SKILL.md             offer + apply newer kit versions, kit files only, after the member's yes (kits ≥1.17)
 pln-app.config.json                            connect/deploy/draft/metadata/logs/feedback/member-context endpoints
                                                (+ appId, appUid, approved appName/appDescription,
                                                 database provisioning choice ≥1.6) — NO token
@@ -1037,9 +1056,22 @@ pl-design-system/                              curated PL Design System (files, 
 styles/pln-theme.css                           minimal CSS-variable fallback (plain-HTML apps)
 styles/FONTS.md                                Inter font guidance
 app/                                           minimal runnable Node/Express scaffold
+.pln-kit/manifest.json                         SHA-256 of every kit-managed file (kits ≥1.17)
 ```
 
-The kit deliberately exposes **no internal PLN APIs** — only the connect, deploy, draft, metadata, logs, and member-context endpoints — and **no token**.
+The kit deliberately exposes **no internal PLN APIs** — only the connect, deploy, draft, metadata, logs, member-context and kit version/update endpoints — and **no token**.
+
+### Kit updates (kits ≥1.17)
+
+The agent in an existing kit offers newer kit versions itself (LAB-2723):
+
+- **Check.** `CLAUDE.md`/`AGENTS.md` tell the agent to `GET` `kitVersionEndpoint` once at the start of a chat (no token) and compare `version` with the config's `kitVersion` as integers per segment. It offers the update only when the live version is newer and isn't `declinedKitVersion`. A failed check is silent.
+- **Consent.** Nothing is downloaded or changed without the member's yes. A "no" writes `declinedKitVersion` into `pln-app.config.json`, so that version isn't offered again; a newer one is. Asking to "update the kit" always runs the flow.
+- **Download.** `kitUpdateEndpoint` needs the deploy credential (`AiAppTokenGuard`), so a member without a valid token approves a connect session first. The ZIP is `buildUpdateZip()`: the full kit minus `app/`.
+- **Local edits.** Every kit ships `.pln-kit/manifest.json` (`{ kitVersion, files: { path: sha256 } }`, excluding `app/` and `pln-app.config.json`). The `kit-update` skill compares local files with the installed manifest, lists add/update/remove, names locally edited files and asks a second time before overwriting them.
+- **Config merge.** New kit-owned keys (endpoints, `kitVersion`, `notes`) win; `appId`, `appUid`, `appName`, `appDescription`, `appTags`, `database` and unknown local keys are kept; `declinedKitVersion` is dropped. The new manifest is written last.
+
+`kitFiles()` in `AiAppsStarterKitService` is the single list behind the full ZIP, the update ZIP and the manifest — add any new kit file there, never straight into a ZIP. When bumping the version, replace `AI_APPS_STARTER_KIT_WHATS_NEW` (it describes only the current version). Kits up to 1.16 have no check, so their members still update by downloading from LabOS.
 
 ### Bundled PL Design System
 
@@ -1098,6 +1130,7 @@ UI work and follows `AGENTS.md` / `CLAUDE.md` for deploy, secrets, and iframe ru
 | `AI_APPS_DEPLOY_POLL_INTERVAL_SEC` | `10` | `pollIntervalSec` returned with every `202` deploy response |
 | `AI_APPS_DEPLOYMENT_STATUS_ENDPOINT` | _derived from `AI_APPS_BASE_URL`_ | Optional override of the status URL template (`{appUid}`/`{deploymentId}`), returned filled in as `statusEndpoint` and shipped in the kit config |
 | `AI_APPS_ANALYTICS_ENDPOINT` | _derived from `AI_APPS_BASE_URL`_ | Optional override for the `POST /v1/ai-apps/track` URL written into the kit as `analyticsEndpoint` — see "Product analytics for deployed apps" above |
+| `AI_APPS_KIT_VERSION_ENDPOINT` / `AI_APPS_KIT_UPDATE_ENDPOINT` | _derived from `AI_APPS_BASE_URL`_ | Optional overrides for the `starter-kit/version` and `starter-kit/update` URLs written into the kit as `kitVersionEndpoint`/`kitUpdateEndpoint` |
 
 S3 uploads reuse the shared `AwsService`, so the standard `AWS_REGION` / `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` credentials must also be present. Product analytics reuses the existing `POSTHOG_API_KEY` / `POSTHOG_HOST` (see `AnalyticsService`) — no separate PostHog project or key.
 

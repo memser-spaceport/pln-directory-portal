@@ -350,6 +350,16 @@ export const ANALYTICS_EVENTS = {
   },
   MCP: {
     TOOL_INVOKED: 'mcp-tool-invoked',
+    PL_INFRA_LIST_READ: 'mcp-pl-infra-list-read',
+    APP_SESSION_OPEN: 'mcp-app-session-open',
+    APP_SESSION_REVOKED: 'mcp-app-session-revoked',
+  },
+  AI_APPS: {
+    RESOURCES_SAVED: 'ai_apps_resources_saved',
+    RESOURCES_SAVE_REJECTED: 'ai_apps_resources_save_rejected',
+  },
+  HUSKY: {
+    INVESTOR_TOOL_INVOKED: 'husky_investor_tool_invoked',
   },
   JOB_BOARD: {
     APPLICATION_RECORDED: 'job-application-recorded',

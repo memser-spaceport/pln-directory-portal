@@ -8,6 +8,8 @@ const MARKER_TYPE = {
   JobLink: 'job',
   NewsLink: 'news',
   ForumLink: 'forum',
+  InvestorLink: 'investor',
+  WarmIntroLink: 'warm_intro',
 } as const;
 
 type DirectoryType = typeof MARKER_TYPE[keyof typeof MARKER_TYPE];
@@ -20,7 +22,8 @@ const LABEL_TYPES: Record<string, DirectoryType[]> = {
   'forum link': ['forum'],
 };
 
-const MARKER_RE = /\[(TeamLink|MemberLink|ProjectLink|EventLink|JobLink|NewsLink|ForumLink)\]\(([^)]+)\)/g;
+const MARKER_RE =
+  /\[(TeamLink|MemberLink|ProjectLink|EventLink|JobLink|NewsLink|ForumLink|InvestorLink|WarmIntroLink)\]\(([^)]+)\)/g;
 const LABEL_RE = /\*{0,2}(Source|Website|LinkedIn|Apply|Forum Link)\*{0,2}:\s*(https?:\/\/[^\s)]+)/gi;
 const CITATION_RE = /\[(\d+)\]\(([^)\s]+)\)/g;
 
@@ -40,7 +43,7 @@ export interface BuiltSourceRefs {
 function cleanTitle(raw: string): string {
   return raw
     .replace(/^[-*]\s+/, '')
-    .replace(/^(Topic|Name|Title|Team|Project|Member|Event):\s*/i, '')
+    .replace(/^(Topic|Name|Title|Team|Project|Member|Event|Investor DB record|Warm intro):\s*/i, '')
     .trim();
 }
 
@@ -181,6 +184,20 @@ export function buildSourceRefs(input: {
     const url = source?.trim();
     if (!url || alreadyRepresented(seenUrls, url)) continue;
     nextIndex += 1;
+    const entry = findEntry(catalog, url);
+    if (entry) {
+      mismatches.push(`LLM source ${url} was not cited; appended as ${entry.directoryLink}`);
+      sourceRefs.push({
+        index: nextIndex,
+        title: entry.title,
+        type: entry.type,
+        directoryLink: entry.directoryLink,
+        ...(entry.externalUrl ? { externalUrl: entry.externalUrl } : {}),
+      });
+      remember(seenUrls, entry.directoryLink);
+      remember(seenUrls, entry.externalUrl);
+      continue;
+    }
     mismatches.push(`LLM source ${url} was not cited; appended as external`);
     sourceRefs.push({ index: nextIndex, title: url, type: 'external', externalUrl: url });
     remember(seenUrls, url);

@@ -1,5 +1,6 @@
 import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
+import { AddParticipantsBulkSchema } from './admin-demo-day';
 
 const emailField = z.string().trim().email();
 
@@ -48,6 +49,11 @@ export const CreateSpvSpotlightSchema = z.object({
   replyToEmail: z.string().email().optional().nullable(),
   docSendUrl: z.string().url().optional().nullable(),
   summary: z.string().optional().nullable(),
+  closesAt: z
+    .string()
+    .refine((value) => !Number.isNaN(Date.parse(value)), 'Invalid date')
+    .optional()
+    .nullable(),
   media: z.array(mediaItemSchema).optional(),
 });
 
@@ -70,7 +76,7 @@ export const UpdateSpvEmailTemplatesSchema = z.object({
 
 export class UpdateSpvEmailTemplatesDto extends createZodDto(UpdateSpvEmailTemplatesSchema) {}
 
-const bulkParticipantSchema = z.object({
+const bulkParticipantSchema = AddParticipantsBulkSchema.shape.participants.element.extend({
   email: emailField,
   name: z.string().optional(),
   emailTemplateVariables: z.record(z.string(), z.string()).optional(),

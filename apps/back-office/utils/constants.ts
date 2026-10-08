@@ -84,6 +84,7 @@ export const API_ROUTE = {
   ADMIN_RBAC_MEMBERS: `${APP_CONSTANTS.V1}admin/rbac/members`,
   ADMIN_RBAC_ROLES: `${APP_CONSTANTS.V1}admin/rbac/roles`,
   ADMIN_RBAC_PERMISSIONS: `${APP_CONSTANTS.V1}admin/rbac/permissions`,
+  ADMIN_AI_APP_RESOURCES: `${APP_CONSTANTS.V1}admin/ai-app-resources`,
 };
 
 export const TOKEN = 'plnetwork@1';
@@ -134,6 +135,10 @@ export const INVESTOR_PROFILE_CONSTANTS = {
 export const ADMIN_PERMISSIONS = {
   DIRECTORY_FULL: 'directory.admin.full',
   TOOLS_ACCESS: 'admin.tools.access',
+} as const;
+
+export const AI_APPS_PERMISSIONS = {
+  RESOURCES_MANAGE: 'ai_apps.resources.manage',
 } as const;
 
 export const TEAM_PITCH_PERMISSIONS = {

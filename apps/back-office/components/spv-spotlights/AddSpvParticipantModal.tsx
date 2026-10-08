@@ -15,6 +15,7 @@ interface AddSpvParticipantModalProps {
   spotlightUid: string;
   defaultType: ParticipantTabType;
   defaultCohort: 'PRE_APPROVED' | 'OUTREACH';
+  showCohort: boolean;
   onAdded?: () => void;
 }
 
@@ -24,6 +25,7 @@ export const AddSpvParticipantModal: React.FC<AddSpvParticipantModalProps> = ({
   spotlightUid,
   defaultType,
   defaultCohort,
+  showCohort,
   onAdded,
 }) => {
   const [authToken] = useCookie('plnadmin');
@@ -154,7 +156,7 @@ export const AddSpvParticipantModal: React.FC<AddSpvParticipantModalProps> = ({
               </div>
             </div>
 
-            {participantType === 'INVESTOR' && (
+            {showCohort && participantType === 'INVESTOR' && (
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   Cohort <span className="text-red-500">*</span>

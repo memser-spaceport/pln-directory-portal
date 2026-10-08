@@ -1593,6 +1593,7 @@ model SpvSpotlight {
   replyToEmail  String?
   docSendUrl    String?
   summary       String?
+  closesAt      DateTime?
   emailTemplates Json
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
@@ -3890,19 +3891,25 @@ model AiAppDeployKey {
 /// App-scoped member session for one deployed AI App (LAB-2695). The token handed to the app is a signed JWT bound to
 /// `appId`; only its sha256 is stored, and every use is validated here (idle timeout, absolute expiry, revocation).
 model AiAppSession {
-  id            Int       @id @default(autoincrement())
-  uid           String    @unique @default(cuid())
-  appId         String
-  memberUid     String
-  tokenHash     String    @unique
-  createdAt     DateTime  @default(now())
-  lastUsedAt    DateTime  @default(now())
-  idleExpiresAt DateTime
-  expiresAt     DateTime
-  revokedAt     DateTime?
+  id                   Int       @id @default(autoincrement())
+  uid                  String    @unique @default(cuid())
+  appId                String
+  memberUid            String
+  tokenHash            String    @unique
+  createdAt            DateTime  @default(now())
+  lastUsedAt           DateTime  @default(now())
+  idleExpiresAt        DateTime
+  expiresAt            DateTime
+  revokedAt            DateTime?
+  /// True when an agent minted this session (LAB-2763). Browser sessions stay false.
+  isAgent              Boolean   @default(false)
+  /// McpAuthorization.uid that minted an agent session. Null for a browser session.
+  /// revokeAuthorization ends these rows (LAB-2764).
+  mcpAuthorizationUid  String?
 
   @@index([memberUid, revokedAt])
   @@index([expiresAt])
+  @@index([mcpAuthorizationUid])
 }
 
 /// One-time code LabOS mints for the app-session sign-in round trip; redeemable once, for the same appId + target,
@@ -4572,4 +4579,63 @@ model McpAuthCode {
   authorization    McpAuthorization @relation(fields: [authorizationUid], references: [uid], onDelete: Cascade)
 
   @@index([expiresAt])
+}
+
+/// One UTC calendar day of suggested-candidate matching.
+model JobMatchRun {
+  uid         String            @id @default(cuid())
+  runDate     DateTime          @unique @db.Date
+  status      JobMatchRunStatus @default(RUNNING)
+  /// Held by the worker. A stale timestamp means the previous worker died and a rerun may claim the row.
+  lockedUntil DateTime?
+  error       String?
+  startedAt   DateTime          @default(now())
+  finishedAt  DateTime?
+  rows        JobMatchRow[]
+}
+
+enum JobMatchRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum JobMatchKind {
+  TEAM
+  ROLE
+  SCORE
+  CRITERIA
+  SUGGESTION
+}
+
+enum JobMatchLabel {
+  STRONG
+  GOOD
+}
+
+/// Resume state and stored results.
+/// TEAM: team finished. ROLE: role finished. SCORE: member fits in payload.
+/// CRITERIA: cached criteria in payload, keyed by roleTextHash.
+/// SUGGESTION: one of the top 5. Marked criteria live in payload.
+/// Unused key columns are empty strings so one unique index covers every kind.
+model JobMatchRow {
+  uid          String         @id @default(cuid())
+  runUid       String
+  run          JobMatchRun    @relation(fields: [runUid], references: [uid], onDelete: Cascade)
+  teamUid      String         @default("")
+  roleUid      String         @default("")
+  memberUid    String         @default("")
+  roleTextHash String         @default("")
+  kind         JobMatchKind
+  rank         Int?
+  fit          Int?
+  label        JobMatchLabel?
+  blurb        String?
+  payload      Json?
+  createdAt    DateTime       @default(now())
+
+  @@unique([kind, runUid, teamUid, roleUid, memberUid, roleTextHash])
+  @@index([runUid, teamUid, kind])
+  @@index([kind, roleUid, createdAt])
+  @@index([kind, roleUid, roleTextHash])
 }

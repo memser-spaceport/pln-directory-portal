@@ -41,6 +41,7 @@ const permissionSeeds: PermissionSeed[] = [
   { code: 'deals.view', module: 'Deals' },
   { code: 'ai_apps.read', module: 'AI Apps' },
   { code: 'ai_apps.write', module: 'AI Apps' },
+  { code: 'ai_apps.resources.manage', module: 'AI Apps' },
   { code: 'code_agent_sessions.view', module: 'Agent Sessions' },
   { code: 'code_agent_sessions.admin', module: 'Agent Sessions' },
   { code: 'founder_guides.view', module: 'Founder Guides' },

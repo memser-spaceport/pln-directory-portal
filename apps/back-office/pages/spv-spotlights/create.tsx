@@ -38,6 +38,7 @@ const CreateSpvSpotlightPage = () => {
     replyToEmail: '',
     docSendUrl: '',
     summary: '',
+    closesAt: '',
   });
 
   useEffect(() => {
@@ -95,6 +96,7 @@ const CreateSpvSpotlightPage = () => {
           replyToEmail: form.replyToEmail.trim() || null,
           docSendUrl: form.docSendUrl.trim() || null,
           summary: form.summary.trim() || null,
+          closesAt: form.closesAt ? `${form.closesAt}:00.000Z` : null,
           slug: form.slug.trim() || undefined,
         },
         { headers: { authorization: `Bearer ${authToken}` } }
@@ -335,6 +337,19 @@ const CreateSpvSpotlightPage = () => {
                 onChange={(e) => setForm((current) => ({ ...current, docSendUrl: e.target.value }))}
                 className={inputClass}
                 placeholder="https://docsend.com/..."
+              />
+            </div>
+
+            <div>
+              <label htmlFor="closesAt" className="mb-2 block text-sm font-medium text-gray-700">
+                Close Date (UTC)
+              </label>
+              <input
+                type="datetime-local"
+                id="closesAt"
+                value={form.closesAt}
+                onChange={(e) => setForm((current) => ({ ...current, closesAt: e.target.value }))}
+                className={inputClass}
               />
             </div>
 

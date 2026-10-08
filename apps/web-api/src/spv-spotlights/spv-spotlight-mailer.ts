@@ -58,6 +58,7 @@ export class SpvSpotlightMailer {
     };
     const senderEmail = resolveTeamPitchSenderEmail(input.spotlight.senderEmail);
     const replyTo = input.spotlight.replyToEmail?.trim() || undefined;
+    const webBase = (process.env.WEB_UI_BASE_URL || 'https://os.pl.xyz').replace(/\/$/, '');
     await this.notificationServiceClient.sendNotification({
       isPriority: true,
       deliveryChannel: 'EMAIL',
@@ -72,6 +73,7 @@ export class SpvSpotlightMailer {
         body: {
           subject: mergeTemplate(input.template.subject, vars),
           bodyHtml: mergeTemplate(input.template.body, vars),
+          preferencesUrl: `${webBase}/settings/email`,
         },
       },
       entityType: 'SPV_SPOTLIGHT',

@@ -6,6 +6,8 @@ import { PushNotificationsModule } from '../push-notifications/push-notification
 import { RbacModule } from '../rbac/rbac.module';
 import { SharedModule } from '../shared/shared.module';
 import { AwsService } from '../utils/aws/aws.service';
+import { JwtService } from '../utils/jwt/jwt.service';
+import { AiAppsResourcesAdminAuthGuard } from '../guards/admin-auth.guard';
 import { AiAppsController } from './ai-apps.controller';
 import { AiAppsTestingUsersController } from './ai-apps-testing-users.controller';
 import { AiAppsService } from './ai-apps.service';
@@ -16,11 +18,15 @@ import { AiAppsConnectService } from './ai-apps-connect.service';
 import { AiAppsSessionService } from './ai-apps-session.service';
 import { AiAppsAuthGateService } from './ai-apps-auth-gate.service';
 import { AiAppsStarterKitService } from './ai-apps-starter-kit.service';
+import { AiAppsKitUpdateNotificationService } from './ai-apps-kit-update-notification.service';
 import { AiAppsTestingUsersService } from './ai-apps-testing-users.service';
 import { AiAppMeRbacGuard } from './guards/ai-app-me-rbac.guard';
 import { AiAppMemberContextGuard } from './guards/ai-app-member-context.guard';
 import { AiAppTokenGuard } from './guards/ai-app-token.guard';
 import { AgentFeedbackDeniedInterceptor } from './agent-feedback-denied.interceptor';
+
+import { AiAppResourcesController } from './ai-app-resources.controller';
+import { AiAppResourcesService } from './ai-app-resources.service';
 
 @Module({
   imports: [
@@ -38,15 +44,19 @@ import { AgentFeedbackDeniedInterceptor } from './agent-feedback-denied.intercep
       settings: { lockDuration: 20000, maxStalledCount: 2 },
     }),
   ],
-  controllers: [AiAppsController, AiAppsTestingUsersController],
+  controllers: [AiAppsController, AiAppsTestingUsersController, AiAppResourcesController],
   providers: [
     AiAppsService,
+    AiAppResourcesService,
+    AiAppsResourcesAdminAuthGuard,
+    JwtService,
     AiAppsDeployProcessor,
     AiAppsAccessService,
     AiAppsConnectService,
     AiAppsSessionService,
     AiAppsAuthGateService,
     AiAppsStarterKitService,
+    AiAppsKitUpdateNotificationService,
     AiAppsTestingUsersService,
     AiAppMemberContextGuard,
     AiAppMeRbacGuard,
@@ -54,6 +64,6 @@ import { AgentFeedbackDeniedInterceptor } from './agent-feedback-denied.intercep
     AgentFeedbackDeniedInterceptor,
     AwsService,
   ],
-  exports: [AiAppsService],
+  exports: [AiAppsService, AiAppsAccessService, AiAppsSessionService],
 })
 export class AiAppsModule {}

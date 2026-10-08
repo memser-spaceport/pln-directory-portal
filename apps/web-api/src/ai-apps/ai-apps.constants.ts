@@ -11,7 +11,19 @@
  */
 
 /** Starter kit version shown in the README, ZIP filename, and LabOS UI. Bump when the kit contents or flow change. */
-export const AI_APPS_STARTER_KIT_VERSION = '1.16';
+export const AI_APPS_STARTER_KIT_VERSION = '1.17';
+
+/**
+ * Member-readable notes for the CURRENT kit version, served by the open
+ * `GET /v1/ai-apps/starter-kit/version` so an agent can summarize an update
+ * before offering it. Replace (don't append) when bumping the version.
+ */
+export const AI_APPS_STARTER_KIT_WHATS_NEW: string[] = [
+  'Your agent now checks for starter-kit updates at the start of a chat and offers to apply them, only after you say yes.',
+  'Updates change only kit files (agent instructions, skills, design system, styles), never your app code in app/.',
+  'Kit files you edited yourself are listed before anything is overwritten.',
+  'If your agent loses track of a LabOS approval mid-way, it now picks it back up instead of asking you to approve again.',
+];
 
 /** Max members on one private app's whitelist (the owner and directory admins never count). */
 export const AI_APPS_MAX_ALLOWED_MEMBERS = 200;
@@ -507,6 +519,16 @@ export const AI_APPS_ANALYTICS_ENDPOINT =
   process.env.AI_APPS_ANALYTICS_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/track`;
 
 /**
+ * Kit self-update endpoints, written into the starter kit as
+ * `kitVersionEndpoint` (open: live version + what's new) and
+ * `kitUpdateEndpoint` (deploy-token auth: the kit files minus `app/`).
+ */
+export const AI_APPS_KIT_VERSION_ENDPOINT =
+  process.env.AI_APPS_KIT_VERSION_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/starter-kit/version`;
+export const AI_APPS_KIT_UPDATE_ENDPOINT =
+  process.env.AI_APPS_KIT_UPDATE_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/starter-kit/update`;
+
+/**
  * Event-name hygiene for `POST /v1/ai-apps/track`: every event lands in the
  * shared Directory PostHog project, so names are snake_case-normalized and
  * forced under one prefix server-side — a vibe-coded app cannot pollute the
@@ -602,6 +624,9 @@ export function aiAppDetailPath(appUid: string): string {
   return `/pl-infra/ai-apps/${appUid}`;
 }
 
+/** The AI Apps list with the "Add your AI App" (starter kit) modal open — LabOS `AiAppsPage` reads `dialog=addAiApp`. */
+export const AI_APPS_ADD_APP_DIALOG_PATH = '/pl-infra/ai-apps?dialog=addAiApp';
+
 /**
  * `metadata.trigger` values stamped on each AI Apps bell notification —
  * mirrors the roadmap module's convention for one category covering several
@@ -614,6 +639,7 @@ export const AI_APPS_NOTIFICATION_TRIGGERS = {
   FEEDBACK_REPLY: 'feedback_reply',
   FEEDBACK_SHIPPED: 'feedback_shipped',
   COMMENT_NEW: 'comment_new',
+  STARTER_KIT_UPDATED: 'starter_kit_updated',
 } as const;
 
 /** FEEDBACK (the written form) or COMMENT (pinned in the live app) — the notification's noun follows it. */
@@ -653,6 +679,11 @@ export const AI_APPS_NOTIFICATION_MESSAGES = {
   commentNew: (appName: string, authorName: string | null, note: string) => ({
     title: `New comment on ${appName}`,
     description: feedbackNotificationExcerpt(`${authorName ?? 'A member'}: ${note}`),
+  }),
+  starterKitUpdated: (version: string) => ({
+    title: `Starter Kit v${version} is out`,
+    description: "See what's new and download the latest kit — or ask your agent to update an existing one.",
+    linkText: 'Get the starter kit',
   }),
 } as const;
 

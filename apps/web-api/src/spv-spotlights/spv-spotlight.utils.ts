@@ -22,34 +22,49 @@ export const EMAIL_TEMPLATE_KEYS: EmailTemplateKey[] = [
   'opened',
 ];
 
-const defaultBody = (intro: string) =>
-  `<p>${intro}</p><p><a href="{{spotlightLink}}">Open the spotlight</a></p><p>Questions? {{supportEmail}}</p>`;
+function spotlightEmailBody(message: string, buttonLabel: string): string {
+  return [
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#ffffff;">',
+    '<tr><td align="center" style="padding:16px 24px 0;font-family:Inter,Helvetica,Arial,sans-serif;">',
+    '<p style="margin:0;font-size:24px;line-height:34px;font-weight:600;letter-spacing:-0.4px;color:#000000;text-align:center;">Hi {{investorName}},</p>',
+    `<p style="margin:8px auto 0;max-width:418px;font-size:15px;line-height:24px;font-weight:400;color:#667085;text-align:center;">${message}</p>`,
+    '</td></tr>',
+    '<tr><td align="center" style="padding:24px 24px 8px;">',
+    `<a href="{{spotlightLink}}" target="_blank" style="display:inline-block;background-color:#1b4dff;color:#ffffff;font-family:Inter,Helvetica,Arial,sans-serif;font-size:14px;line-height:20px;font-weight:500;letter-spacing:-0.2px;text-decoration:none;text-align:center;padding:10px 20px;border-radius:8px;border:1px solid rgba(14,15,17,0.12);">${buttonLabel}</a>`,
+    '</td></tr>',
+    '<tr><td align="center" style="padding:16px 24px;font-family:Montserrat,Inter,Helvetica,Arial,sans-serif;">',
+    '<p style="margin:0;font-size:15px;line-height:24px;font-weight:600;color:#1c1e23;text-align:center;">Cheers,</p>',
+    '<p style="margin:0;font-size:15px;line-height:24px;font-weight:400;color:#8f98b1;text-align:center;">The LabOS Team</p>',
+    '</td></tr>',
+    '</table>',
+  ].join('\n');
+}
 
 export function defaultEmailTemplates(title: string): EmailTemplates {
   return {
     invitePreapproved: {
       subject: `You're invited: ${title}`,
-      body: defaultBody(`Hi {{investorName}}, you have access to ${title}.`),
+      body: spotlightEmailBody('You are invited to {{spotlightTitle}}.', 'View Spotlight'),
     },
     followUpPreapproved: {
       subject: `Reminder: ${title}`,
-      body: defaultBody(`Hi {{investorName}}, a reminder that ${title} is available to you.`),
+      body: spotlightEmailBody('A reminder that {{spotlightTitle}} is available to you.', 'View Spotlight'),
     },
     inviteOutreach: {
       subject: `Invitation: ${title}`,
-      body: defaultBody(`Hi {{investorName}}, you're invited to request access to ${title}.`),
+      body: spotlightEmailBody("You're invited to request access to {{spotlightTitle}}.", 'View Spotlight'),
     },
     followUpOutreach: {
       subject: `Reminder: request access to ${title}`,
-      body: defaultBody(`Hi {{investorName}}, you can still request access to ${title}.`),
+      body: spotlightEmailBody('You can still request access to {{spotlightTitle}}.', 'View Spotlight'),
     },
     approved: {
       subject: `Access approved: ${title}`,
-      body: defaultBody(`Hi {{investorName}}, your request to view ${title} was approved.`),
+      body: spotlightEmailBody('Your request to view {{spotlightTitle}} was approved.', 'View Spotlight'),
     },
     opened: {
       subject: `${title} is open`,
-      body: defaultBody(`Hi {{investorName}}, ${title} is now open.`),
+      body: spotlightEmailBody('{{spotlightTitle}} is now open.', 'View Spotlight'),
     },
   };
 }
