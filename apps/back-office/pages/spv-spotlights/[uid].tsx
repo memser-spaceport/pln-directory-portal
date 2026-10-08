@@ -27,8 +27,8 @@ type TemplateKey =
   | 'opened';
 
 const TEMPLATE_LABELS: { key: TemplateKey; label: string }[] = [
-  { key: 'invitePreapproved', label: 'Invite, pre-approved' },
-  { key: 'followUpPreapproved', label: 'Follow-up, pre-approved' },
+  { key: 'invitePreapproved', label: 'Invite' },
+  { key: 'followUpPreapproved', label: 'Follow-up' },
   { key: 'opened', label: 'Spotlight is open' },
 ];
 
@@ -335,8 +335,8 @@ const SpvSpotlightDetailPage = () => {
     await loadParticipants();
     const uploaded = participants.length - (data.skipped ?? 0);
     toast.success(
-      `Uploaded ${uploaded} ${cohort === 'PRE_APPROVED' ? 'pre-approved' : 'outreach'} investors.${
-        data.skipped ? ` ${data.skipped} already pre-approved, left unchanged.` : ''
+      `Uploaded ${uploaded} ${cohort === 'PRE_APPROVED' ? '' : 'outreach '}investors.${
+        data.skipped ? ` ${data.skipped} already added, left unchanged.` : ''
       }`
     );
   };
@@ -483,7 +483,7 @@ const SpvSpotlightDetailPage = () => {
         field === 'type'
           ? value === 'FOUNDER'
             ? `Change this participant's type to ${label}? They get admin (edit) access and lose their investor cohort.`
-            : `Change this participant's type to ${label}? They become a pre-approved investor and can view the spotlight without applying.`
+            : `Change this participant's type to ${label}? They become an investor and can view the spotlight.`
           : `Change this participant's access to ${label}?`,
       participant,
       run: async () => {
@@ -499,8 +499,8 @@ const SpvSpotlightDetailPage = () => {
       title: cohort === 'PRE_APPROVED' ? 'Grant access' : 'Move to outreach',
       message:
         cohort === 'PRE_APPROVED'
-          ? 'This investor becomes pre-approved and can view the spotlight without applying. A pending or rejected application is removed.'
-          : 'This investor loses pre-approved access and has to apply to view the spotlight.',
+          ? 'This investor can view the spotlight. A pending or rejected application is removed.'
+          : 'This investor loses access and has to apply to view the spotlight.',
       confirmLabel: cohort === 'PRE_APPROVED' ? 'Grant access' : 'Move to outreach',
       participant,
       run: async () => {
@@ -915,7 +915,7 @@ const SpvSpotlightDetailPage = () => {
                       {(tab === 'investors' || tab === 'outreach') && (
                         <>
                           <label className="cursor-pointer rounded-lg bg-green-600 px-4 py-2 text-white hover:bg-green-700">
-                            {tab === 'investors' ? 'Upload pre-approved CSV' : 'Upload outreach CSV'}
+                            {tab === 'investors' ? 'Upload CSV' : 'Upload outreach CSV'}
                             <input
                               type="file"
                               accept=".csv,text/csv"
@@ -1156,9 +1156,6 @@ const SpvSpotlightDetailPage = () => {
                       </div>
                     )}
                     <div className={clsx(s.headerCell, s.first, s.flexible)}>Member</div>
-                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 140 }}>
-                      {tab === 'investors' ? 'Access via' : 'Application'}
-                    </div>
                     <div className={clsx(s.headerCell, s.fixed)} style={{ width: 130 }}>
                       Type
                     </div>
@@ -1195,17 +1192,6 @@ const SpvSpotlightDetailPage = () => {
                           <div className="text-sm font-medium text-gray-900">{participant.member.name || '—'}</div>
                           <div className="text-sm text-gray-500">{participant.member.email}</div>
                         </div>
-                      </div>
-                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 140 }}>
-                        {tab === 'investors'
-                          ? participant.cohort === 'PRE_APPROVED'
-                            ? 'Pre-approved'
-                            : 'Application'
-                          : participant.accessRequestStatus === 'PENDING'
-                          ? 'Pending'
-                          : participant.accessRequestStatus === 'REJECTED'
-                          ? 'Rejected'
-                          : 'Not applied'}
                       </div>
                       {typeSelect(participant)}
                       <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 90 }}>
@@ -1360,8 +1346,8 @@ const SpvSpotlightDetailPage = () => {
           bulkSend?.kind === 'open-notice'
             ? `Email that spotlight is open to ${bulkSend.mode === 'selected' ? 'selected' : 'all'} investors`
             : `Send ${sendNoun}s to ${bulkSend?.mode === 'selected' ? 'selected' : 'all'} ${
-                tab === 'outreach' ? 'outreach' : 'pre-approved'
-              } investors`
+                tab === 'outreach' ? 'outreach ' : ''
+              }investors`
         }
         message={
           sendRecipients.length > 0
@@ -1407,7 +1393,7 @@ const SpvSpotlightDetailPage = () => {
                 ? 'Everyone in Investors gets this email. No Access investors are skipped.'
                 : tab === 'outreach'
                 ? 'Only outreach investors who have not applied get these emails.'
-                : 'Only pre-approved investors get these emails. Approved applicants and No Access investors are skipped.'}
+                : 'No Access investors are skipped.'}
             </p>
             {sendRecipients.length > 0 && (
               <div className="max-h-40 overflow-y-auto rounded-md border border-gray-200">
