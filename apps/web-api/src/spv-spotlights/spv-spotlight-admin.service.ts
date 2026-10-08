@@ -79,6 +79,7 @@ export class SpvSpotlightAdminService {
     replyToEmail?: string | null;
     docSendUrl?: string | null;
     summary?: string | null;
+    closesAt?: string | null;
     media?: MediaInput[];
   }) {
     const team = await this.prisma.team.findUnique({
@@ -107,6 +108,7 @@ export class SpvSpotlightAdminService {
         replyToEmail: normalizeOptionalTrimmed(input.replyToEmail) ?? null,
         docSendUrl: normalizeOptionalTrimmed(input.docSendUrl) ?? null,
         summary: normalizeOptionalTrimmed(input.summary && replaceNbsp(input.summary)) ?? null,
+        closesAt: input.closesAt ? new Date(input.closesAt) : null,
         emailTemplates: asEmailTemplates(null, title),
       },
     });
@@ -130,6 +132,7 @@ export class SpvSpotlightAdminService {
       replyToEmail?: string | null;
       docSendUrl?: string | null;
       summary?: string | null;
+      closesAt?: string | null;
       media?: MediaInput[];
     }
   ) {
@@ -165,6 +168,7 @@ export class SpvSpotlightAdminService {
         ...(input.summary !== undefined
           ? { summary: normalizeOptionalTrimmed(input.summary && replaceNbsp(input.summary)) ?? null }
           : {}),
+        ...(input.closesAt !== undefined ? { closesAt: input.closesAt ? new Date(input.closesAt) : null } : {}),
       },
     });
     if (input.media) {

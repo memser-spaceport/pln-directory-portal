@@ -48,6 +48,7 @@ export const CreateSpvSpotlightSchema = z.object({
   replyToEmail: z.string().email().optional().nullable(),
   docSendUrl: z.string().url().optional().nullable(),
   summary: z.string().optional().nullable(),
+  closesAt: z.string().datetime().optional().nullable(),
   media: z.array(mediaItemSchema).optional(),
 });
 

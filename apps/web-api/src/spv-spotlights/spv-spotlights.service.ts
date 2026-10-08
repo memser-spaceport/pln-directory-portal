@@ -278,6 +278,7 @@ export class SpvSpotlightsService {
       title: spotlight.title,
       description: spotlight.description,
       supportEmail: spotlight.supportEmail,
+      closesAt: spotlight.closesAt,
       docSendUrl: showDataRoom,
       team: {
         uid: spotlight.team.uid,

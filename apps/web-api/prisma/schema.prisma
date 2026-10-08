@@ -1593,6 +1593,7 @@ model SpvSpotlight {
   replyToEmail  String?
   docSendUrl    String?
   summary       String?
+  closesAt      DateTime?
   emailTemplates Json
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt

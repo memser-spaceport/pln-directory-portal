@@ -191,6 +191,7 @@ const SpvSpotlightDetailPage = () => {
       replyToEmail: data.replyToEmail ?? '',
       docSendUrl: data.docSendUrl ?? '',
       summary: data.summary ?? '',
+      closesAt: data.closesAt ? data.closesAt.slice(0, 16) : '',
     });
     setMedia(
       (data.media ?? []).map((item: { imageUid: string; alt: string; fit: string; image?: { url: string } }) => ({
@@ -252,6 +253,7 @@ const SpvSpotlightDetailPage = () => {
         replyToEmail: form.replyToEmail || null,
         docSendUrl: form.docSendUrl || null,
         summary: form.summary || null,
+        closesAt: form.closesAt ? `${form.closesAt}:00.000Z` : null,
         media: media.map(({ imageUid, alt, fit }) => ({ imageUid, alt, fit })),
       },
       { headers: authHeaders }
@@ -627,6 +629,7 @@ const SpvSpotlightDetailPage = () => {
       replyToEmail: String(spotlight.replyToEmail ?? ''),
       docSendUrl: String(spotlight.docSendUrl ?? ''),
       summary: String(spotlight.summary ?? ''),
+      closesAt: spotlight.closesAt ? String(spotlight.closesAt).slice(0, 16) : '',
     });
     setMedia(
       ((spotlight.media as { imageUid: string; alt: string; fit: string; image?: { url: string } }[]) ?? []).map(
@@ -734,6 +737,20 @@ const SpvSpotlightDetailPage = () => {
               {textField('senderName', 'Sender Name')}
               {textField('replyToEmail', 'Reply-To Email')}
               {textField('docSendUrl', 'DocSend URL')}
+              <div className={s.overviewField}>
+                <label className={s.fieldLabel}>Close Date (UTC)</label>
+                {isEditing ? (
+                  <input
+                    type="datetime-local"
+                    value={form.closesAt ?? ''}
+                    onChange={(e) => setForm({ ...form, closesAt: e.target.value })}
+                    className={s.fieldInput}
+                  />
+                ) : (
+                  <div className={s.fieldValue}>{form.closesAt ? form.closesAt.replace('T', ' ') : '—'}</div>
+                )}
+                <p className="text-xs text-gray-500">Shown on the spotlight page. Does not close the spotlight.</p>
+              </div>
               <div className={clsx(s.overviewField, s.fullWidth)}>
                 <label className={s.fieldLabel}>Summary</label>
                 {isEditing ? (
