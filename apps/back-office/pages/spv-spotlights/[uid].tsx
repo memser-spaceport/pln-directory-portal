@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import clsx from 'clsx';
 import { useRouter } from 'next/router';
@@ -11,6 +11,7 @@ import { RichText } from '../../components/common/rich-text';
 import { AddSpvParticipantModal } from '../../components/spv-spotlights/AddSpvParticipantModal';
 import { EditSpvTemplateVariablesModal } from '../../components/spv-spotlights/EditSpvTemplateVariablesModal';
 import { UploadSpvInvestorsModal } from '../../components/spv-spotlights/UploadSpvInvestorsModal';
+import { PreviewSpvEmailModal } from '../../components/spv-spotlights/PreviewSpvEmailModal';
 import { TeamPitchConfirmModal } from '../../components/team-pitches/TeamPitchConfirmModal';
 import api from '../../utils/api';
 import { API_ROUTE, WEB_UI_BASE_URL } from '../../utils/constants';
@@ -149,6 +150,7 @@ const SpvSpotlightDetailPage = () => {
   const [requests, setRequests] = useState<AccessRequest[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [templates, setTemplates] = useState<Record<TemplateKey, { subject: string; body: string }> | null>(null);
+  const [previewTemplate, setPreviewTemplate] = useState<TemplateKey | null>(null);
   const [editingTemplateVars, setEditingTemplateVars] = useState<Participant | null>(null);
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
   const [isConfirmRunning, setIsConfirmRunning] = useState(false);
@@ -479,6 +481,25 @@ const SpvSpotlightDetailPage = () => {
       </select>
     </div>
   );
+
+  const previewDefaults = useMemo(() => {
+    const team = spotlight?.team;
+    const teamName =
+      team && typeof team === 'object' && team !== null && 'name' in team
+        ? String((team as { name?: unknown }).name ?? '')
+        : '';
+    const slug = form.slug || 'spotlight';
+    return {
+      investorName: 'Alex Investor',
+      investorEmail: 'alex@example.com',
+      spotlightTitle: form.title || 'Protocol Labs SPV Spotlight',
+      spotlightLink: `${WEB_UI_BASE_URL.replace(/\/$/, '')}/spv-spotlight/${slug}`,
+      teamName: teamName || 'Example Team',
+      supportEmail: form.supportEmail || 'member-services@plnetwork.io',
+      role: 'Investor',
+      organization: 'Example Fund',
+    };
+  }, [spotlight, form.title, form.slug, form.supportEmail]);
 
   if (!authToken || isLoading) return null;
 
@@ -1228,15 +1249,27 @@ const SpvSpotlightDetailPage = () => {
                 )}
               </div>
               <p className="mb-6 text-sm text-gray-500">
-                Built-in tokens: investorName, investorEmail, spotlightTitle, spotlightLink, teamName, supportEmail.
-                Every email also replaces the investor&apos;s template variables (extra CSV columns, using the column
-                header as the token). Approval emails also have role and organization. Add a fallback for empty values
-                with {'{{firm|your fund}}'}. HTML is allowed.
+                This field is the message inside the card. The logo and the preferences footer come from the
+                notification template. Built-in tokens: investorName, investorEmail, spotlightTitle, spotlightLink,
+                teamName, supportEmail. Every email also replaces the investor&apos;s template variables (extra CSV
+                columns, using the column header as the token). Approval emails also have role and organization. Add a
+                fallback for empty values with {'{{firm|your fund}}'}. HTML is allowed.
               </p>
               <div className="flex flex-col gap-6">
                 {TEMPLATE_LABELS.map(({ key, label }) => (
                   <div key={key} className={clsx(s.overviewField, 'w-full')}>
-                    <label className={s.fieldLabel}>{label}</label>
+                    <div className="flex items-center justify-between gap-3">
+                      <label className={s.fieldLabel} style={{ width: 'auto', marginBottom: 8 }}>
+                        {label}
+                      </label>
+                      <button
+                        type="button"
+                        className="mb-2 shrink-0 text-sm font-medium text-blue-600 hover:underline"
+                        onClick={() => setPreviewTemplate(key)}
+                      >
+                        Preview Email
+                      </button>
+                    </div>
                     <input
                       className={clsx(s.fieldInput, 'box-border w-full self-stretch')}
                       value={templates[key].subject}
@@ -1402,6 +1435,14 @@ const SpvSpotlightDetailPage = () => {
         participantEmail={editingTemplateVars?.member.email}
         emailTemplateVariables={editingTemplateVars?.emailTemplateVariables}
         canEdit={canMutateTeamPitches}
+      />
+      <PreviewSpvEmailModal
+        isOpen={!!previewTemplate && !!templates}
+        onClose={() => setPreviewTemplate(null)}
+        label={TEMPLATE_LABELS.find((item) => item.key === previewTemplate)?.label ?? 'Email'}
+        subject={previewTemplate && templates ? templates[previewTemplate].subject : ''}
+        body={previewTemplate && templates ? templates[previewTemplate].body : ''}
+        defaults={previewDefaults}
       />
       <TeamPitchConfirmModal
         isOpen={!!pendingConfirm}
