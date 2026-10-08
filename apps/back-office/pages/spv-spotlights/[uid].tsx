@@ -10,6 +10,7 @@ import { useAuth } from '../../context/auth-context';
 import { RichText } from '../../components/common/rich-text';
 import { AddSpvParticipantModal } from '../../components/spv-spotlights/AddSpvParticipantModal';
 import { EditSpvTemplateVariablesModal } from '../../components/spv-spotlights/EditSpvTemplateVariablesModal';
+import { UploadSpvInvestorsModal } from '../../components/spv-spotlights/UploadSpvInvestorsModal';
 import { TeamPitchConfirmModal } from '../../components/team-pitches/TeamPitchConfirmModal';
 import api from '../../utils/api';
 import { API_ROUTE, WEB_UI_BASE_URL } from '../../utils/constants';
@@ -52,28 +53,6 @@ const requiredTokens = (template?: { subject: string; body: string }) => {
     if (!match[2] && !BUILT_IN_TOKENS.includes(match[1])) tokens.add(match[1]);
   }
   return [...tokens];
-};
-
-const splitCsvLine = (line: string) => {
-  const cells: string[] = [];
-  let cell = '';
-  let quoted = false;
-  for (let i = 0; i < line.length; i += 1) {
-    const char = line[i];
-    if (quoted && char === '"' && line[i + 1] === '"') {
-      cell += '"';
-      i += 1;
-    } else if (char === '"') {
-      quoted = !quoted;
-    } else if (char === ',' && !quoted) {
-      cells.push(cell.trim());
-      cell = '';
-    } else {
-      cell += char;
-    }
-  }
-  cells.push(cell.trim());
-  return cells;
 };
 
 const ACCESS_OPTIONS = ['VIEW', 'VIEW_ADMIN', 'EDIT', 'RESTRICTED'] as const;
@@ -162,6 +141,7 @@ const SpvSpotlightDetailPage = () => {
   const [tab, setTab] = useState<'applications' | 'investors' | 'outreach' | 'founders' | 'templates'>('investors');
   const [isEditing, setIsEditing] = useState(false);
   const [showAddParticipant, setShowAddParticipant] = useState(false);
+  const [showUpload, setShowUpload] = useState(false);
   const [listSearch, setListSearch] = useState('');
   const [spotlight, setSpotlight] = useState<Record<string, unknown> | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
@@ -293,53 +273,6 @@ const SpvSpotlightDetailPage = () => {
       if (accepted.length) uploadImages(accepted).catch(() => toast.error('Upload failed'));
     },
   });
-
-  const parseCsv = (text: string) => {
-    const lines = text
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean);
-    if (!lines.length) return [];
-    const headers = splitCsvLine(lines[0]);
-    const emailIndex = Math.max(
-      headers.findIndex((header) => header.toLowerCase() === 'email'),
-      0
-    );
-    const nameIndex = headers.findIndex((header) => header.toLowerCase() === 'name');
-    return lines
-      .slice(1)
-      .map((line) => {
-        const cells = splitCsvLine(line);
-        const emailTemplateVariables: Record<string, string> = {};
-        headers.forEach((header, index) => {
-          const key = header.toLowerCase();
-          if (index === emailIndex || key === 'name' || !header) return;
-          if (cells[index]) emailTemplateVariables[header] = cells[index];
-        });
-        return {
-          email: cells[emailIndex],
-          name: nameIndex >= 0 ? cells[nameIndex] : undefined,
-          emailTemplateVariables,
-        };
-      })
-      .filter((row) => row.email);
-  };
-
-  const uploadCohort = async (cohort: 'PRE_APPROVED' | 'OUTREACH', file: File) => {
-    const participants = parseCsv(await file.text());
-    if (!participants.length) {
-      toast.error('No rows with an email column were found.');
-      return;
-    }
-    const { data } = await api.post(`${base}/participants-bulk`, { cohort, participants }, { headers: authHeaders });
-    await loadParticipants();
-    const uploaded = participants.length - (data.skipped ?? 0);
-    toast.success(
-      `Uploaded ${uploaded} ${cohort === 'PRE_APPROVED' ? '' : 'outreach '}investors.${
-        data.skipped ? ` ${data.skipped} already added, left unchanged.` : ''
-      }`
-    );
-  };
 
   const runConfirmed = async (run: () => Promise<void>) => {
     setIsConfirmRunning(true);
@@ -646,6 +579,7 @@ const SpvSpotlightDetailPage = () => {
   const visibleFounders = founders.filter((participant) =>
     matchesPerson(participant.member.name, participant.member.email)
   );
+  const csvVariableColumns = [...new Set(TEMPLATE_LABELS.flatMap(({ key }) => requiredTokens(templates?.[key])))];
   const publicUrl = `${WEB_UI_BASE_URL}/spv-spotlight/${form.slug || spotlight.slug}`;
 
   const cancelEdit = () => {
@@ -914,20 +848,13 @@ const SpvSpotlightDetailPage = () => {
                       </button>
                       {(tab === 'investors' || tab === 'outreach') && (
                         <>
-                          <label className="cursor-pointer rounded-lg bg-green-600 px-4 py-2 text-white hover:bg-green-700">
+                          <button
+                            type="button"
+                            onClick={() => setShowUpload(true)}
+                            className="rounded-lg bg-green-600 px-4 py-2 text-white hover:bg-green-700"
+                          >
                             {tab === 'investors' ? 'Upload CSV' : 'Upload outreach CSV'}
-                            <input
-                              type="file"
-                              accept=".csv,text/csv"
-                              className="hidden"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                const cohort = tab === 'investors' ? 'PRE_APPROVED' : 'OUTREACH';
-                                if (file) uploadCohort(cohort, file).catch(() => toast.error('Upload failed'));
-                                e.target.value = '';
-                              }}
-                            />
-                          </label>
+                          </button>
                           <button
                             type="button"
                             onClick={() =>
@@ -1339,6 +1266,15 @@ const SpvSpotlightDetailPage = () => {
         defaultCohort={tab === 'outreach' ? 'OUTREACH' : 'PRE_APPROVED'}
         showCohort={OUTREACH_UI_ENABLED}
         onAdded={() => loadParticipants()}
+      />
+      <UploadSpvInvestorsModal
+        isOpen={showUpload}
+        onClose={() => setShowUpload(false)}
+        spotlightUid={uid}
+        authToken={authToken}
+        cohort={tab === 'outreach' ? 'OUTREACH' : 'PRE_APPROVED'}
+        variableColumns={csvVariableColumns}
+        onUploaded={() => loadParticipants()}
       />
       <TeamPitchConfirmModal
         isOpen={!!bulkSend}

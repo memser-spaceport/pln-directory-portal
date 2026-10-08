@@ -4,6 +4,7 @@ jest.mock('ai', () => ({}));
 // which ships an untranspiled ESM axios build this jest config can't parse. This spec only
 // needs a constructible stand-in for DI wiring, never the real class.
 jest.mock('./demo-day.tool', () => ({ DemoDayTool: jest.fn() }));
+jest.mock('../../analytics/service/analytics.service', () => ({ AnalyticsService: jest.fn() }));
 // irl-events.tool imports PLEventGuestsService -> MembersService -> axios, same ESM problem.
 jest.mock('./irl-events.tool', () => ({ IrlEventsTool: jest.fn() }));
 

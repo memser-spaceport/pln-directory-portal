@@ -1,4 +1,5 @@
 jest.mock('../../rbac/rbac-permission-check', () => ({ memberHasAnyPermission: jest.fn() }));
+jest.mock('../../analytics/service/analytics.service', () => ({ AnalyticsService: jest.fn() }));
 
 import { InvestorDbAccess } from './investor-db-access';
 import { memberHasAnyPermission } from '../../rbac/rbac-permission-check';
@@ -8,7 +9,8 @@ describe('InvestorDbAccess', () => {
   const logger = { info: jest.fn(), error: jest.fn() };
   const rbacService = {} as any;
   const accessControlV2Service = {} as any;
-  const access = new InvestorDbAccess(logger as any, rbacService, accessControlV2Service);
+  const analytics = { trackEvent: jest.fn() };
+  const access = new InvestorDbAccess(logger as any, rbacService, accessControlV2Service, analytics as any);
 
   beforeEach(() => jest.clearAllMocks());
 
@@ -18,6 +20,11 @@ describe('InvestorDbAccess', () => {
     expect(result).toEqual({ allowed: false, message: expect.stringContaining('not logged in') });
     expect(memberHasAnyPermission).not.toHaveBeenCalled();
     expect(logger.info).toHaveBeenCalledWith('Husky getInvestorDb denied: not logged in member=none');
+    expect(analytics.trackEvent).toHaveBeenCalledWith({
+      name: 'husky_investor_tool_invoked',
+      distinctId: 'anonymous',
+      properties: { toolName: 'getInvestorDb', outcome: 'denied', reason: 'not_logged_in' },
+    });
   });
 
   it('denies a member without Investor DB permissions and logs tool, reason and member', async () => {
@@ -27,6 +34,11 @@ describe('InvestorDbAccess', () => {
 
     expect(result).toEqual({ allowed: false, message: expect.stringContaining('does not have Investor DB access') });
     expect(logger.info).toHaveBeenCalledWith('Husky getWarmIntros denied: no Investor DB access member=member-1');
+    expect(analytics.trackEvent).toHaveBeenCalledWith({
+      name: 'husky_investor_tool_invoked',
+      distinctId: 'member-1',
+      properties: { toolName: 'getWarmIntros', outcome: 'denied', reason: 'no_access', memberUid: 'member-1' },
+    });
   });
 
   it('checks exactly the Investor DB view permissions, so directory.admin.full alone is enough', async () => {
@@ -43,5 +55,10 @@ describe('InvestorDbAccess', () => {
     );
     expect(INVESTOR_DB_VIEW_PERMISSIONS).toContain('directory.admin.full');
     expect(logger.info).not.toHaveBeenCalled();
+    expect(analytics.trackEvent).toHaveBeenCalledWith({
+      name: 'husky_investor_tool_invoked',
+      distinctId: 'admin-1',
+      properties: { toolName: 'getInvestorProfiles', outcome: 'ok', memberUid: 'admin-1' },
+    });
   });
 });

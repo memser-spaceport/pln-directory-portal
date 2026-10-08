@@ -1,6 +1,7 @@
 // `ai` pulls in untranspiled ESM this jest config can't parse; `tool()` just needs to hand
 // back its config object so `getTool()` yields something with a callable `execute`.
 jest.mock('ai', () => ({ tool: (config: any) => config }));
+jest.mock('../../analytics/service/analytics.service', () => ({ AnalyticsService: jest.fn() }));
 
 import { InvestorsTool } from './investors.tool';
 

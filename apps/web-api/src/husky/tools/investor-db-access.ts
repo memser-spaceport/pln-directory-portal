@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
+import { AnalyticsService } from '../../analytics/service/analytics.service';
 import { LogService } from '../../shared/log.service';
 import { RbacService } from '../../rbac/rbac.service';
 import { INVESTOR_DB_VIEW_PERMISSIONS } from '../../rbac/rbac.constants';
 import { memberHasAnyPermission } from '../../rbac/rbac-permission-check';
 import { AccessControlV2Service } from '../../access-control-v2/services/access-control-v2.service';
+import { ANALYTICS_EVENTS } from '../../utils/constants';
 import { HuskyAuthContext } from './husky-auth-context';
 
 export type InvestorDbAccessResult = { allowed: true } | { allowed: false; message: string };
@@ -28,12 +30,14 @@ export class InvestorDbAccess {
   constructor(
     private logger: LogService,
     private rbacService: RbacService,
-    private accessControlV2Service: AccessControlV2Service
+    private accessControlV2Service: AccessControlV2Service,
+    private analytics: AnalyticsService
   ) {}
 
   async check(auth: HuskyAuthContext, toolName: string): Promise<InvestorDbAccessResult> {
     if (!auth.memberUid) {
       this.logger.info(`Husky ${toolName} denied: not logged in member=none`);
+      this.track(toolName, 'denied', undefined, 'not_logged_in');
       return { allowed: false, message: 'User is not logged in, so investor data is unavailable.' };
     }
 
@@ -45,12 +49,32 @@ export class InvestorDbAccess {
     );
     if (!allowed) {
       this.logger.info(`Husky ${toolName} denied: no Investor DB access member=${auth.memberUid}`);
+      this.track(toolName, 'denied', auth.memberUid, 'no_access');
       return {
         allowed: false,
         message: 'The signed-in user does not have Investor DB access, so investor data is unavailable.',
       };
     }
 
+    this.track(toolName, 'ok', auth.memberUid);
     return { allowed: true };
+  }
+
+  private track(
+    toolName: string,
+    outcome: 'ok' | 'denied',
+    memberUid: string | undefined,
+    reason?: 'not_logged_in' | 'no_access'
+  ) {
+    void this.analytics.trackEvent({
+      name: ANALYTICS_EVENTS.HUSKY.INVESTOR_TOOL_INVOKED,
+      distinctId: memberUid ?? 'anonymous',
+      properties: {
+        toolName,
+        outcome,
+        ...(memberUid ? { memberUid } : {}),
+        ...(reason ? { reason } : {}),
+      },
+    });
   }
 }

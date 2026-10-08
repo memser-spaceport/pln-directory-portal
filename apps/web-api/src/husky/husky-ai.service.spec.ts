@@ -14,6 +14,7 @@ jest.mock('ai', () => ({
 // which ships an untranspiled ESM axios build this jest config can't parse. This spec only
 // needs HuskyAiService's own module graph to load; the tools service itself is a plain mock.
 jest.mock('./tools/demo-day.tool', () => ({ DemoDayTool: jest.fn() }));
+jest.mock('../analytics/service/analytics.service', () => ({ AnalyticsService: jest.fn() }));
 // irl-events.tool imports PLEventGuestsService/MembersService -> axios, same ESM problem.
 jest.mock('./tools/irl-events.tool', () => ({ IrlEventsTool: jest.fn() }));
 
