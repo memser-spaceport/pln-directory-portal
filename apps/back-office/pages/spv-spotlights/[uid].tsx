@@ -35,7 +35,14 @@ const TEMPLATE_LABELS: { key: TemplateKey; label: string }[] = [
 // Gated model: investors are invited as pre-approved only. Kept so outreach can come back.
 const OUTREACH_UI_ENABLED = false;
 
-const BUILT_IN_TOKENS = ['investorName', 'investorEmail', 'spotlightTitle', 'spotlightLink', 'teamName', 'supportEmail'];
+const BUILT_IN_TOKENS = [
+  'investorName',
+  'investorEmail',
+  'spotlightTitle',
+  'spotlightLink',
+  'teamName',
+  'supportEmail',
+];
 
 const requiredTokens = (template?: { subject: string; body: string }) => {
   const tokens = new Set<string>();
@@ -239,7 +246,8 @@ const SpvSpotlightDetailPage = () => {
     setSelectedUids([]);
   }, [tab]);
 
-  const statusWarning = form.status && form.status !== 'OPEN' ? `This spotlight is ${form.status}. The link will show that page.` : '';
+  const statusWarning =
+    form.status && form.status !== 'OPEN' ? `This spotlight is ${form.status}. The link will show that page.` : '';
 
   const saveContent = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -287,25 +295,34 @@ const SpvSpotlightDetailPage = () => {
   });
 
   const parseCsv = (text: string) => {
-    const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const lines = text
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
     if (!lines.length) return [];
     const headers = splitCsvLine(lines[0]);
-    const emailIndex = Math.max(headers.findIndex((header) => header.toLowerCase() === 'email'), 0);
+    const emailIndex = Math.max(
+      headers.findIndex((header) => header.toLowerCase() === 'email'),
+      0
+    );
     const nameIndex = headers.findIndex((header) => header.toLowerCase() === 'name');
-    return lines.slice(1).map((line) => {
-      const cells = splitCsvLine(line);
-      const emailTemplateVariables: Record<string, string> = {};
-      headers.forEach((header, index) => {
-        const key = header.toLowerCase();
-        if (index === emailIndex || key === 'name' || !header) return;
-        if (cells[index]) emailTemplateVariables[header] = cells[index];
-      });
-      return {
-        email: cells[emailIndex],
-        name: nameIndex >= 0 ? cells[nameIndex] : undefined,
-        emailTemplateVariables,
-      };
-    }).filter((row) => row.email);
+    return lines
+      .slice(1)
+      .map((line) => {
+        const cells = splitCsvLine(line);
+        const emailTemplateVariables: Record<string, string> = {};
+        headers.forEach((header, index) => {
+          const key = header.toLowerCase();
+          if (index === emailIndex || key === 'name' || !header) return;
+          if (cells[index]) emailTemplateVariables[header] = cells[index];
+        });
+        return {
+          email: cells[emailIndex],
+          name: nameIndex >= 0 ? cells[nameIndex] : undefined,
+          emailTemplateVariables,
+        };
+      })
+      .filter((row) => row.email);
   };
 
   const uploadCohort = async (cohort: 'PRE_APPROVED' | 'OUTREACH', file: File) => {
@@ -391,9 +408,12 @@ const SpvSpotlightDetailPage = () => {
       const { data } = await api.get(`${base}/login-links`, { headers: authHeaders });
       const emails = new Set(list.map((participant) => participant.member.email));
       const rows = data.rows.filter((row: { email: string }) => emails.has(row.email));
-      const lines = ['email,name,cohort,url', ...rows.map((row: { email: string; name: string; cohort: string; url: string }) =>
-        [row.email, row.name, row.cohort, row.url].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')
-      )];
+      const lines = [
+        'email,name,cohort,url',
+        ...rows.map((row: { email: string; name: string; cohort: string; url: string }) =>
+          [row.email, row.name, row.cohort, row.url].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')
+        ),
+      ];
       const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
       const href = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
@@ -422,7 +442,9 @@ const SpvSpotlightDetailPage = () => {
       title: action === 'approve' ? 'Approve application' : 'Reject application',
       message:
         action === 'approve'
-          ? `Approve ${request.member.name || request.member.email}? They are added to Investors and get the approval email now.`
+          ? `Approve ${
+              request.member.name || request.member.email
+            }? They are added to Investors and get the approval email now.`
           : `Reject ${request.member.name || request.member.email}? They can't apply again. No email is sent.`,
       confirmLabel: action === 'approve' ? 'Approve and send email' : 'Reject',
       run: async () => {
@@ -451,14 +473,17 @@ const SpvSpotlightDetailPage = () => {
   };
 
   const updateParticipantField = (participant: Participant, field: 'type' | 'access', value: string) => {
-    const label = field === 'type' ? value.charAt(0) + value.slice(1).toLowerCase() : ACCESS_LABELS[value as typeof ACCESS_OPTIONS[number]];
+    const label =
+      field === 'type'
+        ? value.charAt(0) + value.slice(1).toLowerCase()
+        : ACCESS_LABELS[value as typeof ACCESS_OPTIONS[number]];
     setPendingConfirm({
       title: field === 'type' ? 'Change participant type' : 'Change participant access',
       message:
         field === 'type'
           ? value === 'FOUNDER'
             ? `Change this participant's type to ${label}? They get admin (edit) access and lose their investor cohort.`
-            : `Change this participant's type to ${label}? They become an outreach investor and have to apply.`
+            : `Change this participant's type to ${label}? They become a pre-approved investor and can view the spotlight without applying.`
           : `Change this participant's access to ${label}?`,
       participant,
       run: async () => {
@@ -561,7 +586,8 @@ const SpvSpotlightDetailPage = () => {
   );
   const visibleList = tab === 'investors' ? visibleInvestors : visibleOutreach;
   const selectedUidSet = new Set(selectedUids);
-  const allVisibleSelected = visibleList.length > 0 && visibleList.every((participant) => selectedUidSet.has(participant.uid));
+  const allVisibleSelected =
+    visibleList.length > 0 && visibleList.every((participant) => selectedUidSet.has(participant.uid));
   const someVisibleSelected = visibleList.some((participant) => selectedUidSet.has(participant.uid));
   const toggleSelectAllVisible = () => {
     const visibleUids = visibleList.map((participant) => participant.uid);
@@ -579,7 +605,9 @@ const SpvSpotlightDetailPage = () => {
   const kindRecipients = bulkSend?.kind === 'open-notice' ? investors : inviteRecipients;
   const eligibleUidSet = new Set(kindRecipients.filter(isReachable).map((participant) => participant.uid));
   const sendTargets =
-    bulkSend?.mode === 'selected' ? participants.filter((participant) => selectedUidSet.has(participant.uid)) : kindRecipients;
+    bulkSend?.mode === 'selected'
+      ? participants.filter((participant) => selectedUidSet.has(participant.uid))
+      : kindRecipients;
   const sendEligible = sendTargets.filter((participant) => eligibleUidSet.has(participant.uid));
   const wasSent = (participant: Participant) =>
     (bulkSend?.kind === 'open-notice'
@@ -588,9 +616,12 @@ const SpvSpotlightDetailPage = () => {
       ? participant.followUpSentCount
       : participant.inviteSentCount) > 0;
   const sendAlreadySent = sendEligible.filter(wasSent);
-  const sendRecipients = includeAlreadySent ? sendEligible : sendEligible.filter((participant) => !wasSent(participant));
+  const sendRecipients = includeAlreadySent
+    ? sendEligible
+    : sendEligible.filter((participant) => !wasSent(participant));
   const sendSkipped = sendTargets.length - sendEligible.length;
-  const sendNoun = bulkSend?.kind === 'open-notice' ? 'open notice' : bulkSend?.kind === 'follow-ups' ? 'follow-up' : 'invite';
+  const sendNoun =
+    bulkSend?.kind === 'open-notice' ? 'open notice' : bulkSend?.kind === 'follow-ups' ? 'follow-up' : 'invite';
   const sendTemplateKey: TemplateKey =
     bulkSend?.kind === 'open-notice'
       ? 'opened'
@@ -687,7 +718,11 @@ const SpvSpotlightDetailPage = () => {
               </p>
             )}
           </div>
-          <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${getStatusColor(String(spotlight.status))}`}>
+          <span
+            className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${getStatusColor(
+              String(spotlight.status)
+            )}`}
+          >
             {String(spotlight.status)}
           </span>
         </div>
@@ -784,7 +819,11 @@ const SpvSpotlightDetailPage = () => {
                   {media.map((item, index) => (
                     <div key={`${item.imageUid}-${index}`} className="flex items-center gap-3">
                       {item.url && (
-                        <img src={item.url} alt={item.alt} className="h-16 w-24 rounded border border-gray-200 object-cover" />
+                        <img
+                          src={item.url}
+                          alt={item.alt}
+                          className="h-16 w-24 rounded border border-gray-200 object-cover"
+                        />
                       )}
                       {isEditing ? (
                         <>
@@ -846,7 +885,12 @@ const SpvSpotlightDetailPage = () => {
               <div className={clsx(s.overviewField, s.fullWidth)}>
                 <label className={s.fieldLabel}>Spotlight Page URL</label>
                 <div className={s.fieldValue}>
-                  <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="break-all text-blue-600 hover:text-blue-800">
+                  <a
+                    href={publicUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="break-all text-blue-600 hover:text-blue-800"
+                  >
                     {publicUrl}
                   </a>
                 </div>
@@ -857,9 +901,7 @@ const SpvSpotlightDetailPage = () => {
           <div className={s.participants}>
             <div className={s.participantsHeader}>
               <div className={s.participantsHeaderTop}>
-                <h2 className={s.participantsTitle}>
-                  {tab === 'templates' ? 'Email templates' : 'Participants'}
-                </h2>
+                <h2 className={s.participantsTitle}>{tab === 'templates' ? 'Email templates' : 'Participants'}</h2>
                 {canMutateTeamPitches && (tab === 'investors' || tab === 'outreach' || tab === 'founders') && (
                   <div className="flex flex-col items-end gap-2">
                     <div className="flex flex-wrap justify-end gap-2">
@@ -1033,10 +1075,18 @@ const SpvSpotlightDetailPage = () => {
                     <div className={clsx(s.headerCell, s.first, s.flexible)}>Member</div>
                     <div className={clsx(s.headerCell, s.flexible)}>Role</div>
                     <div className={clsx(s.headerCell, s.flexible)}>Organization</div>
-                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 110 }}>Accredited</div>
-                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 120 }}>Applied</div>
-                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 120 }}>Status</div>
-                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 140 }}>Actions</div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 110 }}>
+                      Accredited
+                    </div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 120 }}>
+                      Applied
+                    </div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 120 }}>
+                      Status
+                    </div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 140 }}>
+                      Actions
+                    </div>
                   </div>
                   {visibleRequests.map((request) => (
                     <div key={request.uid} className={s.tableRow}>
@@ -1054,7 +1104,9 @@ const SpvSpotlightDetailPage = () => {
                       <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 120 }}>
                         {new Date(request.createdAt).toLocaleDateString()}
                       </div>
-                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 120 }}>{request.status}</div>
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 120 }}>
+                        {request.status}
+                      </div>
                       <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 140 }}>
                         {canMutateTeamPitches && request.status !== 'APPROVED' && (
                           <button
@@ -1107,11 +1159,21 @@ const SpvSpotlightDetailPage = () => {
                     <div className={clsx(s.headerCell, s.fixed)} style={{ width: 140 }}>
                       {tab === 'investors' ? 'Access via' : 'Application'}
                     </div>
-                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 130 }}>Type</div>
-                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 90 }}>Invites</div>
-                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 110 }}>Follow-up</div>
-                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 220 }}>Template vars</div>
-                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 220 }}>Actions</div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 130 }}>
+                      Type
+                    </div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 90 }}>
+                      Invites
+                    </div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 110 }}>
+                      Follow-up
+                    </div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 220 }}>
+                      Template vars
+                    </div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 220 }}>
+                      Actions
+                    </div>
                   </div>
                   {visibleList.map((participant) => (
                     <div key={participant.uid} className={s.tableRow}>
@@ -1122,7 +1184,9 @@ const SpvSpotlightDetailPage = () => {
                             className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                             checked={selectedUidSet.has(participant.uid)}
                             onChange={() => toggleSelectUid(participant.uid)}
-                            aria-label={`Select ${participant.member.name || participant.member.email || 'participant'}`}
+                            aria-label={`Select ${
+                              participant.member.name || participant.member.email || 'participant'
+                            }`}
                           />
                         </div>
                       )}
@@ -1144,8 +1208,12 @@ const SpvSpotlightDetailPage = () => {
                           : 'Not applied'}
                       </div>
                       {typeSelect(participant)}
-                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 90 }}>{participant.inviteSentCount}</div>
-                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 110 }}>{participant.followUpSentCount}</div>
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 90 }}>
+                        {participant.inviteSentCount}
+                      </div>
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 110 }}>
+                        {participant.followUpSentCount}
+                      </div>
                       <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 220 }}>
                         {(() => {
                           const vars = participant.emailTemplateVariables;
@@ -1212,8 +1280,12 @@ const SpvSpotlightDetailPage = () => {
                 <div className={s.table}>
                   <div className={clsx(s.tableRow, s.tableHeader)}>
                     <div className={clsx(s.headerCell, s.first, s.flexible)}>Member</div>
-                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 130 }}>Type</div>
-                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 220 }}>Access</div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 130 }}>
+                      Type
+                    </div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 220 }}>
+                      Access
+                    </div>
                   </div>
                   {visibleFounders.map((founder) => (
                     <div key={founder.uid} className={s.tableRow}>
@@ -1244,9 +1316,9 @@ const SpvSpotlightDetailPage = () => {
               </div>
               <p className="mb-6 text-sm text-gray-500">
                 Built-in tokens: investorName, investorEmail, spotlightTitle, spotlightLink, teamName, supportEmail.
-                Every email also replaces the investor&apos;s template variables (extra CSV columns, using the column header
-                as the token). Approval emails also have role and organization. Add a fallback for empty values with{' '}
-                {'{{firm|your fund}}'}. HTML is allowed.
+                Every email also replaces the investor&apos;s template variables (extra CSV columns, using the column
+                header as the token). Approval emails also have role and organization. Add a fallback for empty values
+                with {'{{firm|your fund}}'}. HTML is allowed.
               </p>
               <div className="flex flex-col gap-6">
                 {TEMPLATE_LABELS.map(({ key, label }) => (
@@ -1255,12 +1327,16 @@ const SpvSpotlightDetailPage = () => {
                     <input
                       className={clsx(s.fieldInput, 'box-border w-full self-stretch')}
                       value={templates[key].subject}
-                      onChange={(e) => setTemplates({ ...templates, [key]: { ...templates[key], subject: e.target.value } })}
+                      onChange={(e) =>
+                        setTemplates({ ...templates, [key]: { ...templates[key], subject: e.target.value } })
+                      }
                     />
                     <textarea
                       className={clsx(s.fieldTextarea, 'min-h-[160px]')}
                       value={templates[key].body}
-                      onChange={(e) => setTemplates({ ...templates, [key]: { ...templates[key], body: e.target.value } })}
+                      onChange={(e) =>
+                        setTemplates({ ...templates, [key]: { ...templates[key], body: e.target.value } })
+                      }
                     />
                   </div>
                 ))}
@@ -1289,7 +1365,9 @@ const SpvSpotlightDetailPage = () => {
         }
         message={
           sendRecipients.length > 0
-            ? `Send the ${sendNoun} email to ${sendRecipients.length} investor${sendRecipients.length === 1 ? '' : 's'}?`
+            ? `Send the ${sendNoun} email to ${sendRecipients.length} investor${
+                sendRecipients.length === 1 ? '' : 's'
+              }?`
             : sendEligible.length > 0
             ? `Every eligible investor in this set already received the ${sendNoun}. Enable the option below to resend.`
             : 'No eligible investors in this set.'

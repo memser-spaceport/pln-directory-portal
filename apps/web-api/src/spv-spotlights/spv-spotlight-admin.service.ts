@@ -236,16 +236,31 @@ export class SpvSpotlightAdminService {
     if (!participant) {
       throw new NotFoundException('Participant not found');
     }
-    if (data.cohort === 'PRE_APPROVED') {
+    const typeChanged = data.type !== undefined && data.type !== participant.type;
+    const nextCohort =
+      data.cohort !== undefined
+        ? data.cohort
+        : !typeChanged
+        ? participant.cohort
+        : data.type === 'FOUNDER'
+        ? null
+        : SpvInvestorCohort.PRE_APPROVED;
+    if (nextCohort === 'PRE_APPROVED' && (data.cohort === 'PRE_APPROVED' || typeChanged)) {
       await this.clearOpenApplications(spotlightUid, participant.memberUid);
       await this.enableApproveOnLogin(participant.memberUid);
     }
-    const typeDefaults =
-      data.type === undefined || data.type === participant.type
-        ? {}
-        : data.type === 'FOUNDER'
-        ? { cohort: null, access: defaultAccessForParticipantType('FOUNDER'), teamUid: spotlight.teamUid }
-        : { cohort: SpvInvestorCohort.OUTREACH, access: defaultAccessForParticipantType('INVESTOR'), teamUid: null };
+    if (typeChanged && data.type === 'INVESTOR') {
+      await upsertPolicyAssignmentByCode(this.prisma, participant.memberUid, 'investor_pl');
+    }
+    const typeDefaults = !typeChanged
+      ? {}
+      : data.type === 'FOUNDER'
+      ? { cohort: null, access: defaultAccessForParticipantType('FOUNDER'), teamUid: spotlight.teamUid }
+      : {
+          cohort: nextCohort,
+          access: defaultAccessForParticipantType('INVESTOR'),
+          teamUid: null,
+        };
     return this.prisma.spvSpotlightParticipant.update({
       where: { uid: participantUid },
       data: {

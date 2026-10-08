@@ -254,6 +254,38 @@ describe('investor lists', () => {
     expect(memberUpdate).toHaveBeenCalledWith({ where: { uid: 'mem_1' }, data: { approveOnLogin: true } });
   });
 
+  it('moves a founder to the investors list as pre-approved', async () => {
+    const update = jest.fn().mockResolvedValue({});
+    const deleteMany = jest.fn().mockResolvedValue({ count: 0 });
+    const memberUpdate = jest.fn();
+    const prisma = {
+      spvSpotlight: { findUnique: jest.fn().mockResolvedValue({ uid: 'spv_1', teamUid: 'team_1' }) },
+      spvSpotlightParticipant: {
+        findFirst: jest.fn().mockResolvedValue({ uid: 'p_1', memberUid: 'mem_1', type: 'FOUNDER', cohort: null }),
+        update,
+      },
+      spvAccessRequest: { deleteMany },
+      member: {
+        findUnique: jest.fn().mockResolvedValue({ memberApproval: { state: 'PENDING' } }),
+        update: memberUpdate,
+      },
+      policy: { findUnique: jest.fn().mockResolvedValue({ uid: 'pol_1' }) },
+      policyAssignment: { upsert: jest.fn().mockResolvedValue({}) },
+    };
+
+    await serviceWith(prisma).updateParticipant('spv_1', 'p_1', { type: 'INVESTOR' });
+
+    expect(update.mock.calls[0][0].data).toEqual({
+      cohort: 'PRE_APPROVED',
+      access: 'VIEW',
+      teamUid: null,
+      type: 'INVESTOR',
+    });
+    expect(deleteMany).toHaveBeenCalled();
+    expect(memberUpdate).toHaveBeenCalledWith({ where: { uid: 'mem_1' }, data: { approveOnLogin: true } });
+    expect(prisma.policyAssignment.upsert).toHaveBeenCalled();
+  });
+
   it('resets an investor made founder like an auto-added founder', async () => {
     const update = jest.fn().mockResolvedValue({});
     const prisma = {
