@@ -73,9 +73,13 @@ export function resolveViewerAccess(input: {
   hasToken: boolean;
   requestStatus: AccessRequestStatus | null;
   isPreApproved: boolean;
+  isFounder?: boolean;
 }): ViewerAccess {
   if (!input.hasToken) {
     return 'NONE';
+  }
+  if (input.isFounder) {
+    return 'APPROVED';
   }
   if (input.requestStatus === 'REJECTED') {
     return 'REJECTED';

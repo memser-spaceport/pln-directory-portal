@@ -22,7 +22,7 @@ export class JobMatchServiceController {
   @Post('job-match/run')
   @HttpCode(200)
   async run(@Body() body?: { teamUids?: unknown }) {
-    const blocker = jobMatchBlocker();
+    const blocker = jobMatchBlocker({ ignoreEnabledFlag: true });
     if (blocker?.code === 'disabled') {
       throw new ServiceUnavailableException(blocker.message);
     }
@@ -35,6 +35,6 @@ export class JobMatchServiceController {
     } catch (error) {
       throw new BadRequestException(error instanceof Error ? error.message : 'Invalid teamUids');
     }
-    return this.runner.start(teamUids);
+    return this.runner.start(teamUids, { ignoreEnabledFlag: true });
   }
 }

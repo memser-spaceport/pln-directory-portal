@@ -14,6 +14,7 @@ import {
   normalizeTeamUids,
   parseCandidateNotes,
   parseCriteria,
+  pickInterestNote,
   planTeamWork,
   profileText,
   profileTextHash,
@@ -142,6 +143,36 @@ describe('job match logic', () => {
     expect(labelFor(GOOD_FIT - 1)).toBeNull();
   });
 
+  it('ranks an interested member first on a tie and marks each row (LAB-2788)', () => {
+    const fits = new Map<string, Record<string, number>>([
+      ['m-a', { 'role-1': 70 }],
+      ['m-b', { 'role-1': 70 }],
+      ['m-c', { 'role-1': 90 }],
+      ['m-low', { 'role-1': 40 }],
+    ]);
+    const top = selectTop([...fits.keys()], fits, 'role-1', new Set(['m-b', 'm-low']));
+    expect(top.map((row) => row.memberUid)).toEqual(['m-c', 'm-b', 'm-a']);
+    expect(top.map((row) => row.interested)).toEqual([false, true, false]);
+  });
+
+  it('keeps the old order when nobody is interested (LAB-2788)', () => {
+    const fits = new Map<string, Record<string, number>>([
+      ['m-b', { 'role-1': 70 }],
+      ['m-a', { 'role-1': 70 }],
+    ]);
+    const top = selectTop([...fits.keys()], fits, 'role-1');
+    expect(top.map((row) => row.memberUid)).toEqual(['m-a', 'm-b']);
+    expect(top.every((row) => row.interested === false)).toBe(true);
+  });
+
+  it('picks the role note over the team note, trimmed, and null when both are empty (LAB-2802)', () => {
+    expect(pickInterestNote('  Love this role.  ', 'Big fan of the team.')).toBe('Love this role.');
+    expect(pickInterestNote(null, ' Big fan of the team. ')).toBe('Big fan of the team.');
+    expect(pickInterestNote('   ', 'Big fan of the team.')).toBe('Big fan of the team.');
+    expect(pickInterestNote(undefined, undefined)).toBeNull();
+    expect(pickInterestNote('', '  ')).toBeNull();
+  });
+
   it('plans a same-day resume around finished teams, roles, and member scores', () => {
     const done = planTeamWork({
       teamFinished: true,
@@ -220,6 +251,24 @@ describe('job match logic', () => {
     expect(jobMatchBlocker()?.message).toContain('wif');
     process.env.ANTHROPIC_AUTH_MODE = 'wif';
     expect(jobMatchBlocker()).toBeNull();
+  });
+
+  it('skips the feature flag check when ignoreEnabledFlag is set', () => {
+    delete process.env.IS_JOB_MATCH_ENABLED;
+    process.env.VERCEL_AI_KEY = 'test-key';
+    process.env.ANTHROPIC_AUTH_MODE = 'wif';
+    expect(jobMatchBlocker({ ignoreEnabledFlag: true })).toBeNull();
+    expect(jobMatchBlocker({ ignoreEnabledFlag: false })?.code).toBe('disabled');
+    expect(jobMatchBlocker()?.code).toBe('disabled');
+  });
+
+  it('still requires the Jev key when ignoreEnabledFlag is set', () => {
+    delete process.env.IS_JOB_MATCH_ENABLED;
+    delete process.env.VERCEL_AI_KEY;
+    expect(jobMatchBlocker({ ignoreEnabledFlag: true })).toEqual({
+      code: 'misconfigured',
+      message: 'VERCEL_AI_KEY missing',
+    });
   });
 
   it('runs at most the pool limit at once', async () => {

@@ -13,6 +13,10 @@ export type SuggestedCandidate = {
   rank: number;
   blurb: string | null;
   criteria: { text: string; matched: boolean }[];
+  /** The member said they are interested in this role or in its team, as of the stored run (LAB-2788). */
+  interested: boolean;
+  /** The note the member wrote with that interest, as of the stored run; null when not interested (LAB-2802). */
+  note: string | null;
 };
 
 @Injectable()
@@ -73,6 +77,8 @@ export class JobMatchService {
           rank: row.rank,
           blurb: row.blurb,
           criteria: asMarkedCriteria(row.payload),
+          interested: row.interested === true,
+          note: row.interested === true ? row.interestNote ?? null : null,
         },
       ];
     });

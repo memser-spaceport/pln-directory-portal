@@ -19,10 +19,12 @@ import {
   hasSignal,
   jevQuestions,
   jobMatchBlocker,
+  type JobMatchBlockerOptions,
   lockUntil,
   mapPool,
   parseCandidateNotes,
   parseCriteria,
+  pickInterestNote,
   planTeamWork,
   profileText,
   profileTextHash,
@@ -74,8 +76,8 @@ export class JobMatchRunner {
 
   constructor(private readonly prisma: PrismaService, private readonly ai: AiProviderService) {}
 
-  async start(teamUids?: string[]): Promise<JobMatchStartResult> {
-    const blocker = jobMatchBlocker();
+  async start(teamUids?: string[], blockerOptions?: JobMatchBlockerOptions): Promise<JobMatchStartResult> {
+    const blocker = jobMatchBlocker(blockerOptions);
     if (blocker) {
       throw new Error(blocker.message);
     }
@@ -284,8 +286,20 @@ export class JobMatchRunner {
     }
 
     const jobsToFinish = jobs.filter((job) => plan.rolesToFinish.includes(job.uid));
+    const interestByRole = await this.loadInterest(
+      team.uid,
+      jobsToFinish.map((job) => job.uid)
+    );
     for (const job of jobsToFinish) {
-      await this.finishRole(runUid, team.uid, job, criteriaByUid.get(job.uid) ?? [], members, scoresByMember);
+      await this.finishRole(
+        runUid,
+        team.uid,
+        job,
+        criteriaByUid.get(job.uid) ?? [],
+        members,
+        scoresByMember,
+        interestByRole.get(job.uid) ?? new Map()
+      );
     }
     await this.markTeamComplete(runUid, team.uid);
   }
@@ -318,12 +332,14 @@ export class JobMatchRunner {
     job: MatchJob,
     criteria: string[],
     members: MatchMember[],
-    scoresByMember: Map<string, Record<string, number>>
+    scoresByMember: Map<string, Record<string, number>>,
+    interest: ReadonlyMap<string, string | null>
   ): Promise<void> {
     const ranked = selectTop(
       members.map((member) => member.uid),
       scoresByMember,
-      job.uid
+      job.uid,
+      new Set(interest.keys())
     );
     const byUid = new Map(members.map((member) => [member.uid, member]));
     let notes = new Map<string, { blurb: string; matched: boolean[] }>();
@@ -350,6 +366,8 @@ export class JobMatchRunner {
         rank: index + 1,
         fit: row.fit,
         label: row.label,
+        interested: row.interested,
+        interestNote: row.interested ? interest.get(row.memberUid) ?? null : null,
         blurb: note?.blurb ?? null,
         payload: criteria.map((text, criterionIndex) => ({
           text,
@@ -365,6 +383,31 @@ export class JobMatchRunner {
       }
       await tx.jobMatchRow.create({ data: { kind: 'ROLE', runUid, teamUid, roleUid: job.uid } });
     });
+  }
+
+  /**
+   * Members who said they are interested, per role: interest in the role itself or in the role's team
+   * (LAB-2788). It only marks and orders members already in the eligible pool; it never adds one.
+   * Each member maps to the note of their interest: the role note wins over the team note (LAB-2802).
+   */
+  private async loadInterest(teamUid: string, roleUids: string[]): Promise<Map<string, Map<string, string | null>>> {
+    const byRole = new Map<string, Map<string, string | null>>();
+    if (!roleUids.length) return byRole;
+    const [roleInterest, teamInterest] = await Promise.all([
+      this.prisma.jobOpeningInterest.findMany({
+        where: { jobOpeningUid: { in: roleUids } },
+        select: { jobOpeningUid: true, memberUid: true, note: true },
+      }),
+      this.prisma.teamInterest.findMany({ where: { teamUid }, select: { memberUid: true, message: true } }),
+    ]);
+    const teamNotes = new Map(teamInterest.map((row) => [row.memberUid, row.message]));
+    for (const roleUid of roleUids) {
+      byRole.set(roleUid, new Map(teamInterest.map((row) => [row.memberUid, pickInterestNote(null, row.message)])));
+    }
+    for (const row of roleInterest) {
+      byRole.get(row.jobOpeningUid)?.set(row.memberUid, pickInterestNote(row.note, teamNotes.get(row.memberUid)));
+    }
+    return byRole;
   }
 
   private async markTeamComplete(runUid: string, teamUid: string): Promise<void> {

@@ -56,6 +56,8 @@ export type RankedCandidate = {
   memberUid: string;
   fit: number;
   label: MatchLabel;
+  /** The member said they are interested in this role or in its team (LAB-2788). */
+  interested: boolean;
 };
 
 export function utcRunDate(now = new Date()): Date {
@@ -84,8 +86,13 @@ export function lockUntil(now = Date.now()): Date {
   return new Date(now + LOCK_MS);
 }
 
-export function jobMatchBlocker(): { code: 'disabled' | 'misconfigured'; message: string } | null {
-  if ((process.env.IS_JOB_MATCH_ENABLED ?? '').toLowerCase() !== 'true') {
+export type JobMatchBlockerOptions = { ignoreEnabledFlag?: boolean };
+
+export function jobMatchBlocker({ ignoreEnabledFlag = false }: JobMatchBlockerOptions = {}): {
+  code: 'disabled' | 'misconfigured';
+  message: string;
+} | null {
+  if (!ignoreEnabledFlag && (process.env.IS_JOB_MATCH_ENABLED ?? '').toLowerCase() !== 'true') {
     return { code: 'disabled', message: 'Job match is disabled' };
   }
   if (!process.env.VERCEL_AI_KEY) {
@@ -306,19 +313,34 @@ export function labelFor(fit: number): MatchLabel | null {
   return null;
 }
 
+/**
+ * The note shown with a suggestion of an interested member (LAB-2802): the role note when it is not empty
+ * after trim, else the team note, else null.
+ */
+export function pickInterestNote(
+  roleNote: string | null | undefined,
+  teamNote: string | null | undefined
+): string | null {
+  return roleNote?.trim() || teamNote?.trim() || null;
+}
+
+/** Highest fit first; on equal fit an interested member ranks first, then by uid. */
 export function selectTop(
   memberUids: string[],
   fitsByMember: Map<string, Record<string, number>>,
-  roleUid: string
+  roleUid: string,
+  interestedUids: ReadonlySet<string> = new Set()
 ): RankedCandidate[] {
   return memberUids
     .map((memberUid) => {
       const fit = fitsByMember.get(memberUid)?.[roleUid] ?? 0;
       const label = labelFor(fit);
-      return label ? { memberUid, fit, label } : null;
+      return label ? { memberUid, fit, label, interested: interestedUids.has(memberUid) } : null;
     })
     .filter((row): row is RankedCandidate => row !== null)
-    .sort((a, b) => b.fit - a.fit || a.memberUid.localeCompare(b.memberUid))
+    .sort(
+      (a, b) => b.fit - a.fit || Number(b.interested) - Number(a.interested) || a.memberUid.localeCompare(b.memberUid)
+    )
     .slice(0, TOP_N);
 }
 
