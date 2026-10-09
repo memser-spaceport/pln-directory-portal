@@ -222,6 +222,24 @@ describe('job match logic', () => {
     expect(jobMatchBlocker()).toBeNull();
   });
 
+  it('skips the feature flag check when ignoreEnabledFlag is set', () => {
+    delete process.env.IS_JOB_MATCH_ENABLED;
+    process.env.VERCEL_AI_KEY = 'test-key';
+    process.env.ANTHROPIC_AUTH_MODE = 'wif';
+    expect(jobMatchBlocker({ ignoreEnabledFlag: true })).toBeNull();
+    expect(jobMatchBlocker({ ignoreEnabledFlag: false })?.code).toBe('disabled');
+    expect(jobMatchBlocker()?.code).toBe('disabled');
+  });
+
+  it('still requires the Jev key when ignoreEnabledFlag is set', () => {
+    delete process.env.IS_JOB_MATCH_ENABLED;
+    delete process.env.VERCEL_AI_KEY;
+    expect(jobMatchBlocker({ ignoreEnabledFlag: true })).toEqual({
+      code: 'misconfigured',
+      message: 'VERCEL_AI_KEY missing',
+    });
+  });
+
   it('runs at most the pool limit at once', async () => {
     let active = 0;
     let peak = 0;

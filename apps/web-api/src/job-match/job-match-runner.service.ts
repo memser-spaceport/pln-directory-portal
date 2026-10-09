@@ -19,6 +19,7 @@ import {
   hasSignal,
   jevQuestions,
   jobMatchBlocker,
+  type JobMatchBlockerOptions,
   lockUntil,
   mapPool,
   parseCandidateNotes,
@@ -74,8 +75,8 @@ export class JobMatchRunner {
 
   constructor(private readonly prisma: PrismaService, private readonly ai: AiProviderService) {}
 
-  async start(teamUids?: string[]): Promise<JobMatchStartResult> {
-    const blocker = jobMatchBlocker();
+  async start(teamUids?: string[], blockerOptions?: JobMatchBlockerOptions): Promise<JobMatchStartResult> {
+    const blocker = jobMatchBlocker(blockerOptions);
     if (blocker) {
       throw new Error(blocker.message);
     }

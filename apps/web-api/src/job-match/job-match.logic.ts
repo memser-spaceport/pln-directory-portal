@@ -84,8 +84,13 @@ export function lockUntil(now = Date.now()): Date {
   return new Date(now + LOCK_MS);
 }
 
-export function jobMatchBlocker(): { code: 'disabled' | 'misconfigured'; message: string } | null {
-  if ((process.env.IS_JOB_MATCH_ENABLED ?? '').toLowerCase() !== 'true') {
+export type JobMatchBlockerOptions = { ignoreEnabledFlag?: boolean };
+
+export function jobMatchBlocker({ ignoreEnabledFlag = false }: JobMatchBlockerOptions = {}): {
+  code: 'disabled' | 'misconfigured';
+  message: string;
+} | null {
+  if (!ignoreEnabledFlag && (process.env.IS_JOB_MATCH_ENABLED ?? '').toLowerCase() !== 'true') {
     return { code: 'disabled', message: 'Job match is disabled' };
   }
   if (!process.env.VERCEL_AI_KEY) {
