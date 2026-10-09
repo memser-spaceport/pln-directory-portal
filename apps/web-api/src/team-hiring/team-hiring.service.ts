@@ -8,6 +8,7 @@ import type {
   HiringCandidateKind,
   RoleApplicantsResponse,
 } from 'libs/contracts/src/schema/team-hiring';
+import { JobMatchService } from '../job-match/job-match.service';
 import { HIDDEN_JOB_OPENING_STATUSES } from '../job-openings/job-openings-query.service';
 import { MemberCvImportsService } from '../member-cv-imports/member-cv-imports.service';
 import { MembersService } from '../members/members.service';
@@ -62,7 +63,8 @@ export class TeamHiringService {
     private readonly prisma: PrismaService,
     private readonly teamsService: TeamsService,
     private readonly membersService: MembersService,
-    private readonly cvImports: MemberCvImportsService
+    private readonly cvImports: MemberCvImportsService,
+    private readonly jobMatchService: JobMatchService
   ) {}
 
   /**
@@ -86,7 +88,7 @@ export class TeamHiringService {
   async counts(teamUid: string, viewerUid: string): Promise<ApplicantCountsResponse> {
     const jobs = await this.prisma.jobOpening.findMany({
       where: { teamUid, ...VISIBLE_JOB_WHERE },
-      select: { uid: true },
+      select: { uid: true, teamUid: true, status: true, publishedAt: true },
       orderBy: [{ publishedAt: 'desc' }, { uid: 'desc' }],
     });
     const jobUids = jobs.map((job) => job.uid);
@@ -97,7 +99,7 @@ export class TeamHiringService {
     // Row-level rather than grouped: the facepile needs the newest rows and their
     // avatars, and the new count needs which rows THIS viewer has opened, so a
     // groupBy would leave both of those to a second strategy.
-    const [applications, interests] = await Promise.all([
+    const [applications, interests, suggested] = await Promise.all([
       this.prisma.jobApplication.findMany({
         where: { jobOpeningUid: { in: jobUids } },
         select: applicantTallySelect,
@@ -106,6 +108,7 @@ export class TeamHiringService {
         where: { jobOpeningUid: { in: jobUids } },
         select: applicantTallySelect,
       }),
+      this.jobMatchService.suggestedCounts(jobs),
     ]);
     const seen = await this.seenUids(viewerUid, [
       { kind: 'applications', uids: applications.map((row) => row.uid) },
@@ -137,16 +140,18 @@ export class TeamHiringService {
     applications.forEach((row) => add(row, 'applications'));
     interests.forEach((row) => add(row, 'interests'));
 
-    // A role nobody answered is absent, not a zero row: the array is complete, so
-    // the page reads absence as "nobody" and draws no line at all.
+    // A role nobody answered and nobody is suggested for is absent, not a zero
+    // row: the array is complete, so the page reads absence as "nobody" and draws
+    // no line at all.
     const counts: ApplicantCount[] = jobUids
-      .filter((uid) => byRole.has(uid))
+      .filter((uid) => byRole.has(uid) || suggested.has(uid))
       .map((uid) => {
-        const tally = byRole.get(uid) as Tally;
+        const tally = byRole.get(uid) ?? { applicantCount: 0, interestCount: 0, newCount: 0, rows: [] };
         return {
           roleUid: uid,
           applicantCount: tally.applicantCount,
           interestCount: tally.interestCount,
+          suggestedCount: suggested.get(uid) ?? 0,
           newCount: tally.newCount,
           newestAvatars: tally.rows
             .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())

@@ -45,12 +45,42 @@ export class JobMatchService {
     }
     if (!isLiveOpening(job)) return { suggestions: [] };
 
+    const suggestions = (await this.storedSuggestions(roleUid)).map(({ row, person, fit, rank, label }) => ({
+      memberUid: row.memberUid,
+      name: person.name,
+      role: person.role,
+      imageUrl: person.image?.url ?? null,
+      fit,
+      label: labelText(label),
+      rank,
+      blurb: row.blurb,
+      criteria: asMarkedCriteria(row.payload),
+      interested: row.interested === true,
+      note: row.interested === true ? row.interestNote ?? null : null,
+    }));
+    return { suggestions };
+  }
+
+  /** How many suggestions the Suggested tab lists for each live role; roles with none are absent. */
+  async suggestedCounts(
+    jobs: { uid: string; teamUid: string | null; status: string; publishedAt: Date | null }[]
+  ): Promise<Map<string, number>> {
+    const liveUids = jobs.filter(isLiveOpening).map((job) => job.uid);
+    const lists = await Promise.all(liveUids.map((uid) => this.storedSuggestions(uid)));
+    const counts = new Map<string, number>();
+    liveUids.forEach((uid, index) => {
+      if (lists[index].length > 0) counts.set(uid, lists[index].length);
+    });
+    return counts;
+  }
+
+  private async storedSuggestions(roleUid: string) {
     const latest = await this.prisma.jobMatchRow.findFirst({
       where: { kind: 'ROLE', roleUid },
       orderBy: { createdAt: 'desc' },
       select: { runUid: true },
     });
-    if (!latest) return { suggestions: [] };
+    if (!latest) return [];
 
     const rows = await this.prisma.jobMatchRow.findMany({
       where: { kind: 'SUGGESTION', runUid: latest.runUid, roleUid },
@@ -63,26 +93,11 @@ export class JobMatchService {
     });
     const byUid = new Map(members.map((item) => [item.uid, item]));
 
-    const suggestions = rows.flatMap((row) => {
+    return rows.flatMap((row) => {
       const person = byUid.get(row.memberUid);
       if (!person || row.fit == null || row.rank == null || row.fit < GOOD_FIT || !row.label) return [];
-      return [
-        {
-          memberUid: row.memberUid,
-          name: person.name,
-          role: person.role,
-          imageUrl: person.image?.url ?? null,
-          fit: row.fit,
-          label: labelText(row.label),
-          rank: row.rank,
-          blurb: row.blurb,
-          criteria: asMarkedCriteria(row.payload),
-          interested: row.interested === true,
-          note: row.interested === true ? row.interestNote ?? null : null,
-        },
-      ];
+      return [{ row, person, fit: row.fit, rank: row.rank, label: row.label }];
     });
-    return { suggestions };
   }
 
   private async isCurrentMember(teamUid: string, memberUid: string): Promise<boolean> {
