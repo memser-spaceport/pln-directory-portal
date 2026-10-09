@@ -11,5 +11,6 @@ import { JobMatchService } from './job-match.service';
   imports: [SharedModule, MembersModule],
   controllers: [JobMatchController, JobMatchServiceController],
   providers: [JobMatchRunner, JobMatchService, JobMatchJob],
+  exports: [JobMatchService],
 })
 export class JobMatchModule {}

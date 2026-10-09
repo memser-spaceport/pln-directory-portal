@@ -79,6 +79,8 @@ export const ApplicantCountSchema = z.object({
   roleUid: z.string(),
   applicantCount: z.number().int().nonnegative(),
   interestCount: z.number().int().nonnegative(),
+  /** Candidates on the role's Suggested tab; they are not people who answered. */
+  suggestedCount: z.number().int().nonnegative(),
   /** Unopened by this viewer, across BOTH lists. */
   newCount: z.number().int().nonnegative(),
   /**
@@ -92,7 +94,7 @@ export const ApplicantCountSchema = z.object({
 export type ApplicantCount = z.infer<typeof ApplicantCountSchema>;
 
 /**
- * Counts for every open role somebody answered.
+ * Counts for every open role somebody answered or the matcher suggested people for.
  *
  * Counts only — the roles themselves come from the jobs list the team profile
  * already fetches, and repeating their titles here would be a second description

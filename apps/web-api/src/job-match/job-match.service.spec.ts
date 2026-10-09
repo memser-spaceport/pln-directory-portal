@@ -145,6 +145,40 @@ describe('JobMatchService', () => {
     ]);
   });
 
+  describe('suggestedCounts', () => {
+    const live = { teamUid: 'team-1', status: JobOpeningStatus.CONFIRMED, publishedAt: new Date() };
+
+    it('counts what the Suggested tab lists, for live roles only', async () => {
+      jobMatchRowFindFirst.mockResolvedValue({ runUid: 'run-1' });
+      jobMatchRowFindMany.mockResolvedValue([
+        { memberUid: 'cand-1', rank: 1, fit: 91, label: 'STRONG' },
+        { memberUid: 'cand-2', rank: 2, fit: 40, label: 'GOOD' },
+        { memberUid: 'cand-gone', rank: 3, fit: 80, label: 'GOOD' },
+      ]);
+      memberFindMany.mockResolvedValue([
+        { uid: 'cand-1', name: 'Ada', role: null, image: null },
+        { uid: 'cand-2', name: 'Grace', role: null, image: null },
+      ]);
+
+      const counts = await service.suggestedCounts([
+        { uid: 'role-1', ...live },
+        { uid: 'role-hidden', ...live, status: JobOpeningStatus.STALE },
+        { uid: 'role-draft', ...live, publishedAt: null },
+      ]);
+
+      expect([...counts]).toEqual([['role-1', 1]]);
+      expect(jobMatchRowFindFirst).toHaveBeenCalledTimes(1);
+    });
+
+    it('leaves out a role the matcher has not run for', async () => {
+      jobMatchRowFindFirst.mockResolvedValue(null);
+
+      const counts = await service.suggestedCounts([{ uid: 'role-1', ...live }]);
+
+      expect(counts.size).toBe(0);
+    });
+  });
+
   it('404s when the role does not exist', async () => {
     findMemberByEmail.mockResolvedValue({ uid: 'admin-1', isDirectoryAdmin: true });
     jobOpeningFindUnique.mockResolvedValue(null);

@@ -3,8 +3,10 @@
 jest.mock('../member-cv-imports/member-cv-imports.service', () => ({ MemberCvImportsService: class {} }));
 jest.mock('../members/members.service', () => ({ MembersService: class {} }));
 jest.mock('../teams/teams.service', () => ({ TeamsService: class {} }));
+jest.mock('../job-match/job-match.service', () => ({ JobMatchService: class {} }));
 
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import type { JobMatchService } from '../job-match/job-match.service';
 import type { MemberCvImportsService } from '../member-cv-imports/member-cv-imports.service';
 import type { MembersService } from '../members/members.service';
 import type { PrismaService } from '../shared/prisma.service';
@@ -39,6 +41,7 @@ describe('TeamHiringService', () => {
   let teams: { isMemberTeamLead: jest.Mock };
   let members: { findMemberByEmail: jest.Mock };
   let cvImports: { getStoredCvFiles: jest.Mock };
+  let jobMatch: { suggestedCounts: jest.Mock };
   let service: TeamHiringService;
 
   beforeAll(() => {
@@ -55,11 +58,13 @@ describe('TeamHiringService', () => {
     teams = { isMemberTeamLead: jest.fn().mockResolvedValue(false) };
     members = { findMemberByEmail: jest.fn() };
     cvImports = { getStoredCvFiles: jest.fn().mockResolvedValue(new Map()) };
+    jobMatch = { suggestedCounts: jest.fn().mockResolvedValue(new Map()) };
     service = new TeamHiringService(
       prisma as unknown as PrismaService,
       teams as unknown as TeamsService,
       members as unknown as MembersService,
-      cvImports as unknown as MemberCvImportsService
+      cvImports as unknown as MemberCvImportsService,
+      jobMatch as unknown as JobMatchService
     );
   });
 
@@ -118,6 +123,7 @@ describe('TeamHiringService', () => {
           roleUid: 'job-1',
           applicantCount: 3,
           interestCount: 1,
+          suggestedCount: 0,
           newCount: 3,
           newestAvatars: ['https://cdn/app-1.png', 'https://cdn/app-2.png', 'https://cdn/app-3.png'],
         },
@@ -153,6 +159,27 @@ describe('TeamHiringService', () => {
         'newCount',
         'newestAvatars',
         'roleUid',
+        'suggestedCount',
+      ]);
+    });
+
+    it('keeps a role that only has suggestions, with zero answers', async () => {
+      const job = { uid: 'job-1', teamUid: 'team-1', status: 'NEW', publishedAt: new Date() };
+      prisma.jobOpening.findMany.mockResolvedValue([job, { ...job, uid: 'job-empty' }]);
+      jobMatch.suggestedCounts.mockResolvedValue(new Map([['job-1', 3]]));
+
+      const out = await service.counts('team-1', 'm-lead');
+
+      expect(jobMatch.suggestedCounts).toHaveBeenCalledWith([job, { ...job, uid: 'job-empty' }]);
+      expect(out.counts).toEqual([
+        {
+          roleUid: 'job-1',
+          applicantCount: 0,
+          interestCount: 0,
+          suggestedCount: 3,
+          newCount: 0,
+          newestAvatars: [],
+        },
       ]);
     });
 
