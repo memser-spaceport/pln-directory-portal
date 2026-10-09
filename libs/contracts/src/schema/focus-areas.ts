@@ -23,7 +23,8 @@ export const ResponseFocusAreaWithRelationsSchema = ResponseFocusAreaSchema.exte
   teamAncestorFocusAreas: ResponseTeamFocusAreaSchema.array().optional(),
   team: ResponseTeamWithRelationsSchema.optional(),
   projectFocusAreas: ResponseProjectFocusAreaSchema.array().optional(),
-  projectAncestorFocusAreas: ResponseProjectFocusAreaSchema.array().optional()
+  projectAncestorFocusAreas: ResponseProjectFocusAreaSchema.array().optional(),
+  projectCount: z.number().int().nonnegative().optional()
 });
 
 export const FocusAreaRelationalFields = ResponseFocusAreaWithRelationsSchema.pick({
