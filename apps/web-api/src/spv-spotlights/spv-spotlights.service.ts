@@ -69,15 +69,22 @@ export class SpvSpotlightsService {
         })
       : null;
 
-    const [request, preApproved] = member
+    const [request, participant] = member
       ? await Promise.all([
           this.prisma.spvAccessRequest.findUnique({
             where: { spvSpotlightUid_memberUid: { spvSpotlightUid: spotlight.uid, memberUid: member.uid } },
             select: { status: true },
           }),
           this.prisma.spvSpotlightParticipant.findFirst({
-            where: { spvSpotlightUid: spotlight.uid, memberUid: member.uid, type: 'INVESTOR', cohort: 'PRE_APPROVED' },
-            select: { uid: true },
+            where: {
+              spvSpotlightUid: spotlight.uid,
+              memberUid: member.uid,
+              OR: [
+                { type: 'INVESTOR', cohort: 'PRE_APPROVED' },
+                { type: 'FOUNDER', access: { not: 'RESTRICTED' } },
+              ],
+            },
+            select: { type: true },
           }),
         ])
       : [null, null];
@@ -85,7 +92,8 @@ export class SpvSpotlightsService {
     const viewerAccess = resolveViewerAccess({
       hasToken: !!email,
       requestStatus: request?.status ?? null,
-      isPreApproved: !!preApproved,
+      isPreApproved: participant?.type === 'INVESTOR',
+      isFounder: participant?.type === 'FOUNDER',
     });
 
     return this.toPublic(spotlight, viewerAccess);
