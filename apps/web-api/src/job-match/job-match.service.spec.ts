@@ -69,6 +69,7 @@ describe('JobMatchService', () => {
         blurb: 'Knows Go.',
         payload: [{ text: 'Go', matched: true }],
         interested: true,
+        interestNote: 'Love this role.',
       },
     ]);
     memberFindMany.mockResolvedValue([
@@ -88,6 +89,7 @@ describe('JobMatchService', () => {
           blurb: 'Knows Go.',
           criteria: [{ text: 'Go', matched: true }],
           interested: true,
+          note: 'Love this role.',
         },
       ],
     });
@@ -98,6 +100,49 @@ describe('JobMatchService', () => {
         orderBy: { rank: 'asc' },
       })
     );
+  });
+
+  it('returns note null for a member who is not interested, also if a note was stored (LAB-2802)', async () => {
+    findMemberByEmail.mockResolvedValue({ uid: 'admin-1', isDirectoryAdmin: true });
+    jobOpeningFindUnique.mockResolvedValue({
+      uid: 'role-1',
+      teamUid: 'team-1',
+      status: JobOpeningStatus.CONFIRMED,
+      publishedAt: new Date(),
+    });
+    jobMatchRowFindFirst.mockResolvedValue({ runUid: 'run-1' });
+    jobMatchRowFindMany.mockResolvedValue([
+      {
+        memberUid: 'cand-1',
+        rank: 1,
+        fit: 91,
+        label: 'STRONG',
+        blurb: null,
+        payload: [],
+        interested: false,
+        interestNote: 'x',
+      },
+      {
+        memberUid: 'cand-2',
+        rank: 2,
+        fit: 80,
+        label: 'STRONG',
+        blurb: null,
+        payload: [],
+        interested: true,
+        interestNote: null,
+      },
+    ]);
+    memberFindMany.mockResolvedValue([
+      { uid: 'cand-1', name: 'Ada', role: null, image: null },
+      { uid: 'cand-2', name: 'Grace', role: null, image: null },
+    ]);
+
+    const { suggestions } = await service.listForRole('role-1', 'admin@example.com');
+    expect(suggestions.map((row) => [row.memberUid, row.interested, row.note])).toEqual([
+      ['cand-1', false, null],
+      ['cand-2', true, null],
+    ]);
   });
 
   it('404s when the role does not exist', async () => {

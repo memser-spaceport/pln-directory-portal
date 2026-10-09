@@ -313,6 +313,17 @@ export function labelFor(fit: number): MatchLabel | null {
   return null;
 }
 
+/**
+ * The note shown with a suggestion of an interested member (LAB-2802): the role note when it is not empty
+ * after trim, else the team note, else null.
+ */
+export function pickInterestNote(
+  roleNote: string | null | undefined,
+  teamNote: string | null | undefined
+): string | null {
+  return roleNote?.trim() || teamNote?.trim() || null;
+}
+
 /** Highest fit first; on equal fit an interested member ranks first, then by uid. */
 export function selectTop(
   memberUids: string[],

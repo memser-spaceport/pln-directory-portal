@@ -14,6 +14,7 @@ import {
   normalizeTeamUids,
   parseCandidateNotes,
   parseCriteria,
+  pickInterestNote,
   planTeamWork,
   profileText,
   profileTextHash,
@@ -162,6 +163,14 @@ describe('job match logic', () => {
     const top = selectTop([...fits.keys()], fits, 'role-1');
     expect(top.map((row) => row.memberUid)).toEqual(['m-a', 'm-b']);
     expect(top.every((row) => row.interested === false)).toBe(true);
+  });
+
+  it('picks the role note over the team note, trimmed, and null when both are empty (LAB-2802)', () => {
+    expect(pickInterestNote('  Love this role.  ', 'Big fan of the team.')).toBe('Love this role.');
+    expect(pickInterestNote(null, ' Big fan of the team. ')).toBe('Big fan of the team.');
+    expect(pickInterestNote('   ', 'Big fan of the team.')).toBe('Big fan of the team.');
+    expect(pickInterestNote(undefined, undefined)).toBeNull();
+    expect(pickInterestNote('', '  ')).toBeNull();
   });
 
   it('plans a same-day resume around finished teams, roles, and member scores', () => {
