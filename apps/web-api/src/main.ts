@@ -31,7 +31,6 @@ export async function bootstrap() {
     enabled: process.env.ENVIRONMENT === APP_ENV.PRODUCTION || process.env.ENVIRONMENT === APP_ENV.STAGING,
   });
 
-  // Create forest admin agent if the secret is set
   if (!!process.env.FOREST_AUTH_SECRET) {
     const agent = createForestAdminAgent();
     await agent.mountOnNestJs(app).start();
