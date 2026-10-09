@@ -24,6 +24,7 @@ import {
   mapPool,
   parseCandidateNotes,
   parseCriteria,
+  pickInterestNote,
   planTeamWork,
   profileText,
   profileTextHash,
@@ -297,7 +298,7 @@ export class JobMatchRunner {
         criteriaByUid.get(job.uid) ?? [],
         members,
         scoresByMember,
-        interestByRole.get(job.uid) ?? new Set()
+        interestByRole.get(job.uid) ?? new Map()
       );
     }
     await this.markTeamComplete(runUid, team.uid);
@@ -332,13 +333,13 @@ export class JobMatchRunner {
     criteria: string[],
     members: MatchMember[],
     scoresByMember: Map<string, Record<string, number>>,
-    interestedUids: ReadonlySet<string>
+    interest: ReadonlyMap<string, string | null>
   ): Promise<void> {
     const ranked = selectTop(
       members.map((member) => member.uid),
       scoresByMember,
       job.uid,
-      interestedUids
+      new Set(interest.keys())
     );
     const byUid = new Map(members.map((member) => [member.uid, member]));
     let notes = new Map<string, { blurb: string; matched: boolean[] }>();
@@ -366,6 +367,7 @@ export class JobMatchRunner {
         fit: row.fit,
         label: row.label,
         interested: row.interested,
+        interestNote: row.interested ? interest.get(row.memberUid) ?? null : null,
         blurb: note?.blurb ?? null,
         payload: criteria.map((text, criterionIndex) => ({
           text,
@@ -386,22 +388,24 @@ export class JobMatchRunner {
   /**
    * Members who said they are interested, per role: interest in the role itself or in the role's team
    * (LAB-2788). It only marks and orders members already in the eligible pool; it never adds one.
+   * Each member maps to the note of their interest: the role note wins over the team note (LAB-2802).
    */
-  private async loadInterest(teamUid: string, roleUids: string[]): Promise<Map<string, Set<string>>> {
-    const byRole = new Map<string, Set<string>>();
+  private async loadInterest(teamUid: string, roleUids: string[]): Promise<Map<string, Map<string, string | null>>> {
+    const byRole = new Map<string, Map<string, string | null>>();
     if (!roleUids.length) return byRole;
     const [roleInterest, teamInterest] = await Promise.all([
       this.prisma.jobOpeningInterest.findMany({
         where: { jobOpeningUid: { in: roleUids } },
-        select: { jobOpeningUid: true, memberUid: true },
+        select: { jobOpeningUid: true, memberUid: true, note: true },
       }),
-      this.prisma.teamInterest.findMany({ where: { teamUid }, select: { memberUid: true } }),
+      this.prisma.teamInterest.findMany({ where: { teamUid }, select: { memberUid: true, message: true } }),
     ]);
+    const teamNotes = new Map(teamInterest.map((row) => [row.memberUid, row.message]));
     for (const roleUid of roleUids) {
-      byRole.set(roleUid, new Set(teamInterest.map((row) => row.memberUid)));
+      byRole.set(roleUid, new Map(teamInterest.map((row) => [row.memberUid, pickInterestNote(null, row.message)])));
     }
     for (const row of roleInterest) {
-      byRole.get(row.jobOpeningUid)?.add(row.memberUid);
+      byRole.get(row.jobOpeningUid)?.set(row.memberUid, pickInterestNote(row.note, teamNotes.get(row.memberUid)));
     }
     return byRole;
   }
