@@ -22,6 +22,18 @@ describe('resolveViewerAccess', () => {
     expect(resolveViewerAccess({ hasToken: true, requestStatus: 'APPROVED', isPreApproved: false })).toBe('APPROVED');
   });
 
+  it('approves a founder participant, also over an old rejection', () => {
+    expect(resolveViewerAccess({ hasToken: true, requestStatus: null, isPreApproved: false, isFounder: true })).toBe(
+      'APPROVED'
+    );
+    expect(
+      resolveViewerAccess({ hasToken: true, requestStatus: 'REJECTED', isPreApproved: false, isFounder: true })
+    ).toBe('APPROVED');
+    expect(resolveViewerAccess({ hasToken: false, requestStatus: null, isPreApproved: false, isFounder: true })).toBe(
+      'NONE'
+    );
+  });
+
   it('returns PENDING then NONE', () => {
     expect(resolveViewerAccess({ hasToken: true, requestStatus: 'PENDING', isPreApproved: false })).toBe('PENDING');
     expect(resolveViewerAccess({ hasToken: true, requestStatus: null, isPreApproved: false })).toBe('NONE');
