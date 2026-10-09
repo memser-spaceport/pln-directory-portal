@@ -145,6 +145,49 @@ Warm intro: Mira Kowalczyk (General Partner, Cortex Frontier Fund) [WarmIntroLin
     ]);
   });
 
+  it('names only the team in front of each marker when several teams share one line', () => {
+    const teamsLine =
+      'Teams: Speculative Technologies (Ancestor) [TeamLink](/teams/spec), Science (Ancestor) [TeamLink](/teams/science), Synchron (Ancestor) [TeamLink](/teams/synchron)';
+    const { sourceRefs } = buildSourceRefs({
+      content: 'See [1](/teams/synchron).',
+      toolResults: teamsLine,
+    });
+
+    expect(sourceRefs).toEqual([
+      {
+        index: 1,
+        title: 'Synchron (Ancestor)',
+        type: 'team',
+        directoryLink: '/teams/synchron',
+      },
+    ]);
+  });
+
+  it('splits a pasted team line into one source per team', () => {
+    const teamsLine =
+      'Teams: Speculative Technologies (Ancestor) [TeamLink](/teams/spec), Science (Ancestor) [TeamLink](/teams/science)';
+    const { sourceRefs } = buildSourceRefs({
+      content: 'These teams match the focus area.',
+      toolResults: `Title: Neurotech\n${teamsLine}`,
+      llmSources: [teamsLine],
+    });
+
+    expect(sourceRefs).toEqual([
+      {
+        index: 1,
+        title: 'Speculative Technologies (Ancestor)',
+        type: 'team',
+        directoryLink: '/teams/spec',
+      },
+      {
+        index: 2,
+        title: 'Science (Ancestor)',
+        type: 'team',
+        directoryLink: '/teams/science',
+      },
+    ]);
+  });
+
   it('resolves an uncited LLM source to the in-product path it names', () => {
     const { sourceRefs } = buildSourceRefs({
       content: 'Mira is reachable [1](/investors?mode=warm-intros-v2&wi2_q=Mira).',

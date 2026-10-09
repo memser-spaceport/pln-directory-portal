@@ -43,15 +43,30 @@ export interface BuiltSourceRefs {
 function cleanTitle(raw: string): string {
   return raw
     .replace(/^[-*]\s+/, '')
-    .replace(/^(Topic|Name|Title|Team|Project|Member|Event|Investor DB record|Warm intro):\s*/i, '')
+    .replace(
+      /^(Topic|Name|Title|Teams|Team|Projects|Project|Members|Member|Event|Investor DB record|Warm intro):\s*/i,
+      ''
+    )
+    .replace(/^[\s,;]+/, '')
+    .replace(/^(?:and|or)\s+/i, '')
     .trim();
+}
+
+function textBeforeMarker(line: string, markerOffsetInLine: number): string {
+  const before = line.slice(0, markerOffsetInLine);
+  const markerTail = /\]\([^)]*\)/g;
+  let lastEnd = 0;
+  for (const match of before.matchAll(markerTail)) {
+    lastEnd = (match.index ?? 0) + match[0].length;
+  }
+  return before.slice(lastEnd);
 }
 
 function titleForMarker(record: string, markerIndex: number): string {
   const lineStart = record.lastIndexOf('\n', markerIndex - 1) + 1;
   const lineEnd = record.indexOf('\n', markerIndex);
   const line = record.slice(lineStart, lineEnd === -1 ? undefined : lineEnd);
-  const sameLine = cleanTitle(line.slice(0, markerIndex - lineStart));
+  const sameLine = cleanTitle(textBeforeMarker(line, markerIndex - lineStart));
   if (sameLine) return sameLine;
 
   const nextLine = record.slice(lineEnd === -1 ? record.length : lineEnd + 1).split('\n')[0] ?? '';
@@ -127,6 +142,24 @@ function findEntry(catalog: CatalogEntry[], cited: string): CatalogEntry | undef
   );
 }
 
+function entriesInSource(text: string, catalog: CatalogEntry[]): CatalogEntry[] {
+  const parsed = parseCatalog(text);
+  if (!parsed.length) return [];
+  return parsed.map((entry) => findEntry(catalog, entry.directoryLink) ?? entry);
+}
+
+function pushEntry(sourceRefs: HuskySourceRef[], seenUrls: Set<string>, index: number, entry: CatalogEntry) {
+  sourceRefs.push({
+    index,
+    title: entry.title,
+    type: entry.type,
+    directoryLink: entry.directoryLink,
+    ...(entry.externalUrl ? { externalUrl: entry.externalUrl } : {}),
+  });
+  remember(seenUrls, entry.directoryLink);
+  remember(seenUrls, entry.externalUrl);
+}
+
 function remember(seen: Set<string>, url?: string) {
   if (!url) return;
   for (const key of urlKeys(url)) seen.add(key);
@@ -168,34 +201,34 @@ export function buildSourceRefs(input: {
     if (!citedDirectory && entry.externalUrl) {
       mismatches.push(`citation [${index}](${cited}) resolved to ${entry.directoryLink}`);
     }
-    sourceRefs.push({
-      index,
-      title: entry.title,
-      type: entry.type,
-      directoryLink: entry.directoryLink,
-      ...(entry.externalUrl ? { externalUrl: entry.externalUrl } : {}),
-    });
-    remember(seenUrls, entry.directoryLink);
-    remember(seenUrls, entry.externalUrl);
+    pushEntry(sourceRefs, seenUrls, index, entry);
   }
 
   let nextIndex = sourceRefs.reduce((max, ref) => Math.max(max, ref.index), 0);
   for (const source of input.llmSources ?? []) {
     const url = source?.trim();
     if (!url || alreadyRepresented(seenUrls, url)) continue;
+
+    const embedded = entriesInSource(url, catalog);
+    if (embedded.length) {
+      let added = 0;
+      for (const entry of embedded) {
+        if (alreadyRepresented(seenUrls, entry.directoryLink)) continue;
+        nextIndex += 1;
+        added += 1;
+        pushEntry(sourceRefs, seenUrls, nextIndex, entry);
+      }
+      if (added) {
+        mismatches.push(`LLM source contained ${added} directory links; appended each as its own source`);
+      }
+      continue;
+    }
+
     nextIndex += 1;
     const entry = findEntry(catalog, url);
     if (entry) {
       mismatches.push(`LLM source ${url} was not cited; appended as ${entry.directoryLink}`);
-      sourceRefs.push({
-        index: nextIndex,
-        title: entry.title,
-        type: entry.type,
-        directoryLink: entry.directoryLink,
-        ...(entry.externalUrl ? { externalUrl: entry.externalUrl } : {}),
-      });
-      remember(seenUrls, entry.directoryLink);
-      remember(seenUrls, entry.externalUrl);
+      pushEntry(sourceRefs, seenUrls, nextIndex, entry);
       continue;
     }
     mismatches.push(`LLM source ${url} was not cited; appended as external`);
