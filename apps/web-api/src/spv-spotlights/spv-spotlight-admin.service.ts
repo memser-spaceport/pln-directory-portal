@@ -35,6 +35,32 @@ import { SpvSpotlightMailer } from './spv-spotlight-mailer';
 
 type MediaInput = { imageUid: string; alt: string; fit?: 'cover' | 'contain' };
 
+const SPV_DETAIL_KEYS = [
+  'fundName',
+  'investment',
+  'targetSpvSize',
+  'minimumInvestment',
+  'managementFee',
+  'carriedInterest',
+  'expenseReserve',
+  'investorEligibility',
+  'liquidity',
+] as const;
+
+type SpvDetailKey = (typeof SPV_DETAIL_KEYS)[number];
+type SpvDetailInput = Partial<Record<SpvDetailKey, string | null>>;
+
+function spvDetailColumns(input: SpvDetailInput, mode: 'create' | 'update'): SpvDetailInput {
+  const data: SpvDetailInput = {};
+  for (const key of SPV_DETAIL_KEYS) {
+    if (mode === 'update' && input[key] === undefined) {
+      continue;
+    }
+    data[key] = normalizeOptionalTrimmed(input[key]) ?? null;
+  }
+  return data;
+}
+
 type BulkParticipantInput = Omit<InvestorBulkParticipantInput, 'name'> & {
   name?: string;
   emailTemplateVariables?: Record<string, string>;
@@ -97,7 +123,7 @@ export class SpvSpotlightAdminService {
     summary?: string | null;
     closesAt?: string | null;
     media?: MediaInput[];
-  }) {
+  } & SpvDetailInput) {
     const team = await this.prisma.team.findUnique({
       where: { uid: input.teamUid },
       select: { uid: true, name: true },
@@ -125,6 +151,7 @@ export class SpvSpotlightAdminService {
         docSendUrl: normalizeOptionalTrimmed(input.docSendUrl) ?? null,
         summary: normalizeOptionalTrimmed(input.summary && replaceNbsp(input.summary)) ?? null,
         closesAt: input.closesAt ? new Date(input.closesAt) : null,
+        ...spvDetailColumns(input, 'create'),
         emailTemplates: asEmailTemplates(null, title),
       },
     });
@@ -150,7 +177,7 @@ export class SpvSpotlightAdminService {
       summary?: string | null;
       closesAt?: string | null;
       media?: MediaInput[];
-    }
+    } & SpvDetailInput
   ) {
     const current = await this.prisma.spvSpotlight.findUnique({ where: { uid } });
     if (!current) {
@@ -185,6 +212,7 @@ export class SpvSpotlightAdminService {
           ? { summary: normalizeOptionalTrimmed(input.summary && replaceNbsp(input.summary)) ?? null }
           : {}),
         ...(input.closesAt !== undefined ? { closesAt: input.closesAt ? new Date(input.closesAt) : null } : {}),
+        ...spvDetailColumns(input, 'update'),
       },
     });
     if (input.media) {

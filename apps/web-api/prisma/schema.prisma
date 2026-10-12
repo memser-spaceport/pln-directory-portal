@@ -1594,6 +1594,15 @@ model SpvSpotlight {
   docSendUrl    String?
   summary       String?
   closesAt      DateTime?
+  fundName            String?
+  investment          String?
+  targetSpvSize       String?
+  minimumInvestment   String?
+  managementFee       String?
+  carriedInterest     String?
+  expenseReserve      String?
+  investorEligibility String?
+  liquidity           String?
   emailTemplates Json
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt

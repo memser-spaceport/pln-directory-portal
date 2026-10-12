@@ -287,6 +287,17 @@ export class SpvSpotlightsService {
       description: spotlight.description,
       supportEmail: spotlight.supportEmail,
       closesAt: spotlight.closesAt,
+      spvDetails: {
+        fundName: spotlight.fundName ?? null,
+        investment: spotlight.investment ?? null,
+        targetSpvSize: spotlight.targetSpvSize ?? null,
+        minimumInvestment: spotlight.minimumInvestment ?? null,
+        managementFee: spotlight.managementFee ?? null,
+        carriedInterest: spotlight.carriedInterest ?? null,
+        expenseReserve: spotlight.expenseReserve ?? null,
+        investorEligibility: spotlight.investorEligibility ?? null,
+        liquidity: spotlight.liquidity ?? null,
+      },
       docSendUrl: showDataRoom,
       team: {
         uid: spotlight.team.uid,

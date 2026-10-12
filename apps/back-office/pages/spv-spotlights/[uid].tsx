@@ -34,6 +34,38 @@ const TEMPLATE_LABELS: { key: TemplateKey; label: string }[] = [
   { key: 'opened', label: 'Spotlight is open' },
 ];
 
+const SPV_DETAIL_FIELDS = [
+  { key: 'fundName', label: 'Fund name' },
+  { key: 'investment', label: 'Investment' },
+  { key: 'targetSpvSize', label: 'Target SPV size' },
+  { key: 'minimumInvestment', label: 'Minimum investment' },
+  { key: 'managementFee', label: 'Management Fee' },
+  { key: 'carriedInterest', label: 'Carried Interest' },
+  { key: 'expenseReserve', label: 'Expense Reserve' },
+  { key: 'investorEligibility', label: 'Investor Eligibility' },
+  { key: 'liquidity', label: 'Liquidity' },
+] as const;
+
+function overviewForm(data: Record<string, unknown>): Record<string, string> {
+  const form: Record<string, string> = {
+    title: String(data.title ?? ''),
+    description: String(data.description ?? ''),
+    slug: String(data.slug ?? ''),
+    status: String(data.status ?? 'DRAFT'),
+    supportEmail: String(data.supportEmail ?? ''),
+    senderName: String(data.senderName ?? ''),
+    senderEmail: String(data.senderEmail ?? ''),
+    replyToEmail: String(data.replyToEmail ?? ''),
+    docSendUrl: String(data.docSendUrl ?? ''),
+    summary: String(data.summary ?? ''),
+    closesAt: data.closesAt ? String(data.closesAt).slice(0, 16) : '',
+  };
+  for (const { key } of SPV_DETAIL_FIELDS) {
+    form[key] = String(data[key] ?? '');
+  }
+  return form;
+}
+
 // Gated model: investors are invited as pre-approved only. Kept so outreach can come back.
 const OUTREACH_UI_ENABLED = false;
 
@@ -169,19 +201,7 @@ const SpvSpotlightDetailPage = () => {
     if (!authToken || !uid) return;
     const { data } = await api.get(base, { headers: authHeaders });
     setSpotlight(data);
-    setForm({
-      title: data.title ?? '',
-      description: data.description ?? '',
-      slug: data.slug ?? '',
-      status: data.status ?? 'DRAFT',
-      supportEmail: data.supportEmail ?? '',
-      senderName: data.senderName ?? '',
-      senderEmail: data.senderEmail ?? '',
-      replyToEmail: data.replyToEmail ?? '',
-      docSendUrl: data.docSendUrl ?? '',
-      summary: data.summary ?? '',
-      closesAt: data.closesAt ? data.closesAt.slice(0, 16) : '',
-    });
+    setForm(overviewForm(data));
     setMedia(
       (data.media ?? []).map((item: { imageUid: string; alt: string; fit: string; image?: { url: string } }) => ({
         imageUid: item.imageUid,
@@ -244,6 +264,7 @@ const SpvSpotlightDetailPage = () => {
         docSendUrl: form.docSendUrl || null,
         summary: form.summary || null,
         closesAt: form.closesAt ? `${form.closesAt}:00.000Z` : null,
+        ...Object.fromEntries(SPV_DETAIL_FIELDS.map(({ key }) => [key, form[key] || null])),
         media: media.map(({ imageUid, alt, fit }) => ({ imageUid, alt, fit })),
       },
       { headers: authHeaders }
@@ -604,19 +625,7 @@ const SpvSpotlightDetailPage = () => {
   const publicUrl = `${WEB_UI_BASE_URL}/spv-spotlight/${form.slug || spotlight.slug}`;
 
   const cancelEdit = () => {
-    setForm({
-      title: String(spotlight.title ?? ''),
-      description: String(spotlight.description ?? ''),
-      slug: String(spotlight.slug ?? ''),
-      status: String(spotlight.status ?? 'DRAFT'),
-      supportEmail: String(spotlight.supportEmail ?? ''),
-      senderName: String(spotlight.senderName ?? ''),
-      senderEmail: String(spotlight.senderEmail ?? ''),
-      replyToEmail: String(spotlight.replyToEmail ?? ''),
-      docSendUrl: String(spotlight.docSendUrl ?? ''),
-      summary: String(spotlight.summary ?? ''),
-      closesAt: spotlight.closesAt ? String(spotlight.closesAt).slice(0, 16) : '',
-    });
+    setForm(overviewForm(spotlight));
     setMedia(
       ((spotlight.media as { imageUid: string; alt: string; fit: string; image?: { url: string } }[]) ?? []).map(
         (item) => ({
@@ -740,6 +749,12 @@ const SpvSpotlightDetailPage = () => {
                   <div className={s.fieldValue}>{form.closesAt ? form.closesAt.replace('T', ' ') : '—'}</div>
                 )}
                 <p className="text-xs text-gray-500">Shown on the spotlight page. Does not close the spotlight.</p>
+              </div>
+              <div className={clsx(s.overviewField, s.fullWidth, s.spvDetails)}>
+                <h3 className={s.spvDetailsTitle}>SPV Details</h3>
+                <div className={s.spvDetailsGrid}>
+                  {SPV_DETAIL_FIELDS.map(({ key, label }) => textField(key, label))}
+                </div>
               </div>
               <div className={clsx(s.overviewField, s.fullWidth)}>
                 <label className={s.fieldLabel}>Summary</label>
