@@ -49,6 +49,15 @@ export const CreateSpvSpotlightSchema = z.object({
   replyToEmail: z.string().email().optional().nullable(),
   docSendUrl: z.string().url().optional().nullable(),
   summary: z.string().optional().nullable(),
+  fundName: z.string().trim().max(300).optional().nullable(),
+  investment: z.string().trim().max(300).optional().nullable(),
+  targetSpvSize: z.string().trim().max(300).optional().nullable(),
+  minimumInvestment: z.string().trim().max(300).optional().nullable(),
+  managementFee: z.string().trim().max(300).optional().nullable(),
+  carriedInterest: z.string().trim().max(300).optional().nullable(),
+  expenseReserve: z.string().trim().max(300).optional().nullable(),
+  investorEligibility: z.string().trim().max(300).optional().nullable(),
+  liquidity: z.string().trim().max(300).optional().nullable(),
   closesAt: z
     .string()
     .refine((value) => !Number.isNaN(Date.parse(value)), 'Invalid date')

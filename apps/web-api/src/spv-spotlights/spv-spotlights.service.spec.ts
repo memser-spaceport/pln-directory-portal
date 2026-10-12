@@ -10,6 +10,15 @@ describe('SpvSpotlightsService getBySlug viewer access', () => {
     supportEmail: null,
     closesAt: null,
     summary: null,
+    fundName: null,
+    investment: null,
+    targetSpvSize: null,
+    minimumInvestment: null,
+    managementFee: null,
+    carriedInterest: null,
+    expenseReserve: null,
+    investorEligibility: null,
+    liquidity: null,
     docSendUrl: 'https://docsend.com/view/x',
     media: [],
     team: {
@@ -46,6 +55,17 @@ describe('SpvSpotlightsService getBySlug viewer access', () => {
 
     expect(result.viewerAccess).toBe('APPROVED');
     expect(result.docSendUrl).toBe('https://docsend.com/view/x');
+    expect(result.spvDetails).toEqual({
+      fundName: null,
+      investment: null,
+      targetSpvSize: null,
+      minimumInvestment: null,
+      managementFee: null,
+      carriedInterest: null,
+      expenseReserve: null,
+      investorEligibility: null,
+      liquidity: null,
+    });
     expect(prisma.spvSpotlightParticipant.findFirst).toHaveBeenCalledWith({
       where: {
         spvSpotlightUid: 'spv_1',

@@ -240,6 +240,25 @@
   }
 }
 
+.spvDetailsTitle {
+  color: var(--foreground-neutral-primary, #0a0c11);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.spvDetailsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  row-gap: 12px;
+  column-gap: 16px;
+  width: 100%;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
 .overviewField {
   display: flex;
   flex-direction: column;
@@ -252,6 +271,10 @@
   &.fullWidth {
     grid-column: 1 / -1;
     isolation: isolate;
+  }
+
+  &.spvDetails {
+    gap: 12px;
   }
 }
 
