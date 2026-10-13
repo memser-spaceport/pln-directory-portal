@@ -71,8 +71,11 @@ jobs:
           tags: |
             ${{ env.ECR_REGISTRY }}:${{ env.IMAGE_TAG }}
             ${{ env.ECR_REGISTRY }}:dev
-          cache-from: type=gha,scope=directory-service-dev
-          cache-to: type=gha,mode=max,scope=directory-service-dev
+          # Layer cache lives next to the image in ECR: it is not subject to the
+          # 10 GB GitHub Actions cache limit, so `yarn install` / `yarn build`
+          # layers survive between runs.
+          cache-from: type=registry,ref=${{ env.ECR_REGISTRY }}:buildcache-dev
+          cache-to: type=registry,ref=${{ env.ECR_REGISTRY }}:buildcache-dev,mode=max,image-manifest=true,oci-mediatypes=true
 
       - name: Print pushed image metadata
         run: |
