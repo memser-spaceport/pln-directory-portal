@@ -4652,3 +4652,29 @@ model JobMatchRow {
   @@index([kind, roleUid, createdAt])
   @@index([kind, roleUid, roleTextHash])
 }
+
+/// A lead's disabled match criteria for one role posting (LAB-2846).
+/// Keyed by the posting hash, so an edited posting simply stops matching its old override.
+model JobMatchCriteriaOverride {
+  uid          String   @id @default(cuid())
+  roleUid      String
+  roleTextHash String
+  disabled     String[]
+  updatedByUid String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([roleUid, roleTextHash])
+}
+
+/// A lead's intro email to a suggested candidate for one role; at most one per role and member (LAB-2846).
+model JobMatchContact {
+  uid       String   @id @default(cuid())
+  roleUid   String
+  memberUid String
+  senderUid String
+  message   String
+  createdAt DateTime @default(now())
+
+  @@unique([roleUid, memberUid])
+}

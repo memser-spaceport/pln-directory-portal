@@ -3,7 +3,11 @@ import {
   GOOD_FIT,
   STRONG_FIT,
   TOP_N,
+  MATCH_JOB_SELECT,
   companyKey,
+  currentRoleTextHash,
+  enabledCriteria,
+  flaggedCriteria,
   fitsFromAnswers,
   hasSignal,
   isLiveOpening,
@@ -21,6 +25,7 @@ import {
   reusableFits,
   rolePosting,
   roleTextHash,
+  scoreHash,
   selectTop,
   type MatchJob,
   type MatchMember,
@@ -281,5 +286,49 @@ describe('job match logic', () => {
       active -= 1;
     });
     expect(peak).toBe(2);
+  });
+});
+
+describe('criteria overrides (LAB-2846)', () => {
+  const all = ['Rust', '5+ years', 'Remote EU'];
+
+  it('MATCH_JOB_SELECT lists every MatchJob field', () => {
+    expect(Object.keys(MATCH_JOB_SELECT).sort()).toEqual(Object.keys(job).sort());
+  });
+
+  it('currentRoleTextHash is the hash of the posting', () => {
+    expect(currentRoleTextHash(job)).toBe(roleTextHash(rolePosting(job)));
+  });
+
+  it('enabledCriteria drops disabled texts and keeps order', () => {
+    expect(enabledCriteria(all, ['5+ years'])).toEqual(['Rust', 'Remote EU']);
+    expect(enabledCriteria(all, [])).toEqual(all);
+    expect(enabledCriteria(all, ['Kubernetes'])).toEqual(all);
+  });
+
+  it('enabledCriteria falls back to all when every criterion is disabled', () => {
+    expect(enabledCriteria(all, all)).toEqual(all);
+  });
+
+  it('scoreHash is the posting hash for a role with no override', () => {
+    expect(scoreHash('posting-hash', all, all)).toBe('posting-hash');
+    expect(scoreHash('posting-hash', enabledCriteria(all, []), all)).toBe('posting-hash');
+  });
+
+  it('scoreHash changes with the enabled set', () => {
+    const one = scoreHash('posting-hash', ['Rust', '5+ years'], all);
+    const two = scoreHash('posting-hash', ['Rust', 'Remote EU'], all);
+    expect(one).not.toBe('posting-hash');
+    expect(one).not.toBe(two);
+    expect(scoreHash('posting-hash', ['Rust', '5+ years'], all)).toBe(one);
+    expect(scoreHash('other-posting', ['Rust', '5+ years'], all)).not.toBe(one);
+  });
+
+  it('flaggedCriteria marks disabled texts in extraction order', () => {
+    expect(flaggedCriteria(all, ['Remote EU'])).toEqual([
+      { text: 'Rust', enabled: true },
+      { text: '5+ years', enabled: true },
+      { text: 'Remote EU', enabled: false },
+    ]);
   });
 });
