@@ -89,6 +89,41 @@ export class AwsService {
     return await AWS_SES.sendRawEmail(params).promise();
   }
 
+  /**
+   * Sends already-rendered HTML and text through SES (LAB-2846). Same raw-message path and the same
+   * IS_EMAIL_ENABLED guard as `sendEmailWithTemplate`, for callers that render their own markup.
+   * Returns null without sending when email is disabled.
+   */
+  async sendHtmlEmail(args: {
+    from: string;
+    to: string[];
+    subject: string;
+    html: string;
+    text: string;
+    cc?: string[];
+    replyTo?: string;
+  }) {
+    if (!this.isEmailServiceEnabled()) return null;
+    const cc = args.cc ?? [];
+    const mail = new MailComposer({
+      from: args.from,
+      to: args.to,
+      cc,
+      subject: args.subject,
+      html: args.html,
+      text: args.text,
+      replyTo: args.replyTo,
+    });
+    const rawMessage = await new Promise<Buffer>((resolve, reject) => {
+      mail.compile().build((err, message) => (err ? reject(err) : resolve(message)));
+    });
+    const AWS_SES = new AWS.SES(CONFIG);
+    return await AWS_SES.sendRawEmail({
+      Destinations: [...args.to, ...cc],
+      RawMessage: { Data: rawMessage.toString() },
+    }).promise();
+  }
+
   async uploadFileToS3(file, bucketName, fileName: string) {
     if (process.env.ENVIRONMENT === 'development' && (!bucketName || !CONFIG.region)) {
       return {
