@@ -30,4 +30,5 @@ lambda
 data-sync
 email-templates
 .storybook
-apps/back-office-e2e
+# Note: every project listed in workspace.json must stay in the context,
+# `nx build` reads each project.json while building the project graph.
