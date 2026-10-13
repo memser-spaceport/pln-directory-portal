@@ -35,3 +35,35 @@ export const SuggestedCandidateContactBodySchema = z
     path: ['message'],
   });
 export type SuggestedCandidateContactBody = z.infer<typeof SuggestedCandidateContactBodySchema>;
+
+/**
+ * `POST /v1/job-match/unsubscribe` (LAB-2850): the signed token from the suggested-candidates email's
+ * unsubscribe link. Public route; the token is the only credential.
+ */
+export const SuggestedCandidatesUnsubscribeRequestSchema = z.object({
+  token: z.string().min(1).max(2048),
+});
+export type SuggestedCandidatesUnsubscribeRequest = z.infer<typeof SuggestedCandidatesUnsubscribeRequestSchema>;
+
+export const SuggestedCandidatesUnsubscribeResponseSchema = z.object({
+  memberUid: z.string(),
+  suggestedCandidatesEmailEnabled: z.literal(false),
+});
+export type SuggestedCandidatesUnsubscribeResponse = z.infer<typeof SuggestedCandidatesUnsubscribeResponseSchema>;
+
+/**
+ * `POST /v1/service/job-match/suggested-candidates-email` (LAB-2850): send for this run, or for the latest
+ * completed run when `runUid` is absent. A missing body is treated as `{}`.
+ */
+export const SuggestedCandidatesEmailSendRequestSchema = z.object({
+  runUid: z.string().min(1).optional(),
+});
+export type SuggestedCandidatesEmailSendRequest = z.infer<typeof SuggestedCandidatesEmailSendRequestSchema>;
+
+export const SuggestedCandidatesEmailSendResponseSchema = z.object({
+  runUid: z.string(),
+  dryRun: z.boolean(),
+  sent: z.number(),
+  skipped: z.number(),
+});
+export type SuggestedCandidatesEmailSendResponse = z.infer<typeof SuggestedCandidatesEmailSendResponseSchema>;
