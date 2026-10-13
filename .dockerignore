@@ -1,16 +1,33 @@
+# Build artifacts and caches
 node_modules
 dist
 coverage
-.nx/cache
+.nx
 tmp
+*.tsbuildinfo
+*.log
+
+# VCS / editor / OS
 .git
 .github
+.husky
 .idea
 .vscode
 .DS_Store
 __MACOSX
-*.log
+
+# Local configuration
 .env
 .env.*
-README.md
+
+# Not needed to build web-api
 docker-compose*
+Dockerfile
+README.md
+AGENTS.md
+docs
+lambda
+data-sync
+email-templates
+.storybook
+apps/back-office-e2e
