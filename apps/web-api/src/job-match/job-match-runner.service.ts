@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@prisma/client';
 import { generateText } from 'ai';
 import { HIDDEN_JOB_OPENING_STATUSES } from '../job-openings/job-openings-query.service';
@@ -42,6 +43,7 @@ import {
   type MatchJob,
   type MatchMember,
 } from './job-match.logic';
+import { JOB_MATCH_RUN_COMPLETED, type JobMatchRunCompletedPayload } from './job-match.events';
 
 const BLANK = '';
 
@@ -77,7 +79,11 @@ export class JobMatchRunner {
   private heldRunUid: string | null = null;
   private heldRunDate: string | null = null;
 
-  constructor(private readonly prisma: PrismaService, private readonly ai: AiProviderService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ai: AiProviderService,
+    private readonly events: EventEmitter2
+  ) {}
 
   async start(teamUids?: string[], blockerOptions?: JobMatchBlockerOptions): Promise<JobMatchStartResult> {
     const blocker = jobMatchBlocker(blockerOptions);
@@ -189,11 +195,20 @@ export class JobMatchRunner {
       this.logger.log(`job match run ${runUid} finished ${teams.length} requested teams`);
       return;
     }
+    const finishedAt = new Date();
     await this.prisma.jobMatchRun.update({
       where: { uid: runUid },
-      data: { status: 'COMPLETED', lockedUntil: null, finishedAt: new Date(), error: null },
+      data: { status: 'COMPLETED', lockedUntil: null, finishedAt, error: null },
     });
     this.logger.log(`job match run ${runUid} completed`);
+    // Only a full run that just reached COMPLETED starts the suggested-candidates email (LAB-2850). The listener
+    // runs async and swallows its own errors, so the email can neither fail the run nor hold its lock.
+    const completed: JobMatchRunCompletedPayload = {
+      runUid,
+      runDate: this.heldRunDate ?? formatRunDate(utcRunDate()),
+      completedAt: finishedAt.toISOString(),
+    };
+    this.events.emit(JOB_MATCH_RUN_COMPLETED, completed);
   }
 
   async processTeam(runUid: string, team: TeamRow): Promise<void> {

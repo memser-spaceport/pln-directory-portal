@@ -8,11 +8,12 @@ import { JobMatchPublicController } from './job-match-public.controller';
 import { JobMatchRunner } from './job-match-runner.service';
 import { JobMatchServiceController } from './job-match-service.controller';
 import { JobMatchService } from './job-match.service';
+import { SuggestedCandidatesEmailService } from './suggested-candidates-email.service';
 
 @Module({
   imports: [SharedModule, MembersModule, SuggestedCandidatesEmailPreferenceModule],
   controllers: [JobMatchController, JobMatchServiceController, JobMatchPublicController],
-  providers: [JobMatchRunner, JobMatchService, JobMatchJob],
+  providers: [JobMatchRunner, JobMatchService, JobMatchJob, SuggestedCandidatesEmailService],
   exports: [JobMatchService],
 })
 export class JobMatchModule {}
