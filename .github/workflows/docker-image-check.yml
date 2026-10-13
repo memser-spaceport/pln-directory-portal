@@ -47,6 +47,10 @@ jobs:
         run: |
           docker image inspect directory-service:pr --format 'Size: {{.Size}} bytes'
           docker image ls directory-service:pr
+          echo "::group::Largest packages in node_modules"
+          docker run --rm directory-service:pr sh -c \
+            'du -sm node_modules/* node_modules/@*/* node_modules/.prisma 2>/dev/null | sort -rn | head -60; echo; du -sm node_modules dist'
+          echo "::endgroup::"
 
       - name: Smoke test runtime image
         run: |
