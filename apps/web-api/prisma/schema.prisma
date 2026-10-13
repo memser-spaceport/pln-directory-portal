@@ -1092,6 +1092,8 @@ model NotificationSetting {
   industryTagList        String[]  @default([])
   technologyList         String[]  @default([])
   keywordList            String[]  @default([])
+  /// Weekly suggested-candidates email to team leads; on unless turned off (LAB-2850).
+  suggestedCandidatesEmailEnabled Boolean @default(true)
 }
 
 model LinkedInProfile {
@@ -4601,6 +4603,7 @@ model JobMatchRun {
   startedAt   DateTime          @default(now())
   finishedAt  DateTime?
   rows        JobMatchRow[]
+  emailSends  JobMatchEmailSend[]
 }
 
 enum JobMatchRunStatus {
@@ -4677,4 +4680,19 @@ model JobMatchContact {
   createdAt DateTime @default(now())
 
   @@unique([roleUid, memberUid])
+}
+
+/// One suggested-candidates email per run, role and recipient (LAB-2850).
+model JobMatchEmailSend {
+  uid            String      @id @default(cuid())
+  runUid         String
+  run            JobMatchRun @relation(fields: [runUid], references: [uid], onDelete: Cascade)
+  roleUid        String
+  teamUid        String
+  recipientUid   String
+  candidateCount Int
+  sentAt         DateTime    @default(now())
+
+  @@unique([runUid, roleUid, recipientUid])
+  @@index([recipientUid])
 }

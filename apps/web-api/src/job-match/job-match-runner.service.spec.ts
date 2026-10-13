@@ -82,7 +82,7 @@ describe('JobMatchRunner', () => {
   it('skips a team already finished for this run', async () => {
     const prisma = prismaMock();
     prisma.jobMatchRow.findUnique.mockResolvedValue({ uid: 'team-row' });
-    const runner = new JobMatchRunner(prisma as never, {} as never);
+    const runner = new JobMatchRunner(prisma as never, {} as never, { emit: jest.fn() } as never);
     await runner.processTeam('run-1', { uid: 'team-1', name: 'Prime Intellect' });
     expect(prisma.$queryRaw).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
@@ -100,7 +100,7 @@ describe('JobMatchRunner', () => {
       if (args.where.kind === 'ROLE') return [{ roleUid: 'role-1' }];
       return [];
     });
-    const runner = new JobMatchRunner(prisma as never, {} as never);
+    const runner = new JobMatchRunner(prisma as never, {} as never, { emit: jest.fn() } as never);
     await runner.processTeam('run-1', { uid: 'team-1', name: 'Prime Intellect' });
     expect(prisma.findMany).toHaveBeenCalledTimes(1);
     expect(fetchMock).not.toHaveBeenCalled();
@@ -152,7 +152,11 @@ describe('JobMatchRunner', () => {
       text: JSON.stringify([{ memberUid: 'member-1', blurb: 'Knows Go.', matched: [true, true, true, false] }]),
     });
 
-    const runner = new JobMatchRunner(prisma as never, { getResponsesModel: () => 'model' } as never);
+    const runner = new JobMatchRunner(
+      prisma as never,
+      { getResponsesModel: () => 'model' } as never,
+      { emit: jest.fn() } as never
+    );
     await runner.processTeam('run-1', { uid: 'team-1', name: '  Prime   Intellect ' });
 
     expect(fetchMock).not.toHaveBeenCalled();
@@ -203,7 +207,11 @@ describe('JobMatchRunner', () => {
       ),
     });
 
-    const runner = new JobMatchRunner(prisma as never, { getResponsesModel: () => 'model' } as never);
+    const runner = new JobMatchRunner(
+      prisma as never,
+      { getResponsesModel: () => 'model' } as never,
+      { emit: jest.fn() } as never
+    );
     await runner.processTeam('run-1', { uid: 'team-1', name: 'Prime Intellect' });
 
     expect(prisma.jobOpeningInterest.findMany).toHaveBeenCalledWith(
@@ -252,7 +260,11 @@ describe('JobMatchRunner', () => {
       ),
     });
 
-    const runner = new JobMatchRunner(prisma as never, { getResponsesModel: () => 'model' } as never);
+    const runner = new JobMatchRunner(
+      prisma as never,
+      { getResponsesModel: () => 'model' } as never,
+      { emit: jest.fn() } as never
+    );
     await runner.processTeam('run-1', { uid: 'team-1', name: 'Prime Intellect' });
 
     const rows: { memberUid: string; interested: boolean; interestNote: string | null }[] =
@@ -287,7 +299,11 @@ describe('JobMatchRunner', () => {
       text: JSON.stringify([{ memberUid: 'member-1', blurb: 'Fits.', matched: [true, true, true, true] }]),
     });
 
-    const runner = new JobMatchRunner(prisma as never, { getResponsesModel: () => 'model' } as never);
+    const runner = new JobMatchRunner(
+      prisma as never,
+      { getResponsesModel: () => 'model' } as never,
+      { emit: jest.fn() } as never
+    );
     await runner.processTeam('run-1', { uid: 'team-1', name: 'Prime Intellect' });
 
     expect(prisma.suggestionCreateMany.mock.calls[0][0].data).toEqual([
@@ -310,7 +326,7 @@ describe('JobMatchRunner', () => {
       json: async () => ({ answers: { 'role-1': { probability: 0.2 } } }),
     });
 
-    const runner = new JobMatchRunner(prisma as never, {} as never);
+    const runner = new JobMatchRunner(prisma as never, {} as never, { emit: jest.fn() } as never);
     await runner.processTeam('run-1', { uid: 'team-1', name: 'Prime Intellect' });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -377,7 +393,11 @@ describe('JobMatchRunner', () => {
           text: JSON.stringify([{ memberUid: 'member-1', blurb: 'Fits.', matched: Array(count).fill(true) }]),
         };
       });
-      const runner = new JobMatchRunner(prisma as never, { getResponsesModel: () => 'model' } as never);
+      const runner = new JobMatchRunner(
+        prisma as never,
+        { getResponsesModel: () => 'model' } as never,
+        { emit: jest.fn() } as never
+      );
       return { prisma, runner };
     }
 
@@ -461,6 +481,69 @@ describe('JobMatchRunner', () => {
       expect(prompt).not.toContain('Remote EU');
       const rows = prisma.suggestionCreateMany.mock.calls[0][0].data;
       expect(rows[0].payload).toEqual(enabled.map((text) => ({ text, matched: true })));
+    });
+  });
+
+  describe('run-completed event (LAB-2850)', () => {
+    function runnerFor(failingTeam = false) {
+      const prisma = prismaMock();
+      const jobMatchRun = {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({ uid: 'run-1' }),
+        update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      };
+      const events = { emit: jest.fn() };
+      const runner = new JobMatchRunner({ ...prisma, jobMatchRun } as never, {} as never, events as never);
+      const internals = runner as unknown as {
+        loadTeams: () => Promise<{ uid: string; name: string }[]>;
+        refreshLock: () => Promise<void>;
+        inflight: Promise<void> | null;
+      };
+      jest.spyOn(internals, 'loadTeams').mockResolvedValue([{ uid: 'team-1', name: 'Prime Intellect' }]);
+      jest.spyOn(internals, 'refreshLock').mockResolvedValue(undefined);
+      jest
+        .spyOn(runner, 'processTeam')
+        .mockImplementation(async () => (failingTeam ? Promise.reject(new Error('boom')) : undefined));
+      return { runner, events, jobMatchRun, settle: () => internals.inflight };
+    }
+
+    beforeEach(() => {
+      process.env.ANTHROPIC_AUTH_MODE = 'wif';
+      process.env.IS_JOB_MATCH_ENABLED = 'true';
+    });
+
+    it('emits once after a full run is marked COMPLETED', async () => {
+      const { runner, events, jobMatchRun, settle } = runnerFor();
+      await runner.start();
+      await settle();
+      expect(events.emit).toHaveBeenCalledTimes(1);
+      expect(events.emit).toHaveBeenCalledWith(
+        'job-match.run-completed',
+        expect.objectContaining({ runUid: 'run-1', runDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) })
+      );
+      const completedOrder = jobMatchRun.update.mock.invocationCallOrder.at(-1) ?? 0;
+      expect(jobMatchRun.update).toHaveBeenLastCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: 'COMPLETED' }) })
+      );
+      expect(events.emit.mock.invocationCallOrder[0]).toBeGreaterThan(completedOrder);
+    });
+
+    it('does not emit for a team-limited run', async () => {
+      const { runner, events, settle } = runnerFor();
+      await runner.start(['team-1']);
+      await settle();
+      expect(events.emit).not.toHaveBeenCalled();
+    });
+
+    it('does not emit for a failed run', async () => {
+      const { runner, events, jobMatchRun, settle } = runnerFor(true);
+      await runner.start();
+      await settle();
+      expect(jobMatchRun.update).toHaveBeenLastCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: 'FAILED' }) })
+      );
+      expect(events.emit).not.toHaveBeenCalled();
     });
   });
 });

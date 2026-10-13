@@ -489,6 +489,37 @@ export function asMarkedCriteria(value: unknown): MarkedCriterion[] {
   });
 }
 
+/**
+ * The candidates a suggested-candidates email names (LAB-2850, design D2). `listed` is what the Suggested tab
+ * lists for the role from this run, in rank order. A member is new when the role's previous run did not
+ * suggest them at all (`previous` holds that run's raw SUGGESTION member uids; `null` means no previous run)
+ * and their job-search status is not "Not looking". `total` counts every listed candidate, "Not looking"
+ * included, because it is the number the tab shows.
+ */
+export function newSuggestions<T extends { memberUid: string }>(
+  listed: readonly T[],
+  previous: ReadonlySet<string> | null,
+  notLooking: ReadonlySet<string>
+): { fresh: T[]; total: number } {
+  const fresh = listed.filter((item) => !previous?.has(item.memberUid) && !notLooking.has(item.memberUid));
+  return { fresh, total: listed.length };
+}
+
+/** `JOB_MATCH_EMAIL_TEAM_UIDS`: comma-separated team uids, trimmed, empties dropped. Unset or empty is nobody. */
+export function parseEmailTeamAllowlist(value: string | undefined): Set<string> {
+  return new Set(
+    (value ?? '')
+      .split(',')
+      .map((uid) => uid.trim())
+      .filter(Boolean)
+  );
+}
+
+/** `JOB_MATCH_EMAIL_DRY_RUN`: on only for the exact string `true`. */
+export function isEmailDryRun(value: string | undefined): boolean {
+  return value === 'true';
+}
+
 export function labelText(label: MatchLabel): 'Strong match' | 'Good match' {
   return label === 'STRONG' ? 'Strong match' : 'Good match';
 }

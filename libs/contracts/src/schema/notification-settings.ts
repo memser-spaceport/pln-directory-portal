@@ -18,6 +18,8 @@ export const NotificationSettingsResponseSchema = z.object({
   roleList: z.array(z.string()),
   fundingStageList: z.array(z.string()),
   industryTagList: z.array(z.string()),
+  /** Weekly suggested-candidates email to team leads (LAB-2850). Optional so older rows/clients still parse. */
+  suggestedCandidatesEmailEnabled: z.boolean().optional(),
 });
 
 export const UpdateNotificationSettingsSchema = z.object({
@@ -80,6 +82,25 @@ export const DemoDaySubscriptionSettingsResponseSchema = z.object({
 });
 
 export class DemoDaySubscriptionSettingsResponseDto extends createZodDto(DemoDaySubscriptionSettingsResponseSchema) {}
+
+/** `PUT /v1/notification/settings/:memberUid/suggested-candidates-email` (LAB-2850). */
+export const UpdateSuggestedCandidatesEmailSettingsSchema = z.object({
+  suggestedCandidatesEmailEnabled: z.boolean(),
+});
+
+export class UpdateSuggestedCandidatesEmailSettingsDto extends createZodDto(
+  UpdateSuggestedCandidatesEmailSettingsSchema
+) {}
+
+/** `GET`/`PUT /v1/notification/settings/:memberUid/suggested-candidates-email` and the unsubscribe route (LAB-2850). */
+export const SuggestedCandidatesEmailSettingsResponseSchema = z.object({
+  memberUid: z.string(),
+  suggestedCandidatesEmailEnabled: z.boolean(),
+});
+
+export class SuggestedCandidatesEmailSettingsResponseDto extends createZodDto(
+  SuggestedCandidatesEmailSettingsResponseSchema
+) {}
 
 export class NotificationSettingsResponse extends createZodDto(NotificationSettingsResponseSchema) {}
 export class UpdateNotificationSettingsDto extends createZodDto(UpdateNotificationSettingsSchema) {}

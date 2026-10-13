@@ -435,7 +435,7 @@ describe('JobMatchService', () => {
           Array.from(strings).join(' ').includes('"JobOpening"') ? [{ uid: 'role-1', ...posting }] : []
         ),
       };
-      const runner = new JobMatchRunner(runnerPrisma as never, {} as never);
+      const runner = new JobMatchRunner(runnerPrisma as never, {} as never, { emit: jest.fn() } as never);
       await runner.processTeam('run-1', { uid: 'team-1', name: 'Team' });
       const runnerHashes = runnerPrisma.jobMatchCriteriaOverride.findMany.mock.calls[0][0].where.OR;
       expect(runnerHashes).toEqual([{ roleUid: 'role-1', roleTextHash: serviceHash }]);

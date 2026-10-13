@@ -10,14 +10,17 @@ import {
   flaggedCriteria,
   fitsFromAnswers,
   hasSignal,
+  isEmailDryRun,
   isLiveOpening,
   jevQuestions,
   jobMatchBlocker,
   labelFor,
   mapPool,
+  newSuggestions,
   normalizeTeamUids,
   parseCandidateNotes,
   parseCriteria,
+  parseEmailTeamAllowlist,
   pickInterestNote,
   planTeamWork,
   profileText,
@@ -330,5 +333,60 @@ describe('criteria overrides (LAB-2846)', () => {
       { text: '5+ years', enabled: true },
       { text: 'Remote EU', enabled: false },
     ]);
+  });
+});
+
+describe('newSuggestions (LAB-2850)', () => {
+  const listed = ['a', 'b', 'c', 'd'].map((memberUid, index) => ({ memberUid, rank: index + 1 }));
+  const none = new Set<string>();
+
+  it('drops members the previous run suggested', () => {
+    const { fresh, total } = newSuggestions(listed, new Set(['a', 'c', 'z']), none);
+    expect(fresh.map((item) => item.memberUid)).toEqual(['b', 'd']);
+    expect(total).toBe(4);
+  });
+
+  it('treats every listed member as new on the first run', () => {
+    expect(newSuggestions(listed, null, none).fresh.map((item) => item.memberUid)).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  it('never names a "Not looking" member but still counts them in the total', () => {
+    const { fresh, total } = newSuggestions(listed, null, new Set(['b']));
+    expect(fresh.map((item) => item.memberUid)).toEqual(['a', 'c', 'd']);
+    expect(total).toBe(4);
+  });
+
+  it('is empty when every listed member was suggested before', () => {
+    const { fresh, total } = newSuggestions(listed, new Set(['a', 'b', 'c', 'd']), none);
+    expect(fresh).toEqual([]);
+    expect(total).toBe(4);
+  });
+
+  it('keeps rank order', () => {
+    const shuffledPrevious = new Set(['b']);
+    expect(newSuggestions(listed, shuffledPrevious, none).fresh.map((item) => item.rank)).toEqual([1, 3, 4]);
+  });
+});
+
+describe('parseEmailTeamAllowlist (LAB-2850)', () => {
+  it('is empty when unset or blank', () => {
+    expect(parseEmailTeamAllowlist(undefined).size).toBe(0);
+    expect(parseEmailTeamAllowlist('').size).toBe(0);
+    expect(parseEmailTeamAllowlist(' , ,').size).toBe(0);
+  });
+
+  it('trims and dedupes', () => {
+    expect([...parseEmailTeamAllowlist(' team-1 ,team-2,, team-1 ')]).toEqual(['team-1', 'team-2']);
+  });
+});
+
+describe('isEmailDryRun (LAB-2850)', () => {
+  it('is on only for the exact string true', () => {
+    expect(isEmailDryRun('true')).toBe(true);
+    expect(isEmailDryRun(undefined)).toBe(false);
+    expect(isEmailDryRun('')).toBe(false);
+    expect(isEmailDryRun('TRUE')).toBe(false);
+    expect(isEmailDryRun('1')).toBe(false);
+    expect(isEmailDryRun('false')).toBe(false);
   });
 });
