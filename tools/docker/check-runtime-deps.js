@@ -26,17 +26,33 @@ for (const match of source.matchAll(/\brequire\(\s*["']((?!\.{0,2}\/)[^"']+)["']
 const builtin = new Set(require('module').builtinModules);
 const resolveFrom = path.resolve(process.cwd());
 const missing = [];
-let checked = 0;
+const resolved = [];
 
 for (const specifier of [...specifiers].sort()) {
   const name = specifier.replace(/^node:/, '');
   if (builtin.has(name) || builtin.has(name.split('/')[0])) continue;
-  checked += 1;
   try {
-    require.resolve(specifier, { paths: [resolveFrom] });
+    const entry = require.resolve(specifier, { paths: [resolveFrom] });
+    resolved.push(`${specifier}@${packageVersion(entry)}`);
   } catch (error) {
     missing.push(`${specifier} (${error.code || error.message})`);
   }
+}
+
+function packageVersion(entry) {
+  let dir = path.dirname(entry);
+  while (dir !== path.dirname(dir)) {
+    const pkg = path.join(dir, 'package.json');
+    if (fs.existsSync(pkg)) {
+      try {
+        return JSON.parse(fs.readFileSync(pkg, 'utf8')).version || '?';
+      } catch {
+        return '?';
+      }
+    }
+    dir = path.dirname(dir);
+  }
+  return '?';
 }
 
 if (missing.length) {
@@ -45,5 +61,5 @@ if (missing.length) {
   process.exit(1);
 }
 
-console.log(`OK: ${checked} external packages required by ${bundle} resolve from ${resolveFrom}:`);
-console.log([...specifiers].sort().join(' '));
+console.log(`OK: ${resolved.length} external packages required by ${bundle} resolve from ${resolveFrom}:`);
+console.log(resolved.join(' '));
