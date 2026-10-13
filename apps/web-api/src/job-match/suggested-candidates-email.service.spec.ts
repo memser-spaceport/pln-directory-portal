@@ -294,8 +294,10 @@ describe('SuggestedCandidatesEmailService', () => {
     const role1 = emailFor(aws, 'Backend');
     // A was suggested last run, C is "Not looking", E is deleted, D is below the threshold: only B is new.
     expect(role1.text).toContain('Bob');
-    for (const name of ['Ada', 'Cy', 'Ed', 'Di']) expect(role1.text).not.toContain(name);
-    expect(role1.text).toContain('lists 3 in total');
+    // Each candidate opens a line "<name> · <band>"; a bare substring check would trip on "Edit criteria".
+    expect(role1.text).toMatch(/^Bob · /m);
+    for (const name of ['Ada', 'Cy', 'Ed', 'Di']) expect(role1.text).not.toMatch(new RegExp(`^${name} · `, 'm'));
+    expect(role1.text).toContain('All 3 matches for this role');
     expect(role1.text).not.toMatch(/NOT_LOOKING|ACTIVELY_LOOKING|looking/i);
 
     const role5 = emailFor(aws, 'Rust');

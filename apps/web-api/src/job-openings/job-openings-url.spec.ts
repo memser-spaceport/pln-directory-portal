@@ -1,4 +1,9 @@
-import { jobBoardDetailUrl, memberProfileEmailUrl } from './job-openings-url';
+import {
+  jobBoardDetailUrl,
+  memberProfileEmailUrl,
+  teamSuggestedCandidateEmailUrl,
+  withEmailUtm,
+} from './job-openings-url';
 
 describe('jobBoardDetailUrl', () => {
   const originalWeb = process.env.WEB_UI_BASE_URL;
@@ -45,6 +50,41 @@ describe('memberProfileEmailUrl', () => {
       memberProfileEmailUrl('member-1', { source: 'job_referral_email', content: 'referred', jobUid: 'job-1' })
     ).toBe(
       'https://directory.test/members/member-1?utm_source=job_referral_email&utm_medium=email&utm_content=referred&job_uid=job-1'
+    );
+  });
+});
+
+describe('teamSuggestedCandidateEmailUrl', () => {
+  const originalWeb = process.env.WEB_UI_BASE_URL;
+  const utm = { source: 'job_suggested_candidates_email', content: 'profile', jobUid: 'role 1' };
+
+  afterEach(() => {
+    process.env.WEB_UI_BASE_URL = originalWeb;
+  });
+
+  it('opens the role on the Candidates page, on one suggested member when given', () => {
+    process.env.WEB_UI_BASE_URL = 'https://directory.test/';
+
+    expect(teamSuggestedCandidateEmailUrl('team/1', utm, 'member&1')).toBe(
+      'https://directory.test/teams/team%2F1/applicants?role=role+1&suggested=member%261' +
+        '&utm_source=job_suggested_candidates_email&utm_medium=email&utm_content=profile&job_uid=role+1'
+    );
+    expect(teamSuggestedCandidateEmailUrl('team-1', { ...utm, content: 'all' })).toBe(
+      'https://directory.test/teams/team-1/applicants?role=role+1' +
+        '&utm_source=job_suggested_candidates_email&utm_medium=email&utm_content=all&job_uid=role+1'
+    );
+  });
+});
+
+describe('withEmailUtm', () => {
+  const utm = { source: 's', content: 'c', jobUid: 'j' };
+
+  it('appends the tags with ? or & depending on the URL', () => {
+    expect(withEmailUtm('https://x.test/a', utm)).toBe(
+      'https://x.test/a?utm_source=s&utm_medium=email&utm_content=c&job_uid=j'
+    );
+    expect(withEmailUtm('https://x.test/a?b=1', utm)).toBe(
+      'https://x.test/a?b=1&utm_source=s&utm_medium=email&utm_content=c&job_uid=j'
     );
   });
 });

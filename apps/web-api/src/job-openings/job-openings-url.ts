@@ -12,6 +12,8 @@ export function jobBoardDetailUrl(jobUid: string): string {
 export const JOB_REFERRAL_EMAIL_UTM_SOURCE = 'job_referral_email';
 export const JOB_REFERRAL_NOTICE_EMAIL_UTM_SOURCE = 'job_referral_notice_email';
 export const JOB_APPLICATION_EMAIL_UTM_SOURCE = 'job_application_email';
+export const JOB_SUGGESTED_CANDIDATES_EMAIL_UTM_SOURCE = 'job_suggested_candidates_email';
+export const JOB_SUGGESTED_CANDIDATE_INTRO_EMAIL_UTM_SOURCE = 'job_suggested_candidate_intro_email';
 
 /**
  * A Directory profile link as it appears in a refer/apply email, tagged so the
@@ -38,14 +40,30 @@ export function teamCandidateEmailUrl(teamUid: string, memberUid: string, utm: E
 }
 
 /**
+ * A role's Candidates page as a team lead opens it from the suggested-candidates email: the Suggested tab,
+ * selected on one suggested member when `memberUid` is given, else the whole list.
+ */
+export function teamSuggestedCandidateEmailUrl(teamUid: string, utm: EmailUtm, memberUid?: string): string {
+  const params: Record<string, string> = { role: utm.jobUid };
+  if (memberUid) params.suggested = memberUid;
+  const query = new URLSearchParams(params).toString();
+  return `${webUiBase()}/teams/${encodeURIComponent(teamUid)}/applicants?${query}&${emailUtmQuery(utm)}`;
+}
+
+/**
  * An outside-the-network referred person's LinkedIn URL as it appears in a
  * refer email, tagged the same way as a Directory profile link.
  */
 export function externalProfileEmailUrl(url: string, utm: EmailUtm): string {
+  return withEmailUtm(url, utm);
+}
+
+/** Any absolute URL with the email UTM tags appended, keeping its own query. */
+export function withEmailUtm(url: string, utm: EmailUtm): string {
   return `${url}${url.includes('?') ? '&' : '?'}${emailUtmQuery(utm)}`;
 }
 
-type EmailUtm = { source: string; content: string; jobUid: string };
+export type EmailUtm = { source: string; content: string; jobUid: string };
 
 function emailUtmQuery(utm: EmailUtm): string {
   return new URLSearchParams({
