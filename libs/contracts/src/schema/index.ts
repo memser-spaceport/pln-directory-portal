@@ -52,3 +52,4 @@ export * from './roadmap';
 export * from './follow';
 export * from './feed';
 export * from './pl-infra-members';
+export * from './job-match';
