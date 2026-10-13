@@ -16,8 +16,8 @@ import { PrismaService } from '../shared/prisma.service';
 import { AwsService } from '../utils/aws/aws.service';
 import { maskEmail } from '../utils/mask-email';
 import { renderCandidateIntroEmail, type RenderedEmail } from './emails/candidate-intro-email';
+import { listRunSuggestions } from './job-match-suggestions';
 import {
-  GOOD_FIT,
   MATCH_JOB_SELECT,
   asMarkedCriteria,
   asStringList,
@@ -302,23 +302,7 @@ export class JobMatchService {
       select: { runUid: true },
     });
     if (!latest) return [];
-
-    const rows = await this.prisma.jobMatchRow.findMany({
-      where: { kind: 'SUGGESTION', runUid: latest.runUid, roleUid },
-      orderBy: { rank: 'asc' },
-      take: 5,
-    });
-    const members = await this.prisma.member.findMany({
-      where: { uid: { in: rows.map((row) => row.memberUid) }, deletedAt: null },
-      select: { uid: true, name: true, role: true, image: { select: { url: true } } },
-    });
-    const byUid = new Map(members.map((item) => [item.uid, item]));
-
-    return rows.flatMap((row) => {
-      const person = byUid.get(row.memberUid);
-      if (!person || row.fit == null || row.rank == null || row.fit < GOOD_FIT || !row.label) return [];
-      return [{ row, person, fit: row.fit, rank: row.rank, label: row.label }];
-    });
+    return listRunSuggestions(this.prisma, latest.runUid, roleUid);
   }
 
   /** A team lead whose role on the team has not ended (LAB-2846; the same rule LAB-2850 lists leads by). */
