@@ -24,7 +24,7 @@ model Team {
   id                           Int                           @id @default(autoincrement())
   uid                          String                        @unique @default(cuid())
   name                         String                        @unique
-  logo                         Image?                        @relation(fields: [logoUid], references: [uid])
+  logo                         Image?                        @relation("TeamLogo", fields: [logoUid], references: [uid])
   logoUid                      String?
   blog                         String?
   officeHours                  String?
@@ -41,6 +41,9 @@ model Team {
   portfolioIsland              String?
   portfolioStartYear           Int?
   portfolioEndYear             Int?
+  /// White logo drawn on the Networks Map hex tiles; separate from the colour `logo`.
+  portfolioMapLogo             Image?                        @relation("TeamPortfolioMapLogo", fields: [portfolioMapLogoUid], references: [uid], onDelete: SetNull)
+  portfolioMapLogoUid          String?
   teamSize                     String?
   location                     String?
   status                       TeamStatus                    @default(ACTIVE)
@@ -566,7 +569,8 @@ model Image {
   createdAt               DateTime                     @default(now())
   updatedAt               DateTime                     @updatedAt
   // Reverse Relations:
-  Team                    Team[]
+  Team                    Team[]                       @relation("TeamLogo")
+  teamPortfolioMapLogos   Team[]                       @relation("TeamPortfolioMapLogo")
   Member                  Member[]
   Project                 Project[]
   eventLogo               PLEvent[]                    @relation("logo")
