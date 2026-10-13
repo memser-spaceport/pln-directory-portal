@@ -14,6 +14,8 @@ import {
   blurbPrompt,
   companyKey,
   criteriaPrompt,
+  currentRoleTextHash,
+  enabledCriteria,
   fitsFromAnswers,
   formatRunDate,
   hasSignal,
@@ -31,6 +33,7 @@ import {
   reusableFits,
   rolePosting,
   roleTextHash,
+  scoreHash,
   scorePayload,
   selectTop,
   utcRunDate,
@@ -215,7 +218,23 @@ export class JobMatchRunner {
     }
 
     const members = (await this.loadMembers(team.uid, team.name)).filter(hasSignal);
-    const roleHashes = new Map(jobs.map((job) => [job.uid, roleTextHash(rolePosting(job))]));
+    // A lead's disabled criteria (LAB-2846) change the hash stored with each fit for that role, so fits scored
+    // with another criteria set are not reused. A role without an override keeps its posting hash.
+    const postingHashes = new Map(jobs.map((job) => [job.uid, currentRoleTextHash(job)]));
+    const disabledByUid = await this.loadDisabledCriteria(postingHashes);
+    const criteriaByUid = new Map<string, string[]>();
+    for (const job of jobs) {
+      if (disabledByUid.has(job.uid)) criteriaByUid.set(job.uid, await this.criteriaFor(runUid, job));
+    }
+    const roleHashes = new Map<string, string>(
+      jobs.map((job): [string, string] => {
+        const postingHash = postingHashes.get(job.uid) ?? currentRoleTextHash(job);
+        const all = criteriaByUid.get(job.uid);
+        const disabled = disabledByUid.get(job.uid);
+        if (!all || !disabled) return [job.uid, postingHash];
+        return [job.uid, scoreHash(postingHash, enabledCriteria(all, disabled), all)];
+      })
+    );
     const storedScores = await this.prisma.jobMatchRow.findMany({
       where: { teamUid: team.uid, kind: 'SCORE' },
       select: { memberUid: true, payload: true },
@@ -246,9 +265,11 @@ export class JobMatchRunner {
 
     const toScore = new Set(plan.membersToScore);
     const jobsForCriteria = toScore.size ? jobs : jobs.filter((job) => plan.rolesToFinish.includes(job.uid));
-    const criteriaByUid = new Map<string, string[]>();
+    const enabledByUid = new Map<string, string[]>();
     for (const job of jobsForCriteria) {
-      criteriaByUid.set(job.uid, await this.criteriaFor(runUid, job));
+      const all = criteriaByUid.get(job.uid) ?? (await this.criteriaFor(runUid, job));
+      criteriaByUid.set(job.uid, all);
+      enabledByUid.set(job.uid, enabledCriteria(all, disabledByUid.get(job.uid) ?? []));
     }
 
     const pending = members.filter((member) => toScore.has(member.uid));
@@ -259,7 +280,7 @@ export class JobMatchRunner {
         const text = profileText(member);
         const have = scoresByMember.get(member.uid) ?? {};
         const missing = jobs.filter((job) => !Object.prototype.hasOwnProperty.call(have, job.uid));
-        const answers = await withRetry(member.uid, () => this.jev(text, jevQuestions(missing, criteriaByUid)));
+        const answers = await withRetry(member.uid, () => this.jev(text, jevQuestions(missing, enabledByUid)));
         const scores = {
           ...have,
           ...fitsFromAnswers(
@@ -295,7 +316,7 @@ export class JobMatchRunner {
         runUid,
         team.uid,
         job,
-        criteriaByUid.get(job.uid) ?? [],
+        enabledByUid.get(job.uid) ?? [],
         members,
         scoresByMember,
         interestByRole.get(job.uid) ?? new Map()
@@ -310,6 +331,7 @@ export class JobMatchRunner {
     const cached = await this.prisma.jobMatchRow.findFirst({
       where: { kind: 'CRITERIA', roleUid: job.uid, roleTextHash: hash },
       select: { payload: true },
+      orderBy: { createdAt: 'desc' },
     });
     const cachedCriteria = asStringList(cached?.payload);
     if (cachedCriteria.length >= 4) return cachedCriteria.slice(0, 6);
@@ -324,6 +346,24 @@ export class JobMatchRunner {
       if (!isUniqueConflict(error)) throw error;
     }
     return criteria;
+  }
+
+  /** Disabled criteria per role, from overrides saved against each role's current posting hash (LAB-2846). */
+  private async loadDisabledCriteria(postingHashes: ReadonlyMap<string, string>): Promise<Map<string, string[]>> {
+    const disabledByUid = new Map<string, string[]>();
+    if (!postingHashes.size) return disabledByUid;
+    const overrides = await this.prisma.jobMatchCriteriaOverride.findMany({
+      where: {
+        OR: [...postingHashes].map(([roleUid, roleTextHash]) => ({ roleUid, roleTextHash })),
+      },
+      select: { roleUid: true, roleTextHash: true, disabled: true },
+    });
+    for (const row of overrides) {
+      if (row.disabled.length && postingHashes.get(row.roleUid) === row.roleTextHash) {
+        disabledByUid.set(row.roleUid, row.disabled);
+      }
+    }
+    return disabledByUid;
   }
 
   private async finishRole(

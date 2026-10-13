@@ -2,7 +2,7 @@ jest.mock('ai', () => ({ generateText: jest.fn() }));
 
 import { generateText } from 'ai';
 import { JobMatchRunner } from './job-match-runner.service';
-import { profileText, profileTextHash, rolePosting, roleTextHash } from './job-match.logic';
+import { profileText, profileTextHash, rolePosting, roleTextHash, scoreHash } from './job-match.logic';
 
 const generateTextMock = generateText as jest.Mock;
 
@@ -22,6 +22,7 @@ function prismaMock() {
       createMany: suggestionCreateMany,
     },
     jobMatchRun: { update: jest.fn() },
+    jobMatchCriteriaOverride: { findMany: jest.fn().mockResolvedValue([]) },
     jobOpeningInterest: { findMany: jest.fn().mockResolvedValue([]) },
     teamInterest: { findMany: jest.fn().mockResolvedValue([]) },
     $queryRaw: jest.fn(),
@@ -329,5 +330,137 @@ describe('JobMatchRunner', () => {
     expect(generateTextMock).not.toHaveBeenCalled();
     expect(prisma.suggestionCreateMany).not.toHaveBeenCalled();
     expect(prisma.jobMatchRow.create).toHaveBeenCalled();
+  });
+  describe('criteria overrides (LAB-2846)', () => {
+    const overrideCriteria = ['Go', 'Senior', 'Remote EU', 'Postgres'];
+    const enabled = ['Go', 'Senior', 'Postgres'];
+    const postingHash = roleTextHash(rolePosting(jobRow));
+    const memberProfileHash = profileTextHash(
+      profileText({ ...memberRow, customSkills: [], skills: ['Go'], experiences: [], teams: [] })
+    );
+
+    function setup(options: { overrideHash?: string; storedRoleHash?: string; probability?: number }) {
+      const prisma = prismaMock();
+      prisma.jobMatchRow.findUnique.mockResolvedValue(null);
+      prisma.$queryRaw.mockImplementation(async (strings: TemplateStringsArray) => {
+        const sql = Array.from(strings).join(' ');
+        if (sql.includes('"JobOpening"')) return [jobRow];
+        return [memberRow];
+      });
+      prisma.findMany.mockImplementation(async (args: { where: { kind: string } }) => {
+        if (args.where.kind === 'SCORE' && options.storedRoleHash) {
+          return [
+            {
+              memberUid: 'member-1',
+              payload: {
+                profileHash: memberProfileHash,
+                fits: { 'role-1': { fit: 90, roleTextHash: options.storedRoleHash } },
+              },
+            },
+          ];
+        }
+        return [];
+      });
+      if (options.overrideHash) {
+        prisma.jobMatchCriteriaOverride.findMany.mockResolvedValue([
+          { roleUid: 'role-1', roleTextHash: options.overrideHash, disabled: ['Remote EU'] },
+        ]);
+      }
+      prisma.jobMatchRow.findFirst.mockResolvedValue({ payload: overrideCriteria });
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: async () => ({ answers: { 'role-1': { probability: options.probability ?? 0.9 } } }),
+      });
+      generateTextMock.mockImplementation(async ({ prompt }: { prompt: string }) => {
+        const count = prompt.includes('Remote EU') ? 4 : 3;
+        return {
+          text: JSON.stringify([{ memberUid: 'member-1', blurb: 'Fits.', matched: Array(count).fill(true) }]),
+        };
+      });
+      const runner = new JobMatchRunner(prisma as never, { getResponsesModel: () => 'model' } as never);
+      return { prisma, runner };
+    }
+
+    it('reads the newest CRITERIA row for the posting', async () => {
+      const { prisma, runner } = setup({});
+      await runner.processTeam('run-1', { uid: 'team-1', name: 'Prime Intellect' });
+      expect(prisma.jobMatchRow.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { kind: 'CRITERIA', roleUid: 'role-1', roleTextHash: postingHash },
+          orderBy: { createdAt: 'desc' },
+        })
+      );
+    });
+
+    it('loads overrides at the current posting hash', async () => {
+      const { prisma, runner } = setup({});
+      await runner.processTeam('run-1', { uid: 'team-1', name: 'Prime Intellect' });
+      expect(prisma.jobMatchCriteriaOverride.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { OR: [{ roleUid: 'role-1', roleTextHash: postingHash }] } })
+      );
+    });
+
+    it('leaves a disabled criterion out of the Jev question', async () => {
+      const { runner } = setup({ overrideHash: postingHash });
+      await runner.processTeam('run-1', { uid: 'team-1', name: 'Prime Intellect' });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+      const instructions: string = body.questions['role-1'].instructions;
+      expect(instructions).not.toContain('Remote EU');
+      expect(instructions).toContain('- Go');
+      expect(instructions).toContain('- Postgres');
+    });
+
+    it('does not reuse a fit scored before the override, and stores the score hash', async () => {
+      const { prisma, runner } = setup({ overrideHash: postingHash, storedRoleHash: postingHash });
+      await runner.processTeam('run-1', { uid: 'team-1', name: 'Prime Intellect' });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(prisma.jobMatchRow.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({
+            kind: 'SCORE',
+            payload: expect.objectContaining({
+              fits: {
+                'role-1': { fit: 90, roleTextHash: scoreHash(postingHash, enabled, overrideCriteria) },
+              },
+            }),
+          }),
+        })
+      );
+    });
+
+    it('reuses a fit scored with the same enabled criteria', async () => {
+      const { runner } = setup({
+        overrideHash: postingHash,
+        storedRoleHash: scoreHash(postingHash, enabled, overrideCriteria),
+      });
+      await runner.processTeam('run-1', { uid: 'team-1', name: 'Prime Intellect' });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('reuses the stored fit of a role without an override, with no Jev call', async () => {
+      const { prisma, runner } = setup({ storedRoleHash: postingHash });
+      await runner.processTeam('run-1', { uid: 'team-1', name: 'Prime Intellect' });
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(prisma.suggestionCreateMany.mock.calls[0][0].data[0].payload).toHaveLength(4);
+    });
+
+    it('ignores an override saved against an older posting', async () => {
+      const { prisma, runner } = setup({ overrideHash: 'old-posting-hash', storedRoleHash: postingHash });
+      await runner.processTeam('run-1', { uid: 'team-1', name: 'Prime Intellect' });
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(prisma.suggestionCreateMany.mock.calls[0][0].data[0].payload.map((c: { text: string }) => c.text)).toEqual(
+        overrideCriteria
+      );
+    });
+
+    it('stores only enabled criteria on each suggestion and in the blurb prompt', async () => {
+      const { prisma, runner } = setup({ overrideHash: postingHash });
+      await runner.processTeam('run-1', { uid: 'team-1', name: 'Prime Intellect' });
+      const prompt: string = generateTextMock.mock.calls[0][0].prompt;
+      expect(prompt).not.toContain('Remote EU');
+      const rows = prisma.suggestionCreateMany.mock.calls[0][0].data;
+      expect(rows[0].payload).toEqual(enabled.map((text) => ({ text, matched: true })));
+    });
   });
 });

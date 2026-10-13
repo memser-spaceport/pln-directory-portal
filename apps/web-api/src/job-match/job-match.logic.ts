@@ -181,6 +181,53 @@ export function roleTextHash(posting: string): string {
   return createHash('sha256').update(posting).digest('hex');
 }
 
+/**
+ * The JobOpening fields a posting is built from. The service reads a role with this select and the runner's
+ * raw job query lists the same columns; both hash through `currentRoleTextHash`, so they cannot disagree on
+ * which posting a criteria row or an override belongs to (LAB-2846).
+ */
+export const MATCH_JOB_SELECT = {
+  uid: true,
+  roleTitle: true,
+  companyName: true,
+  roleCategory: true,
+  seniority: true,
+  summary: true,
+  descriptionHtml: true,
+  location: true,
+  workMode: true,
+} as const;
+
+/** The hash of a role's current posting: the key of its CRITERIA row and of its criteria override. */
+export function currentRoleTextHash(job: MatchJob): string {
+  return roleTextHash(rolePosting(job));
+}
+
+/** The criteria the run scores against: all of them minus the disabled ones, or all when none would remain. */
+export function enabledCriteria(all: string[], disabled: readonly string[]): string[] {
+  const off = new Set(disabled);
+  const enabled = all.filter((text) => !off.has(text));
+  return enabled.length ? enabled : all;
+}
+
+/**
+ * The per-role hash stored with fits. A role with nothing disabled keeps its posting hash, so cached fits stay
+ * valid; a role with disabled criteria gets a hash of the posting and its enabled list, so fits scored with a
+ * different set are not reused.
+ */
+export function scoreHash(postingHash: string, enabled: readonly string[], all: readonly string[]): string {
+  if (enabled.length === all.length && enabled.every((text, index) => text === all[index])) return postingHash;
+  return createHash('sha256')
+    .update(`${postingHash}\n${enabled.join('\n')}`)
+    .digest('hex');
+}
+
+/** Every criterion of the posting in extraction order, flagged off when it is in `disabled`. */
+export function flaggedCriteria(all: string[], disabled: readonly string[]): { text: string; enabled: boolean }[] {
+  const off = new Set(disabled);
+  return all.map((text) => ({ text, enabled: !off.has(text) }));
+}
+
 export function profileTextHash(profile: string): string {
   return createHash('sha256').update(profile).digest('hex');
 }
