@@ -1,0 +1,60 @@
+name: Docker image check
+
+# Builds the directory-service image (without pushing it) whenever a pull
+# request touches the image definition or the dependency set, so a broken
+# Dockerfile or a missing runtime dependency is caught before the deploy
+# workflows run.
+
+on:
+  pull_request:
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - package.json
+      - yarn.lock
+      - patches/**
+      - tools/docker/**
+      - apps/web-api/prisma/schema.prisma
+      - apps/web-api/prisma/oso-schema.prisma
+      - .github/workflows/docker-image-check.yml
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build directory-service image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          platforms: linux/amd64
+          provenance: false
+          tags: directory-service:pr
+
+      - name: Report image size
+        run: |
+          docker image inspect directory-service:pr --format 'Size: {{.Size}} bytes'
+          docker image ls directory-service:pr
+          echo "::group::Largest packages in node_modules"
+          docker run --rm directory-service:pr sh -c \
+            'du -sm node_modules/* node_modules/@*/* node_modules/.prisma 2>/dev/null | sort -rn | head -60; echo; du -sm node_modules dist'
+          echo "::endgroup::"
+
+      - name: Smoke test runtime image
+        run: |
+          # The bundle and every external package it requires must load without
+          # a database: the Prisma CLI must run, and the app entry must resolve.
+          docker run --rm directory-service:pr ./node_modules/.bin/prisma --version
+          docker run --rm directory-service:pr node -e "require('@prisma/client'); require('.prisma/oso-client'); console.log('prisma clients OK')"
