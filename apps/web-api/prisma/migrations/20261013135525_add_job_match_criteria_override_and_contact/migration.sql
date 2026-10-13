@@ -27,8 +27,5 @@ CREATE TABLE "JobMatchContact" (
 CREATE UNIQUE INDEX "JobMatchCriteriaOverride_roleUid_roleTextHash_key" ON "JobMatchCriteriaOverride"("roleUid", "roleTextHash");
 
 -- CreateIndex
-CREATE INDEX "JobMatchContact_roleUid_idx" ON "JobMatchContact"("roleUid");
-
--- CreateIndex
 CREATE UNIQUE INDEX "JobMatchContact_roleUid_memberUid_key" ON "JobMatchContact"("roleUid", "memberUid");
 

@@ -4677,5 +4677,4 @@ model JobMatchContact {
   createdAt DateTime @default(now())
 
   @@unique([roleUid, memberUid])
-  @@index([roleUid])
 }
