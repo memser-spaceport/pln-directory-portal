@@ -45,4 +45,5 @@ if (missing.length) {
   process.exit(1);
 }
 
-console.log(`OK: ${checked} external packages required by ${bundle} resolve from ${resolveFrom}`);
+console.log(`OK: ${checked} external packages required by ${bundle} resolve from ${resolveFrom}:`);
+console.log([...specifiers].sort().join(' '));
