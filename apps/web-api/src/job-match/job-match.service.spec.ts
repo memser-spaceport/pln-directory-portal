@@ -431,6 +431,102 @@ describe('JobMatchService', () => {
       });
     });
 
+    describe('structured criteria (LAB-2854)', () => {
+      const structured = [
+        { statement: 'Rust', label: 'Rust', group: 'Skills' },
+        { statement: '5+ years', label: 'Five years in backend', group: 'Experience' },
+        { statement: 'Remote EU', label: 'EU remote', group: 'Location' },
+      ];
+
+      function withSuggestionPayload(payload: unknown) {
+        jobMatchRowFindMany.mockResolvedValue([
+          {
+            memberUid: 'cand-1',
+            rank: 1,
+            fit: 90,
+            label: 'STRONG',
+            blurb: null,
+            payload,
+            interested: false,
+            interestNote: null,
+          },
+        ]);
+      }
+
+      it('GET returns label and group on the role criteria and, joined by statement, on each suggestion', async () => {
+        findMemberByEmail.mockResolvedValue({ ...lead, uid: 'member-1' });
+        withStored({ criteria: structured as never });
+        withSuggestionPayload([
+          { text: 'Rust', matched: true },
+          { text: 'Remote EU', matched: false },
+          { text: 'Go', matched: true },
+        ]);
+        overrideFindUnique.mockResolvedValue({ disabled: ['5+ years'], prompt: null });
+        const result = await service.listForRole('role-1', 'm@example.com');
+        expect(result.criteria).toEqual([
+          { text: 'Rust', enabled: true, label: 'Rust', group: 'Skills' },
+          { text: '5+ years', enabled: false, label: 'Five years in backend', group: 'Experience' },
+          { text: 'Remote EU', enabled: true, label: 'EU remote', group: 'Location' },
+        ]);
+        expect(result.suggestions[0].criteria).toEqual([
+          { text: 'Rust', matched: true, label: 'Rust', group: 'Skills' },
+          { text: 'Remote EU', matched: false, label: 'EU remote', group: 'Location' },
+          { text: 'Go', matched: true },
+        ]);
+        // A criterion that is not current has no label or group keys at all (not null).
+        expect(Object.keys(result.suggestions[0].criteria[2])).toEqual(['text', 'matched']);
+      });
+
+      it('GET omits label and group for a legacy string[] criteria row', async () => {
+        findMemberByEmail.mockResolvedValue({ ...lead, uid: 'member-1' });
+        withSuggestionPayload([{ text: 'Rust', matched: true }]);
+        const result = await service.listForRole('role-1', 'm@example.com');
+        expect(result.criteria.map((item) => Object.keys(item))).toEqual([
+          ['text', 'enabled'],
+          ['text', 'enabled'],
+          ['text', 'enabled'],
+        ]);
+        expect(result.suggestions[0].criteria).toEqual([{ text: 'Rust', matched: true }]);
+        expect(JSON.stringify(result)).not.toContain('null,"group"');
+      });
+
+      it('PUT matches disabled entries by statement and returns label and group', async () => {
+        findMemberByEmail.mockResolvedValue(lead);
+        withStored({ criteria: structured as never });
+        await expect(
+          service.updateCriteria('role-1', { disabled: ['Remote EU'] }, 'lead@example.com')
+        ).resolves.toEqual({
+          criteria: [
+            { text: 'Rust', enabled: true, label: 'Rust', group: 'Skills' },
+            { text: '5+ years', enabled: true, label: 'Five years in backend', group: 'Experience' },
+            { text: 'Remote EU', enabled: false, label: 'EU remote', group: 'Location' },
+          ],
+          prompt: null,
+        });
+        expect(overrideUpsert).toHaveBeenCalledWith(
+          expect.objectContaining({ update: expect.objectContaining({ disabled: ['Remote EU'] }) })
+        );
+      });
+
+      it('PUT 400s for a label, which is not a criterion identity', async () => {
+        findMemberByEmail.mockResolvedValue(lead);
+        withStored({ criteria: structured as never });
+        await expect(
+          service.updateCriteria('role-1', { disabled: ['EU remote'] }, 'lead@example.com')
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(overrideUpsert).not.toHaveBeenCalled();
+      });
+
+      it('an override saved against legacy statements keeps its meaning after the row is labelled', async () => {
+        findMemberByEmail.mockResolvedValue({ ...lead, uid: 'member-1' });
+        overrideFindUnique.mockResolvedValue({ disabled: ['Remote EU'], prompt: null });
+        const before = await service.listForRole('role-1', 'm@example.com');
+        withStored({ criteria: structured as never });
+        const after = await service.listForRole('role-1', 'm@example.com');
+        expect(after.criteria.map(({ text, enabled }) => ({ text, enabled }))).toEqual(before.criteria);
+      });
+    });
+
     it('hashes a posting the same way as the runner (service and runner agree)', async () => {
       findMemberByEmail.mockResolvedValue(admin);
       await service.listForRole('role-1', 'admin@example.com');

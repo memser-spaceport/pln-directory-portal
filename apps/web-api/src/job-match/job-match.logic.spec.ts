@@ -10,10 +10,15 @@ import {
   companyKey,
   currentRoleTextHash,
   enabledCriteria,
+  asCriteria,
+  criteriaLabelPrompt,
+  criteriaPrompt,
+  criterionStatements,
   flaggedCriteria,
   fitsFromAnswers,
   hasSignal,
   isEmailDryRun,
+  isLegacyCriteriaPayload,
   isLiveOpening,
   jevQuestions,
   jobMatchBlocker,
@@ -22,7 +27,10 @@ import {
   newSuggestions,
   normalizeTeamUids,
   parseCandidateNotes,
+  normalizeCriterionGroup,
+  normalizeCriterionLabel,
   parseCriteria,
+  parseCriteriaLabels,
   parseEmailTeamAllowlist,
   pickInterestNote,
   planTeamWork,
@@ -33,6 +41,7 @@ import {
   roleTextHash,
   scoreHash,
   selectTop,
+  withCriterionMeta,
   type MatchJob,
   type MatchMember,
 } from './job-match.logic';
@@ -104,14 +113,9 @@ describe('job match logic', () => {
   });
 
   it('parses 4 to 6 criteria and rejects a short list', () => {
-    expect(parseCriteria('notes [" Go ", "Senior", "Remote", "Postgres", "extra", "sixth", "seventh"]')).toEqual([
-      'Go',
-      'Senior',
-      'Remote',
-      'Postgres',
-      'extra',
-      'sixth',
-    ]);
+    expect(
+      criterionStatements(parseCriteria('notes [" Go ", "Senior", "Remote", "Postgres", "extra", "sixth", "seventh"]'))
+    ).toEqual(['Go', 'Senior', 'Remote', 'Postgres', 'extra', 'sixth']);
     expect(() => parseCriteria('["only one"]')).toThrow(/at least 4/);
   });
 
@@ -380,11 +384,186 @@ describe('criteria overrides (LAB-2846)', () => {
   });
 
   it('flaggedCriteria marks disabled texts in extraction order', () => {
-    expect(flaggedCriteria(all, ['Remote EU'])).toEqual([
+    expect(flaggedCriteria(asCriteria(all), ['Remote EU'])).toEqual([
       { text: 'Rust', enabled: true },
       { text: '5+ years', enabled: true },
       { text: 'Remote EU', enabled: false },
     ]);
+  });
+
+  it('flaggedCriteria carries label and group, and omits the keys when unknown (LAB-2854)', () => {
+    const flagged = flaggedCriteria(
+      [
+        { statement: 'Has shipped Rust in production', label: 'Rust in production', group: 'Skills' },
+        { statement: 'Based in the EU' },
+      ],
+      ['Based in the EU']
+    );
+    expect(flagged).toEqual([
+      { text: 'Has shipped Rust in production', enabled: true, label: 'Rust in production', group: 'Skills' },
+      { text: 'Based in the EU', enabled: false },
+    ]);
+    expect(Object.keys(flagged[1])).toEqual(['text', 'enabled']);
+  });
+});
+
+describe('structured criteria (LAB-2854)', () => {
+  const structured = [
+    { statement: 'Has shipped Rust in production', label: 'Rust in production', group: 'Skills' },
+    { statement: '5+ years building backends', label: '5+ years backend', group: 'Experience' },
+    { statement: 'Senior or staff level', label: 'Senior+', group: 'Seniority' },
+    { statement: 'Based in the EU', label: 'EU-based', group: 'Location' },
+  ];
+
+  it('the extraction prompt asks for statement, label and group, naming every group', () => {
+    const prompt = criteriaPrompt('Title: Backend Engineer');
+    expect(prompt).toContain('statement, label, and group');
+    expect(prompt).toContain('at most 40 characters');
+    expect(prompt).toContain('Skills, Experience, Seniority, Location, Other');
+    expect(prompt).toContain('Title: Backend Engineer');
+  });
+
+  it('parseCriteria reads structured items', () => {
+    expect(parseCriteria(`Here you go: ${JSON.stringify(structured)}`)).toEqual(structured);
+  });
+
+  it('parseCriteria normalises: unknown group to Other, label trimmed and cut, empty and repeated statements dropped', () => {
+    const long = 'A label that is far too long to fit in forty characters';
+    const parsed = parseCriteria(
+      JSON.stringify([
+        { statement: '  Rust  ', label: '  Rust   lang ', group: 'skills' },
+        { statement: 'Go', label: long, group: 'Languages' },
+        { statement: '   ', label: 'Blank', group: 'Skills' },
+        { statement: 'Rust', label: 'Again', group: 'Skills' },
+        { statement: 'Senior', label: '', group: 'Seniority' },
+        { statement: 'Remote', group: null },
+        'Postgres',
+      ])
+    );
+    expect(parsed).toEqual([
+      { statement: 'Rust', label: 'Rust lang', group: 'Skills' },
+      { statement: 'Go', label: `${long.slice(0, 39).trimEnd()}…`, group: 'Other' },
+      { statement: 'Senior', group: 'Seniority' },
+      { statement: 'Remote', group: 'Other' },
+      { statement: 'Postgres', group: 'Other' },
+    ]);
+    expect(parsed[1].label?.length).toBeLessThanOrEqual(40);
+  });
+
+  it('parseCriteria keeps at most 6 and rejects fewer than 4 after dropping empties', () => {
+    const many = Array.from({ length: 8 }, (_, index) => ({
+      statement: `C${index}`,
+      label: `L${index}`,
+      group: 'Skills',
+    }));
+    expect(parseCriteria(JSON.stringify(many))).toHaveLength(6);
+    expect(() =>
+      parseCriteria(JSON.stringify([{ statement: 'A' }, { statement: 'B' }, { statement: ' ' }, { statement: 'A' }]))
+    ).toThrow(/at least 4/);
+    expect(() => parseCriteria('no array here')).toThrow(/not a JSON array/);
+  });
+
+  it('normalizeCriterionGroup and normalizeCriterionLabel', () => {
+    expect(normalizeCriterionGroup('LOCATION')).toBe('Location');
+    expect(normalizeCriterionGroup('Culture')).toBe('Other');
+    expect(normalizeCriterionGroup(undefined)).toBe('Other');
+    expect(normalizeCriterionLabel(' x '.repeat(30))?.length).toBeLessThanOrEqual(40);
+    expect(normalizeCriterionLabel('   ')).toBeUndefined();
+    expect(normalizeCriterionLabel(42)).toBeUndefined();
+  });
+
+  it('asCriteria reads a legacy string[] payload as unlabelled statements', () => {
+    expect(asCriteria([' Rust ', '', '5+ years'])).toEqual([{ statement: 'Rust' }, { statement: '5+ years' }]);
+    expect(isLegacyCriteriaPayload(['Rust', '5+ years'])).toBe(true);
+  });
+
+  it('asCriteria reads the structured payload, keeping only a valid label and group', () => {
+    expect(asCriteria(structured)).toEqual(structured);
+    expect(isLegacyCriteriaPayload(structured)).toBe(false);
+    expect(
+      asCriteria([
+        { statement: 'A', label: 'x'.repeat(41), group: 'Skills' },
+        { statement: 'B', label: 'Bee', group: 'Hobbies' },
+        { statement: 'C', label: null, group: null },
+        { statement: '  ', label: 'Gone' },
+        { label: 'No statement' },
+      ])
+    ).toEqual([{ statement: 'A', group: 'Skills' }, { statement: 'B', label: 'Bee' }, { statement: 'C' }]);
+  });
+
+  it('asCriteria tolerates a missing or non-array payload', () => {
+    expect(asCriteria(null)).toEqual([]);
+    expect(asCriteria(undefined)).toEqual([]);
+    expect(asCriteria({ statement: 'A' })).toEqual([]);
+    expect(isLegacyCriteriaPayload(null)).toBe(false);
+  });
+
+  it('a legacy list and its labelled successor give the same statements, so the same score hash', () => {
+    const legacy = structured.map((item) => item.statement);
+    const fromLegacy = criterionStatements(asCriteria(legacy));
+    const fromLabelled = criterionStatements(asCriteria(structured));
+    expect(fromLabelled).toEqual(fromLegacy);
+    const enabled = fromLegacy.slice(0, 3);
+    expect(scoreHash('posting-hash', enabled, fromLabelled)).toBe(scoreHash('posting-hash', enabled, fromLegacy));
+  });
+
+  describe('legacy labelling', () => {
+    const statements = structured.map((item) => item.statement);
+
+    it('the label prompt lists every statement verbatim and asks for them unchanged', () => {
+      const prompt = criteriaLabelPrompt('Backend Engineer', statements);
+      for (const statement of statements) expect(prompt).toContain(JSON.stringify(statement));
+      expect(prompt).toContain('character for character');
+      expect(prompt).toContain('Skills, Experience, Seniority, Location, Other');
+    });
+
+    it('applies labels and groups to the exact statements, in the given order', () => {
+      const answer = JSON.stringify([...structured].reverse());
+      expect(parseCriteriaLabels(answer, statements)).toEqual(structured);
+    });
+
+    it('normalises the answer: unknown group to Other, long label cut', () => {
+      const answer = JSON.stringify(
+        statements.map((statement, index) => ({ statement, label: index ? 'ok' : 'y'.repeat(60), group: 'Misc' }))
+      );
+      const labelled = parseCriteriaLabels(answer, statements);
+      expect(labelled?.map((item) => item.group)).toEqual(['Other', 'Other', 'Other', 'Other']);
+      expect(labelled?.[0].label?.length).toBe(40);
+    });
+
+    it('returns null when a statement comes back changed', () => {
+      const reworded = structured.map((item, index) =>
+        index === 2 ? { ...item, statement: 'Senior or Staff level' } : item
+      );
+      expect(parseCriteriaLabels(JSON.stringify(reworded), statements)).toBeNull();
+      const trimmedDifferently = structured.map((item, index) =>
+        index === 0 ? { ...item, statement: ` ${item.statement}` } : item
+      );
+      expect(parseCriteriaLabels(JSON.stringify(trimmedDifferently), statements)).toBeNull();
+    });
+
+    it('returns null when a statement is dropped, added or repeated, or the answer is not an array', () => {
+      expect(parseCriteriaLabels(JSON.stringify(structured.slice(0, 3)), statements)).toBeNull();
+      expect(parseCriteriaLabels(JSON.stringify([...structured, { statement: 'Extra' }]), statements)).toBeNull();
+      expect(
+        parseCriteriaLabels(JSON.stringify([structured[0], structured[0], structured[1], structured[2]]), statements)
+      ).toBeNull();
+      expect(parseCriteriaLabels('sorry, no', statements)).toBeNull();
+      expect(parseCriteriaLabels(JSON.stringify(statements), statements)).toBeNull();
+    });
+  });
+
+  it('withCriterionMeta joins stored suggestion criteria to the current criteria by statement', () => {
+    const marked = [
+      { text: 'Has shipped Rust in production', matched: true },
+      { text: 'A criterion from an older posting', matched: false },
+    ];
+    const joined = withCriterionMeta(marked, [...asCriteria(structured), { statement: 'Unlabelled' }]);
+    expect(joined).toEqual([
+      { text: 'Has shipped Rust in production', matched: true, label: 'Rust in production', group: 'Skills' },
+      { text: 'A criterion from an older posting', matched: false },
+    ]);
+    expect(Object.keys(joined[1])).toEqual(['text', 'matched']);
   });
 });
 

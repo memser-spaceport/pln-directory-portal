@@ -1,4 +1,9 @@
 import { createHash } from 'crypto';
+import {
+  MATCH_CRITERION_GROUPS,
+  MATCH_CRITERION_LABEL_MAX_LENGTH,
+  type MatchCriterionGroup,
+} from 'libs/contracts/src/schema/job-match';
 import { HIDDEN_JOB_OPENING_STATUSES } from '../job-openings/job-openings-query.service';
 import { anthropicAuth } from '../shared/anthropic-auth';
 
@@ -51,6 +56,16 @@ export type MatchMember = {
 };
 
 export type MarkedCriterion = { text: string; matched: boolean };
+
+/**
+ * One extracted criterion (LAB-2854). `statement` is the full sentence and the criterion's identity: overrides,
+ * the score hash, the Jev question, the blurb prompt and each suggestion's `{ text, matched }` all use it.
+ * `label` (at most 40 characters) and `group` are display only and absent on criteria not labelled yet.
+ */
+export type MatchCriterionItem = { statement: string; label?: string; group?: MatchCriterionGroup };
+
+/** A criterion's `label` and `group` as response keys: present only when known, never `null`. */
+export type CriterionMeta = { label?: string; group?: MatchCriterionGroup };
 
 export type RankedCandidate = {
   memberUid: string;
@@ -244,10 +259,38 @@ export function leadPromptLine(prompt: string | null | undefined): string {
   return text ? `The hiring lead adds: ${JSON.stringify(text)}` : '';
 }
 
-/** Every criterion of the posting in extraction order, flagged off when it is in `disabled`. */
-export function flaggedCriteria(all: string[], disabled: readonly string[]): { text: string; enabled: boolean }[] {
+/** Every criterion of the posting in extraction order, flagged off when its statement is in `disabled`. */
+export function flaggedCriteria(
+  all: readonly MatchCriterionItem[],
+  disabled: readonly string[]
+): ({ text: string; enabled: boolean } & CriterionMeta)[] {
   const off = new Set(disabled);
-  return all.map((text) => ({ text, enabled: !off.has(text) }));
+  return all.map((item) => ({ text: item.statement, enabled: !off.has(item.statement), ...criterionMeta(item) }));
+}
+
+/** `label` and `group` of a criterion, each key only when it is known. */
+export function criterionMeta(item: { label?: string; group?: MatchCriterionGroup } | undefined): CriterionMeta {
+  const meta: CriterionMeta = {};
+  if (item?.label) meta.label = item.label;
+  if (item?.group) meta.group = item.group;
+  return meta;
+}
+
+/**
+ * Each suggestion's stored `{ text, matched }` with the label and group of the role's current criterion of the same
+ * statement (LAB-2854). A criterion that is no longer current, or has no label yet, keeps just text and matched.
+ */
+export function withCriterionMeta(
+  marked: readonly MarkedCriterion[],
+  current: readonly MatchCriterionItem[]
+): (MarkedCriterion & CriterionMeta)[] {
+  const byStatement = new Map(current.map((item) => [item.statement, item]));
+  return marked.map((item) => ({ ...item, ...criterionMeta(byStatement.get(item.text)) }));
+}
+
+/** The statements of a criteria list, in order: what every hash, prompt and override compares. */
+export function criterionStatements(items: readonly MatchCriterionItem[]): string[] {
+  return items.map((item) => item.statement);
 }
 
 export function profileTextHash(profile: string): string {
@@ -311,20 +354,128 @@ export function scorePayload(
   return { profileHash, fits: stored };
 }
 
+const GROUP_LIST = MATCH_CRITERION_GROUPS.join(', ');
+
 export function criteriaPrompt(posting: string): string {
   return `Extract 4 to 6 checkable criteria for matching a person's profile to this job.
-Each criterion is one short line a profile can confirm or deny: a skill, seniority, or location.
-Return only a JSON array of strings.\n\n${posting}`;
+Each criterion is one a profile can confirm or deny: a skill, experience, seniority, or location.
+For each criterion return:
+- statement: one short line stating the criterion
+- label: a short name for it, at most ${MATCH_CRITERION_LABEL_MAX_LENGTH} characters (for example "Rust in production")
+- group: one of ${GROUP_LIST}
+Return only a JSON array of objects with statement, label, and group.\n\n${posting}`;
 }
 
-export function parseCriteria(text: string): string[] {
+/** `group` as one of the known groups, matched case-insensitively; anything else is `Other`. */
+export function normalizeCriterionGroup(value: unknown): MatchCriterionGroup {
+  const text = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return MATCH_CRITERION_GROUPS.find((group) => group.toLowerCase() === text) ?? 'Other';
+}
+
+/** A label with whitespace collapsed, cut to 40 characters with an ellipsis; `undefined` when empty. */
+export function normalizeCriterionLabel(value: unknown): string | undefined {
+  const text = typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '';
+  if (!text) return undefined;
+  if (text.length <= MATCH_CRITERION_LABEL_MAX_LENGTH) return text;
+  return `${text.slice(0, MATCH_CRITERION_LABEL_MAX_LENGTH - 1).trimEnd()}…`;
+}
+
+function jsonArray(text: string, what: string): unknown[] {
   const match = text.match(/\[[\s\S]*\]/);
-  if (!match) throw new Error(`criteria were not a JSON array: ${text.slice(0, 200)}`);
-  const criteria = JSON.parse(match[0])
-    .map((item: unknown) => String(item).trim())
-    .filter(Boolean);
+  if (!match) throw new Error(`${what} were not a JSON array: ${text.slice(0, 200)}`);
+  const rows = JSON.parse(match[0]);
+  if (!Array.isArray(rows)) throw new Error(`${what} were not a JSON array`);
+  return rows;
+}
+
+/**
+ * The extraction answer as 4 to 6 structured criteria (LAB-2854). Statements are trimmed; empty and repeated
+ * statements are dropped; an unknown or missing group becomes `Other`; a label is trimmed and cut to 40
+ * characters, and left out when empty. A bare string item is accepted as a statement in `Other` with no label.
+ */
+export function parseCriteria(text: string): MatchCriterionItem[] {
+  const seen = new Set<string>();
+  const criteria = jsonArray(text, 'criteria').flatMap((item): MatchCriterionItem[] => {
+    const record = item && typeof item === 'object' ? (item as Record<string, unknown>) : null;
+    const statement = (record ? String(record.statement ?? '') : String(item ?? '')).trim();
+    if (!statement || seen.has(statement)) return [];
+    seen.add(statement);
+    const label = normalizeCriterionLabel(record?.label);
+    return [{ statement, ...(label ? { label } : {}), group: normalizeCriterionGroup(record?.group) }];
+  });
   if (criteria.length < 4) throw new Error(`expected at least 4 criteria, got ${criteria.length}`);
   return criteria.slice(0, 6);
+}
+
+/**
+ * A stored CRITERIA payload in either shape (LAB-2854): a legacy `string[]` of statements, or
+ * `{ statement, label, group }[]`. Statements are trimmed and empty ones dropped, as before; a label is kept
+ * only when it is a non-empty string of at most 40 characters and a group only when it is a known one.
+ * Not deduplicated, so a legacy list keeps exactly the statements (and score hash) it had.
+ */
+export function asCriteria(payload: unknown): MatchCriterionItem[] {
+  if (!Array.isArray(payload)) return [];
+  return payload.flatMap((item): MatchCriterionItem[] => {
+    if (item && typeof item === 'object') {
+      const record = item as Record<string, unknown>;
+      const statement = typeof record.statement === 'string' ? record.statement.trim() : '';
+      if (!statement) return [];
+      const label =
+        typeof record.label === 'string' && record.label.trim().length <= MATCH_CRITERION_LABEL_MAX_LENGTH
+          ? record.label.trim()
+          : '';
+      const group = MATCH_CRITERION_GROUPS.find((known) => known === record.group);
+      return [{ statement, ...(label ? { label } : {}), ...(group ? { group } : {}) }];
+    }
+    const statement = String(item).trim();
+    return statement ? [{ statement }] : [];
+  });
+}
+
+/** A CRITERIA payload written before LAB-2854: any bare string item means it has no labels or groups. */
+export function isLegacyCriteriaPayload(payload: unknown): boolean {
+  return Array.isArray(payload) && payload.some((item) => typeof item === 'string');
+}
+
+/** The one call that labels a legacy criteria list (LAB-2854); the statements must come back unchanged. */
+export function criteriaLabelPrompt(roleTitle: string, statements: readonly string[]): string {
+  return `These are the matching criteria of the job "${roleTitle}".
+Give each criterion a short label and a group. Do not reword, merge, split, add or drop criteria.
+For each criterion return:
+- statement: the criterion exactly as written below, character for character
+- label: a short name for it, at most ${MATCH_CRITERION_LABEL_MAX_LENGTH} characters
+- group: one of ${GROUP_LIST}
+Return only a JSON array of objects with statement, label, and group, in the listed order.
+
+${statements.map((line) => JSON.stringify(line)).join('\n')}`;
+}
+
+/**
+ * The labelling answer applied to the existing statements (LAB-2854), or `null` when it cannot be trusted: not a
+ * JSON array, or its statements are not exactly the given ones (same count, each one character for character).
+ * The caller then keeps the statements unlabelled. Labels and groups are normalised as at extraction.
+ */
+export function parseCriteriaLabels(text: string, statements: readonly string[]): MatchCriterionItem[] | null {
+  let rows: unknown[];
+  try {
+    rows = jsonArray(text, 'criteria labels');
+  } catch {
+    return null;
+  }
+  if (rows.length !== statements.length) return null;
+  const byStatement = new Map<string, Record<string, unknown>>();
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') return null;
+    const record = row as Record<string, unknown>;
+    if (typeof record.statement !== 'string' || byStatement.has(record.statement)) return null;
+    byStatement.set(record.statement, record);
+  }
+  if (!statements.every((statement) => byStatement.has(statement))) return null;
+  return statements.map((statement) => {
+    const record = byStatement.get(statement);
+    const label = normalizeCriterionLabel(record?.label);
+    return { statement, ...(label ? { label } : {}), group: normalizeCriterionGroup(record?.group) };
+  });
 }
 
 export function jobBrief(job: MatchJob, criteria: string[], leadPrompt: string | null = null): string {
@@ -496,11 +647,6 @@ export function parseCandidateNotes(
     }
   }
   return byUid;
-}
-
-export function asStringList(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.map((item) => String(item).trim()).filter(Boolean);
 }
 
 export function asScoreMap(value: unknown): Record<string, number> {

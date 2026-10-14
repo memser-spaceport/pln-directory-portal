@@ -10,6 +10,7 @@ import {
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import type { MatchCriterion, SuggestedCandidateCriterion } from 'libs/contracts/src/schema/job-match';
 import { jobBoardDetailUrl, memberProfileUrl } from '../job-openings/job-openings-url';
 import { MembersService } from '../members/members.service';
 import { PrismaService } from '../shared/prisma.service';
@@ -19,12 +20,15 @@ import { renderCandidateIntroEmail, type RenderedEmail } from './emails/candidat
 import { listRunSuggestions } from './job-match-suggestions';
 import {
   MATCH_JOB_SELECT,
+  asCriteria,
   asMarkedCriteria,
-  asStringList,
+  criterionStatements,
   currentRoleTextHash,
   flaggedCriteria,
   isLiveOpening,
   labelText,
+  withCriterionMeta,
+  type MatchCriterionItem,
   type MatchJob,
 } from './job-match.logic';
 
@@ -37,7 +41,8 @@ export type SuggestedCandidate = {
   label: 'Strong match' | 'Good match';
   rank: number;
   blurb: string | null;
-  criteria: { text: string; matched: boolean }[];
+  /** Stored `{ text, matched }` per criterion, with the label and group of the role's current criterion (LAB-2854). */
+  criteria: SuggestedCandidateCriterion[];
   /** The member said they are interested in this role or in its team, as of the stored run (LAB-2788). */
   interested: boolean;
   /** The note the member wrote with that interest, as of the stored run; null when not interested (LAB-2802). */
@@ -46,7 +51,8 @@ export type SuggestedCandidate = {
   contactedAt: string | null;
 };
 
-export type MatchCriterionView = { text: string; enabled: boolean };
+/** `{ text, enabled }`, plus `label` and `group` when known (LAB-2854); `text` is the full statement. */
+export type MatchCriterionView = MatchCriterion;
 
 type RoleJob = MatchJob & { teamUid: string | null; status: string; publishedAt: Date | null };
 
@@ -93,6 +99,7 @@ export class JobMatchService {
         })
       : [];
     const contactedAt = new Map(contacts.map((contact) => [contact.memberUid, contact.createdAt.toISOString()]));
+    const { hash, all } = await this.currentCriteria(job);
 
     const suggestions = stored.map(({ row, person, fit, rank, label }) => ({
       memberUid: row.memberUid,
@@ -103,13 +110,12 @@ export class JobMatchService {
       label: labelText(label),
       rank,
       blurb: row.blurb,
-      criteria: asMarkedCriteria(row.payload),
+      criteria: withCriterionMeta(asMarkedCriteria(row.payload), all),
       interested: row.interested === true,
       note: row.interested === true ? row.interestNote ?? null : null,
       contactedAt: contactedAt.get(row.memberUid) ?? null,
     }));
 
-    const { hash, all } = await this.currentCriteria(job);
     if (!all.length) return { suggestions, criteria: [], criteriaPrompt: null };
     const override = await this.criteriaOverride(roleUid, hash);
     return {
@@ -139,12 +145,13 @@ export class JobMatchService {
     if (!all.length) {
       throw new ConflictException('No match criteria have been extracted for this role yet');
     }
+    const statements = criterionStatements(all);
     const normalized = [...new Set(disabled.map((text) => text.trim()))];
-    const unknown = normalized.filter((text) => !all.includes(text));
+    const unknown = normalized.filter((text) => !statements.includes(text));
     if (unknown.length) {
       throw new BadRequestException(`Not a criterion of this role: ${unknown.join(', ')}`);
     }
-    if (all.every((text) => normalized.includes(text))) {
+    if (statements.every((text) => normalized.includes(text))) {
       throw new BadRequestException('At least one criterion must stay enabled');
     }
 
@@ -269,15 +276,18 @@ export class JobMatchService {
     return job;
   }
 
-  /** The criteria extracted for the role's current posting, read the way the runner reads them. */
-  private async currentCriteria(job: MatchJob): Promise<{ hash: string; all: string[] }> {
+  /**
+   * The criteria extracted for the role's current posting, read the way the runner reads them: either stored shape
+   * (LAB-2854), newest row first, so a legacy row's labels appear once the runner has labelled it.
+   */
+  private async currentCriteria(job: MatchJob): Promise<{ hash: string; all: MatchCriterionItem[] }> {
     const hash = currentRoleTextHash(job);
     const row = await this.prisma.jobMatchRow.findFirst({
       where: { kind: 'CRITERIA', roleUid: job.uid, roleTextHash: hash },
       orderBy: { createdAt: 'desc' },
       select: { payload: true },
     });
-    return { hash, all: asStringList(row?.payload).slice(0, 6) };
+    return { hash, all: asCriteria(row?.payload).slice(0, 6) };
   }
 
   private async criteriaOverride(
