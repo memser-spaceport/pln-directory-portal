@@ -121,12 +121,16 @@ const BUILT_IN_TOKENS = [
   'docSendLink',
 ];
 
+const TEMPLATE_SYNTAX = new Set(['else']);
+
 const requiredTokens = (template?: { subject: string; body: string }) => {
   const tokens = new Set<string>();
   for (const match of `${template?.subject ?? ''} ${template?.body ?? ''}`.matchAll(
     /\{\{\s*([a-zA-Z0-9_]+)\s*(\|[^}]*)?\}\}/g
   )) {
-    if (!match[2] && !BUILT_IN_TOKENS.includes(match[1])) tokens.add(match[1]);
+    if (!match[2] && !BUILT_IN_TOKENS.includes(match[1]) && !TEMPLATE_SYNTAX.has(match[1])) {
+      tokens.add(match[1]);
+    }
   }
   return [...tokens];
 };
