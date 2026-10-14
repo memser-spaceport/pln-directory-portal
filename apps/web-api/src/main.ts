@@ -2,6 +2,8 @@
 // It sets up instrumentation and telemetry before anything else is loaded.
 // Do NOT move this import below others — doing so may break logging, metrics, or tracing!
 import './instrumentation';
+// FEATURE-ENV ONLY — never merge: SES recipient allowlist, installed before AppModule (and anything that can send) loads.
+import './utils/aws/feature-env-email-guard.install';
 import { NestFactory } from '@nestjs/core';
 import * as Sentry from '@sentry/node';
 import { AppModule } from './app.module';
