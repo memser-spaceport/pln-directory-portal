@@ -1,6 +1,7 @@
 import {
   accessRequestConflict,
   assignSenders,
+  batchSendDurationMs,
   mergeTemplate,
   openNoticeCounts,
   replaceNbsp,
@@ -132,6 +133,14 @@ describe('assignSenders', () => {
       ['b', 'two@example.com'],
       ['c', 'one@example.com'],
     ]);
+  });
+});
+
+describe('batchSendDurationMs', () => {
+  it('uses the fullest sender and waits between that sender’s emails', () => {
+    expect(batchSendDurationMs(5, 2, 1)).toBe(120_000);
+    expect(batchSendDurationMs(10, 1, 10)).toBe(54_000);
+    expect(batchSendDurationMs(1, 2, 5)).toBe(0);
   });
 });
 describe('openNoticeCounts', () => {

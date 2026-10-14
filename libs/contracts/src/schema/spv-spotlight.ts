@@ -141,6 +141,7 @@ export const SendSpvBulkSchema = z.object({
   participantUids: z.array(z.string().min(1)).min(1).optional(),
   useDefaultSender: z.boolean().optional(),
   senderEmails: z.array(z.string().trim().email()).min(1).optional(),
+  emailsPerSenderPerMinute: z.number().int().min(1).max(1000).optional(),
 });
 
 export class SendSpvBulkDto extends createZodDto(SendSpvBulkSchema) {}
@@ -150,6 +151,7 @@ export const SendSpvOpenNoticeSchema = z.object({
   participantUids: z.array(z.string().min(1)).min(1).optional(),
   useDefaultSender: z.boolean().optional(),
   senderEmails: z.array(z.string().trim().email()).min(1).optional(),
+  emailsPerSenderPerMinute: z.number().int().min(1).max(1000).optional(),
 });
 
 export class SendSpvOpenNoticeDto extends createZodDto(SendSpvOpenNoticeSchema) {}

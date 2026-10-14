@@ -72,6 +72,7 @@ export class AdminSpvSpotlightController {
     return this.adminService.sendOpenNotice(uid, body.includeAlreadySent ?? false, body.participantUids, {
       useDefaultSender: body.useDefaultSender,
       senderEmails: body.senderEmails,
+      emailsPerSenderPerMinute: body.emailsPerSenderPerMinute,
     });
   }
 
@@ -115,6 +116,7 @@ export class AdminSpvSpotlightController {
     return this.adminService.sendInvites(uid, body.includeAlreadyInvited ?? false, body.participantUids, {
       useDefaultSender: body.useDefaultSender,
       senderEmails: body.senderEmails,
+      emailsPerSenderPerMinute: body.emailsPerSenderPerMinute,
     });
   }
 
@@ -125,6 +127,7 @@ export class AdminSpvSpotlightController {
     return this.adminService.sendFollowUps(uid, body.includeAlreadyFollowedUp ?? false, body.participantUids, {
       useDefaultSender: body.useDefaultSender,
       senderEmails: body.senderEmails,
+      emailsPerSenderPerMinute: body.emailsPerSenderPerMinute,
     });
   }
 

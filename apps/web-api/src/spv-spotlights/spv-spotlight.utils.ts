@@ -172,6 +172,24 @@ export function assignSenders<T extends { memberUid: string }>(
   }));
 }
 
+export function senderSendIntervalMs(emailsPerMinute?: number): number {
+  if (!emailsPerMinute || emailsPerMinute < 1) {
+    return 0;
+  }
+  return Math.floor(60_000 / emailsPerMinute);
+}
+
+export function batchSendDurationMs(recipientCount: number, senderCount: number, emailsPerMinute: number): number {
+  if (recipientCount < 1 || senderCount < 1 || emailsPerMinute < 1) {
+    return 0;
+  }
+  const busiestSender = Math.ceil(recipientCount / senderCount);
+  if (busiestSender <= 1) {
+    return 0;
+  }
+  return (busiestSender - 1) * senderSendIntervalMs(emailsPerMinute);
+}
+
 export function resolveViewerAccess(input: {
   hasToken: boolean;
   requestStatus: AccessRequestStatus | null;
