@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
 import { MongoPersistantDbService } from './db/mongo-persistant-db.service';
+import { HuskyFeedbackDto } from '../../../../libs/contracts/src/schema/husky-chat';
 
 @Injectable()
 export class HuskyService {
@@ -117,11 +118,25 @@ export class HuskyService {
     }
   }
 
-  async addHuskyFeedback(feedback: any) {
-    await this.huskyPersistentDbService.create(process.env.MONGO_FEEDBACK_COLLECTION || '', {
-      ...feedback,
-      createdAt: Date.now(),
+  async addHuskyFeedback(feedback: HuskyFeedbackDto) {
+    const collection = process.env.MONGO_FEEDBACK_COLLECTION || '';
+    const doc = { ...feedback, createdAt: Date.now() };
+    if (!feedback.questionId) {
+      await this.huskyPersistentDbService.create(collection, doc);
+      return;
+    }
+    await this.huskyPersistentDbService.upsertByKeyValue(collection, 'questionId', feedback.questionId, {
+      ...doc,
+      isDeleted: false,
     });
+  }
+
+  async removeHuskyFeedback(questionId: string) {
+    await this.huskyPersistentDbService.deleteDocByKeyValue(
+      process.env.MONGO_FEEDBACK_COLLECTION || '',
+      'questionId',
+      questionId
+    );
   }
 
   private handleErrors(error, message?) {

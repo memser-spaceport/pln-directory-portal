@@ -69,7 +69,11 @@ export class AdminSpvSpotlightController {
   @UsePipes(ZodValidationPipe)
   @NoCache()
   async sendOpenNotice(@Param('uid') uid: string, @Body() body: SendSpvOpenNoticeDto) {
-    return this.adminService.sendOpenNotice(uid, body.includeAlreadySent ?? false, body.participantUids);
+    return this.adminService.sendOpenNotice(uid, body.includeAlreadySent ?? false, body.participantUids, {
+      useDefaultSender: body.useDefaultSender,
+      senderEmails: body.senderEmails,
+      emailsPerSenderPerMinute: body.emailsPerSenderPerMinute,
+    });
   }
 
   @Get(':uid/login-links')
@@ -109,14 +113,22 @@ export class AdminSpvSpotlightController {
   @UsePipes(ZodValidationPipe)
   @NoCache()
   async sendInvites(@Param('uid') uid: string, @Body() body: SendSpvBulkDto) {
-    return this.adminService.sendInvites(uid, body.includeAlreadyInvited ?? false, body.participantUids);
+    return this.adminService.sendInvites(uid, body.includeAlreadyInvited ?? false, body.participantUids, {
+      useDefaultSender: body.useDefaultSender,
+      senderEmails: body.senderEmails,
+      emailsPerSenderPerMinute: body.emailsPerSenderPerMinute,
+    });
   }
 
   @Post(':uid/participants/send-follow-ups-bulk')
   @UsePipes(ZodValidationPipe)
   @NoCache()
   async sendFollowUps(@Param('uid') uid: string, @Body() body: SendSpvBulkDto) {
-    return this.adminService.sendFollowUps(uid, body.includeAlreadyFollowedUp ?? false, body.participantUids);
+    return this.adminService.sendFollowUps(uid, body.includeAlreadyFollowedUp ?? false, body.participantUids, {
+      useDefaultSender: body.useDefaultSender,
+      senderEmails: body.senderEmails,
+      emailsPerSenderPerMinute: body.emailsPerSenderPerMinute,
+    });
   }
 
   @Post(':uid/participants/remove-bulk')

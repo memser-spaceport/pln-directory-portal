@@ -22,6 +22,17 @@ const templateSchema = z.object({
   body: z.string().trim().min(1),
 });
 
+const dataRoomTemplateSchema = templateSchema.extend({
+  fromEmail: z.string().trim().email(),
+  fromName: z.string().trim().min(1).max(120),
+  cc: z.array(z.string().trim().email()).default([]),
+});
+
+const senderSchema = z.object({
+  email: z.string().trim().email(),
+  name: z.string().trim().max(120).optional().default(''),
+});
+
 export const SpvEmailTemplatesSchema = z.object({
   invitePreapproved: templateSchema,
   followUpPreapproved: templateSchema,
@@ -29,6 +40,7 @@ export const SpvEmailTemplatesSchema = z.object({
   followUpOutreach: templateSchema,
   approved: templateSchema,
   opened: templateSchema,
+  dataRoomAccess: dataRoomTemplateSchema,
 });
 
 const mediaItemSchema = z.object({
@@ -46,6 +58,8 @@ export const CreateSpvSpotlightSchema = z.object({
   supportEmail: z.string().email().optional().nullable(),
   senderEmail: z.string().email().optional().nullable(),
   senderName: z.string().max(120).optional().nullable(),
+  senders: z.array(senderSchema).max(20).optional(),
+  emailOnDataRoomRequest: z.boolean().optional(),
   replyToEmail: z.string().email().optional().nullable(),
   docSendUrl: z.string().url().optional().nullable(),
   summary: z.string().optional().nullable(),
@@ -125,6 +139,9 @@ export const SendSpvBulkSchema = z.object({
   includeAlreadyInvited: z.boolean().optional().default(false),
   includeAlreadyFollowedUp: z.boolean().optional().default(false),
   participantUids: z.array(z.string().min(1)).min(1).optional(),
+  useDefaultSender: z.boolean().optional(),
+  senderEmails: z.array(z.string().trim().email()).min(1).optional(),
+  emailsPerSenderPerMinute: z.number().int().min(1).max(1000).optional(),
 });
 
 export class SendSpvBulkDto extends createZodDto(SendSpvBulkSchema) {}
@@ -132,6 +149,9 @@ export class SendSpvBulkDto extends createZodDto(SendSpvBulkSchema) {}
 export const SendSpvOpenNoticeSchema = z.object({
   includeAlreadySent: z.boolean().optional().default(false),
   participantUids: z.array(z.string().min(1)).min(1).optional(),
+  useDefaultSender: z.boolean().optional(),
+  senderEmails: z.array(z.string().trim().email()).min(1).optional(),
+  emailsPerSenderPerMinute: z.number().int().min(1).max(1000).optional(),
 });
 
 export class SendSpvOpenNoticeDto extends createZodDto(SendSpvOpenNoticeSchema) {}

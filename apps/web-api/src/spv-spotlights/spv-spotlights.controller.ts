@@ -1,7 +1,18 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Req, UseGuards, UsePipes } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  Req,
+  UnauthorizedException,
+  UseGuards,
+  UsePipes,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '@abitia/zod-dto';
-import { OptionalUserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { OptionalUserTokenCheckGuard, UserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { SpvAccessRequestDto } from 'libs/contracts/src/schema/spv-spotlight';
 import { SpvSpotlightsService } from './spv-spotlights.service';
@@ -16,6 +27,17 @@ export class SpvSpotlightsController {
   @NoCache()
   async getBySlug(@Param('slug') slug: string, @Req() req) {
     return this.spvSpotlightsService.getBySlug(slug, req.userEmail || null);
+  }
+
+  @Post(':slug/data-room-access-email')
+  @HttpCode(200)
+  @UseGuards(UserTokenCheckGuard)
+  @NoCache()
+  async sendDataRoomAccessEmail(@Param('slug') slug: string, @Req() req) {
+    if (!req.userEmail) {
+      throw new UnauthorizedException('Sign in to request the data room email');
+    }
+    return this.spvSpotlightsService.sendDataRoomAccessEmail(slug, req.userEmail);
   }
 
   @Post(':slug/access-requests')

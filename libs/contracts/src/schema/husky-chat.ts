@@ -30,6 +30,10 @@ export const HuskyFeedbackSchema = z.object({
   response: z.string(),
   rating: z.number(),
   comment: z.string(),
+  // Optional while frontends that send neither are still live; with them one vote per answer is kept.
+  threadId: z.string().optional(),
+  questionId: z.string().optional(),
+  reasons: z.array(z.string()).optional(),
   name: z.string().optional(),
   team: z.string().optional(),
   directoryId: z.string().optional(),

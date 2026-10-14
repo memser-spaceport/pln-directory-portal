@@ -795,7 +795,13 @@ export class HuskyAiService {
       threadId
     );
 
-    const [thread, summaryData] = await Promise.all([threadPromise, summaryPromise]);
+    const feedbackPromise = this.huskyPersistentDbService.findByKeyValue(
+      process.env.MONGO_FEEDBACK_COLLECTION || '',
+      'threadId',
+      threadId
+    );
+
+    const [thread, summaryData, feedback] = await Promise.all([threadPromise, summaryPromise, feedbackPromise]);
     if (!thread) {
       throw new NotFoundException('Thread not found');
     }
@@ -808,14 +814,18 @@ export class HuskyAiService {
       this.huskyCacheDbService.set(`${threadId}:summary`, summaryData?.summary);
     }
 
-    const chats = thread?.contextual || [];
+    const isOwner = thread?.email === email && email !== '';
+    const votes = new Map(
+      isOwner ? feedback.map((vote) => [vote.questionId, { rating: vote.rating, reasons: vote.reasons }] as const) : []
+    );
+    const chats = (thread?.contextual || []).map((chat) => ({ ...chat, feedback: votes.get(chat.questionId) }));
     return {
       chats: chats.sort((a, b) => a.createdAt - b.createdAt),
       threadId: thread?.threadId,
       title: thread?.title,
       memberName: thread?.memberName,
       memberImage: thread?.memberImage,
-      isOwner: thread?.email === email && email !== '',
+      isOwner,
       ...(thread?.guestUserId && { guestUserId: thread?.guestUserId }),
     };
   }

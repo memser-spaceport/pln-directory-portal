@@ -1,9 +1,10 @@
-import { Body, Controller, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { HuskyService } from './husky.service';
 import { HuskyChatDto, HuskyFeedbackDto } from '../../../../libs/contracts/src/schema/husky-chat';
 import { Response } from 'express';
 import { HuskyAiService } from './husky-ai.service';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { UserAccessTokenValidateGuard } from '../guards/user-access-token-validate.guard';
 
 @Controller()
 export class HuskyChatsController {
@@ -37,8 +38,15 @@ export class HuskyChatsController {
     }
   }
 
+  @UseGuards(UserAccessTokenValidateGuard)
   @Post('v1/husky/chat/feedback')
-  async huskyChatFeedback(@Body() body: HuskyFeedbackDto) {
-    await this.huskyService.addHuskyFeedback({ ...body });
+  async huskyChatFeedback(@Body() body: HuskyFeedbackDto, @Req() req) {
+    await this.huskyService.addHuskyFeedback({ ...body, email: req.userEmail ?? body.email });
+  }
+
+  @UseGuards(UserAccessTokenValidateGuard)
+  @Delete('v1/husky/chat/feedback/:questionId')
+  async removeHuskyChatFeedback(@Param('questionId') questionId: string) {
+    await this.huskyService.removeHuskyFeedback(questionId);
   }
 }

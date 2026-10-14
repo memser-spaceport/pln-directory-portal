@@ -1,5 +1,7 @@
 import {
   accessRequestConflict,
+  assignSenders,
+  batchSendDurationMs,
   mergeTemplate,
   openNoticeCounts,
   replaceNbsp,
@@ -68,6 +70,13 @@ describe('mergeTemplate', () => {
     expect(mergeTemplate('From {{firm|a fund}}, {{note | none}}', { note: '' })).toBe('From a fund, none');
     expect(mergeTemplate('From {{firm|a fund}}', { firm: 'Gamma' })).toBe('From Gamma');
   });
+
+  it('keeps one branch of an if block', () => {
+    const template = '{{#if f25WarmList}}warm{{else}}backed {{sector_hook}}{{/if}}';
+    expect(mergeTemplate(template, { f25WarmList: 'yes', sector_hook: 'climate' })).toBe('warm');
+    expect(mergeTemplate(template, { f25WarmList: '  ', sector_hook: 'climate' })).toBe('backed climate');
+    expect(mergeTemplate(template, { sector_hook: 'climate' })).toBe('backed climate');
+  });
 });
 
 describe('replaceNbsp', () => {
@@ -88,11 +97,50 @@ describe('sanitizeEmailHtml', () => {
 });
 
 describe('visibleDocSendUrl', () => {
+  const url = 'https://docsend.com/view/abc';
+
   it('returns the url only for an approved viewer while the spotlight is open', () => {
-    expect(visibleDocSendUrl('OPEN', 'APPROVED', 'https://docsend.com/view/abc')).toBe('https://docsend.com/view/abc');
-    expect(visibleDocSendUrl('DRAFT', 'APPROVED', 'https://docsend.com/view/abc')).toBeNull();
-    expect(visibleDocSendUrl('OPEN', 'NONE', 'https://docsend.com/view/abc')).toBeNull();
-    expect(visibleDocSendUrl('CLOSED', 'APPROVED', 'https://docsend.com/view/abc')).toBeNull();
+    expect(visibleDocSendUrl('OPEN', 'APPROVED', url)).toBe(url);
+    expect(visibleDocSendUrl('DRAFT', 'APPROVED', url)).toBeNull();
+    expect(visibleDocSendUrl('OPEN', 'NONE', url)).toBeNull();
+    expect(visibleDocSendUrl('CLOSED', 'APPROVED', url)).toBeNull();
+  });
+
+  it('hides the url until the data room email is sent, and shows it when the flag is off', () => {
+    expect(
+      visibleDocSendUrl('OPEN', 'APPROVED', url, { emailOnDataRoomRequest: true, dataRoomEmailSent: false })
+    ).toBeNull();
+    expect(visibleDocSendUrl('OPEN', 'APPROVED', url, { emailOnDataRoomRequest: true, dataRoomEmailSent: true })).toBe(
+      url
+    );
+    expect(
+      visibleDocSendUrl('OPEN', 'APPROVED', url, { emailOnDataRoomRequest: false, dataRoomEmailSent: false })
+    ).toBe(url);
+  });
+});
+
+describe('assignSenders', () => {
+  it('splits an odd list so the counts differ by one', () => {
+    const assigned = assignSenders(
+      [{ memberUid: 'c' }, { memberUid: 'a' }, { memberUid: 'b' }],
+      [
+        { email: 'one@example.com', name: 'One' },
+        { email: 'two@example.com', name: 'Two' },
+      ]
+    );
+    expect(assigned.map((row) => [row.recipient.memberUid, row.sender.email])).toEqual([
+      ['a', 'one@example.com'],
+      ['b', 'two@example.com'],
+      ['c', 'one@example.com'],
+    ]);
+  });
+});
+
+describe('batchSendDurationMs', () => {
+  it('uses the fullest sender and waits between that sender’s emails', () => {
+    expect(batchSendDurationMs(5, 2, 1)).toBe(120_000);
+    expect(batchSendDurationMs(10, 1, 10)).toBe(54_000);
+    expect(batchSendDurationMs(1, 2, 5)).toBe(0);
   });
 });
 describe('openNoticeCounts', () => {

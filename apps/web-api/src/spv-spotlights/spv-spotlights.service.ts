@@ -1,13 +1,15 @@
-import { HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, HttpException, HttpStatus, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import {
   accessRequestConflict,
+  asEmailTemplates,
   normalizeEmail,
   resolveViewerAccess,
   ViewerAccess,
   visibleDocSendUrl,
 } from './spv-spotlight.utils';
+import { SpvSpotlightMailer } from './spv-spotlight-mailer';
 
 const spotlightInclude = {
   media: {
@@ -50,7 +52,7 @@ type SpotlightWithTeam = Prisma.SpvSpotlightGetPayload<{ include: typeof spotlig
 
 @Injectable()
 export class SpvSpotlightsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly mailer: SpvSpotlightMailer) {}
 
   async getBySlug(slug: string, memberEmail: string | null) {
     const spotlight = await this.prisma.spvSpotlight.findUnique({
@@ -75,16 +77,9 @@ export class SpvSpotlightsService {
             where: { spvSpotlightUid_memberUid: { spvSpotlightUid: spotlight.uid, memberUid: member.uid } },
             select: { status: true },
           }),
-          this.prisma.spvSpotlightParticipant.findFirst({
-            where: {
-              spvSpotlightUid: spotlight.uid,
-              memberUid: member.uid,
-              OR: [
-                { type: 'INVESTOR', cohort: 'PRE_APPROVED' },
-                { type: 'FOUNDER', access: { not: 'RESTRICTED' } },
-              ],
-            },
-            select: { type: true },
+          this.prisma.spvSpotlightParticipant.findUnique({
+            where: { spvSpotlightUid_memberUid: { spvSpotlightUid: spotlight.uid, memberUid: member.uid } },
+            select: { type: true, cohort: true, access: true, dataRoomEmailSentAt: true },
           }),
         ])
       : [null, null];
@@ -92,11 +87,86 @@ export class SpvSpotlightsService {
     const viewerAccess = resolveViewerAccess({
       hasToken: !!email,
       requestStatus: request?.status ?? null,
-      isPreApproved: participant?.type === 'INVESTOR',
-      isFounder: participant?.type === 'FOUNDER',
+      isPreApproved: participant?.type === 'INVESTOR' && participant.cohort === 'PRE_APPROVED',
+      isFounder: participant?.type === 'FOUNDER' && participant.access !== 'RESTRICTED',
     });
 
-    return this.toPublic(spotlight, viewerAccess);
+    return this.toPublic(spotlight, viewerAccess, !!participant?.dataRoomEmailSentAt);
+  }
+
+  async sendDataRoomAccessEmail(slug: string, memberEmail: string | null) {
+    if (!memberEmail) {
+      throw new UnauthorizedException('Sign in to request the data room email');
+    }
+    const spotlight = await this.prisma.spvSpotlight.findUnique({
+      where: { slug },
+      include: { team: { select: { name: true } } },
+    });
+    if (!spotlight) {
+      throw new NotFoundException('SPV spotlight not found');
+    }
+    const email = normalizeEmail(memberEmail);
+    const member = await this.prisma.member.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' }, deletedAt: null },
+      select: { uid: true, name: true, email: true },
+    });
+    if (!member?.email) {
+      throw new UnauthorizedException('Sign in to request the data room email');
+    }
+    const [request, participant] = await Promise.all([
+      this.prisma.spvAccessRequest.findUnique({
+        where: { spvSpotlightUid_memberUid: { spvSpotlightUid: spotlight.uid, memberUid: member.uid } },
+        select: { status: true },
+      }),
+      this.prisma.spvSpotlightParticipant.findUnique({
+        where: { spvSpotlightUid_memberUid: { spvSpotlightUid: spotlight.uid, memberUid: member.uid } },
+      }),
+    ]);
+    const viewerAccess = resolveViewerAccess({
+      hasToken: true,
+      requestStatus: request?.status ?? null,
+      isPreApproved: participant?.type === 'INVESTOR' && participant.cohort === 'PRE_APPROVED',
+      isFounder: participant?.type === 'FOUNDER' && participant.access !== 'RESTRICTED',
+    });
+    if (
+      viewerAccess !== 'APPROVED' ||
+      spotlight.status !== 'OPEN' ||
+      !spotlight.emailOnDataRoomRequest ||
+      !spotlight.docSendUrl ||
+      !participant
+    ) {
+      throw new ForbiddenException('Data room email is not available');
+    }
+    if (participant.dataRoomEmailSentAt) {
+      return { docSendUrl: spotlight.docSendUrl };
+    }
+    const template = asEmailTemplates(spotlight.emailTemplates, spotlight.title).dataRoomAccess;
+    await this.mailer.send({
+      spotlight: {
+        uid: spotlight.uid,
+        slug: spotlight.slug,
+        title: spotlight.title,
+        supportEmail: spotlight.supportEmail,
+        senderEmail: spotlight.senderEmail,
+        senderName: spotlight.senderName,
+        replyToEmail: spotlight.replyToEmail,
+        teamName: spotlight.team.name,
+      },
+      template,
+      to: member.email,
+      memberUid: member.uid,
+      memberName: member.name || '',
+      from: { email: template.fromEmail, name: template.fromName },
+      cc: template.cc,
+      replyTo: template.fromEmail,
+      bccSender: false,
+      extra: { docSendLink: spotlight.docSendUrl },
+    });
+    await this.prisma.spvSpotlightParticipant.update({
+      where: { uid: participant.uid },
+      data: { dataRoomEmailSentAt: new Date() },
+    });
+    return { docSendUrl: spotlight.docSendUrl };
   }
 
   async requestAccess(
@@ -260,7 +330,7 @@ export class SpvSpotlightsService {
     return resolvedTeam.uid;
   }
 
-  private toPublic(spotlight: SpotlightWithTeam, viewerAccess: ViewerAccess) {
+  private toPublic(spotlight: SpotlightWithTeam, viewerAccess: ViewerAccess, dataRoomEmailSent = false) {
     const seen = new Set<string>();
     const founders = spotlight.team.teamMemberRoles
       .filter((row) => {
@@ -277,7 +347,11 @@ export class SpvSpotlightsService {
         role: row.role,
       }));
 
-    const showDataRoom = visibleDocSendUrl(spotlight.status, viewerAccess, spotlight.docSendUrl);
+    const emailOnDataRoomRequest = Boolean(spotlight.emailOnDataRoomRequest && spotlight.docSendUrl);
+    const showDataRoom = visibleDocSendUrl(spotlight.status, viewerAccess, spotlight.docSendUrl, {
+      emailOnDataRoomRequest: spotlight.emailOnDataRoomRequest,
+      dataRoomEmailSent,
+    });
 
     return {
       uid: spotlight.uid,
@@ -299,6 +373,8 @@ export class SpvSpotlightsService {
         liquidity: spotlight.liquidity ?? null,
       },
       docSendUrl: showDataRoom,
+      emailOnDataRoomRequest,
+      dataRoomEmailSent,
       team: {
         uid: spotlight.team.uid,
         name: spotlight.team.name,

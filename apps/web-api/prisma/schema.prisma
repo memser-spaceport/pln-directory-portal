@@ -1595,6 +1595,8 @@ model SpvSpotlight {
   senderEmail   String?
   senderName    String?
   replyToEmail  String?
+  senders       Json            @default("[]")
+  emailOnDataRoomRequest Boolean @default(false)
   docSendUrl    String?
   summary       String?
   closesAt      DateTime?
@@ -1650,6 +1652,7 @@ model SpvSpotlightParticipant {
   followUpSentCount      Int                        @default(0)
   openNoticeSentAt       DateTime?
   openNoticeSentCount    Int                        @default(0)
+  dataRoomEmailSentAt    DateTime?
   emailTemplateVariables Json?
   createdAt              DateTime                   @default(now())
   updatedAt              DateTime                   @updatedAt

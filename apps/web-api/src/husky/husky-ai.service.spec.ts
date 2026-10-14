@@ -516,3 +516,54 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
     expect(generateTextMock.mock.invocationCallOrder[0]).toBeLessThan(streamTextMock.mock.invocationCallOrder[0]);
   });
 });
+
+describe('HuskyAiService.getThreadById', () => {
+  const thread = {
+    threadId: 'thread-1',
+    email: 'owner@example.com',
+    contextual: [
+      { questionId: 'q-1', question: 'Who works on storage?', createdAt: 1 },
+      { questionId: 'q-2', question: 'Who funds it?', createdAt: 2 },
+    ],
+  };
+
+  const createService = () => {
+    const persistent = {
+      findOneByKeyValue: jest.fn((collection: string) => Promise.resolve(collection === 'threads' ? thread : null)),
+      findByKeyValue: jest.fn().mockResolvedValue([{ questionId: 'q-2', rating: 1, reasons: ['Out of date'] }]),
+    };
+    const service = new HuskyAiService(
+      { error: jest.fn(), info: jest.fn() } as any,
+      { set: jest.fn() } as any,
+      persistent as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+    return { service, persistent };
+  };
+
+  beforeEach(() => {
+    process.env.MONGO_THREADS_COLLECTION = 'threads';
+    process.env.MONGO_FEEDBACK_COLLECTION = 'feedback';
+  });
+
+  it("returns the owner's vote on each answer they rated", async () => {
+    const { service, persistent } = createService();
+
+    const result = await service.getThreadById('thread-1', 'owner@example.com');
+
+    expect(persistent.findByKeyValue).toHaveBeenCalledWith('feedback', 'threadId', 'thread-1');
+    expect(result.chats.map((chat) => chat.feedback)).toEqual([undefined, { rating: 1, reasons: ['Out of date'] }]);
+  });
+
+  it('returns no votes to a reader who does not own the thread', async () => {
+    const { service } = createService();
+    thread.email = '';
+
+    const result = await service.getThreadById('thread-1', 'reader@example.com');
+
+    expect(result.chats.map((chat) => chat.feedback)).toEqual([undefined, undefined]);
+    thread.email = 'owner@example.com';
+  });
+});
