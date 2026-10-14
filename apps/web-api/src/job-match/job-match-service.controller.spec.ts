@@ -1,4 +1,6 @@
 jest.mock('ai', () => ({ generateText: jest.fn() }));
+// The send service injects the analytics service, whose PostHog client is ESM-only under jest.
+jest.mock('../analytics/service/analytics.service', () => ({ AnalyticsService: class AnalyticsService {} }));
 
 import { BadRequestException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { JobMatchServiceController } from './job-match-service.controller';

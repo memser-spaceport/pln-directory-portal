@@ -3,6 +3,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { AnalyticsService } from '../analytics/service/analytics.service';
 import { webUiBase } from '../job-openings/job-openings-url';
 import { SuggestedCandidatesEmailPreferenceService } from '../notification-settings/suggested-candidates-email-preference.service';
 import { PrismaService } from '../shared/prisma.service';
@@ -13,6 +14,7 @@ import {
   renderSuggestedCandidatesEmail,
   type SuggestedCandidatesEmailInput,
 } from './emails/suggested-candidates-email';
+import { trackSuggestedCandidatesEmailSent } from './job-match-analytics';
 import { listRunSuggestions, type ListedSuggestion } from './job-match-suggestions';
 import { JOB_MATCH_RUN_COMPLETED, type JobMatchRunCompletedPayload } from './job-match.events';
 import { isEmailDryRun, isLiveOpening, labelText, newSuggestions, parseEmailTeamAllowlist } from './job-match.logic';
@@ -46,7 +48,8 @@ export class SuggestedCandidatesEmailService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly awsService: AwsService,
-    private readonly preference: SuggestedCandidatesEmailPreferenceService
+    private readonly preference: SuggestedCandidatesEmailPreferenceService,
+    private readonly analytics: AnalyticsService
   ) {}
 
   /** Never rethrows: an email failure must not reach the runner (whose run is already COMPLETED). */
@@ -170,7 +173,10 @@ export class SuggestedCandidatesEmailService {
     return result;
   }
 
-  /** Claim first so two overlapping sends cannot both email the lead; drop the claim again when SES fails. */
+  /**
+   * Claim first so two overlapping sends cannot both email the lead; drop the claim again when SES fails.
+   * Only a delivered email is tracked (`suggested-candidates-email-sent`); dry runs and previews never get here.
+   */
   private async claimAndSend(
     email: RenderedEmail,
     lead: Lead,
@@ -195,7 +201,6 @@ export class SuggestedCandidatesEmailService {
         html: email.html,
         text: email.text,
       });
-      return true;
     } catch (error) {
       this.logger.error(
         `suggested-candidates email to ${lead.uid} for role ${claim.roleUid} failed: ${errorText(error)}`
@@ -205,6 +210,8 @@ export class SuggestedCandidatesEmailService {
       });
       return false;
     }
+    trackSuggestedCandidatesEmailSent(this.analytics, this.logger, { recipientUid: lead.uid, ...claim });
+    return true;
   }
 
   /** Raw SUGGESTION member uids of the role's previous ROLE row (any run before this one); null when none. */

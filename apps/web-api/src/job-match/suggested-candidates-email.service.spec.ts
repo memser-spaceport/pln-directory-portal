@@ -1,5 +1,7 @@
 // Preview files are not written to disk in tests; fs exports are not spy-able, so the module is mocked.
 jest.mock('fs', () => ({ ...jest.requireActual('fs'), writeFileSync: jest.fn() }));
+// The real analytics service pulls in the PostHog client; the service only calls trackEvent on the instance.
+jest.mock('../analytics/service/analytics.service', () => ({ AnalyticsService: class AnalyticsService {} }));
 
 import * as fs from 'fs';
 import { Logger } from '@nestjs/common';
@@ -213,12 +215,14 @@ function world() {
     isEmailServiceEnabled: jest.fn(() => true),
     sendHtmlEmail: jest.fn<Promise<unknown>, [SentEmail]>(async () => ({ MessageId: 'x' })),
   };
+  const analytics = { trackEvent: jest.fn<Promise<void>, [unknown]>(async () => undefined) };
   const service = new SuggestedCandidatesEmailService(
     prisma as never,
     aws as never,
-    new SuggestedCandidatesEmailPreferenceService(prisma as never)
+    new SuggestedCandidatesEmailPreferenceService(prisma as never),
+    analytics as never
   );
-  return { service, prisma, aws, sends, settings };
+  return { service, prisma, aws, sends, settings, analytics };
 }
 
 describe('SuggestedCandidatesEmailService', () => {
@@ -397,6 +401,58 @@ describe('SuggestedCandidatesEmailService', () => {
       service.onRunCompleted({ runUid: 'run-1', runDate: '2026-10-12', completedAt: day(12).toISOString() })
     ).resolves.toBeUndefined();
     expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('suggested-candidates email for run run-1 failed'));
+  });
+
+  describe('analytics (LAB-2853)', () => {
+    const sentEvent = (recipientUid: string, roleUid: string, candidateCount: number) => ({
+      name: 'suggested-candidates-email-sent',
+      distinctId: recipientUid,
+      properties: { role_uid: roleUid, team_uid: 'team-1', run_uid: 'run-1', candidate_count: candidateCount },
+    });
+
+    it('tracks one suggested-candidates-email-sent per delivered email, to the lead', async () => {
+      const { service, analytics } = world();
+      await service.sendForRun('run-1');
+      expect(analytics.trackEvent).toHaveBeenCalledTimes(2);
+      expect(analytics.trackEvent).toHaveBeenCalledWith(sentEvent('L1', 'role-1', 1));
+      expect(analytics.trackEvent).toHaveBeenCalledWith(sentEvent('L1', 'role-5', 2));
+    });
+
+    it('tracks nothing for a dry run or a preview', async () => {
+      process.env.JOB_MATCH_EMAIL_DRY_RUN = 'true';
+      const dry = world();
+      await dry.service.sendForRun('run-1');
+      expect(dry.analytics.trackEvent).not.toHaveBeenCalled();
+
+      delete process.env.JOB_MATCH_EMAIL_DRY_RUN;
+      const preview = world();
+      preview.aws.isEmailServiceEnabled.mockReturnValue(false);
+      await preview.service.sendForRun('run-1');
+      expect(preview.analytics.trackEvent).not.toHaveBeenCalled();
+    });
+
+    it('tracks nothing for a failed or already-claimed send', async () => {
+      const { service, aws, analytics, prisma } = world();
+      aws.sendHtmlEmail.mockRejectedValueOnce(new Error('SES down'));
+      prisma.jobMatchEmailSend.create.mockRejectedValueOnce(Object.assign(new Error('dup'), { code: 'P2002' }));
+      await expect(service.sendForRun('run-1')).resolves.toMatchObject({ sent: 0, skipped: 4 });
+      expect(analytics.trackEvent).not.toHaveBeenCalled();
+    });
+
+    it('still sends and counts every email when tracking throws or rejects, and logs the failure', async () => {
+      const { service, aws, analytics, sends } = world();
+      analytics.trackEvent
+        .mockImplementationOnce(() => {
+          throw new Error('posthog exploded');
+        })
+        .mockRejectedValueOnce(new Error('posthog unreachable'));
+      await expect(service.sendForRun('run-1')).resolves.toMatchObject({ sent: 2, skipped: 2 });
+      expect(aws.sendHtmlEmail).toHaveBeenCalledTimes(2);
+      expect(sends).toHaveLength(2);
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('posthog exploded'));
+      expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('posthog unreachable'));
+    });
   });
 
   describe('completedRun', () => {
