@@ -220,7 +220,7 @@ describe('attach or create organization team', () => {
         create: roleCreate,
       },
     };
-    const service = new SpvSpotlightsService(prisma as never);
+    const service = new SpvSpotlightsService(prisma as never, {} as never);
     const attach = (
       service as unknown as {
         attachOrganization: (memberUid: string, role: string, organization: string) => Promise<string>;
@@ -250,7 +250,7 @@ describe('attach or create organization team', () => {
         create: jest.fn().mockResolvedValue({}),
       },
     };
-    const service = new SpvSpotlightsService(prisma as never);
+    const service = new SpvSpotlightsService(prisma as never, {} as never);
     const attach = (
       service as unknown as {
         attachOrganization: (memberUid: string, role: string, organization: string) => Promise<string>;
