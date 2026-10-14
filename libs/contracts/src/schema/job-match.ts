@@ -9,12 +9,39 @@ import { z } from 'zod';
 
 export const CONTACT_MESSAGE_MAX_LENGTH = 2000;
 
+/** The groups a match criterion is filed under (LAB-2854), in the order the Edit criteria modal lists them. */
+export const MATCH_CRITERION_GROUPS = ['Skills', 'Experience', 'Seniority', 'Location', 'Other'] as const;
+export type MatchCriterionGroup = typeof MATCH_CRITERION_GROUPS[number];
+export const MatchCriterionGroupSchema = z.enum(MATCH_CRITERION_GROUPS);
+
+/** Longest short label of a match criterion (LAB-2854). */
+export const MATCH_CRITERION_LABEL_MAX_LENGTH = 40;
+
+/**
+ * A criterion's short label and group (LAB-2854). Both keys are absent, never `null`, when unknown: criteria
+ * extracted before LAB-2854 that the runner has not labelled yet, and suggestions whose criterion is no longer
+ * among the role's current criteria. `text` (the full statement) stays the criterion's identity everywhere.
+ */
+const criterionMetaShape = {
+  label: z.string().max(MATCH_CRITERION_LABEL_MAX_LENGTH).optional(),
+  group: MatchCriterionGroupSchema.optional(),
+};
+
 /** One extracted match criterion of a role's current posting, as the GET and the PUT return it. */
 export const MatchCriterionSchema = z.object({
   text: z.string(),
   enabled: z.boolean(),
+  ...criterionMetaShape,
 });
 export type MatchCriterion = z.infer<typeof MatchCriterionSchema>;
+
+/** One criterion of a suggested candidate in the GET: whether the candidate's profile supports it. */
+export const SuggestedCandidateCriterionSchema = z.object({
+  text: z.string(),
+  matched: z.boolean(),
+  ...criterionMetaShape,
+});
+export type SuggestedCandidateCriterion = z.infer<typeof SuggestedCandidateCriterionSchema>;
 
 /** Longest criteria prompt a lead may save, counted after trimming (LAB-2853). */
 export const CRITERIA_PROMPT_MAX_LENGTH = 500;

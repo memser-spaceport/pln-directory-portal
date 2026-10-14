@@ -38,6 +38,11 @@ function prismaMock() {
 
 const criteria = ['Go', 'Senior', 'Remote', 'Postgres'];
 
+/** A CRITERIA payload in the LAB-2854 shape; a bare `string[]` is the legacy shape. */
+function labelled(statements: string[]) {
+  return statements.map((statement) => ({ statement, label: statement.slice(0, 40), group: 'Skills' }));
+}
+
 const jobRow = {
   uid: 'role-1',
   roleTitle: 'Backend Engineer',
@@ -147,7 +152,7 @@ describe('JobMatchRunner', () => {
       }
       return [];
     });
-    prisma.jobMatchRow.findFirst.mockResolvedValue({ payload: criteria });
+    prisma.jobMatchRow.findFirst.mockResolvedValue({ payload: labelled(criteria) });
     generateTextMock.mockResolvedValue({
       text: JSON.stringify([{ memberUid: 'member-1', blurb: 'Knows Go.', matched: [true, true, true, false] }]),
     });
@@ -192,7 +197,7 @@ describe('JobMatchRunner', () => {
       { jobOpeningUid: 'role-1', memberUid: 'member-9' },
     ]);
     prisma.teamInterest.findMany.mockResolvedValue([{ memberUid: 'member-3' }]);
-    prisma.jobMatchRow.findFirst.mockResolvedValue({ payload: criteria });
+    prisma.jobMatchRow.findFirst.mockResolvedValue({ payload: labelled(criteria) });
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({ answers: { 'role-1': { probability: 0.7 } } }),
@@ -249,7 +254,7 @@ describe('JobMatchRunner', () => {
       { memberUid: 'member-3', message: 'Team note.' },
       { memberUid: 'member-4', message: 'Team note 4.' },
     ]);
-    prisma.jobMatchRow.findFirst.mockResolvedValue({ payload: criteria });
+    prisma.jobMatchRow.findFirst.mockResolvedValue({ payload: labelled(criteria) });
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({ answers: { 'role-1': { probability: 0.7 } } }),
@@ -290,7 +295,7 @@ describe('JobMatchRunner', () => {
       { jobOpeningUid: 'role-1', memberUid: 'member-1', note: null },
     ]);
     prisma.teamInterest.findMany.mockResolvedValue([{ memberUid: 'member-1', message: null }]);
-    prisma.jobMatchRow.findFirst.mockResolvedValue({ payload: criteria });
+    prisma.jobMatchRow.findFirst.mockResolvedValue({ payload: labelled(criteria) });
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({ answers: { 'role-1': { probability: 0.7 } } }),
@@ -320,7 +325,7 @@ describe('JobMatchRunner', () => {
       return [memberRow];
     });
     prisma.findMany.mockResolvedValue([]);
-    prisma.jobMatchRow.findFirst.mockResolvedValue({ payload: criteria });
+    prisma.jobMatchRow.findFirst.mockResolvedValue({ payload: labelled(criteria) });
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({ answers: { 'role-1': { probability: 0.2 } } }),
@@ -361,6 +366,8 @@ describe('JobMatchRunner', () => {
       probability?: number;
       disabled?: string[];
       prompt?: string | null;
+      legacy?: boolean;
+      labels?: string | Error;
     }) {
       const prisma = prismaMock();
       prisma.jobMatchRow.findUnique.mockResolvedValue(null);
@@ -393,12 +400,18 @@ describe('JobMatchRunner', () => {
           },
         ]);
       }
-      prisma.jobMatchRow.findFirst.mockResolvedValue({ payload: overrideCriteria });
+      prisma.jobMatchRow.findFirst.mockResolvedValue({
+        payload: options.legacy ? overrideCriteria : labelled(overrideCriteria),
+      });
       fetchMock.mockResolvedValue({
         ok: true,
         json: async () => ({ answers: { 'role-1': { probability: options.probability ?? 0.9 } } }),
       });
       generateTextMock.mockImplementation(async ({ prompt }: { prompt: string }) => {
+        if (prompt.includes('Give each criterion a short label')) {
+          if (options.labels instanceof Error) throw options.labels;
+          return { text: options.labels ?? '[]' };
+        }
         const count = prompt.includes('Remote EU') ? 4 : 3;
         return {
           text: JSON.stringify([{ memberUid: 'member-1', blurb: 'Fits.', matched: Array(count).fill(true) }]),
@@ -492,6 +505,112 @@ describe('JobMatchRunner', () => {
       expect(prompt).not.toContain('Remote EU');
       const rows = prisma.suggestionCreateMany.mock.calls[0][0].data;
       expect(rows[0].payload).toEqual(enabled.map((text) => ({ text, matched: true })));
+    });
+
+    describe('legacy criteria rows (LAB-2854)', () => {
+      const labels = [
+        { statement: 'Go', label: 'Go', group: 'Skills' },
+        { statement: 'Senior', label: 'Senior level', group: 'Seniority' },
+        { statement: 'Remote EU', label: 'Remote in the EU', group: 'Location' },
+        { statement: 'Postgres', label: 'Postgres', group: 'Skills' },
+      ];
+
+      function criteriaUpserts(prisma: ReturnType<typeof setup>['prisma']) {
+        return prisma.jobMatchRow.upsert.mock.calls
+          .map(([args]: [{ create: { kind: string } }]) => args)
+          .filter((args: { create: { kind: string } }) => args.create.kind === 'CRITERIA');
+      }
+
+      function labelCalls() {
+        return generateTextMock.mock.calls.filter(([args]: [{ prompt: string }]) =>
+          args.prompt.includes('Give each criterion a short label')
+        );
+      }
+
+      it('labels a legacy row with one call and stores a new row under the same posting hash', async () => {
+        const { prisma, runner } = setup({ legacy: true, labels: JSON.stringify(labels) });
+        await runner.processTeam('run-1', { uid: 'team-1', name: 'Prime Intellect' });
+        expect(labelCalls()).toHaveLength(1);
+        for (const statement of overrideCriteria) {
+          expect(labelCalls()[0][0].prompt).toContain(JSON.stringify(statement));
+        }
+        expect(criteriaUpserts(prisma)).toEqual([
+          {
+            where: {
+              kind_runUid_teamUid_roleUid_memberUid_roleTextHash: {
+                kind: 'CRITERIA',
+                runUid: 'run-1',
+                teamUid: '',
+                roleUid: 'role-1',
+                memberUid: '',
+                roleTextHash: postingHash,
+              },
+            },
+            create: {
+              kind: 'CRITERIA',
+              runUid: 'run-1',
+              roleUid: 'role-1',
+              roleTextHash: postingHash,
+              payload: labels,
+            },
+            update: { payload: labels },
+          },
+        ]);
+      });
+
+      it('does not label a row already in the new shape', async () => {
+        const { prisma, runner } = setup({});
+        await runner.processTeam('run-1', { uid: 'team-1', name: 'Prime Intellect' });
+        expect(labelCalls()).toHaveLength(0);
+        expect(criteriaUpserts(prisma)).toHaveLength(0);
+      });
+
+      it('keeps the score hash: a fit stored against the legacy row is reused, with no Jev call', async () => {
+        const storedRoleHash = scoreHash(postingHash, enabled, overrideCriteria);
+        const { prisma, runner } = setup({
+          legacy: true,
+          labels: JSON.stringify(labels),
+          overrideHash: postingHash,
+          storedRoleHash,
+        });
+        await runner.processTeam('run-1', { uid: 'team-1', name: 'Prime Intellect' });
+        expect(labelCalls()).toHaveLength(1);
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(prisma.suggestionCreateMany.mock.calls[0][0].data[0].payload).toEqual(
+          enabled.map((text) => ({ text, matched: true }))
+        );
+      });
+
+      it('keeps the posting hash of a role without an override, reusing its fit', async () => {
+        const { runner } = setup({ legacy: true, labels: JSON.stringify(labels), storedRoleHash: postingHash });
+        await runner.processTeam('run-1', { uid: 'team-1', name: 'Prime Intellect' });
+        expect(labelCalls()).toHaveLength(1);
+        expect(fetchMock).not.toHaveBeenCalled();
+      });
+
+      it('stores nothing and runs on unlabelled when the answer changes a statement', async () => {
+        const reworded = labels.map((item, index) => (index === 1 ? { ...item, statement: 'Senior engineer' } : item));
+        const { prisma, runner } = setup({
+          legacy: true,
+          labels: JSON.stringify(reworded),
+          overrideHash: postingHash,
+          storedRoleHash: scoreHash(postingHash, enabled, overrideCriteria),
+        });
+        await runner.processTeam('run-1', { uid: 'team-1', name: 'Prime Intellect' });
+        expect(criteriaUpserts(prisma)).toHaveLength(0);
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(
+          prisma.suggestionCreateMany.mock.calls[0][0].data[0].payload.map((c: { text: string }) => c.text)
+        ).toEqual(enabled);
+      });
+
+      it('stores nothing and still finishes the role when the label call fails', async () => {
+        const { prisma, runner } = setup({ legacy: true, labels: new Error('overloaded') });
+        await runner.processTeam('run-1', { uid: 'team-1', name: 'Prime Intellect' });
+        expect(labelCalls()).toHaveLength(1);
+        expect(criteriaUpserts(prisma)).toHaveLength(0);
+        expect(prisma.suggestionCreateMany).toHaveBeenCalled();
+      });
     });
 
     describe('criteria prompt (LAB-2853)', () => {

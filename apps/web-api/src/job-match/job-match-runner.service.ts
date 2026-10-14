@@ -11,15 +11,18 @@ import {
   JEV_MODEL,
   JEV_URL,
   TEAM_CONCURRENCY,
-  asStringList,
+  asCriteria,
   blurbPrompt,
   companyKey,
+  criteriaLabelPrompt,
   criteriaPrompt,
+  criterionStatements,
   currentRoleTextHash,
   enabledCriteria,
   fitsFromAnswers,
   formatRunDate,
   hasSignal,
+  isLegacyCriteriaPayload,
   jevQuestions,
   jobMatchBlocker,
   type JobMatchBlockerOptions,
@@ -27,6 +30,7 @@ import {
   mapPool,
   parseCandidateNotes,
   parseCriteria,
+  parseCriteriaLabels,
   pickInterestNote,
   planTeamWork,
   profileText,
@@ -39,6 +43,7 @@ import {
   selectTop,
   utcRunDate,
   withRetry,
+  type MatchCriterionItem,
   type MatchExperience,
   type MatchJob,
   type MatchMember,
@@ -238,10 +243,11 @@ export class JobMatchRunner {
     // override keeps its posting hash.
     const postingHashes = new Map(jobs.map((job) => [job.uid, currentRoleTextHash(job)]));
     const { disabledByUid, promptByUid } = await this.loadCriteriaOverrides(postingHashes);
+    // Statements only: labels and groups (LAB-2854) are display data and never reach a hash or a prompt.
     const criteriaByUid = new Map<string, string[]>();
     for (const job of jobs) {
       if (disabledByUid.has(job.uid) || promptByUid.has(job.uid)) {
-        criteriaByUid.set(job.uid, await this.criteriaFor(runUid, job));
+        criteriaByUid.set(job.uid, criterionStatements(await this.criteriaFor(runUid, job)));
       }
     }
     const roleHashes = new Map<string, string>(
@@ -285,7 +291,7 @@ export class JobMatchRunner {
     const jobsForCriteria = toScore.size ? jobs : jobs.filter((job) => plan.rolesToFinish.includes(job.uid));
     const enabledByUid = new Map<string, string[]>();
     for (const job of jobsForCriteria) {
-      const all = criteriaByUid.get(job.uid) ?? (await this.criteriaFor(runUid, job));
+      const all = criteriaByUid.get(job.uid) ?? criterionStatements(await this.criteriaFor(runUid, job));
       criteriaByUid.set(job.uid, all);
       enabledByUid.set(job.uid, enabledCriteria(all, disabledByUid.get(job.uid) ?? []));
     }
@@ -346,7 +352,12 @@ export class JobMatchRunner {
     await this.markTeamComplete(runUid, team.uid);
   }
 
-  private async criteriaFor(runUid: string, job: MatchJob): Promise<string[]> {
+  /**
+   * The role's criteria for its current posting: the newest CRITERIA row when it has at least 4, else a fresh
+   * extraction stored as `[{ statement, label, group }]` (LAB-2854). A cached row from before LAB-2854 (a plain
+   * `string[]`) is labelled once, see `labelLegacyCriteria`.
+   */
+  private async criteriaFor(runUid: string, job: MatchJob): Promise<MatchCriterionItem[]> {
     const posting = rolePosting(job);
     const hash = roleTextHash(posting);
     const cached = await this.prisma.jobMatchRow.findFirst({
@@ -354,10 +365,13 @@ export class JobMatchRunner {
       select: { payload: true },
       orderBy: { createdAt: 'desc' },
     });
-    const cachedCriteria = asStringList(cached?.payload);
-    if (cachedCriteria.length >= 4) return cachedCriteria.slice(0, 6);
+    const cachedCriteria = asCriteria(cached?.payload).slice(0, 6);
+    if (cachedCriteria.length >= 4) {
+      if (!isLegacyCriteriaPayload(cached?.payload)) return cachedCriteria;
+      return this.labelLegacyCriteria(runUid, job, hash, cachedCriteria);
+    }
 
-    const text = await withRetry(job.roleTitle, () => this.claude(criteriaPrompt(posting), 400));
+    const text = await withRetry(job.roleTitle, () => this.claude(criteriaPrompt(posting), 800));
     const criteria = parseCriteria(text);
     try {
       await this.prisma.jobMatchRow.create({
@@ -367,6 +381,48 @@ export class JobMatchRunner {
       if (!isUniqueConflict(error)) throw error;
     }
     return criteria;
+  }
+
+  /**
+   * Adds a label and a group to a legacy (`string[]`) criteria list with one model call, and stores the result as a
+   * new CRITERIA row under the same posting hash, which every reader then picks as the newest (LAB-2854). The
+   * statements are the criteria's identity, so the answer is used only when it returns them exactly; otherwise,
+   * or when the call fails, the run goes on with the statements unlabelled and the next run tries again. Either
+   * way the statements, and so the enabled list and the score hash, are the ones the legacy row held.
+   */
+  private async labelLegacyCriteria(
+    runUid: string,
+    job: MatchJob,
+    hash: string,
+    legacy: MatchCriterionItem[]
+  ): Promise<MatchCriterionItem[]> {
+    const statements = criterionStatements(legacy);
+    let labelled: MatchCriterionItem[] | null = null;
+    try {
+      labelled = parseCriteriaLabels(
+        await this.claude(criteriaLabelPrompt(job.roleTitle, statements), 600),
+        statements
+      );
+    } catch (error) {
+      this.logger.warn(`job match criteria labels for role ${job.uid} failed: ${errorText(error)}`);
+      return legacy;
+    }
+    if (!labelled) {
+      this.logger.warn(`job match criteria labels for role ${job.uid} changed the statements; kept unlabelled`);
+      return legacy;
+    }
+    // The same run may already hold the legacy row (a run claimed again after a deploy), so upsert on its key.
+    // A failed write only costs the labels this time; the run keeps them in memory either way.
+    try {
+      await this.prisma.jobMatchRow.upsert({
+        where: matchKey('CRITERIA', { runUid, roleUid: job.uid, roleTextHash: hash }),
+        create: { kind: 'CRITERIA', runUid, roleUid: job.uid, roleTextHash: hash, payload: labelled },
+        update: { payload: labelled },
+      });
+    } catch (error) {
+      this.logger.warn(`job match criteria labels for role ${job.uid} not stored: ${errorText(error)}`);
+    }
+    return labelled;
   }
 
   /**

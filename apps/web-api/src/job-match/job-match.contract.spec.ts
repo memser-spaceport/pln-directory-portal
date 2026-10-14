@@ -2,6 +2,7 @@ import {
   MatchCriteriaUpdateBodySchema,
   MatchCriterionSchema,
   SuggestedCandidateContactBodySchema,
+  SuggestedCandidateCriterionSchema,
 } from 'libs/contracts/src/schema/job-match';
 
 describe('SuggestedCandidateContactBodySchema', () => {
@@ -80,5 +81,27 @@ describe('MatchCriterionSchema', () => {
   it('describes { text, enabled }', () => {
     expect(MatchCriterionSchema.safeParse({ text: 'Rust', enabled: false }).success).toBe(true);
     expect(MatchCriterionSchema.safeParse({ text: 'Rust' }).success).toBe(false);
+  });
+
+  it('takes an optional label of at most 40 characters and a known group (LAB-2854)', () => {
+    const item = { text: 'Has shipped Rust', enabled: true };
+    expect(MatchCriterionSchema.safeParse({ ...item, label: 'Rust', group: 'Skills' }).success).toBe(true);
+    expect(MatchCriterionSchema.safeParse({ ...item, label: 'x'.repeat(40) }).success).toBe(true);
+    expect(MatchCriterionSchema.safeParse({ ...item, label: 'x'.repeat(41) }).success).toBe(false);
+    expect(MatchCriterionSchema.safeParse({ ...item, group: 'Hobbies' }).success).toBe(false);
+    expect(MatchCriterionSchema.safeParse({ ...item, label: null }).success).toBe(false);
+  });
+});
+
+describe('SuggestedCandidateCriterionSchema (LAB-2854)', () => {
+  it('describes { text, matched, label?, group? }', () => {
+    expect(SuggestedCandidateCriterionSchema.safeParse({ text: 'Rust', matched: true }).success).toBe(true);
+    expect(
+      SuggestedCandidateCriterionSchema.safeParse({ text: 'Rust', matched: false, label: 'Rust', group: 'Location' })
+        .success
+    ).toBe(true);
+    expect(SuggestedCandidateCriterionSchema.safeParse({ text: 'Rust', matched: true, group: 'Other ' }).success).toBe(
+      false
+    );
   });
 });
