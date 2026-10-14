@@ -44,6 +44,27 @@ const TEMPLATE_LABELS: { key: TemplateKey; label: string }[] = [
   { key: 'dataRoomAccess', label: 'Data room access' },
 ];
 
+function formatBatchSendDuration(recipientCount: number, senderCount: number, emailsPerMinute: number): string | null {
+  if (!Number.isInteger(emailsPerMinute) || emailsPerMinute < 1 || senderCount < 1 || recipientCount < 1) {
+    return null;
+  }
+  const busiestSender = Math.ceil(recipientCount / senderCount);
+  const durationMs = busiestSender <= 1 ? 0 : (busiestSender - 1) * Math.floor(60_000 / emailsPerMinute);
+  if (durationMs < 1000) {
+    return 'Less than a minute';
+  }
+  const totalSeconds = Math.ceil(durationMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes === 0) {
+    return `About ${seconds} second${seconds === 1 ? '' : 's'}`;
+  }
+  if (seconds === 0) {
+    return `About ${minutes} minute${minutes === 1 ? '' : 's'}`;
+  }
+  return `About ${minutes} minute${minutes === 1 ? '' : 's'} ${seconds} second${seconds === 1 ? '' : 's'}`;
+}
+
 function readSenders(data: Record<string, unknown> | null): { email: string; name: string }[] {
   if (!data || !Array.isArray(data.senders)) return [];
   return data.senders.flatMap((item) => {
@@ -209,6 +230,7 @@ const SpvSpotlightDetailPage = () => {
   const [dataRoomCc, setDataRoomCc] = useState('');
   const [useDefaultSender, setUseDefaultSender] = useState(true);
   const [selectedSenderEmails, setSelectedSenderEmails] = useState<string[]>([]);
+  const [emailsPerSenderPerMinute, setEmailsPerSenderPerMinute] = useState('');
   const [previewTemplate, setPreviewTemplate] = useState<TemplateKey | null>(null);
   const [editingTemplateVars, setEditingTemplateVars] = useState<Participant | null>(null);
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
@@ -351,7 +373,12 @@ const SpvSpotlightDetailPage = () => {
     mode: 'all' | 'selected',
     participantUids: string[]
   ) => {
-    const senderPayload = useDefaultSender ? { useDefaultSender: true } : { senderEmails: selectedSenderEmails };
+    const parsedRate = Number(emailsPerSenderPerMinute);
+    const emailsPerMinute = Number.isInteger(parsedRate) && parsedRate >= 1 ? parsedRate : undefined;
+    const senderPayload = {
+      ...(useDefaultSender ? { useDefaultSender: true } : { senderEmails: selectedSenderEmails }),
+      ...(emailsPerMinute ? { emailsPerSenderPerMinute: emailsPerMinute } : {}),
+    };
     const { data } =
       kind === 'open-notice'
         ? await api.post(
@@ -648,6 +675,14 @@ const SpvSpotlightDetailPage = () => {
   const sendRecipients = includeAlreadySent
     ? sendEligible
     : sendEligible.filter((participant) => !wasSent(participant));
+  const parsedEmailsPerMinute = Number(emailsPerSenderPerMinute);
+  const emailsPerMinute =
+    Number.isInteger(parsedEmailsPerMinute) && parsedEmailsPerMinute >= 1 ? parsedEmailsPerMinute : undefined;
+  const batchSenderCount = useDefaultSender ? 1 : selectedSenderEmails.length;
+  const busiestSender = batchSenderCount > 0 ? Math.ceil(sendRecipients.length / batchSenderCount) : 0;
+  const batchDuration = emailsPerMinute
+    ? formatBatchSendDuration(sendRecipients.length, batchSenderCount, emailsPerMinute)
+    : null;
   const sendSkipped = sendTargets.length - sendEligible.length;
   const sendNoun =
     bulkSend?.kind === 'open-notice' ? 'open notice' : bulkSend?.kind === 'follow-ups' ? 'follow-up' : 'invite';
@@ -1609,6 +1644,27 @@ const SpvSpotlightDetailPage = () => {
                 One address sends the whole batch. Two or more split the investors evenly.
               </p>
             </fieldset>
+            <label className="block">
+              <span className="mb-1 block font-medium text-gray-900">Emails per sender per minute</span>
+              <input
+                type="number"
+                min={1}
+                max={1000}
+                step={1}
+                value={emailsPerSenderPerMinute}
+                disabled={isConfirmRunning}
+                onChange={(event) => setEmailsPerSenderPerMinute(event.target.value)}
+                className="w-32 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
+                placeholder="No limit"
+              />
+            </label>
+            {batchDuration && (
+              <p className="rounded-md bg-gray-50 px-3 py-2 text-gray-800">
+                Each selected sender sends {emailsPerSenderPerMinute} email
+                {Number(emailsPerSenderPerMinute) === 1 ? '' : 's'} per minute. The fullest sender has {busiestSender}{' '}
+                of {sendRecipients.length}. This batch takes {batchDuration.toLowerCase()}.
+              </p>
+            )}
             <label className="flex cursor-pointer items-start gap-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-3">
               <input
                 type="checkbox"

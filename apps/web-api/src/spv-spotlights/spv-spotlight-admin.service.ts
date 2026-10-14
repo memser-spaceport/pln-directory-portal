@@ -37,6 +37,7 @@ import {
   replaceNbsp,
   resolveConfiguredSenders,
   sanitizeEmailHtml,
+  senderSendIntervalMs,
   SpotlightSender,
 } from './spv-spotlight.utils';
 import { SpvSpotlightMailer } from './spv-spotlight-mailer';
@@ -55,7 +56,7 @@ const SPV_DETAIL_KEYS = [
   'liquidity',
 ] as const;
 
-type SpvDetailKey = (typeof SPV_DETAIL_KEYS)[number];
+type SpvDetailKey = typeof SPV_DETAIL_KEYS[number];
 type SpvDetailInput = Partial<Record<SpvDetailKey, string | null>>;
 
 function spvDetailColumns(input: SpvDetailInput, mode: 'create' | 'update'): SpvDetailInput {
@@ -77,7 +78,10 @@ type BulkParticipantInput = Omit<InvestorBulkParticipantInput, 'name'> & {
 type BatchSenderChoice = {
   useDefaultSender?: boolean;
   senderEmails?: string[];
+  emailsPerSenderPerMinute?: number;
 };
+
+type PacedSend = { senderKey: string; run: () => Promise<void> };
 
 function savedSenderColumns(senders: SpotlightSender[]) {
   return { senders, ...primarySenderColumns(senders) };
@@ -137,23 +141,25 @@ export class SpvSpotlightAdminService {
     };
   }
 
-  async create(input: {
-    teamUid: string;
-    title: string;
-    description: string;
-    slug?: string;
-    status?: TeamPitchStatus;
-    supportEmail?: string | null;
-    senderEmail?: string | null;
-    senderName?: string | null;
-    senders?: SpotlightSender[];
-    emailOnDataRoomRequest?: boolean;
-    replyToEmail?: string | null;
-    docSendUrl?: string | null;
-    summary?: string | null;
-    closesAt?: string | null;
-    media?: MediaInput[];
-  } & SpvDetailInput) {
+  async create(
+    input: {
+      teamUid: string;
+      title: string;
+      description: string;
+      slug?: string;
+      status?: TeamPitchStatus;
+      supportEmail?: string | null;
+      senderEmail?: string | null;
+      senderName?: string | null;
+      senders?: SpotlightSender[];
+      emailOnDataRoomRequest?: boolean;
+      replyToEmail?: string | null;
+      docSendUrl?: string | null;
+      summary?: string | null;
+      closesAt?: string | null;
+      media?: MediaInput[];
+    } & SpvDetailInput
+  ) {
     const team = await this.prisma.team.findUnique({
       where: { uid: input.teamUid },
       select: { uid: true, name: true },
@@ -176,7 +182,9 @@ export class SpvSpotlightAdminService {
         status: input.status ?? 'DRAFT',
         supportEmail: resolveTeamPitchSupportEmail(input.supportEmail),
         ...(input.senders
-          ? savedSenderColumns(input.senders.map((sender) => ({ email: sender.email.trim(), name: sender.name.trim() })))
+          ? savedSenderColumns(
+              input.senders.map((sender) => ({ email: sender.email.trim(), name: sender.name.trim() }))
+            )
           : {
               senderEmail: normalizeOptionalTrimmed(input.senderEmail) ?? null,
               senderName: normalizeOptionalTrimmed(input.senderName) ?? null,
@@ -238,7 +246,9 @@ export class SpvSpotlightAdminService {
         ...(input.status !== undefined ? { status: input.status } : {}),
         ...(input.supportEmail !== undefined ? { supportEmail: resolveTeamPitchSupportEmail(input.supportEmail) } : {}),
         ...(input.senders
-          ? savedSenderColumns(input.senders.map((sender) => ({ email: sender.email.trim(), name: sender.name.trim() })))
+          ? savedSenderColumns(
+              input.senders.map((sender) => ({ email: sender.email.trim(), name: sender.name.trim() }))
+            )
           : {
               ...(input.senderEmail !== undefined
                 ? { senderEmail: normalizeOptionalTrimmed(input.senderEmail) ?? null }
@@ -247,9 +257,7 @@ export class SpvSpotlightAdminService {
                 ? { senderName: normalizeOptionalTrimmed(input.senderName) ?? null }
                 : {}),
             }),
-        ...(input.emailOnDataRoomRequest !== undefined
-          ? { emailOnDataRoomRequest: input.emailOnDataRoomRequest }
-          : {}),
+        ...(input.emailOnDataRoomRequest !== undefined ? { emailOnDataRoomRequest: input.emailOnDataRoomRequest } : {}),
         ...(input.replyToEmail !== undefined
           ? { replyToEmail: normalizeOptionalTrimmed(input.replyToEmail) ?? null }
           : {}),
@@ -696,35 +704,41 @@ export class SpvSpotlightAdminService {
     const senderByMember = this.senderByMember(spotlight, choice, targets);
     let sent = 0;
     let errors = 0;
-    for (const recipient of targets) {
-      try {
-        const sender = senderByMember?.get(recipient.memberUid);
-        await this.mailer.send({
-          spotlight: this.mailContext(spotlight),
-          template: templates.opened,
-          to: recipient.email,
-          memberUid: recipient.memberUid,
-          memberName: recipient.name,
-          extra: recipient.variables,
-          ...(sender ? { from: { email: sender.email, name: sender.name || null } } : {}),
-        });
-        if (recipient.participantUid) {
-          await this.prisma.spvSpotlightParticipant.update({
-            where: { uid: recipient.participantUid },
-            data: { openNoticeSentAt: new Date(), openNoticeSentCount: { increment: 1 } },
-          });
-        }
-        if (recipient.requestUid) {
-          await this.prisma.spvAccessRequest.update({
-            where: { uid: recipient.requestUid },
-            data: { openNoticeSentAt: new Date(), openNoticeSentCount: { increment: 1 } },
-          });
-        }
-        sent += 1;
-      } catch {
-        errors += 1;
-      }
-    }
+    await this.runAtSenderRate(
+      targets.map((recipient) => ({
+        senderKey: senderByMember?.get(recipient.memberUid)?.email ?? 'default',
+        run: async () => {
+          try {
+            const sender = senderByMember?.get(recipient.memberUid);
+            await this.mailer.send({
+              spotlight: this.mailContext(spotlight),
+              template: templates.opened,
+              to: recipient.email,
+              memberUid: recipient.memberUid,
+              memberName: recipient.name,
+              extra: recipient.variables,
+              ...(sender ? { from: { email: sender.email, name: sender.name || null } } : {}),
+            });
+            if (recipient.participantUid) {
+              await this.prisma.spvSpotlightParticipant.update({
+                where: { uid: recipient.participantUid },
+                data: { openNoticeSentAt: new Date(), openNoticeSentCount: { increment: 1 } },
+              });
+            }
+            if (recipient.requestUid) {
+              await this.prisma.spvAccessRequest.update({
+                where: { uid: recipient.requestUid },
+                data: { openNoticeSentAt: new Date(), openNoticeSentCount: { increment: 1 } },
+              });
+            }
+            sent += 1;
+          } catch {
+            errors += 1;
+          }
+        },
+      })),
+      choice.emailsPerSenderPerMinute
+    );
     return { summary: { totalEligible: targets.length, sent, skipped: recipients.length - targets.length, errors } };
   }
 
@@ -823,12 +837,18 @@ export class SpvSpotlightAdminService {
       const already = kind === 'invite' ? participant.inviteSentCount > 0 : participant.followUpSentCount > 0;
       return !!participant.member.email && (!already || includeAlreadySent);
     });
-    const senderByMember = this.senderByMember(spotlight, choice, willSend.map((participant) => ({
-      memberUid: participant.member.uid,
-    })));
+    const senderByMember = this.senderByMember(
+      spotlight,
+      choice,
+      willSend.map((participant) => ({
+        memberUid: participant.member.uid,
+      }))
+    );
+    const paced: PacedSend[] = [];
     for (const participant of participants) {
       const already = kind === 'invite' ? participant.inviteSentCount > 0 : participant.followUpSentCount > 0;
-      if (!participant.member.email) {
+      const recipientEmail = participant.member.email;
+      if (!recipientEmail) {
         errors += 1;
         rows.push({ participantUid: participant.uid, email: null, status: 'error', message: 'No email' });
         continue;
@@ -846,36 +866,42 @@ export class SpvSpotlightAdminService {
           : participant.cohort === 'OUTREACH'
           ? 'followUpOutreach'
           : 'followUpPreapproved';
-      try {
-        const sender = senderByMember?.get(participant.member.uid);
-        await this.mailer.send({
-          spotlight: this.mailContext(spotlight),
-          template: templates[key],
-          to: participant.member.email,
-          memberUid: participant.member.uid,
-          memberName: participant.member.name || '',
-          extra: asStringRecord(participant.emailTemplateVariables),
-          ...(sender ? { from: { email: sender.email, name: sender.name || null } } : {}),
-        });
-        await this.prisma.spvSpotlightParticipant.update({
-          where: { uid: participant.uid },
-          data:
-            kind === 'invite'
-              ? { inviteSentAt: new Date(), inviteSentCount: { increment: 1 } }
-              : { followUpSentAt: new Date(), followUpSentCount: { increment: 1 } },
-        });
-        sent += 1;
-        rows.push({ participantUid: participant.uid, email: participant.member.email, status: 'sent' });
-      } catch (error) {
-        errors += 1;
-        rows.push({
-          participantUid: participant.uid,
-          email: participant.member.email,
-          status: 'error',
-          message: error instanceof Error ? error.message : 'Send failed',
-        });
-      }
+      paced.push({
+        senderKey: senderByMember?.get(participant.member.uid)?.email ?? 'default',
+        run: async () => {
+          try {
+            const sender = senderByMember?.get(participant.member.uid);
+            await this.mailer.send({
+              spotlight: this.mailContext(spotlight),
+              template: templates[key],
+              to: recipientEmail,
+              memberUid: participant.member.uid,
+              memberName: participant.member.name || '',
+              extra: asStringRecord(participant.emailTemplateVariables),
+              ...(sender ? { from: { email: sender.email, name: sender.name || null } } : {}),
+            });
+            await this.prisma.spvSpotlightParticipant.update({
+              where: { uid: participant.uid },
+              data:
+                kind === 'invite'
+                  ? { inviteSentAt: new Date(), inviteSentCount: { increment: 1 } }
+                  : { followUpSentAt: new Date(), followUpSentCount: { increment: 1 } },
+            });
+            sent += 1;
+            rows.push({ participantUid: participant.uid, email: recipientEmail, status: 'sent' });
+          } catch (error) {
+            errors += 1;
+            rows.push({
+              participantUid: participant.uid,
+              email: recipientEmail,
+              status: 'error',
+              message: error instanceof Error ? error.message : 'Send failed',
+            });
+          }
+        },
+      });
     }
+    await this.runAtSenderRate(paced, choice.emailsPerSenderPerMinute);
     return { summary: { totalEligible: participants.length, sent, skipped, errors }, rows };
   }
 
@@ -1059,6 +1085,26 @@ export class SpvSpotlightAdminService {
     return selected as SpotlightSender[];
   }
 
+  private async runAtSenderRate(jobs: PacedSend[], emailsPerSenderPerMinute?: number) {
+    const groups = new Map<string, Array<() => Promise<void>>>();
+    for (const job of jobs) {
+      const runs = groups.get(job.senderKey) ?? [];
+      runs.push(job.run);
+      groups.set(job.senderKey, runs);
+    }
+    const intervalMs = senderSendIntervalMs(emailsPerSenderPerMinute);
+    await Promise.all(
+      [...groups.values()].map(async (runs) => {
+        for (let index = 0; index < runs.length; index += 1) {
+          if (index > 0 && intervalMs > 0) {
+            await new Promise((resolve) => setTimeout(resolve, intervalMs));
+          }
+          await runs[index]();
+        }
+      })
+    );
+  }
+
   private senderByMember(
     spotlight: { senders: unknown; senderEmail: string | null; senderName: string | null },
     choice: BatchSenderChoice,
@@ -1068,9 +1114,7 @@ export class SpvSpotlightAdminService {
     if (!selected) {
       return null;
     }
-    return new Map(
-      assignSenders(recipients, selected).map(({ recipient, sender }) => [recipient.memberUid, sender])
-    );
+    return new Map(assignSenders(recipients, selected).map(({ recipient, sender }) => [recipient.memberUid, sender]));
   }
 
   private mailContext(spotlight: {
