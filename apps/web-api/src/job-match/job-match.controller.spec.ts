@@ -15,7 +15,7 @@ describe('JobMatchController lead actions (LAB-2846)', () => {
   beforeEach(() => {
     service = {
       listForRole: jest.fn(),
-      updateCriteria: jest.fn().mockResolvedValue({ criteria: [] }),
+      updateCriteria: jest.fn().mockResolvedValue({ criteria: [], prompt: null }),
       contactCandidate: jest.fn().mockResolvedValue({ contactedAt: '2026-10-13T12:00:00.000Z' }),
     };
     controller = new JobMatchController(service as unknown as JobMatchService);
@@ -32,7 +32,29 @@ describe('JobMatchController lead actions (LAB-2846)', () => {
 
     it('passes a valid body to the service', async () => {
       await controller.updateMatchCriteria('role-1', { disabled: ['Rust'] }, req);
-      expect(service.updateCriteria).toHaveBeenCalledWith('role-1', ['Rust'], 'lead@example.com');
+      expect(service.updateCriteria).toHaveBeenCalledWith('role-1', { disabled: ['Rust'] }, 'lead@example.com');
+    });
+
+    it('passes a trimmed prompt, and a blank one as null (LAB-2853)', async () => {
+      await controller.updateMatchCriteria('role-1', { disabled: [], prompt: '  Rust in prod. ' }, req);
+      expect(service.updateCriteria).toHaveBeenLastCalledWith(
+        'role-1',
+        { disabled: [], prompt: 'Rust in prod.' },
+        'lead@example.com'
+      );
+      await controller.updateMatchCriteria('role-1', { disabled: [], prompt: '   ' }, req);
+      expect(service.updateCriteria).toHaveBeenLastCalledWith(
+        'role-1',
+        { disabled: [], prompt: null },
+        'lead@example.com'
+      );
+    });
+
+    it('answers 400 naming the prompt for a prompt over 500 characters', async () => {
+      await expect(
+        controller.updateMatchCriteria('role-1', { disabled: [], prompt: 'a'.repeat(501) }, req)
+      ).rejects.toThrow('prompt must be a string of at most 500 characters, or null');
+      expect(service.updateCriteria).not.toHaveBeenCalled();
     });
   });
 

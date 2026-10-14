@@ -16,11 +16,41 @@ export const MatchCriterionSchema = z.object({
 });
 export type MatchCriterion = z.infer<typeof MatchCriterionSchema>;
 
-/** `PUT /v1/job-openings/:roleUid/match-criteria`: the full set of disabled criteria texts. */
-export const MatchCriteriaUpdateBodySchema = z.object({
-  disabled: z.array(z.string().max(500)).max(20),
-});
+/** Longest criteria prompt a lead may save, counted after trimming (LAB-2853). */
+export const CRITERIA_PROMPT_MAX_LENGTH = 500;
+
+/**
+ * `PUT /v1/job-openings/:roleUid/match-criteria`: the full set of disabled criteria texts, and optionally the
+ * lead's free-text criteria prompt (LAB-2853).
+ *
+ * `prompt` semantics:
+ * - absent (`undefined`): keep the stored prompt unchanged, so a body from before prompts existed still works;
+ * - `null`, `""` or whitespace only: clear the stored prompt (parsed to `null`);
+ * - any other string: trimmed, at most `CRITERIA_PROMPT_MAX_LENGTH` characters after trimming.
+ *
+ * Zod 3.19 has no `.trim()`, so the prompt is trimmed in a transform and its length checked on the trimmed text.
+ * The parsed output has no `prompt` key at all when the body had none.
+ */
+export const MatchCriteriaUpdateBodySchema = z
+  .object({
+    disabled: z.array(z.string().max(500)).max(20),
+    prompt: z.string().nullable().optional(),
+  })
+  .transform(({ disabled, prompt }): { disabled: string[]; prompt?: string | null } =>
+    prompt === undefined ? { disabled } : { disabled, prompt: prompt?.trim() || null }
+  )
+  .refine((body) => !body.prompt || body.prompt.length <= CRITERIA_PROMPT_MAX_LENGTH, {
+    message: `prompt must be at most ${CRITERIA_PROMPT_MAX_LENGTH} characters after trimming`,
+    path: ['prompt'],
+  });
 export type MatchCriteriaUpdateBody = z.infer<typeof MatchCriteriaUpdateBodySchema>;
+
+/** What the PUT returns: every criterion with its flag, and the stored prompt (`null` when none). */
+export const MatchCriteriaUpdateResponseSchema = z.object({
+  criteria: z.array(MatchCriterionSchema),
+  prompt: z.string().nullable(),
+});
+export type MatchCriteriaUpdateResponse = z.infer<typeof MatchCriteriaUpdateResponseSchema>;
 
 /**
  * `POST /v1/job-openings/:roleUid/suggested-candidates/:memberUid/contact`.

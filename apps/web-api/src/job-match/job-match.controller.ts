@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import {
   CONTACT_MESSAGE_MAX_LENGTH,
+  CRITERIA_PROMPT_MAX_LENGTH,
   MatchCriteriaUpdateBodySchema,
   SuggestedCandidateContactBodySchema,
 } from 'libs/contracts/src/schema/job-match';
@@ -30,9 +31,14 @@ export class JobMatchController {
   async updateMatchCriteria(@Param('roleUid') roleUid: string, @Body() body: unknown, @Req() request: Request) {
     const parsed = MatchCriteriaUpdateBodySchema.safeParse(body);
     if (!parsed.success) {
-      throw new BadRequestException('disabled must be an array of criterion texts');
+      const promptIssue = parsed.error.issues.some((issue) => issue.path[0] === 'prompt');
+      throw new BadRequestException(
+        promptIssue
+          ? `prompt must be a string of at most ${CRITERIA_PROMPT_MAX_LENGTH} characters, or null`
+          : 'disabled must be an array of criterion texts'
+      );
     }
-    return this.jobMatchService.updateCriteria(roleUid, parsed.data.disabled, request['userEmail']);
+    return this.jobMatchService.updateCriteria(roleUid, parsed.data, request['userEmail']);
   }
 
   @Post(':roleUid/suggested-candidates/:memberUid/contact')

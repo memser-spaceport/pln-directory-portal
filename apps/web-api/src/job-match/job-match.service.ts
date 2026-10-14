@@ -67,7 +67,7 @@ export class JobMatchService {
   async listForRole(
     roleUid: string,
     userEmail: string | undefined
-  ): Promise<{ suggestions: SuggestedCandidate[]; criteria: MatchCriterionView[] }> {
+  ): Promise<{ suggestions: SuggestedCandidate[]; criteria: MatchCriterionView[]; criteriaPrompt: string | null }> {
     if (!userEmail) {
       throw new ForbiddenException('Only hiring team members and directory admins can read suggested candidates');
     }
@@ -83,7 +83,7 @@ export class JobMatchService {
     if (!allowed) {
       throw new ForbiddenException('Only hiring team members and directory admins can read suggested candidates');
     }
-    if (!isLiveOpening(job)) return { suggestions: [], criteria: [] };
+    if (!isLiveOpening(job)) return { suggestions: [], criteria: [], criteriaPrompt: null };
 
     const stored = await this.storedSuggestions(roleUid);
     const contacts = stored.length
@@ -110,19 +110,28 @@ export class JobMatchService {
     }));
 
     const { hash, all } = await this.currentCriteria(job);
-    const criteria = all.length ? flaggedCriteria(all, await this.disabledCriteria(roleUid, hash)) : [];
-    return { suggestions, criteria };
+    if (!all.length) return { suggestions, criteria: [], criteriaPrompt: null };
+    const override = await this.criteriaOverride(roleUid, hash);
+    return {
+      suggestions,
+      criteria: flaggedCriteria(all, override?.disabled ?? []),
+      criteriaPrompt: override?.prompt ?? null,
+    };
   }
 
   /**
-   * Replaces the disabled criteria of the role's current posting (LAB-2846). Takes effect from the next match
-   * run; nothing is re-scored here. Not gated on the role being live: a lead may tune a paused role.
+   * Replaces the disabled criteria of the role's current posting (LAB-2846) and, when `prompt` is present, the
+   * lead's criteria prompt (LAB-2853). `prompt` absent keeps the stored prompt; `null` clears it (the contract
+   * already turned "" and whitespace into `null` and trimmed the rest). A prompt may be saved with nothing
+   * disabled; at least one criterion must stay enabled. Takes effect from the next match run; nothing is
+   * re-scored here. Not gated on the role being live: a lead may tune a paused role.
    */
   async updateCriteria(
     roleUid: string,
-    disabled: string[],
+    body: { disabled: string[]; prompt?: string | null },
     userEmail: string | undefined
-  ): Promise<{ criteria: MatchCriterionView[] }> {
+  ): Promise<{ criteria: MatchCriterionView[]; prompt: string | null }> {
+    const { disabled } = body;
     const job = await this.loadJob(roleUid);
     const member = await this.assertCanAct(job, userEmail);
 
@@ -139,12 +148,14 @@ export class JobMatchService {
       throw new BadRequestException('At least one criterion must stay enabled');
     }
 
-    await this.prisma.jobMatchCriteriaOverride.upsert({
+    const prompt = body.prompt === undefined ? {} : { prompt: body.prompt };
+    const saved = await this.prisma.jobMatchCriteriaOverride.upsert({
       where: { roleUid_roleTextHash: { roleUid, roleTextHash: hash } },
-      create: { roleUid, roleTextHash: hash, disabled: normalized, updatedByUid: member.uid },
-      update: { disabled: normalized, updatedByUid: member.uid },
+      create: { roleUid, roleTextHash: hash, disabled: normalized, ...prompt, updatedByUid: member.uid },
+      update: { disabled: normalized, ...prompt, updatedByUid: member.uid },
+      select: { prompt: true },
     });
-    return { criteria: flaggedCriteria(all, normalized) };
+    return { criteria: flaggedCriteria(all, normalized), prompt: saved.prompt ?? null };
   }
 
   /**
@@ -269,12 +280,14 @@ export class JobMatchService {
     return { hash, all: asStringList(row?.payload).slice(0, 6) };
   }
 
-  private async disabledCriteria(roleUid: string, hash: string): Promise<string[]> {
-    const override = await this.prisma.jobMatchCriteriaOverride.findUnique({
+  private async criteriaOverride(
+    roleUid: string,
+    hash: string
+  ): Promise<{ disabled: string[]; prompt: string | null } | null> {
+    return this.prisma.jobMatchCriteriaOverride.findUnique({
       where: { roleUid_roleTextHash: { roleUid, roleTextHash: hash } },
-      select: { disabled: true },
+      select: { disabled: true, prompt: true },
     });
-    return override?.disabled ?? [];
   }
 
   private previewToConsole(email: RenderedEmail, from: string, to: string, replyTo: string | undefined) {

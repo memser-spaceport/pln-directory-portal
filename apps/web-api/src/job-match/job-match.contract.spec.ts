@@ -37,6 +37,43 @@ describe('MatchCriteriaUpdateBodySchema', () => {
     expect(MatchCriteriaUpdateBodySchema.safeParse({}).success).toBe(false);
     expect(MatchCriteriaUpdateBodySchema.safeParse({ disabled: [1] }).success).toBe(false);
   });
+
+  describe('prompt (LAB-2853)', () => {
+    const parse = (body: unknown) => MatchCriteriaUpdateBodySchema.safeParse(body);
+
+    it('leaves prompt out of the parsed body when absent, meaning "keep the stored prompt"', () => {
+      const parsed = parse({ disabled: ['Rust'] });
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect(parsed.data).toEqual({ disabled: ['Rust'] });
+        expect('prompt' in parsed.data).toBe(false);
+      }
+    });
+
+    it.each([null, '', '   \n\t '])('parses %j to null, meaning "clear the prompt"', (prompt) => {
+      const parsed = parse({ disabled: [], prompt });
+      expect(parsed.success).toBe(true);
+      if (parsed.success) expect(parsed.data).toEqual({ disabled: [], prompt: null });
+    });
+
+    it('trims the prompt', () => {
+      const parsed = parse({ disabled: [], prompt: '  Shipped Rust in production.  ' });
+      expect(parsed.success).toBe(true);
+      if (parsed.success) expect(parsed.data.prompt).toBe('Shipped Rust in production.');
+    });
+
+    it('accepts 500 characters after trimming and rejects 501', () => {
+      const ok = parse({ disabled: [], prompt: `   ${'a'.repeat(500)}   ` });
+      expect(ok.success).toBe(true);
+      if (ok.success) expect(ok.data.prompt).toHaveLength(500);
+      expect(parse({ disabled: [], prompt: 'a'.repeat(501) }).success).toBe(false);
+    });
+
+    it('rejects a non-string prompt', () => {
+      expect(parse({ disabled: [], prompt: 42 }).success).toBe(false);
+      expect(parse({ disabled: [], prompt: ['a'] }).success).toBe(false);
+    });
+  });
 });
 
 describe('MatchCriterionSchema', () => {

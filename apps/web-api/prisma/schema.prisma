@@ -4656,13 +4656,15 @@ model JobMatchRow {
   @@index([kind, roleUid, roleTextHash])
 }
 
-/// A lead's disabled match criteria for one role posting (LAB-2846).
+/// A lead's disabled match criteria (LAB-2846) and criteria prompt (LAB-2853) for one role posting.
 /// Keyed by the posting hash, so an edited posting simply stops matching its old override.
 model JobMatchCriteriaOverride {
   uid          String   @id @default(cuid())
   roleUid      String
   roleTextHash String
   disabled     String[]
+  /// The lead's free-text "who you're looking for" (LAB-2853): trimmed, at most 500 characters, null when none.
+  prompt       String?
   updatedByUid String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
