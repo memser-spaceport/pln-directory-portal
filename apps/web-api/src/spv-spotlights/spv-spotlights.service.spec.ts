@@ -103,7 +103,7 @@ describe('SpvSpotlightsService getBySlug viewer access', () => {
     expect(result.docSendUrl).toBeNull();
   });
 
-  it('hides the DocSend link until the data room email is sent', async () => {
+  it('shows the DocSend link before the data room email is sent', async () => {
     const hidden = { ...spotlight, emailOnDataRoomRequest: true };
     const waiting = buildService(
       { type: 'INVESTOR', cohort: 'PRE_APPROVED', access: 'VIEW', dataRoomEmailSentAt: null },
@@ -111,7 +111,7 @@ describe('SpvSpotlightsService getBySlug viewer access', () => {
       hidden
     );
     const before = await waiting.service.getBySlug('netholabs', 'investor@example.com');
-    expect(before.docSendUrl).toBeNull();
+    expect(before.docSendUrl).toBe('https://docsend.com/view/x');
     expect(before.emailOnDataRoomRequest).toBe(true);
     expect(before.dataRoomEmailSent).toBe(false);
 

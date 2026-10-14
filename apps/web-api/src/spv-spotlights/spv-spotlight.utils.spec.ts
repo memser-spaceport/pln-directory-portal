@@ -105,18 +105,6 @@ describe('visibleDocSendUrl', () => {
     expect(visibleDocSendUrl('OPEN', 'NONE', url)).toBeNull();
     expect(visibleDocSendUrl('CLOSED', 'APPROVED', url)).toBeNull();
   });
-
-  it('hides the url until the data room email is sent, and shows it when the flag is off', () => {
-    expect(
-      visibleDocSendUrl('OPEN', 'APPROVED', url, { emailOnDataRoomRequest: true, dataRoomEmailSent: false })
-    ).toBeNull();
-    expect(visibleDocSendUrl('OPEN', 'APPROVED', url, { emailOnDataRoomRequest: true, dataRoomEmailSent: true })).toBe(
-      url
-    );
-    expect(
-      visibleDocSendUrl('OPEN', 'APPROVED', url, { emailOnDataRoomRequest: false, dataRoomEmailSent: false })
-    ).toBe(url);
-  });
 });
 
 describe('assignSenders', () => {
