@@ -1,16 +1,34 @@
+# Build artifacts and caches
 node_modules
 dist
 coverage
-.nx/cache
+.nx
 tmp
+*.tsbuildinfo
+*.log
+
+# VCS / editor / OS
 .git
 .github
+.husky
 .idea
 .vscode
 .DS_Store
 __MACOSX
-*.log
+
+# Local configuration
 .env
 .env.*
-README.md
+
+# Not needed to build web-api
 docker-compose*
+Dockerfile
+README.md
+AGENTS.md
+docs
+lambda
+data-sync
+email-templates
+.storybook
+# Note: every project listed in workspace.json must stay in the context,
+# `nx build` reads each project.json while building the project graph.
