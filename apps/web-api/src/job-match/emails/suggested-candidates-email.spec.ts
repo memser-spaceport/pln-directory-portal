@@ -82,6 +82,12 @@ describe('renderSuggestedCandidatesEmail', () => {
     });
   });
 
+  it('loads the logo from the directory domain, not pfps.plnetwork.io (LAB-2855)', () => {
+    const { html } = renderSuggestedCandidatesEmail(baseInput());
+    expect(html).toContain(`src="${BASE}/images/email/protocol-labs-logo-246.png"`);
+    expect(html).not.toContain('pfps.plnetwork.io');
+  });
+
   describe('links', () => {
     it("opens each card on that person on the role's Candidates page, tagged utm_content=profile", () => {
       const { html, text } = renderSuggestedCandidatesEmail(baseInput());

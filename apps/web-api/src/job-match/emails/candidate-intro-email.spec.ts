@@ -16,6 +16,21 @@ const baseInput = (overrides: Partial<CandidateIntroEmailInput> = {}): Candidate
 });
 
 describe('renderCandidateIntroEmail', () => {
+  // The shared layout's logo is served from the web UI domain (LAB-2855), as every link already is.
+  const env = process.env.WEB_UI_BASE_URL;
+  beforeEach(() => {
+    process.env.WEB_UI_BASE_URL = 'https://directory.example';
+  });
+  afterEach(() => {
+    process.env.WEB_UI_BASE_URL = env;
+  });
+
+  it('loads the logo from the directory domain (LAB-2855)', () => {
+    const { html } = renderCandidateIntroEmail(baseInput());
+    expect(html).toContain('src="https://directory.example/images/email/protocol-labs-logo-246.png"');
+    expect(html).not.toContain('pfps.plnetwork.io');
+  });
+
   it('names the lead, the team and the role in the subject and the body', () => {
     const { subject, html, text } = renderCandidateIntroEmail(baseInput());
     expect(subject).toBe('Ada Lovelace from Analytical Engines would like to talk about Rust Engineer');
