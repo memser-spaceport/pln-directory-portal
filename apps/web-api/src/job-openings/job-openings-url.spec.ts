@@ -62,16 +62,25 @@ describe('teamSuggestedCandidateEmailUrl', () => {
     process.env.WEB_UI_BASE_URL = originalWeb;
   });
 
-  it('opens the role on the Candidates page, on one suggested member when given', () => {
+  it('opens the role on the Suggested tab of the Candidates page, on one suggested member when given', () => {
     process.env.WEB_UI_BASE_URL = 'https://directory.test/';
 
-    expect(teamSuggestedCandidateEmailUrl('team/1', utm, 'member&1')).toBe(
-      'https://directory.test/teams/team%2F1/applicants?role=role+1&suggested=member%261' +
+    expect(teamSuggestedCandidateEmailUrl('team/1', utm, { memberUid: 'member&1' })).toBe(
+      'https://directory.test/teams/team%2F1/applicants?role=role+1&tab=suggested&suggested=member%261' +
         '&utm_source=job_suggested_candidates_email&utm_medium=email&utm_content=profile&job_uid=role+1'
     );
     expect(teamSuggestedCandidateEmailUrl('team-1', { ...utm, content: 'all' })).toBe(
-      'https://directory.test/teams/team-1/applicants?role=role+1' +
+      'https://directory.test/teams/team-1/applicants?role=role+1&tab=suggested' +
         '&utm_source=job_suggested_candidates_email&utm_medium=email&utm_content=all&job_uid=role+1'
+    );
+  });
+
+  it('also opens the Edit criteria modal with editCriteria', () => {
+    process.env.WEB_UI_BASE_URL = 'https://directory.test';
+
+    expect(teamSuggestedCandidateEmailUrl('team-1', { ...utm, content: 'criteria' }, { editCriteria: true })).toBe(
+      'https://directory.test/teams/team-1/applicants?role=role+1&tab=suggested&edit=criteria' +
+        '&utm_source=job_suggested_candidates_email&utm_medium=email&utm_content=criteria&job_uid=role+1'
     );
   });
 });

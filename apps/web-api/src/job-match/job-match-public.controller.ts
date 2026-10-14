@@ -1,11 +1,13 @@
-import { BadRequestException, Body, Controller, HttpCode, NotFoundException, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, HttpCode, Logger, NotFoundException, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import {
   SuggestedCandidatesUnsubscribeRequestSchema,
   type SuggestedCandidatesUnsubscribeResponse,
 } from 'libs/contracts/src/schema/job-match';
+import { AnalyticsService } from '../analytics/service/analytics.service';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { SuggestedCandidatesEmailPreferenceService } from '../notification-settings/suggested-candidates-email-preference.service';
+import { trackSuggestedCandidatesEmailUnsubscribed } from './job-match-analytics';
 import { verifySuggestedCandidatesUnsubscribeToken } from './suggested-candidates-token.util';
 
 /**
@@ -16,7 +18,12 @@ import { verifySuggestedCandidatesUnsubscribeToken } from './suggested-candidate
 @ApiTags('Job match - Public')
 @Controller('v1/job-match')
 export class JobMatchPublicController {
-  constructor(private readonly preference: SuggestedCandidatesEmailPreferenceService) {}
+  private readonly logger = new Logger(JobMatchPublicController.name);
+
+  constructor(
+    private readonly preference: SuggestedCandidatesEmailPreferenceService,
+    private readonly analytics: AnalyticsService
+  ) {}
 
   @Post('unsubscribe')
   @HttpCode(200)
@@ -32,12 +39,15 @@ export class JobMatchPublicController {
     } catch (error) {
       throw new BadRequestException(error instanceof Error ? error.message : 'Invalid token');
     }
+    let changed: boolean;
     try {
-      await this.preference.set(memberUid, false);
+      ({ changed } = await this.preference.unsubscribe(memberUid));
     } catch (error) {
       if (error instanceof NotFoundException) throw new BadRequestException('Unknown member');
       throw error;
     }
+    // Tracked only when the link actually turned the email off, so a repeated click is not a second unsubscribe.
+    if (changed) trackSuggestedCandidatesEmailUnsubscribed(this.analytics, this.logger, { memberUid });
     return { memberUid, suggestedCandidatesEmailEnabled: false };
   }
 }

@@ -1,7 +1,10 @@
 import { JobOpeningStatus } from '@prisma/client';
+import { createHash } from 'crypto';
 import {
   GOOD_FIT,
   STRONG_FIT,
+  blurbPrompt,
+  leadPromptLine,
   TOP_N,
   MATCH_JOB_SELECT,
   companyKey,
@@ -325,6 +328,55 @@ describe('criteria overrides (LAB-2846)', () => {
     expect(one).not.toBe(two);
     expect(scoreHash('posting-hash', ['Rust', '5+ years'], all)).toBe(one);
     expect(scoreHash('other-posting', ['Rust', '5+ years'], all)).not.toBe(one);
+  });
+
+  describe('criteria prompt (LAB-2853)', () => {
+    const sha = (text: string) => createHash('sha256').update(text).digest('hex');
+
+    it('scoreHash keeps the posting hash for a role with nothing disabled and no prompt', () => {
+      expect(scoreHash('posting-hash', all, all, null)).toBe('posting-hash');
+      expect(scoreHash('posting-hash', all, all, '')).toBe('posting-hash');
+    });
+
+    it('scoreHash of a prompt-less override is unchanged from before prompts existed', () => {
+      expect(scoreHash('posting-hash', ['Rust', '5+ years'], all, null)).toBe(sha('posting-hash\nRust\n5+ years'));
+    });
+
+    it('scoreHash changes with a prompt, also when nothing is disabled', () => {
+      const withPrompt = scoreHash('posting-hash', all, all, 'Shipped Rust in production.');
+      expect(withPrompt).not.toBe('posting-hash');
+      expect(scoreHash('posting-hash', all, all, 'Shipped Rust in production.')).toBe(withPrompt);
+      expect(scoreHash('posting-hash', all, all, 'Knows Go.')).not.toBe(withPrompt);
+      const disabledOnly = scoreHash('posting-hash', ['Rust'], all);
+      expect(scoreHash('posting-hash', ['Rust'], all, 'Shipped Rust in production.')).not.toBe(disabledOnly);
+      expect(scoreHash('posting-hash', ['Rust'], all, 'Shipped Rust in production.')).not.toBe(withPrompt);
+    });
+
+    it('leadPromptLine quotes the prompt on one line, and is empty without one', () => {
+      expect(leadPromptLine('  Shipped "Rust"\n\nin   production. ')).toBe(
+        'The hiring lead adds: "Shipped \\"Rust\\" in production."'
+      );
+      expect(leadPromptLine(null)).toBe('');
+      expect(leadPromptLine('  \n ')).toBe('');
+    });
+
+    it('jevQuestions adds the prompt line to its own role only', () => {
+      const questions = jevQuestions(
+        [job, { ...job, uid: 'role-2', roleTitle: 'Designer' }],
+        new Map([[job.uid, ['Go']]]),
+        new Map([[job.uid, 'Shipped Rust in production.']])
+      );
+      expect(questions['role-1'].instructions).toContain('The hiring lead adds: "Shipped Rust in production."');
+      expect(questions['role-2'].instructions).not.toContain('The hiring lead adds');
+    });
+
+    it('blurbPrompt adds the prompt line, and omits it without one', () => {
+      const ranked: { member: MatchMember; fit: number }[] = [];
+      expect(blurbPrompt(job, ['Go'], ranked, 'Shipped Rust in production.')).toContain(
+        'The hiring lead adds: "Shipped Rust in production."'
+      );
+      expect(blurbPrompt(job, ['Go'], ranked)).not.toContain('The hiring lead adds');
+    });
   });
 
   it('flaggedCriteria marks disabled texts in extraction order', () => {

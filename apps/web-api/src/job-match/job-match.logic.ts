@@ -211,15 +211,37 @@ export function enabledCriteria(all: string[], disabled: readonly string[]): str
 }
 
 /**
- * The per-role hash stored with fits. A role with nothing disabled keeps its posting hash, so cached fits stay
- * valid; a role with disabled criteria gets a hash of the posting and its enabled list, so fits scored with a
- * different set are not reused.
+ * The per-role hash stored with fits. A role with nothing disabled and no lead prompt keeps its posting hash, so
+ * cached fits stay valid; a role with disabled criteria gets a hash of the posting and its enabled list, so fits
+ * scored with a different set are not reused. A lead prompt (LAB-2853) is hashed in too, in a separate shape so
+ * the hashes of prompt-less overrides stay what they were before prompts existed (no re-score at deploy).
  */
-export function scoreHash(postingHash: string, enabled: readonly string[], all: readonly string[]): string {
-  if (enabled.length === all.length && enabled.every((text, index) => text === all[index])) return postingHash;
+export function scoreHash(
+  postingHash: string,
+  enabled: readonly string[],
+  all: readonly string[],
+  prompt: string | null = null
+): string {
+  const allEnabled = enabled.length === all.length && enabled.every((text, index) => text === all[index]);
+  if (!prompt) {
+    if (allEnabled) return postingHash;
+    return createHash('sha256')
+      .update(`${postingHash}\n${enabled.join('\n')}`)
+      .digest('hex');
+  }
   return createHash('sha256')
-    .update(`${postingHash}\n${enabled.join('\n')}`)
+    .update(JSON.stringify({ posting: postingHash, enabled, prompt }))
     .digest('hex');
+}
+
+/**
+ * The lead's free-text prompt (LAB-2853) as one line of a model prompt: whitespace collapsed to single spaces and
+ * the text JSON-quoted, so it reads as the lead's words rather than as more of our instructions. Empty when there
+ * is no prompt.
+ */
+export function leadPromptLine(prompt: string | null | undefined): string {
+  const text = (prompt ?? '').replace(/\s+/g, ' ').trim();
+  return text ? `The hiring lead adds: ${JSON.stringify(text)}` : '';
 }
 
 /** Every criterion of the posting in extraction order, flagged off when it is in `disabled`. */
@@ -305,7 +327,7 @@ export function parseCriteria(text: string): string[] {
   return criteria.slice(0, 6);
 }
 
-export function jobBrief(job: MatchJob, criteria: string[]): string {
+export function jobBrief(job: MatchJob, criteria: string[], leadPrompt: string | null = null): string {
   return [
     `Title: ${job.roleTitle}`,
     `Company: ${job.companyName}`,
@@ -313,6 +335,7 @@ export function jobBrief(job: MatchJob, criteria: string[]): string {
     job.location.length ? `Location: ${job.location.join(', ')}` : '',
     job.workMode ? `Work mode: ${job.workMode}` : '',
     criteria.length ? `Criteria:\n${criteria.map((line) => `- ${line}`).join('\n')}` : '',
+    leadPromptLine(leadPrompt),
   ]
     .filter(Boolean)
     .join('\n');
@@ -324,7 +347,12 @@ export type JevQuestion = {
   criteria: { true: string; false: string };
 };
 
-export function jevQuestions(jobs: MatchJob[], criteriaByUid: Map<string, string[]>): Record<string, JevQuestion> {
+/** `promptByUid` holds a lead's criteria prompt per role (LAB-2853); a role without one is absent. */
+export function jevQuestions(
+  jobs: MatchJob[],
+  criteriaByUid: Map<string, string[]>,
+  promptByUid: ReadonlyMap<string, string> = new Map()
+): Record<string, JevQuestion> {
   const questions: Record<string, JevQuestion> = {};
   for (const job of jobs) {
     const criteria = criteriaByUid.get(job.uid) ?? [];
@@ -332,7 +360,8 @@ export function jevQuestions(jobs: MatchJob[], criteriaByUid: Map<string, string
       type: 'boolean',
       instructions: `This person is a credible match for the role below. Most of the criteria are supported by the profile.\n\n${jobBrief(
         job,
-        criteria
+        criteria,
+        promptByUid.get(job.uid) ?? null
       )}`,
       criteria: {
         true: 'Most of the listed criteria are supported by the profile',
@@ -413,7 +442,12 @@ export function planTeamWork(args: {
   return { skipTeam: false, membersToScore, rolesToFinish };
 }
 
-export function blurbPrompt(job: MatchJob, criteria: string[], ranked: { member: MatchMember; fit: number }[]): string {
+export function blurbPrompt(
+  job: MatchJob,
+  criteria: string[],
+  ranked: { member: MatchMember; fit: number }[],
+  leadPrompt: string | null = null
+): string {
   const people = ranked
     .map(
       (row, index) =>
@@ -427,7 +461,7 @@ For each person return:
 Return only a JSON array of objects with memberUid, blurb, and matched.
 No introduction.
 
-${jobBrief(job, criteria)}
+${jobBrief(job, criteria, leadPrompt)}
 
 Criteria order:
 ${criteria.map((line, index) => `${index + 1}. ${line}`).join('\n')}

@@ -53,6 +53,17 @@ export class SuggestedCandidatesEmailPreferenceService {
     return { memberUid, suggestedCandidatesEmailEnabled: setting.suggestedCandidatesEmailEnabled };
   }
 
+  /**
+   * Turns the preference off, as the email's unsubscribe link does; 404 for an unknown member. `changed` is true
+   * when it was on before (absent row counts as on), false for a repeated unsubscribe.
+   */
+  async unsubscribe(memberUid: string): Promise<{ changed: boolean }> {
+    await this.assertMember(memberUid);
+    const wasEnabled = await this.isEnabled(memberUid);
+    await this.set(memberUid, false);
+    return { changed: wasEnabled };
+  }
+
   private async assertMember(memberUid: string): Promise<void> {
     const member = await this.prisma.member.findUnique({ where: { uid: memberUid }, select: { uid: true } });
     if (!member) {

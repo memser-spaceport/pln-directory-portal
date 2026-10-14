@@ -40,12 +40,18 @@ export function teamCandidateEmailUrl(teamUid: string, memberUid: string, utm: E
 }
 
 /**
- * A role's Candidates page as a team lead opens it from the suggested-candidates email: the Suggested tab,
- * selected on one suggested member when `memberUid` is given, else the whole list.
+ * A role's Candidates page as a team lead opens it from the suggested-candidates email: always the Suggested tab
+ * (`tab=suggested`), selected on one suggested member when `memberUid` is given, else the whole list; with
+ * `editCriteria` the page also opens the Edit criteria modal (`edit=criteria`).
  */
-export function teamSuggestedCandidateEmailUrl(teamUid: string, utm: EmailUtm, memberUid?: string): string {
-  const params: Record<string, string> = { role: utm.jobUid };
-  if (memberUid) params.suggested = memberUid;
+export function teamSuggestedCandidateEmailUrl(
+  teamUid: string,
+  utm: EmailUtm,
+  options: { memberUid?: string; editCriteria?: boolean } = {}
+): string {
+  const params: Record<string, string> = { role: utm.jobUid, tab: 'suggested' };
+  if (options.memberUid) params.suggested = options.memberUid;
+  if (options.editCriteria) params.edit = 'criteria';
   const query = new URLSearchParams(params).toString();
   return `${webUiBase()}/teams/${encodeURIComponent(teamUid)}/applicants?${query}&${emailUtmQuery(utm)}`;
 }

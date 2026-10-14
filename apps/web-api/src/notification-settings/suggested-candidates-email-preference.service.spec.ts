@@ -93,4 +93,28 @@ describe('SuggestedCandidatesEmailPreferenceService', () => {
       expect(settingUpsert).not.toHaveBeenCalled();
     });
   });
+  describe('unsubscribe', () => {
+    beforeEach(() => {
+      memberFindUnique.mockResolvedValue({ uid: 'm1' });
+      settingUpsert.mockResolvedValue({ suggestedCandidatesEmailEnabled: false });
+    });
+
+    it.each([
+      ['no row', null, true],
+      ['stored on', { suggestedCandidatesEmailEnabled: true }, true],
+      ['stored off', { suggestedCandidatesEmailEnabled: false }, false],
+    ])('turns the email off and reports changed for %s', async (_label, row, changed) => {
+      settingFindUnique.mockResolvedValue(row);
+      await expect(service.unsubscribe('m1')).resolves.toEqual({ changed });
+      expect(settingUpsert).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { memberUid: 'm1' }, update: { suggestedCandidatesEmailEnabled: false } })
+      );
+    });
+
+    it('404s for an unknown member and writes nothing', async () => {
+      memberFindUnique.mockResolvedValue(null);
+      await expect(service.unsubscribe('ghost')).rejects.toBeInstanceOf(NotFoundException);
+      expect(settingUpsert).not.toHaveBeenCalled();
+    });
+  });
 });

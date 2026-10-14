@@ -233,21 +233,24 @@ export class JobMatchRunner {
     }
 
     const members = (await this.loadMembers(team.uid, team.name)).filter(hasSignal);
-    // A lead's disabled criteria (LAB-2846) change the hash stored with each fit for that role, so fits scored
-    // with another criteria set are not reused. A role without an override keeps its posting hash.
+    // A lead's disabled criteria (LAB-2846) and criteria prompt (LAB-2853) change the hash stored with each fit
+    // for that role, so fits scored with another criteria set or prompt are not reused. A role without an
+    // override keeps its posting hash.
     const postingHashes = new Map(jobs.map((job) => [job.uid, currentRoleTextHash(job)]));
-    const disabledByUid = await this.loadDisabledCriteria(postingHashes);
+    const { disabledByUid, promptByUid } = await this.loadCriteriaOverrides(postingHashes);
     const criteriaByUid = new Map<string, string[]>();
     for (const job of jobs) {
-      if (disabledByUid.has(job.uid)) criteriaByUid.set(job.uid, await this.criteriaFor(runUid, job));
+      if (disabledByUid.has(job.uid) || promptByUid.has(job.uid)) {
+        criteriaByUid.set(job.uid, await this.criteriaFor(runUid, job));
+      }
     }
     const roleHashes = new Map<string, string>(
       jobs.map((job): [string, string] => {
         const postingHash = postingHashes.get(job.uid) ?? currentRoleTextHash(job);
         const all = criteriaByUid.get(job.uid);
-        const disabled = disabledByUid.get(job.uid);
-        if (!all || !disabled) return [job.uid, postingHash];
-        return [job.uid, scoreHash(postingHash, enabledCriteria(all, disabled), all)];
+        if (!all) return [job.uid, postingHash];
+        const enabled = enabledCriteria(all, disabledByUid.get(job.uid) ?? []);
+        return [job.uid, scoreHash(postingHash, enabled, all, promptByUid.get(job.uid) ?? null)];
       })
     );
     const storedScores = await this.prisma.jobMatchRow.findMany({
@@ -295,7 +298,9 @@ export class JobMatchRunner {
         const text = profileText(member);
         const have = scoresByMember.get(member.uid) ?? {};
         const missing = jobs.filter((job) => !Object.prototype.hasOwnProperty.call(have, job.uid));
-        const answers = await withRetry(member.uid, () => this.jev(text, jevQuestions(missing, enabledByUid)));
+        const answers = await withRetry(member.uid, () =>
+          this.jev(text, jevQuestions(missing, enabledByUid, promptByUid))
+        );
         const scores = {
           ...have,
           ...fitsFromAnswers(
@@ -332,6 +337,7 @@ export class JobMatchRunner {
         team.uid,
         job,
         enabledByUid.get(job.uid) ?? [],
+        promptByUid.get(job.uid) ?? null,
         members,
         scoresByMember,
         interestByRole.get(job.uid) ?? new Map()
@@ -363,22 +369,30 @@ export class JobMatchRunner {
     return criteria;
   }
 
-  /** Disabled criteria per role, from overrides saved against each role's current posting hash (LAB-2846). */
-  private async loadDisabledCriteria(postingHashes: ReadonlyMap<string, string>): Promise<Map<string, string[]>> {
+  /**
+   * Disabled criteria (LAB-2846) and the lead's criteria prompt (LAB-2853) per role, from overrides saved against
+   * each role's current posting hash. A role with no disabled criteria is absent from `disabledByUid`; a role
+   * with no (or a blank) prompt is absent from `promptByUid`.
+   */
+  private async loadCriteriaOverrides(
+    postingHashes: ReadonlyMap<string, string>
+  ): Promise<{ disabledByUid: Map<string, string[]>; promptByUid: Map<string, string> }> {
     const disabledByUid = new Map<string, string[]>();
-    if (!postingHashes.size) return disabledByUid;
+    const promptByUid = new Map<string, string>();
+    if (!postingHashes.size) return { disabledByUid, promptByUid };
     const overrides = await this.prisma.jobMatchCriteriaOverride.findMany({
       where: {
         OR: [...postingHashes].map(([roleUid, roleTextHash]) => ({ roleUid, roleTextHash })),
       },
-      select: { roleUid: true, roleTextHash: true, disabled: true },
+      select: { roleUid: true, roleTextHash: true, disabled: true, prompt: true },
     });
     for (const row of overrides) {
-      if (row.disabled.length && postingHashes.get(row.roleUid) === row.roleTextHash) {
-        disabledByUid.set(row.roleUid, row.disabled);
-      }
+      if (postingHashes.get(row.roleUid) !== row.roleTextHash) continue;
+      if (row.disabled.length) disabledByUid.set(row.roleUid, row.disabled);
+      const prompt = row.prompt?.trim();
+      if (prompt) promptByUid.set(row.roleUid, prompt);
     }
-    return disabledByUid;
+    return { disabledByUid, promptByUid };
   }
 
   private async finishRole(
@@ -386,6 +400,7 @@ export class JobMatchRunner {
     teamUid: string,
     job: MatchJob,
     criteria: string[],
+    leadPrompt: string | null,
     members: MatchMember[],
     scoresByMember: Map<string, Record<string, number>>,
     interest: ReadonlyMap<string, string | null>
@@ -403,7 +418,9 @@ export class JobMatchRunner {
         const member = byUid.get(row.memberUid);
         return member ? [{ member, fit: row.fit }] : [];
       });
-      const text = await withRetry(job.roleTitle, () => this.claude(blurbPrompt(job, criteria, people), 2000));
+      const text = await withRetry(job.roleTitle, () =>
+        this.claude(blurbPrompt(job, criteria, people, leadPrompt), 2000)
+      );
       notes = parseCandidateNotes(
         text,
         people.map((row) => ({ memberUid: row.member.uid, criteriaCount: criteria.length }))

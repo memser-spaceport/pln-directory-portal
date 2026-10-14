@@ -72,6 +72,9 @@ describe('JobMatchService', () => {
     );
     contactFindMany.mockResolvedValue([]);
     overrideFindUnique.mockResolvedValue(null);
+    overrideUpsert.mockImplementation(async ({ create }: { create: { prompt?: string | null } }) => ({
+      prompt: create.prompt ?? null,
+    }));
     process.env.WEB_UI_BASE_URL = 'https://directory.example';
     process.env.SES_SOURCE_EMAIL = 'directory@example.com';
   });
@@ -106,6 +109,7 @@ describe('JobMatchService', () => {
     await expect(service.listForRole('role-1', 'admin@example.com')).resolves.toEqual({
       suggestions: [],
       criteria: [],
+      criteriaPrompt: null,
     });
     expect(jobMatchRowFindFirst).not.toHaveBeenCalled();
   });
@@ -155,6 +159,7 @@ describe('JobMatchService', () => {
         },
       ],
       criteria: [],
+      criteriaPrompt: null,
     });
     expect(jobMatchRowFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -377,8 +382,26 @@ describe('JobMatchService', () => {
         );
       });
 
+      it('returns criteriaPrompt from the override, and null without one (LAB-2853)', async () => {
+        overrideFindUnique.mockResolvedValue({ disabled: [], prompt: 'Shipped Rust in production.' });
+        await expect(service.listForRole('role-1', 'm@example.com')).resolves.toEqual(
+          expect.objectContaining({ criteriaPrompt: 'Shipped Rust in production.' })
+        );
+        overrideFindUnique.mockResolvedValue(null);
+        await expect(service.listForRole('role-1', 'm@example.com')).resolves.toEqual(
+          expect.objectContaining({ criteriaPrompt: null })
+        );
+      });
+
+      it('returns criteriaPrompt null for a role that is not live, even with a stored prompt', async () => {
+        jobOpeningFindUnique.mockResolvedValue({ ...liveJob, status: JobOpeningStatus.STALE });
+        overrideFindUnique.mockResolvedValue({ disabled: [], prompt: 'Shipped Rust in production.' });
+        const result = await service.listForRole('role-1', 'm@example.com');
+        expect(result.criteriaPrompt).toBeNull();
+      });
+
       it('returns the posting criteria in order with a disabled one flagged off', async () => {
-        overrideFindUnique.mockResolvedValue({ disabled: ['Remote EU'] });
+        overrideFindUnique.mockResolvedValue({ disabled: ['Remote EU'], prompt: null });
         const { criteria: listed } = await service.listForRole('role-1', 'm@example.com');
         expect(listed).toEqual([
           { text: 'Rust', enabled: true },
@@ -449,7 +472,7 @@ describe('JobMatchService', () => {
 
       it('404s for an unknown role', async () => {
         jobOpeningFindUnique.mockResolvedValue(null);
-        await expect(service.updateCriteria('missing', [], 'lead@example.com')).rejects.toBeInstanceOf(
+        await expect(service.updateCriteria('missing', { disabled: [] }, 'lead@example.com')).rejects.toBeInstanceOf(
           NotFoundException
         );
         expect(overrideUpsert).not.toHaveBeenCalled();
@@ -457,7 +480,7 @@ describe('JobMatchService', () => {
 
       it('403s for a member who is not a lead', async () => {
         findMemberByEmail.mockResolvedValue({ ...lead, uid: 'member-1' });
-        await expect(service.updateCriteria('role-1', ['Rust'], 'm@example.com')).rejects.toBeInstanceOf(
+        await expect(service.updateCriteria('role-1', { disabled: ['Rust'] }, 'm@example.com')).rejects.toBeInstanceOf(
           ForbiddenException
         );
         expect(overrideUpsert).not.toHaveBeenCalled();
@@ -465,50 +488,97 @@ describe('JobMatchService', () => {
 
       it('409s when the current posting has no criteria', async () => {
         withStored({ criteria: null });
-        await expect(service.updateCriteria('role-1', [], 'lead@example.com')).rejects.toBeInstanceOf(
+        await expect(service.updateCriteria('role-1', { disabled: [] }, 'lead@example.com')).rejects.toBeInstanceOf(
           ConflictException
         );
         expect(overrideUpsert).not.toHaveBeenCalled();
       });
 
       it('400s for an unknown criterion', async () => {
-        await expect(service.updateCriteria('role-1', ['Kubernetes'], 'lead@example.com')).rejects.toBeInstanceOf(
-          BadRequestException
-        );
+        await expect(
+          service.updateCriteria('role-1', { disabled: ['Kubernetes'] }, 'lead@example.com')
+        ).rejects.toBeInstanceOf(BadRequestException);
         expect(overrideUpsert).not.toHaveBeenCalled();
       });
 
       it('400s when every criterion would be disabled', async () => {
-        await expect(service.updateCriteria('role-1', criteria, 'lead@example.com')).rejects.toBeInstanceOf(
-          BadRequestException
-        );
+        await expect(
+          service.updateCriteria('role-1', { disabled: criteria }, 'lead@example.com')
+        ).rejects.toBeInstanceOf(BadRequestException);
         expect(overrideUpsert).not.toHaveBeenCalled();
       });
 
       it('trims, dedupes and upserts against the current posting hash', async () => {
         await expect(
-          service.updateCriteria('role-1', [' Remote EU ', 'Remote EU'], 'lead@example.com')
+          service.updateCriteria('role-1', { disabled: [' Remote EU ', 'Remote EU'] }, 'lead@example.com')
         ).resolves.toEqual({
           criteria: [
             { text: 'Rust', enabled: true },
             { text: '5+ years', enabled: true },
             { text: 'Remote EU', enabled: false },
           ],
+          prompt: null,
         });
         expect(overrideUpsert).toHaveBeenCalledWith({
           where: { roleUid_roleTextHash: { roleUid: 'role-1', roleTextHash: hash } },
           create: { roleUid: 'role-1', roleTextHash: hash, disabled: ['Remote EU'], updatedByUid: 'lead-1' },
           update: { disabled: ['Remote EU'], updatedByUid: 'lead-1' },
+          select: { prompt: true },
         });
       });
 
       it('re-enables everything with an empty list, on a role that is not live', async () => {
         jobOpeningFindUnique.mockResolvedValue({ ...liveJob, status: JobOpeningStatus.STALE });
-        const result = await service.updateCriteria('role-1', [], 'lead@example.com');
+        const result = await service.updateCriteria('role-1', { disabled: [] }, 'lead@example.com');
         expect(result.criteria.every((item) => item.enabled)).toBe(true);
         expect(overrideUpsert).toHaveBeenCalledWith(
           expect.objectContaining({ update: expect.objectContaining({ disabled: [] }) })
         );
+      });
+
+      describe('criteria prompt (LAB-2853)', () => {
+        it('saves a prompt with nothing disabled and returns it', async () => {
+          await expect(
+            service.updateCriteria(
+              'role-1',
+              { disabled: [], prompt: 'Shipped Rust in production.' },
+              'lead@example.com'
+            )
+          ).resolves.toEqual({
+            criteria: criteria.map((text) => ({ text, enabled: true })),
+            prompt: 'Shipped Rust in production.',
+          });
+          expect(overrideUpsert).toHaveBeenCalledWith(
+            expect.objectContaining({
+              create: expect.objectContaining({ disabled: [], prompt: 'Shipped Rust in production.' }),
+              update: expect.objectContaining({ disabled: [], prompt: 'Shipped Rust in production.' }),
+            })
+          );
+        });
+
+        it('clears the stored prompt on null', async () => {
+          const result = await service.updateCriteria('role-1', { disabled: [], prompt: null }, 'lead@example.com');
+          expect(result.prompt).toBeNull();
+          const args = overrideUpsert.mock.calls[0][0];
+          expect(args.update).toHaveProperty('prompt', null);
+          expect(args.create).toHaveProperty('prompt', null);
+        });
+
+        it('keeps the stored prompt when the body has none, and returns the stored one', async () => {
+          overrideUpsert.mockResolvedValue({ prompt: 'Kept from before.' });
+          const result = await service.updateCriteria('role-1', { disabled: ['Rust'] }, 'lead@example.com');
+          expect(result.prompt).toBe('Kept from before.');
+          const args = overrideUpsert.mock.calls[0][0];
+          expect(args.update).not.toHaveProperty('prompt');
+          expect(args.create).not.toHaveProperty('prompt');
+        });
+
+        it('still 400s when every criterion would be disabled, prompt or not', async () => {
+          await expect(
+            service.updateCriteria('role-1', { disabled: criteria, prompt: 'Anyone.' }, 'lead@example.com')
+          ).rejects.toBeInstanceOf(BadRequestException);
+          expect(overrideUpsert).not.toHaveBeenCalled();
+        });
       });
     });
 

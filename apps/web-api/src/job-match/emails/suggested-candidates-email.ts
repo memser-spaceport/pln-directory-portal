@@ -62,7 +62,8 @@ const BADGE_STYLE: Record<SuggestedCandidatesEmailInput['candidates'][number]['l
 /**
  * The founder email (LAB-2848): one card per new suggested candidate with View profile, then "All N matches for
  * this role" and Edit criteria, then email preferences and unsubscribe. Every Candidates-page link opens
- * `/teams/<teamUid>/applicants?role=<roleUid>` (plus `&suggested=<memberUid>` on a card), UTM-tagged.
+ * `/teams/<teamUid>/applicants?role=<roleUid>&tab=suggested` (plus `&suggested=<memberUid>` on a card and
+ * `&edit=criteria` on Edit criteria), UTM-tagged.
  *
  * Pure: renders, never sends. All input text is HTML-escaped. Throws, so nothing is sent with a broken link,
  * when there are no candidates or `teamUid` / `roleUid` is missing.
@@ -90,9 +91,9 @@ export function renderSuggestedCandidatesEmail(input: SuggestedCandidatesEmailIn
     content,
     jobUid: roleUid,
   });
-  const profileUrl = (memberUid: string) => teamSuggestedCandidateEmailUrl(teamUid, utm('profile'), memberUid);
+  const profileUrl = (memberUid: string) => teamSuggestedCandidateEmailUrl(teamUid, utm('profile'), { memberUid });
   const allUrl = teamSuggestedCandidateEmailUrl(teamUid, utm('all'));
-  const criteriaUrl = teamSuggestedCandidateEmailUrl(teamUid, utm('criteria'));
+  const criteriaUrl = teamSuggestedCandidateEmailUrl(teamUid, utm('criteria'), { editCriteria: true });
 
   const subject = `${count} new suggested ${one ? 'candidate' : 'candidates'} for ${roleTitle}`;
   const allText = `All ${total} ${total === 1 ? 'match' : 'matches'} for this role`;
@@ -100,7 +101,9 @@ export function renderSuggestedCandidatesEmail(input: SuggestedCandidatesEmailIn
   const who = one ? 'This member' : 'These members';
   const verbs = one ? 'matches' : 'match';
   const applied = one ? "hasn't" : "haven't";
-  const footerReason = `You're getting this because you lead ${teamName}, which posted ${roleTitle} on the job board.`;
+  const footerReason =
+    `You're getting this because you lead ${teamName}, which posted ${roleTitle} on the job board. ` +
+    'At most one a week per role.';
 
   const html = emailShell({
     title: subject,

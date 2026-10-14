@@ -355,7 +355,13 @@ describe('JobMatchRunner', () => {
       profileText({ ...memberRow, customSkills: [], skills: ['Go'], experiences: [], teams: [] })
     );
 
-    function setup(options: { overrideHash?: string; storedRoleHash?: string; probability?: number }) {
+    function setup(options: {
+      overrideHash?: string;
+      storedRoleHash?: string;
+      probability?: number;
+      disabled?: string[];
+      prompt?: string | null;
+    }) {
       const prisma = prismaMock();
       prisma.jobMatchRow.findUnique.mockResolvedValue(null);
       prisma.$queryRaw.mockImplementation(async (strings: TemplateStringsArray) => {
@@ -379,7 +385,12 @@ describe('JobMatchRunner', () => {
       });
       if (options.overrideHash) {
         prisma.jobMatchCriteriaOverride.findMany.mockResolvedValue([
-          { roleUid: 'role-1', roleTextHash: options.overrideHash, disabled: ['Remote EU'] },
+          {
+            roleUid: 'role-1',
+            roleTextHash: options.overrideHash,
+            disabled: options.disabled ?? ['Remote EU'],
+            prompt: options.prompt ?? null,
+          },
         ]);
       }
       prisma.jobMatchRow.findFirst.mockResolvedValue({ payload: overrideCriteria });
@@ -481,6 +492,80 @@ describe('JobMatchRunner', () => {
       expect(prompt).not.toContain('Remote EU');
       const rows = prisma.suggestionCreateMany.mock.calls[0][0].data;
       expect(rows[0].payload).toEqual(enabled.map((text) => ({ text, matched: true })));
+    });
+
+    describe('criteria prompt (LAB-2853)', () => {
+      const prompt = 'Shipped Go in production.';
+      const promptLine = 'The hiring lead adds: "Shipped Go in production."';
+      const promptHash = scoreHash(postingHash, overrideCriteria, overrideCriteria, prompt);
+
+      function storedFitHash(prisma: ReturnType<typeof setup>['prisma']) {
+        const call = prisma.jobMatchRow.upsert.mock.calls.find(
+          ([args]: [{ create: { kind: string } }]) => args.create.kind === 'SCORE'
+        );
+        return call[0].create.payload.fits['role-1'].roleTextHash;
+      }
+
+      it('passes the prompt to the Jev fit question and to the blurb prompt', async () => {
+        const { runner } = setup({ overrideHash: postingHash, disabled: [], prompt });
+        await runner.processTeam('run-1', { uid: 'team-1', name: 'Prime Intellect' });
+        const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+        expect(body.questions['role-1'].instructions).toContain(promptLine);
+        expect(generateTextMock.mock.calls[0][0].prompt).toContain(promptLine);
+      });
+
+      it('re-scores a role whose only change is a new prompt, storing a hash with the prompt in it', async () => {
+        const { prisma, runner } = setup({
+          overrideHash: postingHash,
+          disabled: [],
+          prompt,
+          storedRoleHash: postingHash,
+        });
+        await runner.processTeam('run-1', { uid: 'team-1', name: 'Prime Intellect' });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(storedFitHash(prisma)).toBe(promptHash);
+        expect(promptHash).not.toBe(postingHash);
+      });
+
+      it('re-scores when the prompt changes, and reuses the fit while it stays the same', async () => {
+        const changed = setup({
+          overrideHash: postingHash,
+          disabled: [],
+          prompt: 'Knows Postgres internals.',
+          storedRoleHash: promptHash,
+        });
+        await changed.runner.processTeam('run-1', { uid: 'team-1', name: 'Prime Intellect' });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(storedFitHash(changed.prisma)).not.toBe(promptHash);
+
+        fetchMock.mockClear();
+        const same = setup({ overrideHash: postingHash, disabled: [], prompt, storedRoleHash: promptHash });
+        await same.runner.processTeam('run-1', { uid: 'team-1', name: 'Prime Intellect' });
+        expect(fetchMock).not.toHaveBeenCalled();
+      });
+
+      it('keeps the posting hash for an override with nothing disabled and no prompt, reusing the fit', async () => {
+        const { runner } = setup({
+          overrideHash: postingHash,
+          disabled: [],
+          prompt: null,
+          storedRoleHash: postingHash,
+        });
+        await runner.processTeam('run-1', { uid: 'team-1', name: 'Prime Intellect' });
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(generateTextMock.mock.calls[0][0].prompt).not.toContain('The hiring lead adds');
+      });
+
+      it('treats a blank stored prompt as none', async () => {
+        const { runner } = setup({
+          overrideHash: postingHash,
+          disabled: [],
+          prompt: '   ',
+          storedRoleHash: postingHash,
+        });
+        await runner.processTeam('run-1', { uid: 'team-1', name: 'Prime Intellect' });
+        expect(fetchMock).not.toHaveBeenCalled();
+      });
     });
   });
 
