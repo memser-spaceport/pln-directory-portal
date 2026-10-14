@@ -1,4 +1,11 @@
-import { ForbiddenException, HttpException, HttpStatus, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import {
@@ -348,10 +355,7 @@ export class SpvSpotlightsService {
       }));
 
     const emailOnDataRoomRequest = Boolean(spotlight.emailOnDataRoomRequest && spotlight.docSendUrl);
-    const showDataRoom = visibleDocSendUrl(spotlight.status, viewerAccess, spotlight.docSendUrl, {
-      emailOnDataRoomRequest: spotlight.emailOnDataRoomRequest,
-      dataRoomEmailSent,
-    });
+    const showDataRoom = visibleDocSendUrl(spotlight.status, viewerAccess, spotlight.docSendUrl);
 
     return {
       uid: spotlight.uid,

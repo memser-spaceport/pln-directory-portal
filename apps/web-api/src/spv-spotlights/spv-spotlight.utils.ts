@@ -100,13 +100,13 @@ function dataRoomAccessBody(): string {
       'Thanks for your interest in PLC Neurotech SPV – Netholabs I LLC. Here\'s the data room: <a href="{{docSendLink}}" target="_blank" style="color:#1b4dff;">{{docSendLink}}</a>'
     ),
     paragraph(
-      'DocSend will ask you to confirm your email the first time you open it. Please use this address so your access goes through. Inside you\'ll find the PL Capital SPV memo and the Netholabs company materials, including the deck, science primers and data collection videos.'
+      "DocSend will ask you to confirm your email the first time you open it. Please use this address so your access goes through. Inside you'll find the PL Capital SPV memo and the Netholabs company materials, including the deck, science primers and data collection videos."
     ),
     paragraph(
-      'If you\'d like to go ahead, reply with the amount you\'d like to commit. We\'ll send subscription documents through Carta, followed by an accredited-investor verification request from VerifyInvestor.'
+      "If you'd like to go ahead, reply with the amount you'd like to commit. We'll send subscription documents through Carta, followed by an accredited-investor verification request from VerifyInvestor."
     ),
     paragraph(
-      'We\'re targeting a close on Friday 16 October, so timing is tight. I\'m happy to talk it through if that\'s useful.'
+      "We're targeting a close on Friday 16 October, so timing is tight. I'm happy to talk it through if that's useful."
     ),
     paragraph('Thanks,<br>Juan<br>Protocol Labs Capital'),
     '<p style="margin:0;font-family:Inter,Helvetica,Arial,sans-serif;font-size:13px;line-height:20px;color:#667085;">Only for accredited investors, and confidential. Not an offer to sell or a solicitation to buy any security, and not investment, legal, or tax advice.</p>',
@@ -291,7 +291,8 @@ export function asEmailTemplates(value: unknown, title: string): EmailTemplates 
       continue;
     }
     const record = entry as Record<string, unknown>;
-    const subject = typeof record.subject === 'string' && record.subject.trim() ? record.subject : defaults[key].subject;
+    const subject =
+      typeof record.subject === 'string' && record.subject.trim() ? record.subject : defaults[key].subject;
     const body = typeof record.body === 'string' && record.body.trim() ? record.body : defaults[key].body;
     if (key === 'dataRoomAccess') {
       const cc = emailStringList(record.cc);
@@ -322,16 +323,8 @@ export function openNoticeCounts(recipients: { sent: boolean }[]): { willReceive
   };
 }
 
-export function visibleDocSendUrl(
-  status: string,
-  viewerAccess: ViewerAccess,
-  url: string | null,
-  options?: { emailOnDataRoomRequest?: boolean; dataRoomEmailSent?: boolean }
-): string | null {
+export function visibleDocSendUrl(status: string, viewerAccess: ViewerAccess, url: string | null): string | null {
   if (viewerAccess !== 'APPROVED' || status !== 'OPEN' || !url) {
-    return null;
-  }
-  if (options?.emailOnDataRoomRequest && !options.dataRoomEmailSent) {
     return null;
   }
   return url;
