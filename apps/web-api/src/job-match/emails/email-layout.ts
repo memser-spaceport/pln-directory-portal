@@ -1,4 +1,5 @@
 import { escapeHtml } from '../../job-openings/job-openings-email-html';
+import { webUiBase } from '../../job-openings/job-openings-url';
 
 /**
  * Email-safe building blocks shared by the job-match emails (LAB-2848): table layout, inline styles only, no
@@ -20,7 +21,11 @@ export const COLORS = {
 } as const;
 
 const FONT = "Inter, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
-const LOGO_URL = 'https://pfps.plnetwork.io/protocol-labs-logo-246.png';
+/**
+ * Served from the directory's own domain (frontend `public/images/email/`). The old host, pfps.plnetwork.io,
+ * serves a *.os.pl.xyz certificate, so Gmail drops the image (pln-directory-portal#3514, LAB-2855).
+ */
+export const emailLogoUrl = (): string => `${webUiBase()}/images/email/protocol-labs-logo-246.png`;
 
 export { escapeHtml };
 
@@ -41,7 +46,7 @@ export function emailShell(args: { title: string; preheader: string; rawRows: st
           <table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" style="width: 100%; max-width: 640px; margin: 0 auto;">
             <tr>
               <td align="center" style="padding: 8px 24px;">
-                <img src="${LOGO_URL}" width="246" height="56" alt="Protocol Labs" style="display: block; width: 246px; height: 56px; border: 0;" />
+                <img src="${emailLogoUrl()}" width="246" height="56" alt="Protocol Labs" style="display: block; width: 246px; height: 56px; border: 0;" />
               </td>
             </tr>
 ${args.rawRows.join('\n')}
