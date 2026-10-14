@@ -12,7 +12,7 @@ import { currentRoleTextHash, isLiveOpening, MATCH_JOB_SELECT } from './job-matc
  *
  * Runs when FEATURE_ENV_SEED_TEAM_UID is set (seed that team's live roles) and/or when BOTH
  * FEATURE_ENV_SEED_TEST_LEAD_EMAIL and FEATURE_ENV_SEED_TEST_CANDIDATE_EMAIL are set (seed a dedicated test
- * team whose only member is that existing lead, with one role whose top suggestion is a test candidate — so the
+ * team whose members are those existing leads (comma-separated), with one role whose top suggestion is a test candidate — so the
  * weekly email can be sent to the developer's own inbox without touching any real team).
  * Idempotent: it owns two runs with fixed uids and fixed past run dates (so it never collides with a real daily
  * run) and rewrites their rows each start; the test team, role, candidate and lead membership are upserts.
@@ -180,11 +180,21 @@ export class JobMatchEnvSeedService implements OnApplicationBootstrap {
    * exist or the candidate email already belongs to another member.
    */
   private async testTeamPlan(leadEmail: string, candidateEmail: string): Promise<RoleSeed | null> {
-    const lead = await this.prisma.member.findFirst({
-      where: { email: { equals: leadEmail, mode: 'insensitive' }, deletedAt: null },
-      select: { uid: true },
-    });
-    if (!lead) {
+    // FEATURE_ENV_SEED_TEST_LEAD_EMAIL may list several leads, comma-separated; each must be an existing member.
+    const leadEmails = leadEmail
+      .split(',')
+      .map((email) => email.trim())
+      .filter(Boolean);
+    const leads: { uid: string }[] = [];
+    for (const email of leadEmails) {
+      const lead = await this.prisma.member.findFirst({
+        where: { email: { equals: email, mode: 'insensitive' }, deletedAt: null },
+        select: { uid: true },
+      });
+      if (lead) leads.push(lead);
+      else this.logger.warn(`env seed: no member for one FEATURE_ENV_SEED_TEST_LEAD_EMAIL entry; it is skipped`);
+    }
+    if (!leads.length) {
       this.logger.warn('env seed: no member with FEATURE_ENV_SEED_TEST_LEAD_EMAIL; test team skipped');
       return null;
     }
@@ -231,11 +241,13 @@ export class JobMatchEnvSeedService implements OnApplicationBootstrap {
         jobSearchStatus: null,
       },
     });
-    await this.prisma.teamMemberRole.upsert({
-      where: { memberUid_teamUid: { memberUid: lead.uid, teamUid: TEST_TEAM_UID } },
-      create: { memberUid: lead.uid, teamUid: TEST_TEAM_UID, teamLead: true, endDate: null },
-      update: { teamLead: true, endDate: null },
-    });
+    for (const lead of leads) {
+      await this.prisma.teamMemberRole.upsert({
+        where: { memberUid_teamUid: { memberUid: lead.uid, teamUid: TEST_TEAM_UID } },
+        create: { memberUid: lead.uid, teamUid: TEST_TEAM_UID, teamLead: true, endDate: null },
+        update: { teamLead: true, endDate: null },
+      });
+    }
 
     const job = await this.prisma.jobOpening.findUniqueOrThrow({
       where: { uid: TEST_ROLE_UID },
@@ -246,7 +258,7 @@ export class JobMatchEnvSeedService implements OnApplicationBootstrap {
       select: { memberUid: true },
     });
     const others = await this.pickMembers(
-      [...teamMembers.map((row) => row.memberUid), lead.uid, TEST_CANDIDATE_UID],
+      [...teamMembers.map((row) => row.memberUid), ...leads.map((l) => l.uid), TEST_CANDIDATE_UID],
       SUGGESTIONS - 1
     );
     return {
