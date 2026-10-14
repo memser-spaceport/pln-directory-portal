@@ -26,6 +26,8 @@ const CreateSpvSpotlightPage = () => {
   const [selectedTeamName, setSelectedTeamName] = useState('');
   const [selectedTeamLogo, setSelectedTeamLogo] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [senders, setSenders] = useState<{ email: string; name: string }[]>([]);
+  const [emailOnDataRoomRequest, setEmailOnDataRoomRequest] = useState(false);
   const [form, setForm] = useState({
     teamUid: '',
     title: '',
@@ -33,8 +35,6 @@ const CreateSpvSpotlightPage = () => {
     slug: '',
     status: 'DRAFT',
     supportEmail: '',
-    senderEmail: '',
-    senderName: '',
     replyToEmail: '',
     docSendUrl: '',
     summary: '',
@@ -91,8 +91,10 @@ const CreateSpvSpotlightPage = () => {
         {
           ...form,
           supportEmail: form.supportEmail.trim() || null,
-          senderEmail: form.senderEmail.trim() || null,
-          senderName: form.senderName.trim() || null,
+          senders: senders
+            .filter((sender) => sender.email.trim())
+            .map((sender) => ({ email: sender.email.trim(), name: sender.name.trim() })),
+          emailOnDataRoomRequest,
           replyToEmail: form.replyToEmail.trim() || null,
           docSendUrl: form.docSendUrl.trim() || null,
           summary: form.summary.trim() || null,
@@ -140,7 +142,13 @@ const CreateSpvSpotlightPage = () => {
                 <div className="mt-2 flex items-center gap-2 text-sm text-gray-600">
                   <span>Selected:</span>
                   {selectedTeamLogo ? (
-                    <Image src={selectedTeamLogo} alt="" width={24} height={24} className="h-6 w-6 rounded object-cover" />
+                    <Image
+                      src={selectedTeamLogo}
+                      alt=""
+                      width={24}
+                      height={24}
+                      className="h-6 w-6 rounded object-cover"
+                    />
                   ) : (
                     <div className="flex h-6 w-6 items-center justify-center rounded bg-gray-200 text-xs font-medium text-gray-600">
                       {selectedTeamName.charAt(0).toUpperCase()}
@@ -174,10 +182,18 @@ const CreateSpvSpotlightPage = () => {
                         )}
                       >
                         {team.logoUrl ? (
-                          <Image src={team.logoUrl} alt="" width={32} height={32} className="h-8 w-8 flex-shrink-0 rounded object-cover" />
+                          <Image
+                            src={team.logoUrl}
+                            alt=""
+                            width={32}
+                            height={32}
+                            className="h-8 w-8 flex-shrink-0 rounded object-cover"
+                          />
                         ) : (
                           <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded bg-gray-200">
-                            <span className="text-sm font-medium text-gray-600">{team.name.charAt(0).toUpperCase()}</span>
+                            <span className="text-sm font-medium text-gray-600">
+                              {team.name.charAt(0).toUpperCase()}
+                            </span>
                           </div>
                         )}
                         <span className="text-sm font-medium text-gray-900">{team.name}</span>
@@ -283,33 +299,54 @@ const CreateSpvSpotlightPage = () => {
             </div>
 
             <div>
-              <label htmlFor="senderEmail" className="mb-2 block text-sm font-medium text-gray-700">
-                Sender Email
-              </label>
-              <input
-                type="email"
-                id="senderEmail"
-                value={form.senderEmail}
-                onChange={(e) => setForm((current) => ({ ...current, senderEmail: e.target.value }))}
-                className={inputClass}
-                placeholder="Leave blank to use system default"
-              />
-              <p className="mt-1 text-xs text-gray-500">From address used for investor invite and follow-up emails.</p>
-            </div>
-
-            <div>
-              <label htmlFor="senderName" className="mb-2 block text-sm font-medium text-gray-700">
-                Sender Name
-              </label>
-              <input
-                type="text"
-                id="senderName"
-                value={form.senderName}
-                onChange={(e) => setForm((current) => ({ ...current, senderName: e.target.value }))}
-                className={inputClass}
-                placeholder="e.g. Remi Antczak"
-              />
-              <p className="mt-1 text-xs text-gray-500">Display name shown in the inbox From field.</p>
+              <span className="mb-2 block text-sm font-medium text-gray-700">Senders</span>
+              <div className="flex flex-col gap-2">
+                {senders.map((sender, index) => (
+                  <div key={index} className="flex gap-2">
+                    <input
+                      type="email"
+                      value={sender.email}
+                      onChange={(e) =>
+                        setSenders((current) =>
+                          current.map((row, rowIndex) => (rowIndex === index ? { ...row, email: e.target.value } : row))
+                        )
+                      }
+                      className={inputClass}
+                      placeholder="name@example.com"
+                      aria-label={`Sender ${index + 1} email`}
+                    />
+                    <input
+                      type="text"
+                      value={sender.name}
+                      onChange={(e) =>
+                        setSenders((current) =>
+                          current.map((row, rowIndex) => (rowIndex === index ? { ...row, name: e.target.value } : row))
+                        )
+                      }
+                      className={inputClass}
+                      placeholder="Display name"
+                      aria-label={`Sender ${index + 1} name`}
+                    />
+                    <button
+                      type="button"
+                      className="shrink-0 text-sm text-red-600"
+                      onClick={() => setSenders((current) => current.filter((_, rowIndex) => rowIndex !== index))}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="mt-2 text-sm font-medium text-blue-600"
+                onClick={() => setSenders((current) => [...current, { email: '', name: '' }])}
+              >
+                Add sender
+              </button>
+              <p className="mt-1 text-xs text-gray-500">
+                Batch emails can use one or more of these addresses, or the LabOS default.
+              </p>
             </div>
 
             <div>
@@ -339,6 +376,21 @@ const CreateSpvSpotlightPage = () => {
                 placeholder="https://docsend.com/..."
               />
             </div>
+
+            <label className="flex items-start gap-3 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600"
+                checked={emailOnDataRoomRequest}
+                onChange={(e) => setEmailOnDataRoomRequest(e.target.checked)}
+              />
+              <span>
+                Send the data room email when an investor clicks Request data room access
+                <span className="mt-1 block text-xs text-gray-500">
+                  Off keeps Access data room, which opens the DocSend link.
+                </span>
+              </span>
+            </label>
 
             <div>
               <label htmlFor="closesAt" className="mb-2 block text-sm font-medium text-gray-700">

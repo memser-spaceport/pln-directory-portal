@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Modal from '../modal/modal';
-import { WEB_UI_BASE_URL } from '../../utils/constants';
 import { emailTemplateTokens, mergeEmailTemplate, wrapSpvSpotlightEmail } from './spv-spotlight-email-shell';
 
 type PreviewSpvEmailModalProps = {
@@ -32,9 +31,8 @@ export const PreviewSpvEmailModal: React.FC<PreviewSpvEmailModalProps> = ({
     setValues(next);
   }, [isOpen, tokens, defaults]);
 
-  const preferencesUrl = `${WEB_UI_BASE_URL.replace(/\/$/, '')}/settings/email`;
   const previewSubject = mergeEmailTemplate(subject, values);
-  const previewHtml = wrapSpvSpotlightEmail(mergeEmailTemplate(body, values), preferencesUrl);
+  const previewHtml = wrapSpvSpotlightEmail(mergeEmailTemplate(body, values), previewSubject);
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} modalClassName="w-full max-w-3xl">
