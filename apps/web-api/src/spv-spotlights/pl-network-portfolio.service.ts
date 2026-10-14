@@ -10,6 +10,8 @@ export class PlNetworkPortfolioService {
     const teams = await this.prisma.team.findMany({
       where: {
         communityAffiliations: { some: { title: PL_PORTFOLIO_COMMUNITY_AFFILIATION } },
+        // L0 teams are "inactive": their public profile is refused, so they are not listed either.
+        OR: [{ accessLevel: null }, { accessLevel: { not: 'L0' } }],
       },
       orderBy: { name: 'asc' },
       select: {
@@ -21,6 +23,7 @@ export class PlNetworkPortfolioService {
         portfolioStartYear: true,
         portfolioEndYear: true,
         logo: { select: { url: true } },
+        portfolioMapLogo: { select: { url: true } },
         fundingStage: { select: { title: true } },
       },
     });
@@ -30,6 +33,7 @@ export class PlNetworkPortfolioService {
         id: team.uid,
         name: team.name,
         logoUrl: team.logo?.url ?? null,
+        mapLogoUrl: team.portfolioMapLogo?.url ?? null,
         island: team.portfolioIsland,
         startYear: team.portfolioStartYear,
         endYear: team.portfolioEndYear,
