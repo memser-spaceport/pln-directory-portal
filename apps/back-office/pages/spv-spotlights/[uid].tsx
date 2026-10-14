@@ -121,12 +121,16 @@ const BUILT_IN_TOKENS = [
   'docSendLink',
 ];
 
+const TEMPLATE_SYNTAX = new Set(['else']);
+
 const requiredTokens = (template?: { subject: string; body: string }) => {
   const tokens = new Set<string>();
   for (const match of `${template?.subject ?? ''} ${template?.body ?? ''}`.matchAll(
     /\{\{\s*([a-zA-Z0-9_]+)\s*(\|[^}]*)?\}\}/g
   )) {
-    if (!match[2] && !BUILT_IN_TOKENS.includes(match[1])) tokens.add(match[1]);
+    if (!match[2] && !BUILT_IN_TOKENS.includes(match[1]) && !TEMPLATE_SYNTAX.has(match[1])) {
+      tokens.add(match[1]);
+    }
   }
   return [...tokens];
 };
@@ -1645,7 +1649,7 @@ const SpvSpotlightDetailPage = () => {
               </p>
             </fieldset>
             <label className="block">
-              <span className="mb-1 block font-medium text-gray-900">Emails per sender per minute</span>
+              <span className="mb-1 block font-medium text-gray-900">Send rate</span>
               <input
                 type="number"
                 min={1}
@@ -1656,12 +1660,16 @@ const SpvSpotlightDetailPage = () => {
                 onChange={(event) => setEmailsPerSenderPerMinute(event.target.value)}
                 className="w-32 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
                 placeholder="No limit"
+                aria-describedby="batch-send-rate-hint"
               />
+              <span id="batch-send-rate-hint" className="mt-1 block text-xs text-gray-500">
+                Emails per minute for each From address.
+              </span>
             </label>
             {batchDuration && (
               <p className="rounded-md bg-gray-50 px-3 py-2 text-gray-800">
-                Each selected sender sends {emailsPerSenderPerMinute} email
-                {Number(emailsPerSenderPerMinute) === 1 ? '' : 's'} per minute. The fullest sender has {busiestSender}{' '}
+                Each From address sends {emailsPerSenderPerMinute} email
+                {Number(emailsPerSenderPerMinute) === 1 ? '' : 's'} per minute. The fullest address has {busiestSender}{' '}
                 of {sendRecipients.length}. This batch takes {batchDuration.toLowerCase()}.
               </p>
             )}
