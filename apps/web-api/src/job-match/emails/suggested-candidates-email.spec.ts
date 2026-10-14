@@ -86,16 +86,16 @@ describe('renderSuggestedCandidatesEmail', () => {
     it("opens each card on that person on the role's Candidates page, tagged utm_content=profile", () => {
       const { html, text } = renderSuggestedCandidatesEmail(baseInput());
       for (const uid of ['m1', 'm2', 'm3']) {
-        const url = `${BASE}/teams/team-1/applicants?role=role-1&suggested=${uid}&${UTM('profile')}`;
+        const url = `${BASE}/teams/team-1/applicants?role=role-1&tab=suggested&suggested=${uid}&${UTM('profile')}`;
         expect(html).toContain(attr(url));
         expect(text).toContain(`View profile: ${url}`);
       }
     });
 
-    it('opens the whole role list for "All N matches" (all) and Edit criteria (criteria)', () => {
+    it('opens the Suggested tab for "All N matches" (all) and Edit criteria (criteria, with the modal open)', () => {
       const { html, text } = renderSuggestedCandidatesEmail(baseInput());
-      const all = `${BASE}/teams/team-1/applicants?role=role-1&${UTM('all')}`;
-      const criteria = `${BASE}/teams/team-1/applicants?role=role-1&${UTM('criteria')}`;
+      const all = `${BASE}/teams/team-1/applicants?role=role-1&tab=suggested&${UTM('all')}`;
+      const criteria = `${BASE}/teams/team-1/applicants?role=role-1&tab=suggested&edit=criteria&${UTM('criteria')}`;
       expect(html).toContain(`${attr(all)} style="color: #156FF7; text-decoration: underline;">All 12 matches`);
       expect(html).toContain(`${attr(criteria)} style="color: #156FF7; text-decoration: underline;">Edit criteria`);
       expect(text).toContain(`All 12 matches for this role: ${all}`);
@@ -106,7 +106,7 @@ describe('renderSuggestedCandidatesEmail', () => {
       const { text } = renderSuggestedCandidatesEmail(
         baseInput({ teamUid: 'team/1', candidates: [candidate({ memberUid: 'm&1' })] })
       );
-      expect(text).toContain(`${BASE}/teams/team%2F1/applicants?role=role-1&suggested=m%261&`);
+      expect(text).toContain(`${BASE}/teams/team%2F1/applicants?role=role-1&tab=suggested&suggested=m%261&`);
     });
 
     it('carries the preferences and unsubscribe URLs from the input, untouched, in the footer', () => {
@@ -117,6 +117,13 @@ describe('renderSuggestedCandidatesEmail', () => {
       expect(html).toContain('>Unsubscribe</a>');
       expect(text).toContain(`Email preferences: ${BASE}/settings/email\n`);
       expect(text).toContain(`Unsubscribe: ${BASE}/settings/email/unsubscribed?token=v1.a.b`);
+    });
+
+    it('sends every Candidates-page link to the Suggested tab', () => {
+      const { html } = renderSuggestedCandidatesEmail(baseInput());
+      const pageLinks = [...html.matchAll(/href="([^"]*\/applicants\?[^"]*)"/g)].map((m) => m[1]);
+      expect(pageLinks).toHaveLength(5);
+      for (const href of pageLinks) expect(href).toContain('?role=role-1&amp;tab=suggested&amp;');
     });
 
     it('uses absolute URLs only: no relative href or src', () => {
@@ -214,6 +221,14 @@ describe('renderSuggestedCandidatesEmail', () => {
       expect(subject).toBe('1 new suggested candidate for Rust & Go');
       expect(text).toContain('Grace Hopper · Strong match');
     });
+  });
+
+  it('says in the footer, html and text, that it comes at most once a week per role', () => {
+    const { html, text } = renderSuggestedCandidatesEmail(baseInput());
+    const reason =
+      "You're getting this because you lead Analytical Engines, which posted Rust Engineer on the job board. At most one a week per role.";
+    expect(visibleText(html)).toContain(reason.replace("'", '&#39;'));
+    expect(text).toContain(`${reason}\nEmail preferences: `);
   });
 
   it('never mentions job-search status', () => {
