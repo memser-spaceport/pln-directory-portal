@@ -27,6 +27,10 @@ import { AgentFeedbackDeniedInterceptor } from './agent-feedback-denied.intercep
 
 import { AiAppResourcesController } from './ai-app-resources.controller';
 import { AiAppResourcesService } from './ai-app-resources.service';
+import { AiAppsLinearService } from './ai-apps-linear.service';
+import { AiAppFeedbackLinearSync } from './ai-app-feedback-linear-sync.service';
+import { AiAppFeedbackLinearHandler } from './ai-app-feedback-linear.handler';
+import { FeedbackLinearModule } from '../feedback-linear/feedback-linear.module';
 
 @Module({
   imports: [
@@ -35,6 +39,7 @@ import { AiAppResourcesService } from './ai-app-resources.service';
     AccessControlV2Module,
     PushNotificationsModule,
     AnalyticsModule,
+    FeedbackLinearModule,
     BullModule.registerQueue({
       name: AI_APPS_DEPLOY_QUEUE,
       // Queue options merge shallowly over BullModule.forRoot, so `settings`
@@ -52,6 +57,9 @@ import { AiAppResourcesService } from './ai-app-resources.service';
     JwtService,
     AiAppsDeployProcessor,
     AiAppsAccessService,
+    AiAppsLinearService,
+    AiAppFeedbackLinearSync,
+    AiAppFeedbackLinearHandler,
     AiAppsConnectService,
     AiAppsSessionService,
     AiAppsAuthGateService,

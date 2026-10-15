@@ -33,6 +33,12 @@ describe('FeedbackLinearOutboxService', () => {
       identifier: null,
       url: null,
       lastError: null,
+      targetState: 'INTAKE',
+      appliedState: null,
+      intakeStateId: null,
+      pendingCommentUid: null,
+      pendingCommentId: null,
+      version: 0,
       createdAt: now,
       updatedAt: now,
       ...overrides,
@@ -121,46 +127,115 @@ describe('FeedbackLinearOutboxService', () => {
     });
   });
 
-  describe('markSynced', () => {
-    it('stores the issue reference and clears the lease and error', async () => {
-      await service.markSynced(row({ attempts: 2 }), { identifier: 'LAB-1', url: 'https://linear.app/x' });
+  describe('requestState', () => {
+    it('bumps the version and makes the row due now, without touching the lease', async () => {
+      prisma.feedbackLinearIssue.updateMany.mockResolvedValue({ count: 1 });
+      await expect(service.requestState('AI_APP_FEEDBACK', 'f1', 'COMPLETED', undefined, now)).resolves.toBe(true);
+      const { where, data } = prisma.feedbackLinearIssue.updateMany.mock.calls[0][0];
+      expect(where).toEqual({ sourceType: 'AI_APP_FEEDBACK', sourceUid: 'f1', status: { not: 'SKIPPED' } });
+      expect(data).toEqual({
+        targetState: 'COMPLETED',
+        version: { increment: 1 },
+        status: 'PENDING',
+        attempts: 0,
+        nextAttemptAt: now,
+      });
+      expect(data).not.toHaveProperty('leaseUntil');
+    });
+
+    it('records a pending comment with a fresh comment id', async () => {
+      prisma.feedbackLinearIssue.updateMany.mockResolvedValue({ count: 1 });
+      await service.requestState('AI_APP_FEEDBACK', 'f1', 'COMPLETED', { uid: 'c1' }, now);
+      const { data } = prisma.feedbackLinearIssue.updateMany.mock.calls[0][0];
+      expect(data.pendingCommentUid).toBe('c1');
+      expect(data.pendingCommentId).toMatch(/^[0-9a-f-]{36}$/);
+    });
+
+    it('is a no-op for an item that was never pushed', async () => {
+      prisma.feedbackLinearIssue.updateMany.mockResolvedValue({ count: 0 });
+      await expect(service.requestState('AI_APP_FEEDBACK', 'f1', 'CANCELED')).resolves.toBe(false);
+    });
+  });
+
+  describe('saveProgress', () => {
+    it('stores only the fields given and clears a posted comment', async () => {
+      await service.saveProgress(row(), { appliedState: 'COMPLETED', commentDone: true });
       expect(prisma.feedbackLinearIssue.update).toHaveBeenCalledWith({
         where: { id: 1 },
-        data: {
-          status: 'SYNCED',
-          attempts: 3,
-          identifier: 'LAB-1',
-          url: 'https://linear.app/x',
-          leaseUntil: null,
-          lastError: null,
-        },
+        data: { appliedState: 'COMPLETED', pendingCommentUid: null, pendingCommentId: null },
+      });
+    });
+
+    it('writes nothing when there is no progress', async () => {
+      await service.saveProgress(row(), {});
+      expect(prisma.feedbackLinearIssue.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('markSynced', () => {
+    it('marks SYNCED only for the claimed version, then stores progress and releases the lease', async () => {
+      prisma.feedbackLinearIssue.updateMany.mockResolvedValue({ count: 1 });
+      await service.markSynced(row({ attempts: 2, version: 3 }), { identifier: 'LAB-1', url: 'https://linear.app/x' });
+      expect(prisma.feedbackLinearIssue.updateMany).toHaveBeenCalledWith({
+        where: { id: 1, version: 3 },
+        data: { status: 'SYNCED', attempts: 3, lastError: null },
+      });
+      expect(prisma.feedbackLinearIssue.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { identifier: 'LAB-1', url: 'https://linear.app/x', leaseUntil: null },
+      });
+    });
+
+    it('still stores progress when a newer request changed the version (row stays PENDING)', async () => {
+      prisma.feedbackLinearIssue.updateMany.mockResolvedValue({ count: 0 });
+      await service.markSynced(row(), { identifier: 'LAB-1', url: 'u', appliedState: 'INTAKE' });
+      expect(prisma.feedbackLinearIssue.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { identifier: 'LAB-1', url: 'u', appliedState: 'INTAKE', leaseUntil: null },
       });
     });
   });
 
+  it('marks a row SKIPPED for its version and releases the lease', async () => {
+    prisma.feedbackLinearIssue.updateMany.mockResolvedValue({ count: 1 });
+    await service.markSkipped(row({ version: 2 }));
+    expect(prisma.feedbackLinearIssue.updateMany).toHaveBeenCalledWith({
+      where: { id: 1, version: 2 },
+      data: { status: 'SKIPPED', leaseUntil: null, lastError: null },
+    });
+    expect(prisma.feedbackLinearIssue.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { leaseUntil: null } });
+  });
+
   describe('markFailedAttempt', () => {
+    beforeEach(() => {
+      prisma.feedbackLinearIssue.updateMany.mockResolvedValue({ count: 1 });
+    });
+
     it('reschedules with backoff while attempts remain', async () => {
       const status = await service.markFailedAttempt(row({ attempts: 0 }), 'boom', 8, null, now);
       expect(status).toBe('PENDING');
-      expect(prisma.feedbackLinearIssue.update.mock.calls[0][0].data).toEqual({
-        status: 'PENDING',
-        attempts: 1,
-        lastError: 'boom',
-        leaseUntil: null,
-        nextAttemptAt: new Date(now.getTime() + 30_000),
+      expect(prisma.feedbackLinearIssue.updateMany.mock.calls[0][0]).toEqual({
+        where: { id: 1, version: 0 },
+        data: {
+          status: 'PENDING',
+          attempts: 1,
+          lastError: 'boom',
+          leaseUntil: null,
+          nextAttemptAt: new Date(now.getTime() + 30_000),
+        },
       });
     });
 
     it('uses a Retry-After later than the backoff', async () => {
       await service.markFailedAttempt(row({ attempts: 0 }), 'rate limited', 8, 120_000, now);
-      expect(prisma.feedbackLinearIssue.update.mock.calls[0][0].data.nextAttemptAt).toEqual(
+      expect(prisma.feedbackLinearIssue.updateMany.mock.calls[0][0].data.nextAttemptAt).toEqual(
         new Date(now.getTime() + 120_000)
       );
     });
 
     it('keeps the backoff when Retry-After is shorter', async () => {
       await service.markFailedAttempt(row({ attempts: 2 }), 'rate limited', 8, 1_000, now);
-      expect(prisma.feedbackLinearIssue.update.mock.calls[0][0].data.nextAttemptAt).toEqual(
+      expect(prisma.feedbackLinearIssue.updateMany.mock.calls[0][0].data.nextAttemptAt).toEqual(
         new Date(now.getTime() + 120_000)
       );
     });
@@ -168,7 +243,7 @@ describe('FeedbackLinearOutboxService', () => {
     it('marks FAILED on the last attempt', async () => {
       const status = await service.markFailedAttempt(row({ attempts: 7 }), 'still down', 8, null, now);
       expect(status).toBe('FAILED');
-      expect(prisma.feedbackLinearIssue.update.mock.calls[0][0].data).toEqual({
+      expect(prisma.feedbackLinearIssue.updateMany.mock.calls[0][0].data).toEqual({
         status: 'FAILED',
         attempts: 8,
         lastError: 'still down',
@@ -178,7 +253,13 @@ describe('FeedbackLinearOutboxService', () => {
 
     it('truncates long errors to 1000 characters', async () => {
       await service.markFailedAttempt(row(), 'x'.repeat(5000), 8, null, now);
-      expect(prisma.feedbackLinearIssue.update.mock.calls[0][0].data.lastError).toHaveLength(1000);
+      expect(prisma.feedbackLinearIssue.updateMany.mock.calls[0][0].data.lastError).toHaveLength(1000);
+    });
+
+    it('never overwrites a newer request with a failure', async () => {
+      prisma.feedbackLinearIssue.updateMany.mockResolvedValue({ count: 0 });
+      await expect(service.markFailedAttempt(row({ attempts: 7 }), 'down', 8, null, now)).resolves.toBeNull();
+      expect(prisma.feedbackLinearIssue.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { leaseUntil: null } });
     });
   });
 });

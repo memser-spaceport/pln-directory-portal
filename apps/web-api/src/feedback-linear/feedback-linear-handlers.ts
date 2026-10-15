@@ -9,6 +9,8 @@ export type FeedbackLinearIssueDraft = Omit<LinearIssueCreateInput, 'id'>;
 export interface FeedbackLinearSourceHandler {
   readonly sourceType: FeedbackLinearSource;
   buildIssue(row: FeedbackLinearIssue): Promise<FeedbackLinearIssueDraft>;
+  /** Markdown for a LabOS comment to post on the issue; null drops it (e.g. the comment is gone). */
+  buildComment?(row: FeedbackLinearIssue, commentUid: string): Promise<string | null>;
 }
 
 /** A failure that a retry can't fix, such as the source row being gone. The push becomes FAILED at once. */

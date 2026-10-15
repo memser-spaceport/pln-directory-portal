@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import axios, { AxiosError, AxiosInstance } from 'axios';
-import { getFeedbackLinearConfig } from './feedback-linear.config';
+import { getFeedbackLinearCredentials } from './feedback-linear.config';
 
 const LINEAR_GRAPHQL_URL = 'https://api.linear.app/graphql';
 const LINEAR_TOKEN_URL = 'https://api.linear.app/oauth/token';
@@ -53,6 +53,7 @@ export interface LinearIssueCreateInput {
   projectId?: string;
   labelIds?: string[];
   priority?: number;
+  assigneeId?: string;
   createAsUser?: string;
 }
 
@@ -60,6 +61,43 @@ export interface LinearTeamLabel {
   id: string;
   name: string;
   parentName: string | null;
+}
+
+export interface LinearProjectRef {
+  id: string;
+  name: string;
+}
+
+export interface LinearWorkflowState {
+  id: string;
+  /** triage, backlog, unstarted, started, completed or canceled. */
+  type: string;
+  position: number;
+}
+
+export interface LinearTeamDetails {
+  id: string;
+  key: string;
+  name: string;
+  private: boolean;
+  triageEnabled: boolean;
+  states: LinearWorkflowState[];
+  /** The team's own labels plus workspace labels. */
+  labels: LinearTeamLabel[];
+  projects: LinearProjectRef[];
+}
+
+export interface LinearTeamSummary {
+  id: string;
+  key: string;
+  name: string;
+  private: boolean;
+  projects: LinearProjectRef[];
+}
+
+export interface LinearUserRef {
+  id: string;
+  teamIds: string[];
 }
 
 export interface LinearUploadTarget {
@@ -109,20 +147,117 @@ export class LinearClient {
     }
   }
 
-  async teamLabels(teamId: string): Promise<LinearTeamLabel[]> {
-    const data = await this.graphql<{
-      team: { labels: { nodes: { id: string; name: string; parent: { name: string } | null }[] } } | null;
-    }>(
-      `query FeedbackTeamLabels($id: String!) {
-        team(id: $id) { labels(first: 250) { nodes { id name parent { name } } } }
-      }`,
-      { id: teamId }
-    );
-    return (data.team?.labels.nodes ?? []).map((label) => ({
+  /** The team with its states, labels (team + workspace) and projects, or null when the app can't see it. */
+  async team(id: string): Promise<LinearTeamDetails | null> {
+    type LabelNode = { id: string; name: string; parent: { name: string } | null };
+    let data: {
+      team: {
+        id: string;
+        key: string;
+        name: string;
+        private: boolean;
+        triageEnabled: boolean;
+        states: { nodes: LinearWorkflowState[] };
+        labels: { nodes: LabelNode[] };
+        projects: { nodes: LinearProjectRef[] };
+      } | null;
+      issueLabels: { nodes: LabelNode[] };
+    };
+    try {
+      data = await this.graphql(
+        `query FeedbackTeam($id: String!) {
+          team(id: $id) {
+            id key name private triageEnabled
+            states(first: 100) { nodes { id type position } }
+            labels(first: 250) { nodes { id name parent { name } } }
+            projects(first: 250) { nodes { id name } }
+          }
+          issueLabels(first: 250, filter: { team: { null: true } }) { nodes { id name parent { name } } }
+        }`,
+        { id }
+      );
+    } catch (error) {
+      if (error instanceof LinearApiError && error.isNotFound) return null;
+      throw error;
+    }
+    if (!data.team) return null;
+    const toLabel = (label: LabelNode): LinearTeamLabel => ({
       id: label.id,
       name: label.name,
       parentName: label.parent?.name ?? null,
+    });
+    return {
+      id: data.team.id,
+      key: data.team.key,
+      name: data.team.name,
+      private: data.team.private,
+      triageEnabled: data.team.triageEnabled,
+      states: data.team.states.nodes,
+      labels: [...data.team.labels.nodes, ...(data.issueLabels?.nodes ?? [])].map(toLabel),
+      projects: data.team.projects.nodes,
+    };
+  }
+
+  /** Every team the Linear app can see, with its projects. */
+  async teams(): Promise<LinearTeamSummary[]> {
+    const data = await this.graphql<{
+      teams: {
+        nodes: { id: string; key: string; name: string; private: boolean; projects: { nodes: LinearProjectRef[] } }[];
+      };
+    }>(
+      `query FeedbackTeams {
+        teams(first: 100) { nodes { id key name private projects(first: 50) { nodes { id name } } } }
+      }`,
+      {}
+    );
+    return data.teams.nodes.map((team) => ({
+      id: team.id,
+      key: team.key,
+      name: team.name,
+      private: team.private,
+      projects: team.projects.nodes,
     }));
+  }
+
+  /** The active Linear user with this email (case-insensitive) and their team ids, or null. */
+  async userByEmail(email: string): Promise<LinearUserRef | null> {
+    const data = await this.graphql<{
+      users: { nodes: { id: string; teams: { nodes: { id: string }[] } }[] };
+    }>(
+      `query FeedbackUserByEmail($email: String!) {
+        users(first: 1, filter: { email: { eqIgnoreCase: $email }, active: { eq: true } }) {
+          nodes { id teams(first: 100) { nodes { id } } }
+        }
+      }`,
+      { email }
+    );
+    const user = data.users.nodes[0];
+    return user ? { id: user.id, teamIds: user.teams.nodes.map((team) => team.id) } : null;
+  }
+
+  async issueUpdate(id: string, input: { stateId: string }): Promise<void> {
+    const data = await this.graphql<{ issueUpdate: { success: boolean } }>(
+      `mutation FeedbackIssueUpdate($id: String!, $input: IssueUpdateInput!) {
+        issueUpdate(id: $id, input: $input) { success }
+      }`,
+      { id, input }
+    );
+    if (!data.issueUpdate?.success) {
+      throw new LinearApiError('Linear did not update the issue', 200, null, true);
+    }
+  }
+
+  /** Posts a comment under the given id, so a retry can't post it twice. */
+  async commentCreate(input: { id: string; issueId: string; body: string }): Promise<void> {
+    const data = await this.graphql<{ commentCreate: { success: boolean } }>(
+      `mutation FeedbackCommentCreate($input: CommentCreateInput!) {
+        commentCreate(input: $input) { success }
+      }`,
+      { input }
+    );
+    if (!data.commentCreate?.success) {
+      throw new LinearApiError('Linear did not create the comment', 200, null, true);
+    }
   }
 
   async fileUpload(contentType: string, filename: string, size: number): Promise<LinearUploadTarget> {
@@ -175,7 +310,7 @@ export class LinearClient {
     if (this.token && Date.now() < this.token.refreshAt) {
       return this.token.value;
     }
-    const config = getFeedbackLinearConfig();
+    const config = getFeedbackLinearCredentials();
     if (!config) {
       throw new LinearApiError('Linear is not configured', 0, null, false);
     }

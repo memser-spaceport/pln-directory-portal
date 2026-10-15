@@ -49,6 +49,7 @@ import {
   type PublicFeedbackPin,
 } from './ai-app-feedback-pins';
 import type { FeedbackContext, FeedbackPinInput } from './dto/submit-feedback.dto';
+import { AiAppFeedbackLinearIssue, AiAppFeedbackLinearSync } from './ai-app-feedback-linear-sync.service';
 import {
   AiAppLogPhase,
   AiAppTargetEnvironment,
@@ -407,7 +408,8 @@ export class AiAppsService {
     private readonly awsService: AwsService,
     private readonly pushNotifications: PushNotificationsService,
     private readonly analyticsService: AnalyticsService,
-    @Optional() @InjectQueue(AI_APPS_DEPLOY_QUEUE) private readonly deployQueue?: Queue<AiAppDeployJobData>
+    @Optional() @InjectQueue(AI_APPS_DEPLOY_QUEUE) private readonly deployQueue?: Queue<AiAppDeployJobData>,
+    @Optional() private readonly feedbackLinear?: AiAppFeedbackLinearSync
   ) {}
 
   private async withMember<T extends { memberUid: string }>(records: T[]): Promise<Array<WithMember<T>>> {
@@ -1923,6 +1925,7 @@ export class AiAppsService {
         ...(extras.priority ? { priority: extras.priority } : {}),
       },
     });
+    await this.feedbackLinear?.onSubmitted(app, feedback);
     const [withAuthor] = await this.withMember([feedback]);
     if (isComment && app.memberUid !== memberUid) {
       await this.notifyFeedbackConversation(app, { ...feedback, hasPins: true }, app.memberUid, {
@@ -2003,9 +2006,10 @@ export class AiAppsService {
     const app = await this.findAgentFeedbackApp(requesterUid, uid, scope);
     const { updated, from } = await this.applyFeedbackStatus(app.uid, feedbackUid, status);
     if (note) {
-      await this.prisma.aiAppFeedbackComment.create({
+      const closingNote = await this.prisma.aiAppFeedbackComment.create({
         data: { feedbackUid, memberUid: app.memberUid, text: note, kind: 'CLOSING_NOTE' },
       });
+      await this.feedbackLinear?.onClosingNote(feedbackUid, closingNote.uid);
       const feedback = await this.prisma.aiAppFeedback.findUnique({
         where: { uid: feedbackUid },
         select: { uid: true, appUid: true, memberUid: true, kind: true, _count: { select: { pins: true } } },
@@ -2185,12 +2189,20 @@ export class AiAppsService {
     const withMembers = await this.withMember(rows);
     const comments = options.withComments ? await this.withMember(rows.flatMap((row) => row.comments ?? [])) : [];
     let offset = 0;
-    return withMembers.map(({ _count, comments: own, ...row }) => {
+    const result = withMembers.map(({ _count, comments: own, ...row }) => {
       const count = own?.length ?? 0;
       const thread = options.withComments ? { comments: comments.slice(offset, offset + count) } : {};
       offset += count;
       return { ...row, ...thread, commentCount: _count?.comments ?? 0 };
     });
+    return this.withLinearIssue(result);
+  }
+
+  /** Managers' rows carry the item's Linear issue (or null); see AiAppFeedbackLinearSync. */
+  private async withLinearIssue<T extends { uid: string }>(
+    rows: T[]
+  ): Promise<Array<T & { linearIssue?: AiAppFeedbackLinearIssue | null }>> {
+    return this.feedbackLinear ? this.feedbackLinear.attach(rows) : rows;
   }
 
   /**
@@ -2296,6 +2308,7 @@ export class AiAppsService {
       where: { uid: feedbackUid },
       data: { status },
     });
+    await this.feedbackLinear?.onStatusChanged(feedbackUid, feedback.status, status);
     return { updated: (await this.withMember([updated]))[0], from: feedback.status };
   }
 
@@ -2323,12 +2336,14 @@ export class AiAppsService {
     });
     const withMembers = await this.withMember(feedback);
     // `pinCount` lets the list offer "Show on page" without sending every pin.
-    return withMembers.map(({ _count, ...row }) => ({
-      ...row,
-      appName: appNameByUid.get(row.appUid) ?? '',
-      pinCount: _count?.pins ?? 0,
-      commentCount: _count?.comments ?? 0,
-    }));
+    return this.withLinearIssue(
+      withMembers.map(({ _count, ...row }) => ({
+        ...row,
+        appName: appNameByUid.get(row.appUid) ?? '',
+        pinCount: _count?.pins ?? 0,
+        commentCount: _count?.comments ?? 0,
+      }))
+    );
   }
 
   /**
@@ -2530,6 +2545,7 @@ export class AiAppsService {
       throw new ForbiddenException('Only its author or a directory admin can delete it');
     }
     await this.prisma.aiAppFeedback.delete({ where: { uid: feedback.uid } });
+    await this.feedbackLinear?.onDeleted(feedback.uid);
   }
 
   /** Removes a reply. Its author may; so may a directory admin (moderation). */

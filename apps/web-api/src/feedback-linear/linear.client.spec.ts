@@ -133,7 +133,7 @@ describe('LinearClient', () => {
     post.mockResolvedValueOnce(tokenResponse()).mockRejectedValueOnce(httpError(429, {}, { 'retry-after': '120' }));
     const client = new LinearClient();
 
-    const error = await client.teamLabels('t').catch((e) => e);
+    const error = await client.teams().catch((e) => e);
     expect(error).toBeInstanceOf(LinearApiError);
     expect(error).toMatchObject({ status: 429, retryable: true, retryAfterMs: 120_000 });
   });
@@ -151,13 +151,13 @@ describe('LinearClient', () => {
       );
     const client = new LinearClient();
 
-    const error = await client.teamLabels('t').catch((e) => e);
+    const error = await client.teams().catch((e) => e);
     expect(error).toMatchObject({ code: 'RATELIMITED', retryable: true, retryAfterMs: 30_000 });
   });
 
   it('maps a 5xx to a retryable error', async () => {
     post.mockResolvedValueOnce(tokenResponse()).mockRejectedValueOnce(httpError(503));
-    const error = await new LinearClient().teamLabels('t').catch((e) => e);
+    const error = await new LinearClient().teams().catch((e) => e);
     expect(error).toMatchObject({ status: 503, retryable: true });
   });
 
@@ -165,7 +165,7 @@ describe('LinearClient', () => {
     post
       .mockResolvedValueOnce(tokenResponse())
       .mockRejectedValueOnce(Object.assign(new Error('timeout'), { code: 'ECONNABORTED' }));
-    const error = await new LinearClient().teamLabels('t').catch((e) => e);
+    const error = await new LinearClient().teams().catch((e) => e);
     expect(error).toMatchObject({ status: 0, retryable: true });
   });
 
@@ -175,7 +175,7 @@ describe('LinearClient', () => {
         errors: [{ message: 'Argument Validation Error', extensions: { code: 'INVALID_INPUT' } }],
       })
     );
-    const error = await new LinearClient().teamLabels('t').catch((e) => e);
+    const error = await new LinearClient().teams().catch((e) => e);
     expect(error).toMatchObject({ status: 400, code: 'INVALID_INPUT', retryable: false });
   });
 
@@ -213,25 +213,6 @@ describe('LinearClient', () => {
     expect(error.isAlreadyExists).toBe(true);
   });
 
-  it('flattens team labels with their parent group name', async () => {
-    post.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(
-      gqlResponse({
-        team: {
-          labels: {
-            nodes: [
-              { id: 'l1', name: 'Bug', parent: { name: 'Type' } },
-              { id: 'l2', name: 'User feedback', parent: null },
-            ],
-          },
-        },
-      })
-    );
-    await expect(new LinearClient().teamLabels('t')).resolves.toEqual([
-      { id: 'l1', name: 'Bug', parentName: 'Type' },
-      { id: 'l2', name: 'User feedback', parentName: null },
-    ]);
-  });
-
   it('never puts the token or client secret into error messages', async () => {
     post
       .mockResolvedValueOnce(tokenResponse('tok-secret-value'))
@@ -239,8 +220,8 @@ describe('LinearClient', () => {
       .mockRejectedValueOnce(httpError(401, { error: 'invalid_client' }));
     const client = new LinearClient();
 
-    const first = await client.teamLabels('t').catch((e) => e);
-    const second = await new LinearClient().teamLabels('t').catch((e) => e);
+    const first = await client.teams().catch((e) => e);
+    const second = await new LinearClient().teams().catch((e) => e);
     for (const error of [first, second]) {
       expect(error.message).not.toContain('tok-secret-value');
       expect(error.message).not.toContain('super-secret');
@@ -249,8 +230,103 @@ describe('LinearClient', () => {
 
   it('fails without calling Linear when it is not configured', async () => {
     delete process.env.FEEDBACK_LINEAR_CLIENT_ID;
-    const error = await new LinearClient().teamLabels('t').catch((e) => e);
+    const error = await new LinearClient().teams().catch((e) => e);
     expect(error).toMatchObject({ message: 'Linear is not configured', retryable: false });
     expect(post).not.toHaveBeenCalled();
+  });
+
+  describe('team', () => {
+    it('merges team and workspace labels and returns states and projects', async () => {
+      post.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(
+        gqlResponse({
+          team: {
+            id: 't',
+            key: 'ABC',
+            name: 'Alpha',
+            private: true,
+            triageEnabled: false,
+            states: { nodes: [{ id: 's1', type: 'backlog', position: 0 }] },
+            labels: { nodes: [{ id: 'l1', name: 'Bug', parent: { name: 'Type' } }] },
+            projects: { nodes: [{ id: 'p1', name: 'Roadmap' }] },
+          },
+          issueLabels: { nodes: [{ id: 'l2', name: 'User feedback', parent: null }] },
+        })
+      );
+      await expect(new LinearClient().team('t')).resolves.toEqual({
+        id: 't',
+        key: 'ABC',
+        name: 'Alpha',
+        private: true,
+        triageEnabled: false,
+        states: [{ id: 's1', type: 'backlog', position: 0 }],
+        labels: [
+          { id: 'l1', name: 'Bug', parentName: 'Type' },
+          { id: 'l2', name: 'User feedback', parentName: null },
+        ],
+        projects: [{ id: 'p1', name: 'Roadmap' }],
+      });
+      expect(graphqlCalls()[0][1].variables).toEqual({ id: 't' });
+    });
+
+    it('returns null for a team the app cannot see', async () => {
+      post.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce({
+        status: 200,
+        data: { errors: [{ message: 'Entity not found: Team' }] },
+        headers: {},
+      });
+      await expect(new LinearClient().team('nope')).resolves.toBeNull();
+    });
+  });
+
+  it('lists teams with their privacy flag and projects', async () => {
+    post.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(
+      gqlResponse({
+        teams: {
+          nodes: [
+            { id: 't', key: 'ABC', name: 'Alpha', private: false, projects: { nodes: [{ id: 'p', name: 'P' }] } },
+          ],
+        },
+      })
+    );
+    await expect(new LinearClient().teams()).resolves.toEqual([
+      { id: 't', key: 'ABC', name: 'Alpha', private: false, projects: [{ id: 'p', name: 'P' }] },
+    ]);
+  });
+
+  describe('userByEmail', () => {
+    it('returns the active user and their team ids', async () => {
+      post
+        .mockResolvedValueOnce(tokenResponse())
+        .mockResolvedValueOnce(
+          gqlResponse({ users: { nodes: [{ id: 'u1', teams: { nodes: [{ id: 't1' }, { id: 't2' }] } }] } })
+        );
+      await expect(new LinearClient().userByEmail('Ada@B.co')).resolves.toEqual({ id: 'u1', teamIds: ['t1', 't2'] });
+      expect(graphqlCalls()[0][1].query).toContain('eqIgnoreCase');
+      expect(graphqlCalls()[0][1].query).toContain('active: { eq: true }');
+    });
+
+    it('returns null when no active user has the email', async () => {
+      post.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(gqlResponse({ users: { nodes: [] } }));
+      await expect(new LinearClient().userByEmail('x@y.z')).resolves.toBeNull();
+    });
+  });
+
+  it('updates an issue state', async () => {
+    post.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(gqlResponse({ issueUpdate: { success: true } }));
+    await new LinearClient().issueUpdate('i1', { stateId: 'done' });
+    expect(graphqlCalls()[0][1].variables).toEqual({ id: 'i1', input: { stateId: 'done' } });
+  });
+
+  it('fails when Linear reports the update did not succeed', async () => {
+    post.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(gqlResponse({ issueUpdate: { success: false } }));
+    await expect(new LinearClient().issueUpdate('i1', { stateId: 'done' })).rejects.toBeInstanceOf(LinearApiError);
+  });
+
+  it('creates a comment under the given id', async () => {
+    post
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(gqlResponse({ commentCreate: { success: true } }));
+    await new LinearClient().commentCreate({ id: 'c1', issueId: 'i1', body: 'Fixed' });
+    expect(graphqlCalls()[0][1].variables).toEqual({ input: { id: 'c1', issueId: 'i1', body: 'Fixed' } });
   });
 });

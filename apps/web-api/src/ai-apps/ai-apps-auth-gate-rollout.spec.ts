@@ -285,7 +285,8 @@ describe('auth-gate admin routes', () => {
       {} as any,
       {} as any,
       {} as any,
-      authGateService as any
+      authGateService as any,
+      {} as any
     );
     await expect(call(controller, { memberUid: 'm-1' })).rejects.toBeInstanceOf(ForbiddenException);
     expect(authGateService.listFleet).not.toHaveBeenCalled();

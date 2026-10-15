@@ -6,7 +6,7 @@ import { FeedbackLinearOutboxService } from './feedback-linear-outbox.service';
 import { FeedbackLinearWorker } from './feedback-linear.worker';
 import { LinearClient } from './linear.client';
 import { LinearImageUploader } from './linear-images';
-import { LinearTypeLabels } from './linear-type-labels';
+import { LinearTeamMeta } from './linear-team-meta';
 
 /** Pushes LabOS feedback to Linear through the `FeedbackLinearIssue` outbox (docs/FEEDBACK_LINEAR.md). */
 @Module({
@@ -14,7 +14,7 @@ import { LinearTypeLabels } from './linear-type-labels';
   providers: [
     LinearClient,
     LinearImageUploader,
-    LinearTypeLabels,
+    LinearTeamMeta,
     FeedbackLinearOutboxService,
     FeedbackLinearHandlerRegistry,
     FeedbackLinearWorker,
@@ -23,7 +23,7 @@ import { LinearTypeLabels } from './linear-type-labels';
   exports: [
     LinearClient,
     LinearImageUploader,
-    LinearTypeLabels,
+    LinearTeamMeta,
     FeedbackLinearOutboxService,
     FeedbackLinearHandlerRegistry,
   ],
