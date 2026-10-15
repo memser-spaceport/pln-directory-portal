@@ -316,10 +316,7 @@ export function asEmailTemplates(value: unknown, title: string): EmailTemplates 
           typeof record.fromEmail === 'string' && record.fromEmail.trim()
             ? record.fromEmail.trim()
             : defaults.dataRoomAccess.fromEmail,
-        fromName:
-          typeof record.fromName === 'string' && record.fromName.trim()
-            ? record.fromName.trim()
-            : defaults.dataRoomAccess.fromName,
+        fromName: typeof record.fromName === 'string' ? record.fromName.trim() : defaults.dataRoomAccess.fromName,
         cc: cc ?? defaults.dataRoomAccess.cc,
         replyTo: typeof record.replyTo === 'string' ? record.replyTo.trim() : defaults.dataRoomAccess.replyTo,
       };

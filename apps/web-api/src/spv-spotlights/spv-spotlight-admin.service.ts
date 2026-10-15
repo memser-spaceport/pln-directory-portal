@@ -94,8 +94,8 @@ function savedDataRoomTemplate(value: DataRoomAccessTemplate): DataRoomAccessTem
     subject: value.subject.trim(),
     body: sanitizeEmailHtml(value.body),
     fromEmail: value.fromEmail.trim(),
-    fromName: value.fromName.trim(),
-    cc: value.cc.map((email) => email.trim()).filter(Boolean),
+    fromName: value.fromName?.trim() ?? '',
+    cc: (value.cc ?? []).map((email) => email.trim()).filter(Boolean),
     replyTo: value.replyTo?.trim() ?? '',
   };
 }

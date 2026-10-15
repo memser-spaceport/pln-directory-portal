@@ -22,19 +22,30 @@ const templateSchema = z.object({
   body: z.string().trim().min(1),
 });
 
-const optionalReplyTo = z.union([z.string().trim().email(), z.literal('')]).optional().default('');
+const optionalText = z.string().trim().max(120).nullish().transform((value) => value ?? '');
+const optionalReplyTo = z
+  .string()
+  .trim()
+  .nullish()
+  .transform((value) => value ?? '')
+  .refine((value) => value === '' || z.string().email().safeParse(value).success, 'Invalid email');
+const optionalCc = z
+  .array(z.string())
+  .nullish()
+  .transform((value) => (value ?? []).map((email) => email.trim()).filter(Boolean))
+  .refine((value) => value.every((email) => z.string().email().safeParse(email).success), 'Invalid email');
 
 const inviteTemplateSchema = templateSchema.extend({
-  fromName: z.string().trim().max(120).optional().default(''),
-  cc: z.array(z.string().trim().email()).optional().default([]),
-  replyTo: optionalReplyTo,
+  fromName: optionalText.optional().default(''),
+  cc: optionalCc.optional().default([]),
+  replyTo: optionalReplyTo.optional().default(''),
 });
 
 const dataRoomTemplateSchema = templateSchema.extend({
   fromEmail: z.string().trim().email(),
-  fromName: z.string().trim().min(1).max(120),
-  cc: z.array(z.string().trim().email()).default([]),
-  replyTo: optionalReplyTo,
+  fromName: optionalText.optional().default(''),
+  cc: optionalCc.optional().default([]),
+  replyTo: optionalReplyTo.optional().default(''),
 });
 
 const senderSchema = z.object({

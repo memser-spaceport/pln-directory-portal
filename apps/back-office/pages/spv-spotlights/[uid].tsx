@@ -1498,7 +1498,7 @@ const SpvSpotlightDetailPage = () => {
                           type="text"
                           className={clsx(s.fieldInput, 'box-border w-full self-stretch')}
                           value={templates.invitePreapproved.fromName ?? ''}
-                          placeholder="From name"
+                          placeholder="From name (optional)"
                           aria-label="Invite from name"
                           onChange={(e) =>
                             setTemplates({
@@ -1511,7 +1511,7 @@ const SpvSpotlightDetailPage = () => {
                           type="text"
                           className={clsx(s.fieldInput, 'box-border w-full self-stretch')}
                           value={inviteCc}
-                          placeholder="Cc emails, separated by commas"
+                          placeholder="Cc emails, separated by commas (optional)"
                           aria-label="Invite cc"
                           onChange={(e) => setInviteCc(e.target.value)}
                         />
@@ -1519,7 +1519,7 @@ const SpvSpotlightDetailPage = () => {
                           type="email"
                           className={clsx(s.fieldInput, 'box-border w-full self-stretch')}
                           value={templates.invitePreapproved.replyTo ?? ''}
-                          placeholder="Reply-to"
+                          placeholder="Reply-to (optional)"
                           aria-label="Invite reply-to"
                           onChange={(e) =>
                             setTemplates({
@@ -1549,7 +1549,7 @@ const SpvSpotlightDetailPage = () => {
                           type="text"
                           className={clsx(s.fieldInput, 'box-border w-full self-stretch')}
                           value={templates[key].fromName ?? ''}
-                          placeholder="From name"
+                          placeholder="From name (optional)"
                           aria-label="Data room from name"
                           onChange={(e) =>
                             setTemplates({
@@ -1562,7 +1562,7 @@ const SpvSpotlightDetailPage = () => {
                           type="text"
                           className={clsx(s.fieldInput, 'box-border w-full self-stretch')}
                           value={dataRoomCc}
-                          placeholder="Cc emails, separated by commas"
+                          placeholder="Cc emails, separated by commas (optional)"
                           aria-label="Data room cc"
                           onChange={(e) => setDataRoomCc(e.target.value)}
                         />
@@ -1570,7 +1570,7 @@ const SpvSpotlightDetailPage = () => {
                           type="email"
                           className={clsx(s.fieldInput, 'box-border w-full self-stretch')}
                           value={templates.dataRoomAccess.replyTo ?? ''}
-                          placeholder="Reply-to"
+                          placeholder="Reply-to (optional)"
                           aria-label="Data room reply-to"
                           onChange={(e) =>
                             setTemplates({
