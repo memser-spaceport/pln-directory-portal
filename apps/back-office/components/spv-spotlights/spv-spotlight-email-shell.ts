@@ -20,15 +20,37 @@ ${bodyHtml}
 </html>`;
 }
 
+function hasTemplateValue(vars: Record<string, string>, key: string): boolean {
+  return Boolean(vars[key]?.trim());
+}
+
+function chooseEmailBranch(ifKey: string, inner: string, vars: Record<string, string>): string {
+  const parts: { key: string | null; body: string }[] = [];
+  const marker = /\{\{\s*else(?:\s+if\s+([a-zA-Z0-9_]+))?\s*\}\}/g;
+  let lastIndex = 0;
+  let key: string | null = ifKey;
+  for (const match of inner.matchAll(marker)) {
+    const at = match.index ?? 0;
+    parts.push({ key, body: inner.slice(lastIndex, at) });
+    key = match[1] ?? null;
+    lastIndex = at + match[0].length;
+    if (key === null) {
+      break;
+    }
+  }
+  parts.push({ key, body: inner.slice(lastIndex) });
+  for (const part of parts) {
+    if (part.key === null || hasTemplateValue(vars, part.key)) {
+      return part.body;
+    }
+  }
+  return '';
+}
+
 function applyEmailConditionals(template: string, vars: Record<string, string>): string {
   return template.replace(
     /\{\{#if\s+([a-zA-Z0-9_]+)\s*\}\}([\s\S]*?)\{\{\s*\/if\s*\}\}/g,
-    (_match, key: string, inner: string) => {
-      const elseMatch = inner.match(/\{\{\s*else\s*\}\}/);
-      const whenTrue = elseMatch ? inner.slice(0, elseMatch.index) : inner;
-      const whenFalse = elseMatch ? inner.slice((elseMatch.index ?? 0) + elseMatch[0].length) : '';
-      return vars[key]?.trim() ? whenTrue : whenFalse;
-    }
+    (_match, key: string, inner: string) => chooseEmailBranch(key, inner, vars)
   );
 }
 
@@ -42,6 +64,11 @@ export function mergeEmailTemplate(template: string, vars: Record<string, string
 export function emailTemplateTokens(template: string): { key: string; fallback: string }[] {
   const seen = new Map<string, string>();
   for (const match of template.matchAll(/\{\{#if\s+([a-zA-Z0-9_]+)\s*\}\}/g)) {
+    if (!seen.has(match[1])) {
+      seen.set(match[1], '');
+    }
+  }
+  for (const match of template.matchAll(/\{\{\s*else\s+if\s+([a-zA-Z0-9_]+)\s*\}\}/g)) {
     if (!seen.has(match[1])) {
       seen.set(match[1], '');
     }

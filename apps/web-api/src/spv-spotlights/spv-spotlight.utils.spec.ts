@@ -77,6 +77,14 @@ describe('mergeTemplate', () => {
     expect(mergeTemplate(template, { f25WarmList: '  ', sector_hook: 'climate' })).toBe('backed climate');
     expect(mergeTemplate(template, { sector_hook: 'climate' })).toBe('backed climate');
   });
+
+  it('uses else if when an earlier flag is empty', () => {
+    const template =
+      '{{#if f25_warm_list}}A{{else if sector_hook}}backed {{sector_hook}}{{else}}C{{/if}}';
+    expect(mergeTemplate(template, { f25_warm_list: 'yes', sector_hook: 'climate' })).toBe('A');
+    expect(mergeTemplate(template, { sector_hook: 'climate' })).toBe('backed climate');
+    expect(mergeTemplate(template, {})).toBe('C');
+  });
 });
 
 describe('replaceNbsp', () => {

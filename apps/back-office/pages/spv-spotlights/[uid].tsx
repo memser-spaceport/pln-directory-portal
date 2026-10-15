@@ -1467,8 +1467,8 @@ const SpvSpotlightDetailPage = () => {
                 name, Cc, and Reply-to. The data room access template has its own From address, From name, Cc, and
                 Reply-to. Investor template variables use the CSV column header as the
                 token. Approval emails also have role and organization. Use {'{{firm|your fund}}'} when a value can be
-                empty. Use {'{{#if token}}'} … {'{{else}}'} … {'{{/if}}'} to choose one block when a variable has a
-                value. HTML is allowed.
+                empty. Use {'{{#if token}}'} … {'{{else if token}}'} … {'{{else}}'} … {'{{/if}}'} to choose one block
+                when a variable has a value. HTML is allowed.
               </p>
               <div className="flex flex-col gap-6">
                 {TEMPLATE_LABELS.map(({ key, label }) => (
