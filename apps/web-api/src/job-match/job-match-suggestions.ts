@@ -1,5 +1,14 @@
 import { PrismaService } from '../shared/prisma.service';
-import { GOOD_FIT, TOP_N } from './job-match.logic';
+import {
+  GOOD_FIT,
+  TOP_N,
+  asCriteria,
+  asMarkedCriteria,
+  currentRoleTextHash,
+  withCriterionMeta,
+  type MatchCriterionItem,
+  type MatchJob,
+} from './job-match.logic';
 
 /**
  * The suggestions the Suggested tab lists for a role from one run: the run's `SUGGESTION` rows ranked, the top
@@ -16,7 +25,13 @@ export async function listRunSuggestions(prisma: PrismaService, runUid: string, 
   });
   const members = await prisma.member.findMany({
     where: { uid: { in: rows.map((row) => row.memberUid) }, deletedAt: null },
-    select: { uid: true, name: true, role: true, image: { select: { url: true } } },
+    select: {
+      uid: true,
+      name: true,
+      role: true,
+      image: { select: { url: true } },
+      location: { select: { city: true, country: true } },
+    },
   });
   const byUid = new Map(members.map((item) => [item.uid, item]));
 
@@ -28,3 +43,29 @@ export async function listRunSuggestions(prisma: PrismaService, runUid: string, 
 }
 
 export type ListedSuggestion = Awaited<ReturnType<typeof listRunSuggestions>>[number];
+
+/**
+ * The criteria extracted for the role's current posting, read the way the runner reads them: either stored shape
+ * (LAB-2854), newest row first, so a legacy row's labels appear once the runner has labelled it. Shared by the
+ * Suggested tab and the weekly email (LAB-2865), so both label a suggestion's criteria the same way.
+ */
+export async function currentRoleCriteria(
+  prisma: PrismaService,
+  job: MatchJob
+): Promise<{ hash: string; all: MatchCriterionItem[] }> {
+  const hash = currentRoleTextHash(job);
+  const row = await prisma.jobMatchRow.findFirst({
+    where: { kind: 'CRITERIA', roleUid: job.uid, roleTextHash: hash },
+    orderBy: { createdAt: 'desc' },
+    select: { payload: true },
+  });
+  return { hash, all: asCriteria(row?.payload).slice(0, 6) };
+}
+
+/**
+ * A suggestion's stored `{ text, matched }` criteria, in the stored order, each with the label and group of the
+ * role's current criterion of the same statement (absent when the statement is no longer current or unlabelled).
+ */
+export function suggestionCriteria(payload: unknown, current: readonly MatchCriterionItem[]) {
+  return withCriterionMeta(asMarkedCriteria(payload), current);
+}

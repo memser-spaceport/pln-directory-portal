@@ -263,7 +263,13 @@ describe('JobMatchService', () => {
       publishedAt: new Date(),
     };
     const hash = roleTextHash(rolePosting({ uid: 'role-1', ...posting }));
-    const lead = { uid: 'lead-1', name: 'Ada Lead', email: 'lead@example.com', isDirectoryAdmin: false };
+    const lead = {
+      uid: 'lead-1',
+      name: 'Ada Lead',
+      email: 'lead@example.com',
+      role: 'Head of Engineering',
+      isDirectoryAdmin: false,
+    };
     const admin = { uid: 'admin-1', name: 'Admin', email: 'admin@example.com', isDirectoryAdmin: true };
     const now = Date.now();
     const roles = [
@@ -683,7 +689,7 @@ describe('JobMatchService', () => {
 
       beforeEach(() => {
         findMemberByEmail.mockResolvedValue(lead);
-        memberFindUnique.mockResolvedValue({ email: 'cand@example.com' });
+        memberFindUnique.mockResolvedValue({ email: 'cand@example.com', name: 'Grace Candidate' });
         teamFindUnique.mockResolvedValue({ name: 'Prime Team' });
         contactCreate.mockResolvedValue({ uid: 'contact-1', createdAt });
         contactDelete.mockResolvedValue({});
@@ -771,8 +777,14 @@ describe('JobMatchService', () => {
             data: { roleUid: 'role-1', memberUid: 'cand-1', senderUid: 'lead-1', message: 'Would love to chat.' },
           })
         );
+        expect(memberFindUnique).toHaveBeenCalledWith({
+          where: { uid: 'cand-1' },
+          select: { email: true, name: true },
+        });
         expect(renderCandidateIntroEmail).toHaveBeenCalledWith({
+          candidateName: 'Grace Candidate',
           leadName: 'Ada Lead',
+          leadRole: 'Head of Engineering',
           leadEmail: 'lead@example.com',
           roleTitle: 'Backend Engineer',
           teamName: 'Prime Team',
@@ -790,6 +802,17 @@ describe('JobMatchService', () => {
           replyTo: 'lead@example.com',
         });
         expect(contactDelete).not.toHaveBeenCalled();
+      });
+
+      it('passes a null lead role when the lead has none', async () => {
+        findMemberByEmail.mockResolvedValue({ ...lead, role: null });
+        await service.contactCandidate('role-1', 'cand-1', 'Hi', 'lead@example.com');
+        expect(renderCandidateIntroEmail).toHaveBeenCalledWith(expect.objectContaining({ leadRole: null }));
+        const rendered = (renderCandidateIntroEmail as jest.Mock).mock.results[0].value;
+        expect(rendered.text).toContain(
+          'Ada Lead — Prime Team thinks you will be a good fit for Backend Engineer role.'
+        );
+        expect(rendered.text.startsWith('Hi Grace,')).toBe(true);
       });
 
       it('lets an admin contact a candidate, with no Reply-To when the admin has no email', async () => {

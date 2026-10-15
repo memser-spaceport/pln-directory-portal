@@ -6,7 +6,8 @@ jest.mock('../analytics/service/analytics.service', () => ({ AnalyticsService: c
 import * as fs from 'fs';
 import { Logger } from '@nestjs/common';
 import { SuggestedCandidatesEmailPreferenceService } from '../notification-settings/suggested-candidates-email-preference.service';
-import { SuggestedCandidatesEmailService } from './suggested-candidates-email.service';
+import { currentRoleTextHash, type MatchJob } from './job-match.logic';
+import { SuggestedCandidatesEmailService, locationText } from './suggested-candidates-email.service';
 import { verifySuggestedCandidatesUnsubscribeToken } from './suggested-candidates-token.util';
 
 /**
@@ -14,7 +15,7 @@ import { verifySuggestedCandidatesUnsubscribeToken } from './suggested-candidate
  * member, missing email, NOT_LOOKING, ...), so dropping a filter from the service makes a test fail.
  */
 type Row = {
-  kind: 'ROLE' | 'SUGGESTION';
+  kind: 'ROLE' | 'SUGGESTION' | 'CRITERIA';
   runUid: string;
   roleUid: string;
   memberUid?: string;
@@ -22,6 +23,8 @@ type Row = {
   fit?: number;
   label?: 'STRONG' | 'GOOD';
   blurb?: string | null;
+  payload?: unknown;
+  roleTextHash?: string;
   createdAt: Date;
 };
 
@@ -29,6 +32,20 @@ type SentEmail = { from: string; to: string[]; subject: string; html: string; te
 
 const day = (n: number) => new Date(Date.UTC(2026, 9, n));
 const LIVE = { status: 'CONFIRMED', publishedAt: day(1) };
+/** The posting fields the criteria hash is built from (MATCH_JOB_SELECT). */
+const POSTING = {
+  roleCategory: null,
+  seniority: null,
+  summary: null,
+  descriptionHtml: '<p>Build things.</p>',
+  location: [] as string[],
+  workMode: null,
+};
+/** Every suggestion's stored criteria marks, unless a test gives its own. */
+const MARKS = [
+  { text: 'Writes Rust in production', matched: false },
+  { text: 'Has run a distributed system', matched: true },
+];
 
 function world() {
   const rows: Row[] = [];
@@ -45,6 +62,7 @@ function world() {
         fit,
         label,
         blurb: `${memberUid} blurb`,
+        payload: MARKS,
         createdAt: day(1),
       })
     );
@@ -79,30 +97,58 @@ function world() {
   ]);
 
   const jobs = [
-    { uid: 'role-1', roleTitle: 'Backend Engineer', companyName: 'Acme', teamUid: 'team-1', ...LIVE },
-    { uid: 'role-2', roleTitle: 'Designer', companyName: 'Other', teamUid: 'team-2', ...LIVE },
+    { uid: 'role-1', roleTitle: 'Backend Engineer', companyName: 'Acme', teamUid: 'team-1', ...POSTING, ...LIVE },
+    { uid: 'role-2', roleTitle: 'Designer', companyName: 'Other', teamUid: 'team-2', ...POSTING, ...LIVE },
     {
       uid: 'role-3',
       roleTitle: 'Closed role',
       companyName: 'Acme',
       teamUid: 'team-1',
+      ...POSTING,
       status: 'CLOSED_ROLE_FILLED',
       publishedAt: day(1),
     },
-    { uid: 'role-4', roleTitle: 'Old news', companyName: 'Acme', teamUid: 'team-1', ...LIVE },
-    { uid: 'role-5', roleTitle: 'Rust Engineer', companyName: 'Acme', teamUid: 'team-1', ...LIVE },
+    { uid: 'role-4', roleTitle: 'Old news', companyName: 'Acme', teamUid: 'team-1', ...POSTING, ...LIVE },
+    { uid: 'role-5', roleTitle: 'Rust Engineer', companyName: 'Acme', teamUid: 'team-1', ...POSTING, ...LIVE },
   ];
+
+  // The role's current criteria (labelled), and an older posting's row whose labels must not be used.
+  const criteriaRow = (roleUid: string, payload: unknown, hash: string, createdAt: Date) =>
+    rows.push({ kind: 'CRITERIA', runUid: 'run-1', roleUid, payload, roleTextHash: hash, createdAt });
+  const role1 = jobs.find((job) => job.uid === 'role-1') as unknown as MatchJob;
+  criteriaRow(
+    'role-1',
+    [
+      { statement: 'Writes Rust in production', label: 'Rust' },
+      { statement: 'Has run a distributed system', label: 'Distributed systems' },
+    ],
+    currentRoleTextHash(role1),
+    day(10)
+  );
+  criteriaRow('role-1', [{ statement: 'Has run a distributed system', label: 'Stale label' }], 'old-hash', day(11));
 
   const members: Record<
     string,
-    { name: string; deletedAt: Date | null; jobSearchStatus?: string; email: string | null }
+    {
+      name: string;
+      deletedAt: Date | null;
+      jobSearchStatus?: string;
+      email: string | null;
+      location?: { city: string | null; country: string | null } | null;
+    }
   > = {
     A: { name: 'Ada', deletedAt: null, email: 'a@x' },
-    B: { name: 'Bob', deletedAt: null, jobSearchStatus: 'ACTIVELY_LOOKING', email: 'b@x' },
+    B: {
+      name: 'Bob',
+      deletedAt: null,
+      jobSearchStatus: 'ACTIVELY_LOOKING',
+      email: 'b@x',
+      location: { city: 'Boston', country: 'United States' },
+    },
     C: { name: 'Cy', deletedAt: null, jobSearchStatus: 'NOT_LOOKING', email: 'c@x' },
     D: { name: 'Di', deletedAt: null, email: 'd@x' },
     E: { name: 'Ed', deletedAt: day(2), email: 'e@x' },
-    G: { name: 'Gus', deletedAt: null, email: 'g@x' },
+    G: { name: 'Gus', deletedAt: null, email: 'g@x', location: { city: '  ', country: 'Germany' } },
     H: { name: 'Hal', deletedAt: null, email: 'h@x' },
     L1: { name: 'Lead One', deletedAt: null, email: 'l1@x' },
     L2: { name: 'Lead Two', deletedAt: null, email: 'l2@x' },
@@ -147,6 +193,7 @@ function world() {
             (row) =>
               row.kind === where.kind &&
               row.roleUid === where.roleUid &&
+              (where.roleTextHash === undefined || row.roleTextHash === where.roleTextHash) &&
               (!where.runUid?.not || row.runUid !== where.runUid.not) &&
               (!where.createdAt?.lt || row.createdAt < where.createdAt.lt)
           )
@@ -165,6 +212,7 @@ function world() {
             name: members[uid].name,
             role: 'Engineer',
             image: { url: `https://img/${uid}` },
+            location: members[uid].location ?? null,
           }))
       ),
     },
@@ -306,8 +354,52 @@ describe('SuggestedCandidatesEmailService', () => {
 
     const role5 = emailFor(aws, 'Rust');
     expect(role5.text.indexOf('Gus')).toBeLessThan(role5.text.indexOf('Hal'));
-    expect(role5.text).toContain('Hi Lead One');
+    expect(role5.text).toContain('Hi Lead,');
     expect(role5.text).toContain('Acme Labs');
+  });
+
+  describe('card details (LAB-2865)', () => {
+    it("gives each card the member's location and the stored criteria, labelled from the role's current posting", async () => {
+      const { service, aws } = world();
+      await service.sendForRun('run-1');
+      const { text, html } = emailFor(aws, 'Backend');
+      expect(text).toContain(
+        'Bob · Good match\nEngineer\n1 of 2 requirements · Boston, United States\nWhy we suggested:\n' +
+          '✓ Distributed systems: Has run a distributed system\n– Rust: Writes Rust in production (not met)\n'
+      );
+      // The newer CRITERIA row belongs to an older posting (another hash): its label is never used.
+      expect(html).not.toContain('Stale label');
+    });
+
+    it('shows unlabelled statements when the role has no criteria row, and skips blank location parts', async () => {
+      const { service, aws } = world();
+      await service.sendForRun('run-1');
+      const { text } = emailFor(aws, 'Rust');
+      expect(text).toContain('Gus · Good match\nEngineer\n1 of 2 requirements · Germany\nWhy we suggested:\n');
+      expect(text).toContain('✓ Has run a distributed system\n– Writes Rust in production (not met)\n');
+      expect(text).toContain('Hal · Strong match\nEngineer\n1 of 2 requirements\nWhy we suggested:');
+    });
+
+    it('reads no criteria in a dry run', async () => {
+      process.env.JOB_MATCH_EMAIL_DRY_RUN = 'true';
+      const { service, prisma } = world();
+      await service.sendForRun('run-1');
+      const kinds = prisma.jobMatchRow.findFirst.mock.calls.map(([args]) => args.where.kind);
+      expect(kinds).not.toContain('CRITERIA');
+    });
+  });
+
+  describe('locationText', () => {
+    it.each([
+      [{ city: 'Boston', country: 'United States' }, 'Boston, United States'],
+      [{ city: null, country: 'Germany' }, 'Germany'],
+      [{ city: 'Lisbon', country: '' }, 'Lisbon'],
+      [{ city: ' ', country: ' ' }, null],
+      [null, null],
+      [undefined, null],
+    ])('%j -> %j', (location, expected) => {
+      expect(locationText(location)).toBe(expected);
+    });
   });
 
   it('links to email preferences and a working unsubscribe token for the lead', async () => {

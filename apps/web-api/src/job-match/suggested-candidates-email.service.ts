@@ -15,9 +15,22 @@ import {
   type SuggestedCandidatesEmailInput,
 } from './emails/suggested-candidates-email';
 import { trackSuggestedCandidatesEmailSent } from './job-match-analytics';
-import { listRunSuggestions, type ListedSuggestion } from './job-match-suggestions';
+import {
+  currentRoleCriteria,
+  listRunSuggestions,
+  suggestionCriteria,
+  type ListedSuggestion,
+} from './job-match-suggestions';
 import { JOB_MATCH_RUN_COMPLETED, type JobMatchRunCompletedPayload } from './job-match.events';
-import { isEmailDryRun, isLiveOpening, labelText, newSuggestions, parseEmailTeamAllowlist } from './job-match.logic';
+import {
+  MATCH_JOB_SELECT,
+  isEmailDryRun,
+  isLiveOpening,
+  labelText,
+  newSuggestions,
+  parseEmailTeamAllowlist,
+  type MatchCriterionItem,
+} from './job-match.logic';
 import {
   hasSuggestedCandidatesTokenSecret,
   issueSuggestedCandidatesUnsubscribeToken,
@@ -98,7 +111,7 @@ export class SuggestedCandidatesEmailService {
     const jobs = roleRows.length
       ? await this.prisma.jobOpening.findMany({
           where: { uid: { in: [...roleRowAt.keys()] } },
-          select: { uid: true, roleTitle: true, companyName: true, teamUid: true, status: true, publishedAt: true },
+          select: { ...MATCH_JOB_SELECT, teamUid: true, status: true, publishedAt: true },
         })
       : [];
 
@@ -135,6 +148,8 @@ export class SuggestedCandidatesEmailService {
         ).map((row) => row.recipientUid)
       );
 
+      // The role's current criteria, read once per role and only when an email is rendered.
+      let criteria: MatchCriterionItem[] | undefined;
       for (const lead of team.leads) {
         if (!optedIn.has(lead.uid) || alreadySent.has(lead.uid)) {
           result.skipped++;
@@ -148,8 +163,9 @@ export class SuggestedCandidatesEmailService {
           continue;
         }
 
+        criteria ??= (await currentRoleCriteria(this.prisma, job)).all;
         const email = renderSuggestedCandidatesEmail(
-          emailInput({ lead, teamUid, teamName: team.name ?? job.companyName, job, fresh, total, baseUrl })
+          emailInput({ lead, teamUid, teamName: team.name ?? job.companyName, job, fresh, total, baseUrl, criteria })
         );
         if (mode === 'preview') {
           this.preview(email, lead, job.uid);
@@ -290,6 +306,7 @@ function emailInput(args: {
   fresh: ListedSuggestion[];
   total: number;
   baseUrl: string;
+  criteria: readonly MatchCriterionItem[];
 }): SuggestedCandidatesEmailInput {
   const token = issueSuggestedCandidatesUnsubscribeToken(args.lead.uid);
   return {
@@ -305,11 +322,25 @@ function emailInput(args: {
       imageUrl: person.image?.url ?? null,
       label: labelText(label),
       blurb: row.blurb,
+      location: locationText(person.location),
+      criteria: suggestionCriteria(row.payload, args.criteria).map((item) => ({
+        statement: item.text,
+        ...(item.label ? { label: item.label } : {}),
+        matched: item.matched,
+      })),
     })),
     totalMatchCount: args.total,
     preferencesUrl: `${args.baseUrl}/settings/email`,
     unsubscribeUrl: `${args.baseUrl}/settings/email/unsubscribed?token=${encodeURIComponent(token)}`,
   };
+}
+
+/** "City, Country" from a member's location, skipping blank parts; null when neither is known. */
+export function locationText(
+  location: { city: string | null; country: string | null } | null | undefined
+): string | null {
+  const parts = [location?.city, location?.country].map((part) => (part ?? '').trim()).filter(Boolean);
+  return parts.length ? parts.join(', ') : null;
 }
 
 function isUniqueConflict(error: unknown): boolean {
