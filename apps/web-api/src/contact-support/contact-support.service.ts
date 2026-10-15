@@ -6,6 +6,13 @@ import { isEmails } from '../utils/helper/helper';
 import { AwsService } from '../utils/aws/aws.service';
 import * as path from 'path';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
+import { FeedbackLinearSource } from '@prisma/client';
+import { FeedbackLinearOutboxService } from '../feedback-linear/feedback-linear-outbox.service';
+import { getFeedbackLinearConfig } from '../feedback-linear/feedback-linear.config';
+import {
+  FEEDBACK_LINEAR_AI_APPS_TOPIC,
+  isFeedbackLinearPlatformTopic,
+} from '../feedback-linear/feedback-linear.constants';
 import {
   clipTelegramText,
   escapeTelegramHtml,
@@ -26,7 +33,8 @@ export class ContactSupportService {
     private prisma: PrismaService,
     private logger: LogService,
     private awsService: AwsService,
-    private notificationServiceClient: NotificationServiceClient
+    private notificationServiceClient: NotificationServiceClient,
+    private feedbackLinearOutbox: FeedbackLinearOutboxService
   ) {
     this.supportEmails = this.getSupportEmails();
     this.isSupportEmailsValid = this.validateSupportEmails();
@@ -75,6 +83,8 @@ export class ContactSupportService {
         } catch (error) {
           this.logger.error(`Failed to send Telegram alert for contact support request ${result.uid}`, error);
         }
+
+        await this.enqueueLinearPush(result);
         return { uid: result.uid };
       } else {
         throw new InternalServerErrorException('Cannot save a contact support request');
@@ -120,6 +130,41 @@ export class ContactSupportService {
       this.logger.error(
         `Cannot send contact support notification for ${supportRequest.uid} as ${this.supportEmails} does not contain valid email addresses`
       );
+    }
+  }
+
+  /**
+   * Queue product feedback from a verified member for a Linear issue
+   * (docs/FEEDBACK_LINEAR.md). Never fails the request.
+   */
+  private async enqueueLinearPush(saved: {
+    uid: string;
+    topic: string;
+    email: string | null;
+    metadata: unknown;
+  }): Promise<void> {
+    try {
+      const config = getFeedbackLinearConfig();
+      if (!config || !isFeedbackLinearPlatformTopic(saved.topic) || !saved.email) {
+        return;
+      }
+      const metadata = saved.metadata as Record<string, unknown> | null;
+      const memberUid = typeof metadata?.uid === 'string' ? metadata.uid : '';
+      if (!memberUid) {
+        return;
+      }
+      const member = await this.prisma.member.findUnique({ where: { uid: memberUid }, select: { email: true } });
+      if (!member?.email || member.email.toLowerCase() !== saved.email.toLowerCase()) {
+        return;
+      }
+      await this.feedbackLinearOutbox.enqueue({
+        sourceType: FeedbackLinearSource.CONTACT_SUPPORT,
+        sourceUid: saved.uid,
+        teamId: config.platformTeamId,
+        projectId: saved.topic === FEEDBACK_LINEAR_AI_APPS_TOPIC ? config.aiAppsProjectId : null,
+      });
+    } catch (error) {
+      this.logger.error(`Failed to queue contact support request ${saved.uid} for Linear`, error);
     }
   }
 

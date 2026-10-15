@@ -1713,6 +1713,47 @@ model ContactSupportRequest {
   createdAt DateTime @default(now())
 }
 
+/// Where a feedback item pushed to Linear came from.
+enum FeedbackLinearSource {
+  CONTACT_SUPPORT
+  AI_APP_FEEDBACK
+}
+
+enum FeedbackLinearStatus {
+  PENDING
+  SYNCED
+  FAILED
+}
+
+/// Outbox of feedback items to turn into Linear issues, one row per item.
+/// `sourceUid` has no FK so the row outlives its source (see docs/FEEDBACK_LINEAR.md).
+/// `linearIssueId` is chosen at enqueue and sent as the issue id, so a retry
+/// never creates a second issue.
+model FeedbackLinearIssue {
+  id            Int                  @id @default(autoincrement())
+  uid           String               @unique @default(cuid())
+  sourceType    FeedbackLinearSource
+  sourceUid     String
+  /// Linear team and project the issue goes to, frozen at enqueue.
+  teamId        String
+  projectId     String?
+  linearIssueId String               @unique
+  status        FeedbackLinearStatus @default(PENDING)
+  attempts      Int                  @default(0)
+  nextAttemptAt DateTime             @default(now())
+  /// Set while a worker holds the row; another worker may claim it after this.
+  leaseUntil    DateTime?
+  /// Linear's issue key (e.g. LAB-123) and URL, once SYNCED.
+  identifier    String?
+  url           String?
+  lastError     String?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@unique([sourceType, sourceUid])
+  @@index([status, nextAttemptAt])
+}
+
 // Push Notification Categories - for real-time WebSocket notifications
 enum PushNotificationCategory {
   // Demo Day engagement

@@ -398,6 +398,22 @@
   - Purpose: Stores user questions and support requests
   - Tracks question type and status
 
+#### Feedback → Linear outbox
+- FeedbackLinearIssue: One row per feedback item that is turned into a Linear issue (see `docs/FEEDBACK_LINEAR.md`)
+  - Purpose: Delivers feedback to Linear asynchronously, with retries and at most one issue per item
+  - Key Fields:
+    - sourceType: FeedbackLinearSource (CONTACT_SUPPORT, AI_APP_FEEDBACK)
+    - sourceUid: uid of the source row (ContactSupportRequest or AiAppFeedback); no FK, so the row outlives its source
+    - teamId / projectId: Linear team and optional project, frozen at enqueue
+    - linearIssueId: issue id chosen at enqueue and sent to Linear, so retries are idempotent
+    - status: FeedbackLinearStatus (PENDING, SYNCED, FAILED)
+    - attempts / nextAttemptAt: retry counter and backoff schedule
+    - leaseUntil: set while a worker holds the row
+    - identifier / url: Linear issue key and link once SYNCED
+    - lastError: last failure, without credentials
+    - createdAt / updatedAt
+  - Unique constraints on [sourceType, sourceUid] and linearIssueId; index on [status, nextAttemptAt]
+
 ### Image Management
 - Image: Manages dynamic image assets in the system like pfps
   - Purpose: Handles image storage, versioning, and relationships
