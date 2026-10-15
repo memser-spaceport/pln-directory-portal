@@ -3,6 +3,8 @@ import {
   escapeTelegramHtml,
   stripInlineDataImages,
   TELEGRAM_MESSAGE_MAX_LENGTH,
+  toLinearMarkdown,
+  toPlainText,
   toSupportEmailHtml,
   toSupportTelegramHtml,
 } from './contact-support-html';
@@ -124,5 +126,95 @@ describe('clipTelegramText', () => {
     const clipped = clipTelegramText('<b>bold</b> <a href="https://x.test/long">link text</a>', 26);
     expect(clipped).toBe('<b>bold</b> …');
     expect(clipTelegramText('<b>abcdefghij</b>', 8)).toBe('<b>abcd…</b>');
+  });
+});
+
+describe('toLinearMarkdown', () => {
+  it('keeps a plain-text message as is', () => {
+    expect(toLinearMarkdown('  Search is slow\nsecond line ')).toEqual({
+      markdown: 'Search is slow\nsecond line',
+      images: [],
+    });
+  });
+
+  it('converts emphasis, links, headings, lists and line breaks', () => {
+    const html =
+      '<h2>Title</h2><p><strong>Bold</strong> and <em>italic</em> and <s>gone</s></p>' +
+      '<p>See <a href="https://x.test/a b">the page</a><br>next line</p>' +
+      '<ol><li data-list="bullet">one</li><li data-list="bullet">two</li></ol><p>end</p>';
+    expect(toLinearMarkdown(html).markdown).toBe(
+      [
+        '## Title',
+        '',
+        '**Bold** and _italic_ and ~~gone~~',
+        '',
+        'See [the page](https://x.test/a%20b)',
+        'next line',
+        '',
+        '- one',
+        '- two',
+        '',
+        'end',
+      ].join('\n')
+    );
+  });
+
+  it('keeps mailto links', () => {
+    expect(toLinearMarkdown('<p><a href="mailto:a@b.co">mail</a></p>').markdown).toBe('[mail](mailto:a@b.co)');
+  });
+
+  it('drops an unsafe link but keeps its text', () => {
+    const { markdown } = toLinearMarkdown('<p><a href="javascript:alert(1)">x</a></p>');
+    expect(markdown).toBe('x');
+    expect(markdown).not.toContain('javascript:');
+  });
+
+  it('escapes markdown control characters in text', () => {
+    expect(toLinearMarkdown('<p># not *a* [link](y) `code` _x_</p>').markdown).toBe(
+      '\\# not \\*a\\* \\[link\\](y) \\`code\\` \\_x\\_'
+    );
+  });
+
+  it('decodes entities before escaping', () => {
+    expect(toLinearMarkdown('<p>a &lt;b&gt; &amp; &quot;c&quot;</p>').markdown).toBe('a \\<b\\> & "c"');
+  });
+
+  it('encodes parentheses in a link target', () => {
+    expect(toLinearMarkdown('<p><a href="https://x.test/a_(b)">w</a></p>').markdown).toBe(
+      '[w](https://x.test/a_%28b%29)'
+    );
+  });
+
+  it('returns images separately, with the flattened copy when present', () => {
+    const html =
+      '<p>look</p>' +
+      '<p><img src="https://h.test/raw.png" data-flat-src="https://h.test/flat.png" data-annotations="x"></p>' +
+      '<p><img src="https://h.test/two.png"></p>' +
+      '<p><img src="ftp://h.test/no.png"></p>';
+    const { markdown, images } = toLinearMarkdown(html);
+    expect(markdown).toBe('look');
+    expect(images).toEqual([
+      { src: 'https://h.test/raw.png', flatSrc: 'https://h.test/flat.png' },
+      { src: 'https://h.test/two.png' },
+    ]);
+  });
+
+  it('ignores a non-http flattened copy', () => {
+    const { images } = toLinearMarkdown('<p><img src="https://h.test/raw.png" data-flat-src="javascript:x"></p>');
+    expect(images).toEqual([{ src: 'https://h.test/raw.png' }]);
+  });
+
+  it('strips scripts through the sanitizer', () => {
+    expect(toLinearMarkdown('<p>hi</p><script>alert(1)</script>').markdown).toBe('hi');
+  });
+});
+
+describe('toPlainText', () => {
+  it('drops tags, decodes entities and keeps line structure', () => {
+    expect(toPlainText('<p><strong>Search</strong> is slow</p><p>&amp; more</p>')).toBe('Search is slow\n& more');
+  });
+
+  it('returns plain text trimmed', () => {
+    expect(toPlainText('  hello  ')).toBe('hello');
   });
 });
