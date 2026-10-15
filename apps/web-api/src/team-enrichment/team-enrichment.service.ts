@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { FileUploadService } from '../utils/file-upload/file-upload.service';
+import { syncTeamLocations } from '../teams/team-locations';
 import { TeamEnrichmentAiService } from './team-enrichment-ai.service';
 import { buildTeamEnrichmentEligibilityFilter } from './team-enrichment-eligibility-filter';
 import { formatUsageLog, mergeUsageEntries } from './team-enrichment-cost';
@@ -2224,7 +2225,10 @@ export class TeamEnrichmentService {
         data: { dataEnrichment: updated as any },
       });
       if (Object.keys(teamUpdate).length > 0) {
-        await tx.team.update({ where: { uid: teamUid }, data: teamUpdate });
+        await tx.team.update({
+          where: { uid: teamUid },
+          data: await syncTeamLocations({ tx, teamUid, data: teamUpdate }),
+        });
       }
       if (investmentFocus !== null) {
         if (team.investorProfile) {

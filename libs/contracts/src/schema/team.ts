@@ -59,8 +59,10 @@ export const TeamSchema = z.object({
   dateFounded: z.number().int().gte(1000).lte(9999).nullish(),
   /** Employee count (as a number) or a range label (e.g. "11-50"). Stored as text. */
   teamSize: z.union([z.number(), z.string()]).nullish(),
-  /** Free-text place label, e.g. "San Francisco, United States". */
+  /** The HQ: always the first of `locations`. Free-text place label, e.g. "San Francisco, United States". */
   location: z.string().nullish(),
+  /** Free-text place labels; the first one is the HQ. */
+  locations: z.array(z.string()).optional(),
   /** Defaults to ACTIVE for teams without a value. */
   status: z.enum(['ACTIVE', 'INACTIVE']).nullish(),
 });
@@ -83,6 +85,7 @@ export const CreateTeamSchema = TeamSchema.pick({
   dateFounded: true,
   teamSize: true,
   location: true,
+  locations: true,
   status: true,
 });
 

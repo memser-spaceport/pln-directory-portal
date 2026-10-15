@@ -72,7 +72,14 @@ const teamsFactory = Factory.define<Omit<Team, 'id'>>(({ sequence, onCreate }) =
     portfolioEndYear: null,
     portfolioMapLogoUid: null,
     teamSize: faker.helpers.arrayElement([null, String(faker.datatype.number({ min: 1, max: 500 }))]),
-    location: faker.helpers.arrayElement([null, faker.address.city()]),
+    ...((): { location: string | null; locations: string[] } => {
+      const locations = faker.helpers.arrayElement([
+        [],
+        [faker.address.city()],
+        [faker.address.city(), faker.address.city()],
+      ]);
+      return { location: locations[0] ?? null, locations };
+    })(),
     status: 'ACTIVE',
     // Keep tier/priority in sync in fixtures.
     ...((): { tier: number; priority: number } => {

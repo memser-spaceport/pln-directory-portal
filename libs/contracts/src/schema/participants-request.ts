@@ -67,6 +67,16 @@ const newDataMemberSchema = z.object({
   hasInactiveEmail: z.boolean().nullish(),
 });
 
+const TEAM_LOCATIONS_LIMIT = 10;
+
+const teamLocationsSchema = z
+  .array(z.string().refine((location) => location.trim().length > 0, 'Location cannot be empty'))
+  .max(TEAM_LOCATIONS_LIMIT)
+  .refine(
+    (locations) => new Set(locations.map((location) => location.trim().toLowerCase())).size === locations.length,
+    'Locations must be unique'
+  );
+
 const newDataTeamSchema = z.object({
   name: z.string(),
   website: z.string().optional().nullable(),
@@ -104,6 +114,7 @@ const newDataTeamSchema = z.object({
   dateFounded: z.number().int().gte(1000).lte(9999).optional().nullable(),
   teamSize: z.union([z.number(), z.string()]).optional().nullable(),
   location: z.string().optional().nullable(),
+  locations: teamLocationsSchema.optional(),
   status: z.enum(['ACTIVE', 'INACTIVE']).optional().nullable(),
   officeHours: z.string().optional().nullable(),
   logoUid: z.string().optional().nullable(),
