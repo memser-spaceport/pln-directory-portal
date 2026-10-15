@@ -1,6 +1,8 @@
-import { Body, Controller, Get, Logger, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Logger, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { SkipEmptyStringToNull } from '../decorators/skip-empty-string-to-null.decorator';
 import { ServiceAuthGuard } from '../guards/service-auth.guard';
+import { PatchManualFieldsDto, serviceActor } from '../manual-field-lock/manual-field-lock.service';
 import {
   IngestConnectionEdgesDto,
   IngestWarmIntrosV2Response,
@@ -20,6 +22,22 @@ export class WarmIntrosV2ServiceController {
   private readonly logger = new Logger(WarmIntrosV2ServiceController.name);
 
   constructor(private readonly warmIntrosV2Service: WarmIntrosV2Service) {}
+
+  @Patch('warm-intros-v2/edges/:uid')
+  @SkipEmptyStringToNull()
+  async patchEdge(@Param('uid') uid: string, @Body() dto: PatchManualFieldsDto) {
+    const fieldCount = dto?.fields && typeof dto.fields === 'object' ? Object.keys(dto.fields).length : 0;
+    this.logger.log(`Received connection-edge patch: uid=${uid} fields=${fieldCount}`);
+    return this.warmIntrosV2Service.patchEdgeFields(uid, dto?.fields, serviceActor(dto));
+  }
+
+  @Patch('warm-intros-v2/paths/:uid')
+  @SkipEmptyStringToNull()
+  async patchPath(@Param('uid') uid: string, @Body() dto: PatchManualFieldsDto) {
+    const fieldCount = dto?.fields && typeof dto.fields === 'object' ? Object.keys(dto.fields).length : 0;
+    this.logger.log(`Received warm-path patch: uid=${uid} fields=${fieldCount}`);
+    return this.warmIntrosV2Service.patchPathFields(uid, dto?.fields, serviceActor(dto));
+  }
 
   @Post('warm-intros-v2/edges/ingest')
   async ingestEdges(@Body() dto: IngestConnectionEdgesDto): Promise<IngestWarmIntrosV2Response> {

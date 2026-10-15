@@ -1,6 +1,8 @@
-import { Body, Controller, Get, Logger, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Logger, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { SkipEmptyStringToNull } from '../decorators/skip-empty-string-to-null.decorator';
 import { ServiceAuthGuard } from '../guards/service-auth.guard';
+import { PatchManualFieldsDto, serviceActor } from '../manual-field-lock/manual-field-lock.service';
 import {
   IngestMasterProfileDto,
   IngestMasterProfileResponse,
@@ -20,6 +22,14 @@ export class MasterProfileServiceController {
   private readonly logger = new Logger(MasterProfileServiceController.name);
 
   constructor(private readonly masterProfileService: MasterProfileService) {}
+
+  @Patch('master-profiles/:uid')
+  @SkipEmptyStringToNull()
+  async patchProfile(@Param('uid') uid: string, @Body() dto: PatchManualFieldsDto) {
+    const fieldCount = dto?.fields && typeof dto.fields === 'object' ? Object.keys(dto.fields).length : 0;
+    this.logger.log(`Received master-profile patch: uid=${uid} fields=${fieldCount}`);
+    return this.masterProfileService.patchFields(uid, dto?.fields, serviceActor(dto));
+  }
 
   @Post('master-profiles/ingest')
   async ingest(@Body() dto: IngestMasterProfileDto): Promise<IngestMasterProfileResponse> {

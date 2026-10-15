@@ -25,6 +25,9 @@ describe('mcpToolOperation', () => {
     ['get_warm_path_note', 'read'],
     ['submit_warm_path_feedback', 'write'],
     ['submit_warm_path_note', 'write'],
+    ['update_master_profile', 'write'],
+    ['update_connection_edge', 'write'],
+    ['update_warm_path', 'write'],
   ] as const)('%s is %s', (toolName, operation) => {
     expect(mcpToolOperation(toolName)).toBe(operation);
   });
@@ -99,6 +102,16 @@ describe('buildMcpToolAnalyticsProperties', () => {
       connectorProfileUid: 'from1',
       isClear: true,
     });
+  });
+
+  it('counts locked fields and omits their values', () => {
+    const props = buildMcpToolAnalyticsProperties('update_master_profile', {
+      uid: 'u1',
+      fields: { bio: 'secret', currentOrg: 'PL' },
+    });
+    expect(props).toEqual({ uid: 'u1', fieldCount: 2 });
+    expect(props).not.toHaveProperty('bio');
+    expect(props).not.toHaveProperty('fields');
   });
 
   it('adds errorKind from the exception class name only', () => {

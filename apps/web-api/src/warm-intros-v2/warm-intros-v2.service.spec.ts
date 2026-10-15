@@ -1,5 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { ManualFieldLockService } from '../manual-field-lock/manual-field-lock.service';
 import { WarmIntrosV2Service } from './warm-intros-v2.service';
 import { PrismaService } from '../shared/prisma.service';
 
@@ -126,9 +127,11 @@ describe('WarmIntrosV2Service', () => {
     memberUid: null,
   };
 
+  const reapplyAll = jest.fn();
+
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new WarmIntrosV2Service(prismaMock);
+    service = new WarmIntrosV2Service(prismaMock, { reapplyAll } as unknown as ManualFieldLockService);
     masterProfileFindMany.mockResolvedValue([investorProfile, connectorProfile]);
     memberFindMany.mockResolvedValue([]);
     pathCount.mockResolvedValue(1);
@@ -241,6 +244,30 @@ describe('WarmIntrosV2Service', () => {
         created: 1,
         updated: 1,
       });
+      expect(reapplyAll).toHaveBeenCalledTimes(1);
+      expect(reapplyAll).toHaveBeenCalledWith(expect.anything(), 'connection_edge', ['e1']);
+    });
+
+    it('does not reapply locks when the edge is new', async () => {
+      edgeFindUnique.mockResolvedValue(null);
+      edgeCreate.mockResolvedValue({ uid: 'e-new' });
+
+      await service.ingestEdges({
+        edges: [
+          {
+            fromProfileUid: 'from1',
+            toProfileUid: 'to1',
+            relationKind: 'pl_direct',
+            score: 0.9,
+            confidence: 0.8,
+            method: 'llm',
+            reasons: [],
+          },
+        ],
+      });
+
+      expect(edgeUpdate).not.toHaveBeenCalled();
+      expect(reapplyAll).not.toHaveBeenCalled();
     });
   });
 
@@ -344,6 +371,29 @@ describe('WarmIntrosV2Service', () => {
         created: 1,
         updated: 1,
       });
+      expect(reapplyAll).toHaveBeenCalledTimes(1);
+      expect(reapplyAll).toHaveBeenCalledWith(expect.anything(), 'warm_path_v2', ['p1']);
+    });
+
+    it('does not reapply locks when the path is new', async () => {
+      pathFindUnique.mockResolvedValue(null);
+      pathCreate.mockResolvedValue({ uid: 'p-new' });
+
+      await service.ingestPaths({
+        paths: [
+          {
+            targetProfileUid: 'inv1',
+            targetSet: 'neuro-fund-i',
+            rank: 1,
+            score: 0.9,
+            hopCount: 1,
+            hopChain: [],
+          },
+        ],
+      });
+
+      expect(pathUpdate).not.toHaveBeenCalled();
+      expect(reapplyAll).not.toHaveBeenCalled();
     });
   });
 
