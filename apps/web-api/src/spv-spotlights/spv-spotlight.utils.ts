@@ -24,9 +24,10 @@ export type DataRoomAccessTemplate = EmailTemplate & {
   replyTo: string;
 };
 export type EmailTemplates = {
-  [K in Exclude<EmailTemplateKey, 'dataRoomAccess' | 'invitePreapproved'>]: EmailTemplate;
+  [K in Exclude<EmailTemplateKey, 'dataRoomAccess' | 'invitePreapproved' | 'followUpPreapproved'>]: EmailTemplate;
 } & {
   invitePreapproved: InviteEmailTemplate;
+  followUpPreapproved: InviteEmailTemplate;
   dataRoomAccess: DataRoomAccessTemplate;
 };
 
@@ -74,6 +75,9 @@ export function defaultEmailTemplates(title: string): EmailTemplates {
     followUpPreapproved: {
       subject: `Reminder: ${title}`,
       body: spotlightEmailBody('A reminder that {{spotlightTitle}} is available to you.', 'View Spotlight'),
+      fromName: '',
+      cc: [],
+      replyTo: '',
     },
     inviteOutreach: {
       subject: `Invitation: ${title}`,
@@ -344,14 +348,15 @@ export function asEmailTemplates(value: unknown, title: string): EmailTemplates 
       };
       continue;
     }
-    if (key === 'invitePreapproved') {
+    if (key === 'invitePreapproved' || key === 'followUpPreapproved') {
       const cc = emailStringList(record.cc);
-      result.invitePreapproved = {
+      const defaultsForKey = defaults[key];
+      result[key] = {
         subject,
         body,
-        fromName: typeof record.fromName === 'string' ? record.fromName.trim() : defaults.invitePreapproved.fromName,
-        cc: cc ?? defaults.invitePreapproved.cc,
-        replyTo: typeof record.replyTo === 'string' ? record.replyTo.trim() : defaults.invitePreapproved.replyTo,
+        fromName: typeof record.fromName === 'string' ? record.fromName.trim() : defaultsForKey.fromName,
+        cc: cc ?? defaultsForKey.cc,
+        replyTo: typeof record.replyTo === 'string' ? record.replyTo.trim() : defaultsForKey.replyTo,
       };
       continue;
     }

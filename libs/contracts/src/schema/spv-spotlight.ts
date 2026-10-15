@@ -55,7 +55,7 @@ const senderSchema = z.object({
 
 export const SpvEmailTemplatesSchema = z.object({
   invitePreapproved: inviteTemplateSchema,
-  followUpPreapproved: templateSchema,
+  followUpPreapproved: inviteTemplateSchema,
   inviteOutreach: templateSchema,
   followUpOutreach: templateSchema,
   approved: templateSchema,
