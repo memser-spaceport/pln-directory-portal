@@ -86,6 +86,21 @@ export class SuggestedCandidatesEmailService {
   /** The run to send for: the given one if it is COMPLETED, else the latest COMPLETED run; null when none. */
   async completedRun(runUid?: string): Promise<{ uid: string } | null> {
     if (runUid) {
+      // FEATURE-ENV ONLY (never merge): a team-scoped run never becomes COMPLETED, it only drops its lock when it
+      // finishes. On a feature env (the email guard is configured) accept such a finished run so the email can be
+      // tested end to end on one team.
+      if (process.env.FEATURE_ENV_EMAIL_ALLOWLIST !== undefined) {
+        return this.prisma.jobMatchRun.findFirst({
+          where: {
+            uid: runUid,
+            OR: [
+              { status: 'COMPLETED' },
+              { status: 'RUNNING', OR: [{ lockedUntil: null }, { lockedUntil: { lt: new Date() } }] },
+            ],
+          },
+          select: { uid: true },
+        });
+      }
       return this.prisma.jobMatchRun.findFirst({ where: { uid: runUid, status: 'COMPLETED' }, select: { uid: true } });
     }
     return this.prisma.jobMatchRun.findFirst({
