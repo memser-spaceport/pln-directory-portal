@@ -106,6 +106,9 @@ The `pollToken` and `deployToken` are held in agent memory only and never writte
 | PUT    | `/v1/ai-apps/:uid/access`        | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | Replace the access mode and whole whitelist: `{ access: 'OPEN' \| 'PRIVATE', memberUids: string[] }` (max 200); 400 names uids that aren't members with AI Apps access |
 | GET    | `/v1/ai-apps/:uid/public-paths`  | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | Public path patterns: `{ publicPaths, publicPathsGateReady }` |
 | PUT    | `/v1/ai-apps/:uid/public-paths`  | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | Replace the whole list: `{ publicPaths: string[] }` (`[]` clears); 400 whose `message` names each invalid pattern and why; audited as `PUBLIC_PATHS_UPDATED` when it changes |
+| GET    | `/v1/ai-apps/linear/teams`      | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Private Linear teams the caller may send an app's feedback to: `[{ id, key, name, projects: [{ id, name }] }]` — the caller's own teams (matched by LabOS email; `[]` without a Linear account), every private team for a directory admin; never public teams; 503 when Linear isn't configured (see "Feedback → Linear") |
+| GET    | `/v1/ai-apps/:uid/linear-target` | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | The app's Linear target: `{ teamId, projectId, setAt }` (nulls when unset); 503 when Linear isn't configured |
+| PUT    | `/v1/ai-apps/:uid/linear-target` | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | Set `{ teamId, projectId? }` or clear `{ teamId: null }`; 400 names an unknown or public team, or a project outside the team; saving re-queues the app's `FAILED` pushes |
 | GET    | `/v1/ai-apps/:uid/access/candidates` | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | Member name search for the whitelist picker (`?search=`, 10 results) with `hasAiAppsAccess` + `alreadyAdded` flags |
 | GET    | `/v1/ai-apps/:uid/events`        | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Full event/status history for one app (404 if app missing, 403 if private and not viewable) |
 | GET    | `/v1/ai-apps/:uid/live`          | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Liveness probe: one server-side reachability check of the app URL → `{ live }`; gateway timeouts AND 404 count as down (the ingress 404s until a first deploy's route is ready). The LabOS detail page polls it so the iframe never shows a raw gateway/404 error |
@@ -539,6 +542,35 @@ audited (no `AiAppEvent`).
 The starter kit (≥1.5) ships `buildLogsEndpoint` / `runtimeLogsEndpoint` as
 `{appUid}` templates in `pln-app.config.json` plus the `app-logs` skill; the
 deploy skill points at it from its `ERROR`-status and timeout paths.
+
+## Feedback → Linear
+
+An app's creator or a directory admin can send the app's private feedback to a
+Linear team (off by default). Details of delivery, retries and issue content are
+in `docs/FEEDBACK_LINEAR.md`.
+
+- **Target:** `AiApp.linearTeamId` (a private team), `linearProjectId`
+  (optional) and `linearTargetSetAt`, managed through
+  `GET`/`PUT /v1/ai-apps/:uid/linear-target` (`AiAppsLinearService`).
+- **Team list privacy:** `GET /v1/ai-apps/linear/teams` offers only private teams,
+  and only the caller's own (their Linear user is found by LabOS email). A
+  directory admin sees every private team the Linear app can reach. Public
+  teams are refused, because feedback is visible only to the app's creator,
+  admins and its author. A team missing from the list may not be shared with
+  the Linear app yet.
+- **What is pushed:** each `FEEDBACK` item created after the target was set
+  (never `COMMENT`s or older items) becomes one issue in the team's intake
+  state, assigned to the owner when their email matches a Linear user. The
+  reporter's email never appears in it. `AiAppFeedbackLinearSync.onSubmitted`
+  queues it from `submitFeedback`.
+- **Status sync (LabOS → Linear only):** `applyFeedbackStatus` (LabOS, agent
+  and MCP routes) maps `IMPLEMENTED` to the completed state, and leaving
+  `IMPLEMENTED` back to the intake state. The agent/MCP closing note is posted
+  as a comment, and `deleteFeedbackItem` cancels the issue. All of it is
+  queued, so no feedback request waits on or fails because of Linear.
+- **`linearIssue`:** owner/admin feedback rows (per-app list, `GET /v1/ai-apps/feedback`,
+  agent and MCP lists) carry `{ status, identifier, url, lastError }` or `null`;
+  `/feedback/mine` never does.
 
 ## Agent feedback access
 

@@ -59,7 +59,28 @@ export function feedbackLinearMaxAttempts(): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : FEEDBACK_LINEAR_DEFAULT_MAX_ATTEMPTS;
 }
 
-/** The full config, or null when Linear is not configured (the feature is then off). */
+export interface FeedbackLinearCredentials {
+  clientId: string;
+  clientSecret: string;
+  imageHosts: string[];
+  maxAttempts: number;
+}
+
+/**
+ * The Linear app credentials plus the shared push settings, or null when they
+ * are not set. Enough for the worker and AI App feedback, which pick their own
+ * teams; platform feedback also needs `getFeedbackLinearConfig`.
+ */
+export function getFeedbackLinearCredentials(): FeedbackLinearCredentials | null {
+  const clientId = env('FEEDBACK_LINEAR_CLIENT_ID');
+  const clientSecret = env('FEEDBACK_LINEAR_CLIENT_SECRET');
+  if (!clientId || !clientSecret) {
+    return null;
+  }
+  return { clientId, clientSecret, imageHosts: feedbackLinearImageHosts(), maxAttempts: feedbackLinearMaxAttempts() };
+}
+
+/** The platform-feedback config, or null when it is not configured (platform pushes are then off). */
 export function getFeedbackLinearConfig(): FeedbackLinearConfig | null {
   const clientId = env('FEEDBACK_LINEAR_CLIENT_ID');
   const clientSecret = env('FEEDBACK_LINEAR_CLIENT_SECRET');

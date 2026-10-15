@@ -1,8 +1,9 @@
 import { FeedbackLinearIssue } from '@prisma/client';
-import { ContactSupportLinearHandler, feedbackIssueTitle, feedbackTypeName } from './contact-support-linear.handler';
+import { ContactSupportLinearHandler, feedbackTypeName } from './contact-support-linear.handler';
+import { feedbackIssueTitle } from './feedback-issue-text';
 import { isFeedbackLinearPlatformTopic } from './feedback-linear.constants';
 import { FeedbackLinearHandlerRegistry, FeedbackLinearPermanentError } from './feedback-linear-handlers';
-import { LinearTypeLabels } from './linear-type-labels';
+import { LinearTeamMeta } from './linear-team-meta';
 
 // A factory keeps Jest from loading axios's ESM build.
 jest.mock('axios', () => ({ create: jest.fn(() => ({ post: jest.fn(), get: jest.fn(), put: jest.fn() })) }));
@@ -22,7 +23,7 @@ describe('contact-support → Linear issue', () => {
   const saved: Record<string, string | undefined> = {};
   let prisma: { contactSupportRequest: { findUnique: jest.Mock }; member: { findUnique: jest.Mock } };
   let images: { rehost: jest.Mock };
-  let linear: { teamLabels: jest.Mock };
+  let linear: { team: jest.Mock };
   let handler: ContactSupportLinearHandler;
   let registry: FeedbackLinearHandlerRegistry;
 
@@ -59,6 +60,12 @@ describe('contact-support → Linear issue', () => {
       identifier: null,
       url: null,
       lastError: null,
+      targetState: 'INTAKE',
+      appliedState: null,
+      intakeStateId: null,
+      pendingCommentUid: null,
+      pendingCommentId: null,
+      version: 0,
       createdAt: now,
       updatedAt: now,
       ...overrides,
@@ -76,19 +83,28 @@ describe('contact-support → Linear issue', () => {
     };
     images = { rehost: jest.fn().mockResolvedValue([]) };
     linear = {
-      teamLabels: jest.fn().mockResolvedValue([
-        { id: 'bug-label', name: 'Bug', parentName: 'Type' },
-        { id: 'feature-label', name: 'Feature', parentName: 'Type' },
-        { id: 'improvement-label', name: 'Improvement', parentName: 'Type' },
-        { id: 'bug-severity', name: 'Bug', parentName: 'QA severity' },
-      ]),
+      team: jest.fn().mockResolvedValue({
+        id: 'lab-team',
+        key: 'LAB',
+        name: 'LabOS',
+        private: false,
+        triageEnabled: false,
+        states: [],
+        labels: [
+          { id: 'bug-label', name: 'Bug', parentName: 'Type' },
+          { id: 'feature-label', name: 'Feature', parentName: 'Type' },
+          { id: 'improvement-label', name: 'Improvement', parentName: 'Type' },
+          { id: 'bug-severity', name: 'Bug', parentName: 'QA severity' },
+        ],
+        projects: [],
+      }),
     };
     registry = new FeedbackLinearHandlerRegistry();
     handler = new ContactSupportLinearHandler(
       prisma as never,
       registry,
       images as never,
-      new LinearTypeLabels(linear as never)
+      new LinearTeamMeta(linear as never)
     );
   });
 
@@ -195,7 +211,16 @@ describe('contact-support → Linear issue', () => {
   });
 
   it('keeps only the User feedback label when the team has no matching Type label', async () => {
-    linear.teamLabels.mockResolvedValue([]);
+    linear.team.mockResolvedValue({
+      id: 'lab-team',
+      key: 'LAB',
+      name: 'LabOS',
+      private: false,
+      triageEnabled: false,
+      states: [],
+      labels: [],
+      projects: [],
+    });
     const draft = await handler.buildIssue(row());
     expect(draft.labelIds).toEqual(['user-feedback-label']);
   });
@@ -252,25 +277,11 @@ describe('contact-support → Linear issue', () => {
       await expect(handler.buildIssue(row())).rejects.toBeInstanceOf(FeedbackLinearPermanentError);
     });
 
-    it('fails (retryably) when Linear is no longer configured', async () => {
-      delete process.env.FEEDBACK_LINEAR_CLIENT_ID;
+    it('fails (retryably) when platform feedback is no longer configured', async () => {
+      delete process.env.FEEDBACK_LINEAR_PLATFORM_TEAM_ID;
       const error = await handler.buildIssue(row()).catch((e) => e);
       expect(error).not.toBeInstanceOf(FeedbackLinearPermanentError);
-      expect(error.message).toBe('Linear is not configured');
+      expect(error.message).toBe('Platform feedback to Linear is not configured');
     });
-  });
-});
-
-describe('LinearTypeLabels', () => {
-  it('caches a team’s labels for an hour', async () => {
-    const linear = { teamLabels: jest.fn().mockResolvedValue([{ id: 'b', name: 'Bug', parentName: 'Type' }]) };
-    const labels = new LinearTypeLabels(linear as never);
-
-    await expect(labels.find('t', 'Bug', 0)).resolves.toBe('b');
-    await expect(labels.find('t', 'Feature', 59 * 60_000)).resolves.toBeNull();
-    expect(linear.teamLabels).toHaveBeenCalledTimes(1);
-
-    await labels.find('t', 'Bug', 60 * 60_000);
-    expect(linear.teamLabels).toHaveBeenCalledTimes(2);
   });
 });

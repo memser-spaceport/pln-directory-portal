@@ -1,8 +1,15 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { FeedbackLinearIssue, FeedbackLinearSource } from '@prisma/client';
-import { escapeMarkdown, toLinearMarkdown, toPlainText } from '../contact-support/contact-support-html';
+import { escapeMarkdown, toLinearMarkdown } from '../contact-support/contact-support-html';
 import { PrismaService } from '../shared/prisma.service';
 import { getFeedbackLinearConfig } from './feedback-linear.config';
+import {
+  FEEDBACK_EXPECTED_RESULT_SECTION,
+  feedbackContextSection,
+  feedbackIssueTitle,
+  feedbackPriority,
+  hideEmail,
+} from './feedback-issue-text';
 import {
   FeedbackLinearHandlerRegistry,
   FeedbackLinearIssueDraft,
@@ -10,36 +17,12 @@ import {
   FeedbackLinearSourceHandler,
 } from './feedback-linear-handlers';
 import { LinearImageUploader } from './linear-images';
-import { LinearTypeLabels, LinearTypeName } from './linear-type-labels';
-
-const TITLE_MAX_LENGTH = 80;
-const CONTEXT_MAX_LENGTH = 2000;
-const EXPECTED_RESULT_PLACEHOLDER = '_Fill in during triage before moving to Todo._';
-/** Linear priorities: 1 Urgent, 2 High, 3 Medium, 4 Low. */
-const PRIORITY_BY_LEVEL: Record<string, number> = { P0: 1, P1: 2, P2: 3, P3: 4 };
-
-export function feedbackIssueTitle(message: string, fallback: string): string {
-  const firstLine =
-    toPlainText(message)
-      .split('\n')
-      .map((line) => line.trim())
-      .find(Boolean) ?? '';
-  const text = firstLine || fallback;
-  const clipped = text.length > TITLE_MAX_LENGTH ? `${text.slice(0, TITLE_MAX_LENGTH - 1)}…` : text;
-  return `[Feedback] ${clipped}`;
-}
+import { LinearTeamMeta, LinearTypeName } from './linear-team-meta';
 
 export function feedbackTypeName(topic: string, reportKind: unknown): LinearTypeName {
   if (topic === 'Report a bug' || reportKind === 'bug') return 'Bug';
   if (topic === 'Share an idea') return 'Feature';
   return 'Improvement';
-}
-
-function hideEmail(text: string, email: string | null): string {
-  if (!email) return text;
-  // The markdown pass may have put a backslash before characters of the address (e.g. `_`).
-  const pattern = [...email].map((char) => `\\\\?${char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).join('');
-  return text.replace(new RegExp(pattern, 'gi'), '[email hidden]');
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -55,7 +38,7 @@ export class ContactSupportLinearHandler implements FeedbackLinearSourceHandler,
     private readonly prisma: PrismaService,
     private readonly registry: FeedbackLinearHandlerRegistry,
     private readonly images: LinearImageUploader,
-    private readonly typeLabels: LinearTypeLabels
+    private readonly teamMeta: LinearTeamMeta
   ) {}
 
   onModuleInit(): void {
@@ -65,7 +48,7 @@ export class ContactSupportLinearHandler implements FeedbackLinearSourceHandler,
   async buildIssue(row: FeedbackLinearIssue): Promise<FeedbackLinearIssueDraft> {
     const config = getFeedbackLinearConfig();
     if (!config) {
-      throw new Error('Linear is not configured');
+      throw new Error('Platform feedback to Linear is not configured');
     }
     const request = await this.prisma.contactSupportRequest.findUnique({ where: { uid: row.sourceUid } });
     if (!request) {
@@ -90,10 +73,13 @@ export class ContactSupportLinearHandler implements FeedbackLinearSourceHandler,
 
     const labelIds: string[] = [];
     if (config.labelId) labelIds.push(config.labelId);
-    const typeLabelId = await this.typeLabels.find(row.teamId, feedbackTypeName(request.topic, metadata.reportKind));
+    const typeLabelId = await this.teamMeta.typeLabelId(
+      row.teamId,
+      feedbackTypeName(request.topic, metadata.reportKind)
+    );
     if (typeLabelId) labelIds.push(typeLabelId);
 
-    const priority = typeof metadata.priority === 'string' ? PRIORITY_BY_LEVEL[metadata.priority] : undefined;
+    const priority = feedbackPriority(metadata.priority);
     const description = hideEmail(
       this.body({
         memberName: member.name,
@@ -142,11 +128,9 @@ export class ContactSupportLinearHandler implements FeedbackLinearSourceHandler,
     if (input.imageLines.length) {
       sections.push(`## Screenshots\n\n${input.imageLines.join('\n\n')}`);
     }
-    if (input.context && typeof input.context === 'object') {
-      const json = JSON.stringify(input.context, null, 2).slice(0, CONTEXT_MAX_LENGTH);
-      sections.push(`## Context\n\n\`\`\`json\n${json}\n\`\`\``);
-    }
-    sections.push(`## Expected result\n\n${EXPECTED_RESULT_PLACEHOLDER}`);
+    const context = feedbackContextSection(input.context);
+    if (context) sections.push(context);
+    sections.push(FEEDBACK_EXPECTED_RESULT_SECTION);
     sections.push(`---\nLabOS contact-support request \`${input.requestUid}\``);
     return sections.join('\n\n');
   }

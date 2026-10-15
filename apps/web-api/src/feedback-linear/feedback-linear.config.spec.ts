@@ -3,6 +3,7 @@ import {
   feedbackLinearImageHosts,
   feedbackLinearMaxAttempts,
   getFeedbackLinearConfig,
+  getFeedbackLinearCredentials,
   isFeedbackLinearConfigured,
 } from './feedback-linear.config';
 
@@ -81,6 +82,26 @@ describe('feedback-linear config', () => {
     process.env.FEEDBACK_LINEAR_AI_APPS_PROJECT_ID = 'proj';
     process.env.FEEDBACK_LINEAR_LABEL_ID = 'label';
     expect(getFeedbackLinearConfig()).toMatchObject({ aiAppsProjectId: 'proj', labelId: 'label' });
+  });
+
+  describe('credentials', () => {
+    it('are null without a client id and secret', () => {
+      process.env.FEEDBACK_LINEAR_CLIENT_ID = 'cid';
+      expect(getFeedbackLinearCredentials()).toBeNull();
+    });
+
+    it('are enough on their own: no platform team or state needed', () => {
+      process.env.FEEDBACK_LINEAR_CLIENT_ID = 'cid';
+      process.env.FEEDBACK_LINEAR_CLIENT_SECRET = 'secret';
+      process.env.FEEDBACK_LINEAR_IMAGE_HOSTS = 'images.test';
+      expect(getFeedbackLinearCredentials()).toEqual({
+        clientId: 'cid',
+        clientSecret: 'secret',
+        imageHosts: ['images.test'],
+        maxAttempts: 8,
+      });
+      expect(isFeedbackLinearConfigured()).toBe(false);
+    });
   });
 
   describe('image hosts', () => {

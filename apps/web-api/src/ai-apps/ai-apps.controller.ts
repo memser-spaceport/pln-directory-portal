@@ -38,6 +38,8 @@ import { AI_APPS_PERMISSIONS } from '../access-control-v2/access-control-v2.cons
 import { AiAppsService } from './ai-apps.service';
 import { AgentFeedbackDeniedInterceptor } from './agent-feedback-denied.interceptor';
 import { AiAppsAccessService } from './ai-apps-access.service';
+import { AiAppsLinearService } from './ai-apps-linear.service';
+import { UpdateAiAppLinearTargetDto } from './dto/ai-app-linear-target.dto';
 import { AiAppsConnectService } from './ai-apps-connect.service';
 import { AiAppsSessionService, isAiAppSessionToken, isTestingSessionToken } from './ai-apps-session.service';
 import { AiAppsStarterKitService } from './ai-apps-starter-kit.service';
@@ -107,7 +109,8 @@ export class AiAppsController {
     private readonly rbacService: RbacService,
     private readonly accessService: AiAppsAccessService,
     private readonly sessionService: AiAppsSessionService,
-    private readonly authGateService: AiAppsAuthGateService
+    private readonly authGateService: AiAppsAuthGateService,
+    private readonly linearService: AiAppsLinearService
   ) {}
 
   /**
@@ -303,6 +306,20 @@ export class AiAppsController {
   async listMyFeedback(@Req() req: any) {
     const memberUid = await this.resolveMemberUid(req);
     return this.aiAppsService.listMyFeedback(memberUid);
+  }
+
+  /**
+   * Private Linear teams the caller may send an app's feedback to: their own
+   * (by LabOS email), or every private team for a directory admin. 503 when
+   * Linear isn't configured. Declared before `:uid` so the literal path wins.
+   */
+  @NoCache()
+  @Get('linear/teams')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async listLinearTeams(@Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.linearService.listTeams(memberUid);
   }
 
   /**
@@ -699,6 +716,30 @@ export class AiAppsController {
   async recordView(@Param('uid') uid: string, @Req() req: any) {
     const memberUid = await this.resolveMemberUid(req);
     await this.aiAppsService.recordView(memberUid, uid);
+  }
+
+  /** The Linear team/project the app's private feedback goes to. Creator or directory admin only. */
+  @NoCache()
+  @Get(':uid/linear-target')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async getLinearTarget(@Param('uid') uid: string, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.linearService.getTarget(memberUid, uid);
+  }
+
+  /**
+   * Set (`{ teamId, projectId? }`) or clear (`{ teamId: null }`) the app's
+   * Linear target. Creator or directory admin only; the team must be private.
+   */
+  @NoCache()
+  @Put(':uid/linear-target')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  @UsePipes(ZodValidationPipe)
+  async updateLinearTarget(@Param('uid') uid: string, @Body() body: UpdateAiAppLinearTargetDto, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.linearService.updateTarget(memberUid, uid, body);
   }
 
   /** Access mode + whitelist of one app. Creator or directory admin only (checked in the service). */

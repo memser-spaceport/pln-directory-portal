@@ -64,6 +64,7 @@ describe('AiAppsController GET /me wiring', () => {
       {} as any,
       {} as any,
       {} as any,
+      {} as any,
       {} as any
     );
     await expect(
@@ -80,6 +81,7 @@ describe('AiAppsController GET /me wiring', () => {
     const aiAppsService = { getMemberContext: jest.fn().mockResolvedValue({ member }) };
     const controller = new AiAppsController(
       aiAppsService as any,
+      {} as any,
       {} as any,
       {} as any,
       {} as any,

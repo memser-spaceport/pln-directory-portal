@@ -68,6 +68,7 @@ describe('POST /track with an app session token', () => {
       {} as any,
       {} as any,
       sessionService as any,
+      {} as any,
       {} as any
     );
     return { controller, aiAppsService, sessionService };

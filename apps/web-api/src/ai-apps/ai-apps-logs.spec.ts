@@ -133,6 +133,7 @@ describe('AiAppsController log routes wiring', () => {
       {} as any,
       {} as any,
       {} as any,
+      {} as any,
       {} as any
     );
     const req = { aiAppMemberUid: 'creator-1' };
@@ -175,6 +176,7 @@ describe('AiAppsController log routes wiring', () => {
       {} as any,
       {} as any,
       {} as any,
+      {} as any,
       {} as any
     );
     const req = { aiAppMemberUid: 'creator-1' };
@@ -191,6 +193,7 @@ describe('AiAppsController log routes wiring', () => {
     const service = { getAgentLogs: jest.fn() };
     const controller = new AiAppsController(
       service as any,
+      {} as any,
       {} as any,
       {} as any,
       {} as any,
@@ -456,6 +459,7 @@ describe('AiAppsController member log routes — order param', () => {
     };
     const controller = new AiAppsController(
       service as any,
+      {} as any,
       {} as any,
       {} as any,
       {} as any,

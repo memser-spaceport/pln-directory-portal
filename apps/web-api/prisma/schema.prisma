@@ -1723,6 +1723,15 @@ enum FeedbackLinearStatus {
   PENDING
   SYNCED
   FAILED
+  /// The item was deleted before its issue was created; nothing to push.
+  SKIPPED
+}
+
+/// The Linear state a pushed item's issue should be in.
+enum FeedbackLinearTargetState {
+  INTAKE
+  COMPLETED
+  CANCELED
 }
 
 /// Outbox of feedback items to turn into Linear issues, one row per item.
@@ -1747,6 +1756,17 @@ model FeedbackLinearIssue {
   identifier    String?
   url           String?
   lastError     String?
+  /// The state LabOS wants the issue in; the worker applies it after creating the issue.
+  targetState       FeedbackLinearTargetState  @default(INTAKE)
+  /// The state last applied in Linear; null until the issue exists.
+  appliedState      FeedbackLinearTargetState?
+  /// The Linear state the issue was created in, used when an item is reopened.
+  intakeStateId     String?
+  /// A LabOS comment (e.g. a closing note) still to post, and the comment id sent to Linear.
+  pendingCommentUid String?
+  pendingCommentId  String?
+  /// Bumped by every change request, so a worker that started earlier never marks the row synced over it.
+  version           Int                  @default(0)
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
 
@@ -3844,6 +3864,13 @@ model AiApp {
   /// feedback still works. Existing and new apps stay on until an editor
   /// turns it off.
   feedbackEnabled Boolean     @default(true)
+  /// Linear team (private) the app's private feedback is pushed to, set by the
+  /// owner or a directory admin; null = not pushed (docs/FEEDBACK_LINEAR.md).
+  linearTeamId      String?
+  /// Optional project in that team.
+  linearProjectId   String?
+  /// When the target was last set. Only feedback created after it is pushed.
+  linearTargetSetAt DateTime?
   /// New apps are open to all PL Infra members; the owner (or a directory
   /// admin) can restrict them from LabOS, or the agent on deploy when the
   /// member chooses. A deploy that doesn't send `access` keeps it.

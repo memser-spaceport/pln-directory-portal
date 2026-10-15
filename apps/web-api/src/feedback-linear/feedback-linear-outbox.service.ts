@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { FeedbackLinearIssue, FeedbackLinearSource, FeedbackLinearStatus, Prisma } from '@prisma/client';
+import {
+  FeedbackLinearIssue,
+  FeedbackLinearSource,
+  FeedbackLinearStatus,
+  FeedbackLinearTargetState,
+  Prisma,
+} from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../shared/prisma.service';
 
@@ -14,6 +20,16 @@ export interface FeedbackLinearEnqueueInput {
   sourceUid: string;
   teamId: string;
   projectId?: string | null;
+}
+
+/** What a push has done in Linear so far; saved whether or not the row is then marked synced. */
+export interface FeedbackLinearProgress {
+  identifier?: string;
+  url?: string;
+  appliedState?: FeedbackLinearTargetState;
+  intakeStateId?: string;
+  /** The pending comment was posted (or dropped). */
+  commentDone?: boolean;
 }
 
 /** Delay before the next attempt after `attempts` failed ones: 30 s doubling, capped at 1 h. */
@@ -73,23 +89,70 @@ export class FeedbackLinearOutboxService {
     return this.prisma.feedbackLinearIssue.findMany({ where: { id: { in: claimed } }, orderBy: { id: 'asc' } });
   }
 
-  async markSynced(row: FeedbackLinearIssue, issue: { identifier: string; url: string }): Promise<void> {
-    await this.prisma.feedbackLinearIssue.update({
-      where: { id: row.id },
+  /**
+   * Asks for the item's issue to end up in `targetState`, optionally posting a
+   * LabOS comment. Bumps the version and makes the row due now, so the worker
+   * applies it next, after creating the issue if needed. No row (the item was
+   * never pushed) is a no-op; returns whether a row was found.
+   */
+  async requestState(
+    sourceType: FeedbackLinearSource,
+    sourceUid: string,
+    targetState: FeedbackLinearTargetState,
+    comment?: { uid: string },
+    now = new Date()
+  ): Promise<boolean> {
+    const result = await this.prisma.feedbackLinearIssue.updateMany({
+      where: { sourceType, sourceUid, status: { not: FeedbackLinearStatus.SKIPPED } },
       data: {
-        status: FeedbackLinearStatus.SYNCED,
-        attempts: row.attempts + 1,
-        identifier: issue.identifier,
-        url: issue.url,
-        leaseUntil: null,
-        lastError: null,
+        targetState,
+        version: { increment: 1 },
+        status: FeedbackLinearStatus.PENDING,
+        attempts: 0,
+        nextAttemptAt: now,
+        ...(comment ? { pendingCommentUid: comment.uid, pendingCommentId: randomUUID() } : {}),
       },
     });
+    return result.count > 0;
+  }
+
+  /** Stores what a push has done so far; unconditional, so a newer request never loses the issue reference. */
+  async saveProgress(row: FeedbackLinearIssue, progress: FeedbackLinearProgress): Promise<void> {
+    const data = this.progressData(progress);
+    if (Object.keys(data).length === 0) return;
+    await this.prisma.feedbackLinearIssue.update({ where: { id: row.id }, data });
+  }
+
+  /**
+   * Marks the row SYNCED only if no change was requested since it was claimed
+   * (same version); otherwise it stays PENDING for the next tick. The lease is
+   * released either way.
+   */
+  async markSynced(row: FeedbackLinearIssue, progress: FeedbackLinearProgress = {}): Promise<void> {
+    await this.prisma.feedbackLinearIssue.updateMany({
+      where: { id: row.id, version: row.version },
+      data: { status: FeedbackLinearStatus.SYNCED, attempts: row.attempts + 1, lastError: null },
+    });
+    await this.prisma.feedbackLinearIssue.update({
+      where: { id: row.id },
+      data: { ...this.progressData(progress), leaseUntil: null },
+    });
+  }
+
+  /** Ends a row whose item was deleted before its issue was created. */
+  async markSkipped(row: FeedbackLinearIssue): Promise<void> {
+    await this.prisma.feedbackLinearIssue.updateMany({
+      where: { id: row.id, version: row.version },
+      data: { status: FeedbackLinearStatus.SKIPPED, leaseUntil: null, lastError: null },
+    });
+    await this.releaseLease(row);
   }
 
   /**
    * Records a failed attempt: back to PENDING with backoff, or FAILED once
    * `maxAttempts` is reached. A `retryAfterMs` later than the backoff wins.
+   * Returns null, leaving the row alone, when a newer change request arrived
+   * meanwhile (it reset the attempts).
    */
   async markFailedAttempt(
     row: FeedbackLinearIssue,
@@ -97,28 +160,42 @@ export class FeedbackLinearOutboxService {
     maxAttempts: number,
     retryAfterMs: number | null = null,
     now = new Date()
-  ): Promise<FeedbackLinearStatus> {
+  ): Promise<FeedbackLinearStatus | null> {
     const attempts = row.attempts + 1;
     const lastError = error.slice(0, LAST_ERROR_MAX_LENGTH);
-    if (attempts >= maxAttempts) {
-      await this.prisma.feedbackLinearIssue.update({
-        where: { id: row.id },
-        data: { status: FeedbackLinearStatus.FAILED, attempts, lastError, leaseUntil: null },
-      });
-      return FeedbackLinearStatus.FAILED;
-    }
+    const failed = attempts >= maxAttempts;
     const delay = Math.max(feedbackLinearBackoffMs(attempts), retryAfterMs ?? 0);
-    await this.prisma.feedbackLinearIssue.update({
-      where: { id: row.id },
-      data: {
-        status: FeedbackLinearStatus.PENDING,
-        attempts,
-        lastError,
-        leaseUntil: null,
-        nextAttemptAt: new Date(now.getTime() + delay),
-      },
+    const result = await this.prisma.feedbackLinearIssue.updateMany({
+      where: { id: row.id, version: row.version },
+      data: failed
+        ? { status: FeedbackLinearStatus.FAILED, attempts, lastError, leaseUntil: null }
+        : {
+            status: FeedbackLinearStatus.PENDING,
+            attempts,
+            lastError,
+            leaseUntil: null,
+            nextAttemptAt: new Date(now.getTime() + delay),
+          },
     });
-    return FeedbackLinearStatus.PENDING;
+    if (result.count === 0) {
+      await this.releaseLease(row);
+      return null;
+    }
+    return failed ? FeedbackLinearStatus.FAILED : FeedbackLinearStatus.PENDING;
+  }
+
+  private async releaseLease(row: FeedbackLinearIssue): Promise<void> {
+    await this.prisma.feedbackLinearIssue.update({ where: { id: row.id }, data: { leaseUntil: null } });
+  }
+
+  private progressData(progress: FeedbackLinearProgress): Prisma.FeedbackLinearIssueUpdateInput {
+    return {
+      ...(progress.identifier !== undefined ? { identifier: progress.identifier } : {}),
+      ...(progress.url !== undefined ? { url: progress.url } : {}),
+      ...(progress.appliedState !== undefined ? { appliedState: progress.appliedState } : {}),
+      ...(progress.intakeStateId !== undefined ? { intakeStateId: progress.intakeStateId } : {}),
+      ...(progress.commentDone ? { pendingCommentUid: null, pendingCommentId: null } : {}),
+    };
   }
 
   private dueWhere(now: Date): Prisma.FeedbackLinearIssueWhereInput {

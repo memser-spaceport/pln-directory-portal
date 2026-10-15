@@ -406,13 +406,18 @@
     - sourceUid: uid of the source row (ContactSupportRequest or AiAppFeedback); no FK, so the row outlives its source
     - teamId / projectId: Linear team and optional project, frozen at enqueue
     - linearIssueId: issue id chosen at enqueue and sent to Linear, so retries are idempotent
-    - status: FeedbackLinearStatus (PENDING, SYNCED, FAILED)
+    - status: FeedbackLinearStatus (PENDING, SYNCED, FAILED, SKIPPED — deleted before its issue was created)
     - attempts / nextAttemptAt: retry counter and backoff schedule
     - leaseUntil: set while a worker holds the row
     - identifier / url: Linear issue key and link once SYNCED
     - lastError: last failure, without credentials
+    - targetState / appliedState: FeedbackLinearTargetState (INTAKE, COMPLETED, CANCELED) LabOS wants vs. last applied in Linear (appliedState null until the issue exists)
+    - intakeStateId: Linear state the issue was created in, used when an item is reopened
+    - pendingCommentUid / pendingCommentId: LabOS comment still to post (e.g. a closing note) and the comment id sent to Linear
+    - version: bumped by every change request so an older worker run never marks the row SYNCED over it
     - createdAt / updatedAt
   - Unique constraints on [sourceType, sourceUid] and linearIssueId; index on [status, nextAttemptAt]
+  - Linear target of an AI App lives on AiApp: linearTeamId (a private team), linearProjectId (optional), linearTargetSetAt (only feedback created after it is pushed)
 
 ### Image Management
 - Image: Manages dynamic image assets in the system like pfps

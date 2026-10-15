@@ -1,15 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { FeedbackLinearIssue, FeedbackLinearStatus } from '@prisma/client';
+import { FeedbackLinearIssue, FeedbackLinearStatus, FeedbackLinearTargetState } from '@prisma/client';
 import { AnalyticsService } from '../analytics/service/analytics.service';
 import {
   FEEDBACK_LINEAR_DEFAULT_SYNC_CRON,
-  FeedbackLinearConfig,
-  getFeedbackLinearConfig,
+  FeedbackLinearCredentials,
+  getFeedbackLinearCredentials,
 } from './feedback-linear.config';
-import { FeedbackLinearHandlerRegistry, FeedbackLinearPermanentError } from './feedback-linear-handlers';
-import { FeedbackLinearOutboxService } from './feedback-linear-outbox.service';
+import {
+  FeedbackLinearHandlerRegistry,
+  FeedbackLinearIssueDraft,
+  FeedbackLinearPermanentError,
+} from './feedback-linear-handlers';
+import { FeedbackLinearOutboxService, FeedbackLinearProgress } from './feedback-linear-outbox.service';
 import { LinearApiError, LinearClient, LinearIssueRef } from './linear.client';
+import { LinearTeamMeta } from './linear-team-meta';
 
 /** Rows pushed per tick; a busy backlog drains over a few ticks. */
 const BATCH_SIZE = 10;
@@ -25,12 +30,13 @@ export class FeedbackLinearWorker {
     private readonly outbox: FeedbackLinearOutboxService,
     private readonly handlers: FeedbackLinearHandlerRegistry,
     private readonly linear: LinearClient,
+    private readonly teamMeta: LinearTeamMeta,
     private readonly analytics: AnalyticsService
   ) {}
 
   @Cron(process.env.FEEDBACK_LINEAR_SYNC_CRON || FEEDBACK_LINEAR_DEFAULT_SYNC_CRON, { name: 'feedback-linear-sync' })
   async tick(): Promise<void> {
-    const config = getFeedbackLinearConfig();
+    const config = getFeedbackLinearCredentials();
     if (!config || this.running) return;
     this.running = true;
     try {
@@ -45,11 +51,17 @@ export class FeedbackLinearWorker {
     }
   }
 
-  private async push(row: FeedbackLinearIssue, config: FeedbackLinearConfig): Promise<void> {
+  private async push(row: FeedbackLinearIssue, config: FeedbackLinearCredentials): Promise<void> {
     try {
-      const issue = await this.createOnce(row);
-      await this.outbox.markSynced(row, issue);
-      await this.track('feedback-linear-pushed', row, row.attempts + 1);
+      const outcome = await this.apply(row);
+      if (outcome === 'skipped') {
+        await this.outbox.markSkipped(row);
+        return;
+      }
+      await this.outbox.markSynced(row, outcome.progress);
+      if (outcome.linked) {
+        await this.track('feedback-linear-pushed', row, row.attempts + 1);
+      }
     } catch (error) {
       const permanent = error instanceof FeedbackLinearPermanentError;
       const retryAfterMs = error instanceof LinearApiError ? error.retryAfterMs : null;
@@ -64,19 +76,73 @@ export class FeedbackLinearWorker {
   }
 
   /**
-   * Creates the issue under the row's own id. A retry first looks the id up,
-   * and "already exists" counts as success, so one row never makes two issues.
+   * Brings the row's issue to what LabOS asked for: creates it if needed, moves
+   * it to the target state, posts a pending comment. Each step's result is
+   * saved as soon as it is done, so a failure later in the row never repeats it.
    */
-  private async createOnce(row: FeedbackLinearIssue): Promise<LinearIssueRef> {
-    if (row.attempts > 0) {
-      const existing = await this.linear.issueById(row.linearIssueId);
-      if (existing) return existing;
-    }
+  private async apply(
+    row: FeedbackLinearIssue
+  ): Promise<{ linked: boolean; progress: FeedbackLinearProgress } | 'skipped'> {
     const handler = this.handlers.get(row.sourceType);
     if (!handler) {
       throw new FeedbackLinearPermanentError(`No handler for source type ${row.sourceType}`);
     }
-    const draft = await handler.buildIssue(row);
+    const progress: FeedbackLinearProgress = {};
+    let applied = row.appliedState;
+    let intakeStateId = row.intakeStateId;
+    let linked = false;
+
+    if (!applied) {
+      let issue = row.attempts > 0 ? await this.linear.issueById(row.linearIssueId) : null;
+      if (!issue && row.targetState === FeedbackLinearTargetState.CANCELED) {
+        return 'skipped';
+      }
+      if (!issue) {
+        const draft = await handler.buildIssue(row);
+        issue = await this.createOnce(row, draft);
+        intakeStateId = draft.stateId;
+      }
+      applied = FeedbackLinearTargetState.INTAKE;
+      linked = true;
+      Object.assign(progress, {
+        identifier: issue.identifier,
+        url: issue.url,
+        appliedState: applied,
+        ...(intakeStateId ? { intakeStateId } : {}),
+      });
+      await this.outbox.saveProgress(row, progress);
+    }
+
+    if (row.targetState !== applied) {
+      const stateId =
+        row.targetState === FeedbackLinearTargetState.INTAKE
+          ? intakeStateId ?? (await this.teamMeta.intakeStateId(row.teamId))
+          : await this.teamMeta.stateIdOfType(
+              row.teamId,
+              row.targetState === FeedbackLinearTargetState.COMPLETED ? 'completed' : 'canceled'
+            );
+      await this.linear.issueUpdate(row.linearIssueId, { stateId });
+      progress.appliedState = row.targetState;
+      await this.outbox.saveProgress(row, { appliedState: row.targetState });
+    }
+
+    if (row.pendingCommentUid && row.pendingCommentId) {
+      const body = handler.buildComment ? await handler.buildComment(row, row.pendingCommentUid) : null;
+      if (body) {
+        try {
+          await this.linear.commentCreate({ id: row.pendingCommentId, issueId: row.linearIssueId, body });
+        } catch (error) {
+          if (!(error instanceof LinearApiError && error.isAlreadyExists)) throw error;
+        }
+      }
+      progress.commentDone = true;
+    }
+
+    return { linked, progress };
+  }
+
+  /** Creates the issue under the row's own id; "already exists" counts as success. */
+  private async createOnce(row: FeedbackLinearIssue, draft: FeedbackLinearIssueDraft): Promise<LinearIssueRef> {
     try {
       return await this.linear.issueCreate({ ...draft, id: row.linearIssueId });
     } catch (error) {

@@ -28,6 +28,7 @@ function buildController(aiAppsService: Record<string, any>) {
     {} as any,
     {} as any,
     {} as any,
+    {} as any,
     {} as any
   );
 }
