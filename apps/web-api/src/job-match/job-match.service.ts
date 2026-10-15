@@ -17,17 +17,13 @@ import { PrismaService } from '../shared/prisma.service';
 import { AwsService } from '../utils/aws/aws.service';
 import { maskEmail } from '../utils/mask-email';
 import { renderCandidateIntroEmail, type RenderedEmail } from './emails/candidate-intro-email';
-import { listRunSuggestions } from './job-match-suggestions';
+import { currentRoleCriteria, listRunSuggestions, suggestionCriteria } from './job-match-suggestions';
 import {
   MATCH_JOB_SELECT,
-  asCriteria,
-  asMarkedCriteria,
   criterionStatements,
-  currentRoleTextHash,
   flaggedCriteria,
   isLiveOpening,
   labelText,
-  withCriterionMeta,
   type MatchCriterionItem,
   type MatchJob,
 } from './job-match.logic';
@@ -110,7 +106,7 @@ export class JobMatchService {
       label: labelText(label),
       rank,
       blurb: row.blurb,
-      criteria: withCriterionMeta(asMarkedCriteria(row.payload), all),
+      criteria: suggestionCriteria(row.payload, all),
       interested: row.interested === true,
       note: row.interested === true ? row.interestNote ?? null : null,
       contactedAt: contactedAt.get(row.memberUid) ?? null,
@@ -186,14 +182,19 @@ export class JobMatchService {
     if (!suggested.some(({ row }) => row.memberUid === memberUid)) {
       throw new NotFoundException('This member is not a current suggestion for this role');
     }
-    const candidate = await this.prisma.member.findUnique({ where: { uid: memberUid }, select: { email: true } });
+    const candidate = await this.prisma.member.findUnique({
+      where: { uid: memberUid },
+      select: { email: true, name: true },
+    });
     if (!candidate?.email) {
       throw new BadRequestException('This candidate has no email address');
     }
     const team = await this.prisma.team.findUnique({ where: { uid: job.teamUid }, select: { name: true } });
 
     const email = renderCandidateIntroEmail({
+      candidateName: candidate.name ?? '',
       leadName: lead.name,
+      leadRole: lead.role ?? null,
       leadEmail: lead.email ?? '',
       roleTitle: job.roleTitle,
       teamName: team?.name ?? job.companyName,
@@ -276,18 +277,9 @@ export class JobMatchService {
     return job;
   }
 
-  /**
-   * The criteria extracted for the role's current posting, read the way the runner reads them: either stored shape
-   * (LAB-2854), newest row first, so a legacy row's labels appear once the runner has labelled it.
-   */
+  /** The role's current criteria; see `currentRoleCriteria`. */
   private async currentCriteria(job: MatchJob): Promise<{ hash: string; all: MatchCriterionItem[] }> {
-    const hash = currentRoleTextHash(job);
-    const row = await this.prisma.jobMatchRow.findFirst({
-      where: { kind: 'CRITERIA', roleUid: job.uid, roleTextHash: hash },
-      orderBy: { createdAt: 'desc' },
-      select: { payload: true },
-    });
-    return { hash, all: asCriteria(row?.payload).slice(0, 6) };
+    return currentRoleCriteria(this.prisma, job);
   }
 
   private async criteriaOverride(
