@@ -14,6 +14,6 @@ import { PlNetworkPortfolioController } from './pl-network-portfolio.controller'
   imports: [SharedModule, NotificationsModule, AuthModule, InvestorsModule],
   controllers: [SpvSpotlightsController, PlNetworkPortfolioController],
   providers: [SpvSpotlightsService, SpvSpotlightAdminService, SpvSpotlightMailer, PlNetworkPortfolioService],
-  exports: [SpvSpotlightsService, SpvSpotlightAdminService],
+  exports: [SpvSpotlightsService, SpvSpotlightAdminService, PlNetworkPortfolioService],
 })
 export class SpvSpotlightsModule {}

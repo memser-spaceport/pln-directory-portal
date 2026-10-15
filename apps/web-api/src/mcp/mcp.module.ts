@@ -9,6 +9,7 @@ import { PLEventsModule } from '../pl-events/pl-events.module';
 import { SearchModule } from '../search/search.module';
 import { RbacModule } from '../rbac/rbac.module';
 import { SharedModule } from '../shared/shared.module';
+import { SpvSpotlightsModule } from '../spv-spotlights/spv-spotlights.module';
 import { WarmIntrosV2Module } from '../warm-intros-v2/warm-intros-v2.module';
 import { McpAppSessionService } from './mcp-app-session.service';
 import { McpAppSessionsController } from './mcp-app-sessions.controller';
@@ -30,6 +31,7 @@ import { McpController } from './mcp.controller';
     PLEventsModule,
     SearchModule,
     AiAppsModule,
+    SpvSpotlightsModule,
   ],
   controllers: [McpOAuthController, McpAuthorizationsController, McpAppSessionsController, McpController],
   providers: [McpOAuthService, McpAppSessionService],
