@@ -23,10 +23,12 @@ import { ProjectsService } from '../projects/projects.service';
 import { PLEventsService } from '../pl-events/pl-events.service';
 import { SearchService } from '../search/search.service';
 import { AiAppsService } from '../ai-apps/ai-apps.service';
+import { PlNetworkPortfolioService } from '../spv-spotlights/pl-network-portfolio.service';
 import { aiAppFeedbackTools } from './mcp-ai-app-feedback-tools';
 import { trackMcpToolInvocation } from './mcp-analytics';
 import { directoryTools } from './mcp-directory-tools';
 import { McpOAuthService } from './mcp-oauth.service';
+import { portfolioTools } from './mcp-portfolio-tools';
 import { toolsForPermissions, WHOAMI_TOOL, warmIntroTools } from './mcp-tools';
 
 @ApiTags('MCP')
@@ -44,6 +46,7 @@ export class McpController {
     private readonly plEvents: PLEventsService,
     private readonly search: SearchService,
     private readonly aiApps: AiAppsService,
+    private readonly portfolio: PlNetworkPortfolioService,
     private readonly analytics: AnalyticsService
   ) {}
 
@@ -74,6 +77,7 @@ export class McpController {
       ...warmIntroTools(this.masterProfiles, this.warmIntros),
       ...directoryTools(this.members, this.teams, this.projects, this.plEvents, this.search),
       ...aiAppFeedbackTools(this.aiApps),
+      ...portfolioTools(this.portfolio),
     ]);
 
     const server = new McpServer({ name: 'LabOS', version: '1.0.0' });
