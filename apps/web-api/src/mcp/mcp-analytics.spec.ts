@@ -65,6 +65,23 @@ describe('buildMcpToolAnalyticsProperties', () => {
     expect(searchInvestors).not.toHaveProperty('search');
   });
 
+  it('records counts and filters for list_portfolio_teams without the name query', () => {
+    const props = buildMcpToolAnalyticsProperties(
+      'list_portfolio_teams',
+      { q: 'agoric', island: 'digital-human-rights' },
+      { teams: [{ teamUid: 't1' }], total: 1, limit: 20, offset: 0, nextOffset: null }
+    );
+    expect(props).toEqual({
+      hasQuery: true,
+      island: 'digital-human-rights',
+      limit: 20,
+      offset: 0,
+      resultCount: 1,
+      total: 1,
+    });
+    expect(props).not.toHaveProperty('q');
+  });
+
   it('includes uids only for get tools', () => {
     expect(buildMcpToolAnalyticsProperties('get_master_profile', { uid: 'mp-1' })).toEqual({ uid: 'mp-1' });
     expect(
