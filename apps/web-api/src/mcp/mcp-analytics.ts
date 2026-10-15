@@ -89,6 +89,16 @@ export function buildMcpToolAnalyticsProperties(
     case 'list_my_ai_apps':
       props.resultCount = countOf(result?.apps);
       break;
+    case 'list_portfolio_teams':
+      props.hasQuery = Boolean(stringProp(args.q));
+      props.island = stringProp(args.island);
+      props.limit = numberProp(result?.limit) ?? numberProp(args.limit);
+      props.offset = numberProp(result?.offset) ?? numberProp(args.offset);
+      props.resultCount = countOf(result?.teams);
+      if (typeof result?.total === 'number') {
+        props.total = result.total;
+      }
+      break;
     case 'list_ai_app_feedback':
       props.appUid = stringProp(args.appUid);
       props.status = stringProp(args.status);
