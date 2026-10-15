@@ -165,7 +165,7 @@ export class SpvSpotlightsService {
       memberName: member.name || '',
       from: { email: template.fromEmail, name: template.fromName },
       cc: template.cc,
-      replyTo: template.fromEmail,
+      replyTo: template.replyTo.trim() || template.fromEmail,
       bccSender: false,
       extra: { docSendLink: spotlight.docSendUrl },
     });

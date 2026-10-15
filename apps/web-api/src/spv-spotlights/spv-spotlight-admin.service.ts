@@ -20,6 +20,7 @@ import {
   asStringRecord,
   defaultAccessForParticipantType,
   normalizeOptionalTrimmed,
+  resolveTeamPitchSenderEmail,
   resolveTeamPitchSupportEmail,
   toKebabSlug,
 } from '../team-pitches/team-pitch.utils';
@@ -28,6 +29,7 @@ import {
   assignSenders,
   DataRoomAccessTemplate,
   EMAIL_TEMPLATE_KEYS,
+  InviteEmailTemplate,
   EmailTemplateKey,
   EmailTemplates,
   LABOS_DEFAULT_SENDER_EMAIL,
@@ -94,6 +96,17 @@ function savedDataRoomTemplate(value: DataRoomAccessTemplate): DataRoomAccessTem
     fromEmail: value.fromEmail.trim(),
     fromName: value.fromName.trim(),
     cc: value.cc.map((email) => email.trim()).filter(Boolean),
+    replyTo: value.replyTo?.trim() ?? '',
+  };
+}
+
+function savedInviteTemplate(value: InviteEmailTemplate): InviteEmailTemplate {
+  return {
+    subject: value.subject.trim(),
+    body: sanitizeEmailHtml(value.body),
+    fromName: value.fromName?.trim() ?? '',
+    cc: (value.cc ?? []).map((email) => email.trim()).filter(Boolean),
+    replyTo: value.replyTo?.trim() ?? '',
   };
 }
 
@@ -288,6 +301,14 @@ export class SpvSpotlightAdminService {
           continue;
         }
         current.dataRoomAccess = savedDataRoomTemplate(value);
+        continue;
+      }
+      if (key === 'invitePreapproved') {
+        const value = templates.invitePreapproved;
+        if (!value) {
+          continue;
+        }
+        current.invitePreapproved = savedInviteTemplate(value);
         continue;
       }
       const value = templates[key];
@@ -871,6 +892,13 @@ export class SpvSpotlightAdminService {
         run: async () => {
           try {
             const sender = senderByMember?.get(participant.member.uid);
+            const invite = key === 'invitePreapproved' ? templates.invitePreapproved : null;
+            const inviteFromName = invite?.fromName.trim() ?? '';
+            const from = sender
+              ? { email: sender.email, name: inviteFromName || sender.name || null }
+              : inviteFromName
+                ? { email: resolveTeamPitchSenderEmail(spotlight.senderEmail), name: inviteFromName }
+                : undefined;
             await this.mailer.send({
               spotlight: this.mailContext(spotlight),
               template: templates[key],
@@ -878,7 +906,10 @@ export class SpvSpotlightAdminService {
               memberUid: participant.member.uid,
               memberName: participant.member.name || '',
               extra: asStringRecord(participant.emailTemplateVariables),
-              ...(sender ? { from: { email: sender.email, name: sender.name || null } } : {}),
+              ...(from ? { from } : {}),
+              ...(invite
+                ? { cc: invite.cc, ...(invite.replyTo.trim() ? { replyTo: invite.replyTo.trim() } : {}) }
+                : {}),
             });
             await this.prisma.spvSpotlightParticipant.update({
               where: { uid: participant.uid },

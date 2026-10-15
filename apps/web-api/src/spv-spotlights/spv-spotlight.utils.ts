@@ -12,14 +12,23 @@ export type EmailTemplateKey =
   | 'dataRoomAccess';
 
 export type EmailTemplate = { subject: string; body: string };
+export type InviteEmailTemplate = EmailTemplate & {
+  fromName: string;
+  cc: string[];
+  replyTo: string;
+};
 export type DataRoomAccessTemplate = EmailTemplate & {
   fromEmail: string;
   fromName: string;
   cc: string[];
+  replyTo: string;
 };
 export type EmailTemplates = {
-  [K in Exclude<EmailTemplateKey, 'dataRoomAccess'>]: EmailTemplate;
-} & { dataRoomAccess: DataRoomAccessTemplate };
+  [K in Exclude<EmailTemplateKey, 'dataRoomAccess' | 'invitePreapproved'>]: EmailTemplate;
+} & {
+  invitePreapproved: InviteEmailTemplate;
+  dataRoomAccess: DataRoomAccessTemplate;
+};
 
 export const EMAIL_TEMPLATE_KEYS: EmailTemplateKey[] = [
   'invitePreapproved',
@@ -58,6 +67,9 @@ export function defaultEmailTemplates(title: string): EmailTemplates {
     invitePreapproved: {
       subject: `You're invited: ${title}`,
       body: spotlightEmailBody('You are invited to {{spotlightTitle}}.', 'View Spotlight'),
+      fromName: '',
+      cc: [],
+      replyTo: '',
     },
     followUpPreapproved: {
       subject: `Reminder: ${title}`,
@@ -85,6 +97,7 @@ export function defaultEmailTemplates(title: string): EmailTemplates {
       fromEmail: 'netholabsspv@plcapital.xyz',
       fromName: 'PL Capital, Netholabs SPV',
       cc: [],
+      replyTo: '',
     },
   };
 }
@@ -308,6 +321,18 @@ export function asEmailTemplates(value: unknown, title: string): EmailTemplates 
             ? record.fromName.trim()
             : defaults.dataRoomAccess.fromName,
         cc: cc ?? defaults.dataRoomAccess.cc,
+        replyTo: typeof record.replyTo === 'string' ? record.replyTo.trim() : defaults.dataRoomAccess.replyTo,
+      };
+      continue;
+    }
+    if (key === 'invitePreapproved') {
+      const cc = emailStringList(record.cc);
+      result.invitePreapproved = {
+        subject,
+        body,
+        fromName: typeof record.fromName === 'string' ? record.fromName.trim() : defaults.invitePreapproved.fromName,
+        cc: cc ?? defaults.invitePreapproved.cc,
+        replyTo: typeof record.replyTo === 'string' ? record.replyTo.trim() : defaults.invitePreapproved.replyTo,
       };
       continue;
     }

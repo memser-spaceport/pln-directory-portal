@@ -35,6 +35,7 @@ type TemplateDraft = {
   fromEmail?: string;
   fromName?: string;
   cc?: string[];
+  replyTo?: string;
 };
 
 const TEMPLATE_LABELS: { key: TemplateKey; label: string }[] = [
@@ -232,6 +233,7 @@ const SpvSpotlightDetailPage = () => {
   const [senders, setSenders] = useState<{ email: string; name: string }[]>([]);
   const [emailOnDataRoomRequest, setEmailOnDataRoomRequest] = useState(false);
   const [dataRoomCc, setDataRoomCc] = useState('');
+  const [inviteCc, setInviteCc] = useState('');
   const [useDefaultSender, setUseDefaultSender] = useState(true);
   const [selectedSenderEmails, setSelectedSenderEmails] = useState<string[]>([]);
   const [emailsPerSenderPerMinute, setEmailsPerSenderPerMinute] = useState('');
@@ -267,6 +269,7 @@ const SpvSpotlightDetailPage = () => {
     setSenders(readSenders(data));
     setEmailOnDataRoomRequest(Boolean(data.emailOnDataRoomRequest));
     setDataRoomCc((data.emailTemplates?.dataRoomAccess?.cc ?? []).join(', '));
+    setInviteCc((data.emailTemplates?.invitePreapproved?.cc ?? []).join(', '));
   }, [authToken, uid]);
 
   const loadRequests = useCallback(async () => {
@@ -484,11 +487,22 @@ const SpvSpotlightDetailPage = () => {
     try {
       const payload = {
         ...templates,
+        invitePreapproved: {
+          subject: templates.invitePreapproved.subject,
+          body: templates.invitePreapproved.body,
+          fromName: templates.invitePreapproved.fromName ?? '',
+          replyTo: templates.invitePreapproved.replyTo ?? '',
+          cc: inviteCc
+            .split(/[,;\n]/)
+            .map((email) => email.trim())
+            .filter(Boolean),
+        },
         dataRoomAccess: {
           subject: templates.dataRoomAccess.subject,
           body: templates.dataRoomAccess.body,
           fromEmail: templates.dataRoomAccess.fromEmail ?? '',
           fromName: templates.dataRoomAccess.fromName ?? '',
+          replyTo: templates.dataRoomAccess.replyTo ?? '',
           cc: dataRoomCc
             .split(/[,;\n]/)
             .map((email) => email.trim())
@@ -500,6 +514,7 @@ const SpvSpotlightDetailPage = () => {
       const stripped = TEMPLATE_LABELS.some(({ key }) => saved[key].body !== templates[key].body);
       setTemplates(saved);
       setDataRoomCc((saved.dataRoomAccess.cc ?? []).join(', '));
+      setInviteCc((saved.invitePreapproved.cc ?? []).join(', '));
       if (stripped) {
         toast.warning('Templates saved. Scripts, iframes or event handlers were removed from the HTML.');
       } else {
@@ -1448,8 +1463,9 @@ const SpvSpotlightDetailPage = () => {
               </div>
               <p className="mb-6 text-sm text-gray-500">
                 The body is the email HTML. Built-in tokens: investorName, firstName, investorEmail, spotlightTitle,
-                spotlightLink, teamName, supportEmail, senderName, docSendLink. The data room access template also has
-                its own From address, From name, and Cc. Investor template variables use the CSV column header as the
+                spotlightLink, teamName, supportEmail, senderName, docSendLink. The invite template has its own From
+                name, Cc, and Reply-to. The data room access template has its own From address, From name, Cc, and
+                Reply-to. Investor template variables use the CSV column header as the
                 token. Approval emails also have role and organization. Use {'{{firm|your fund}}'} when a value can be
                 empty. Use {'{{#if token}}'} … {'{{else}}'} … {'{{/if}}'} to choose one block when a variable has a
                 value. HTML is allowed.
@@ -1476,6 +1492,44 @@ const SpvSpotlightDetailPage = () => {
                         setTemplates({ ...templates, [key]: { ...templates[key], subject: e.target.value } })
                       }
                     />
+                    {key === 'invitePreapproved' && (
+                      <div className="mt-3 flex flex-col gap-2">
+                        <input
+                          type="text"
+                          className={clsx(s.fieldInput, 'box-border w-full self-stretch')}
+                          value={templates.invitePreapproved.fromName ?? ''}
+                          placeholder="From name"
+                          aria-label="Invite from name"
+                          onChange={(e) =>
+                            setTemplates({
+                              ...templates,
+                              invitePreapproved: { ...templates.invitePreapproved, fromName: e.target.value },
+                            })
+                          }
+                        />
+                        <input
+                          type="text"
+                          className={clsx(s.fieldInput, 'box-border w-full self-stretch')}
+                          value={inviteCc}
+                          placeholder="Cc emails, separated by commas"
+                          aria-label="Invite cc"
+                          onChange={(e) => setInviteCc(e.target.value)}
+                        />
+                        <input
+                          type="email"
+                          className={clsx(s.fieldInput, 'box-border w-full self-stretch')}
+                          value={templates.invitePreapproved.replyTo ?? ''}
+                          placeholder="Reply-to"
+                          aria-label="Invite reply-to"
+                          onChange={(e) =>
+                            setTemplates({
+                              ...templates,
+                              invitePreapproved: { ...templates.invitePreapproved, replyTo: e.target.value },
+                            })
+                          }
+                        />
+                      </div>
+                    )}
                     {key === 'dataRoomAccess' && (
                       <div className="mt-3 flex flex-col gap-2">
                         <input
@@ -1511,6 +1565,19 @@ const SpvSpotlightDetailPage = () => {
                           placeholder="Cc emails, separated by commas"
                           aria-label="Data room cc"
                           onChange={(e) => setDataRoomCc(e.target.value)}
+                        />
+                        <input
+                          type="email"
+                          className={clsx(s.fieldInput, 'box-border w-full self-stretch')}
+                          value={templates.dataRoomAccess.replyTo ?? ''}
+                          placeholder="Reply-to"
+                          aria-label="Data room reply-to"
+                          onChange={(e) =>
+                            setTemplates({
+                              ...templates,
+                              dataRoomAccess: { ...templates.dataRoomAccess, replyTo: e.target.value },
+                            })
+                          }
                         />
                       </div>
                     )}

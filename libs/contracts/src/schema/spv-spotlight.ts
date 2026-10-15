@@ -22,10 +22,19 @@ const templateSchema = z.object({
   body: z.string().trim().min(1),
 });
 
+const optionalReplyTo = z.union([z.string().trim().email(), z.literal('')]).optional().default('');
+
+const inviteTemplateSchema = templateSchema.extend({
+  fromName: z.string().trim().max(120).optional().default(''),
+  cc: z.array(z.string().trim().email()).optional().default([]),
+  replyTo: optionalReplyTo,
+});
+
 const dataRoomTemplateSchema = templateSchema.extend({
   fromEmail: z.string().trim().email(),
   fromName: z.string().trim().min(1).max(120),
   cc: z.array(z.string().trim().email()).default([]),
+  replyTo: optionalReplyTo,
 });
 
 const senderSchema = z.object({
@@ -34,7 +43,7 @@ const senderSchema = z.object({
 });
 
 export const SpvEmailTemplatesSchema = z.object({
-  invitePreapproved: templateSchema,
+  invitePreapproved: inviteTemplateSchema,
   followUpPreapproved: templateSchema,
   inviteOutreach: templateSchema,
   followUpOutreach: templateSchema,
