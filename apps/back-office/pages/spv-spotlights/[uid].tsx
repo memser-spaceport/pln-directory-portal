@@ -688,7 +688,6 @@ const SpvSpotlightDetailPage = () => {
     );
   const isReachable = (participant: Participant) => participant.access !== 'RESTRICTED' && !!participant.member.email;
   const eligibleRecipients = inviteRecipients.filter(isReachable);
-  const openNoticeRecipients = investors.filter(isReachable);
   const kindRecipients = bulkSend?.kind === 'open-notice' ? investors : inviteRecipients;
   const eligibleUidSet = new Set(kindRecipients.filter(isReachable).map((participant) => participant.uid));
   const sendTargets =
@@ -1458,8 +1457,7 @@ const SpvSpotlightDetailPage = () => {
                 The body is the email HTML. Built-in tokens: investorName, firstName, investorEmail, spotlightTitle,
                 spotlightLink, teamName, supportEmail, senderName, docSendLink. The invite and follow-up templates have
                 an optional From name, Cc, and Reply-to. The data room access template has its own From address, From
-                name, Cc, and
-                Reply-to. Investor template variables use the CSV column header as the
+                name, Cc, and Reply-to. Investor template variables use the CSV column header as the
                 token. Approval emails also have role and organization. Use {'{{firm|your fund}}'} when a value can be
                 empty. Use {'{{#if token}}'} … {'{{else if token}}'} … {'{{else}}'} … {'{{/if}}'} to choose one block
                 when a variable has a value. HTML is allowed.
