@@ -4684,17 +4684,29 @@ model JobMatchContact {
   @@unique([roleUid, memberUid])
 }
 
+/// Which weekly suggested-candidates email a lead got for a role (LAB-2837 feedback).
+enum JobMatchEmailKind {
+  FIRST
+  NEW
+  REMINDER
+}
+
 /// One suggested-candidates email per run, role and recipient (LAB-2850).
 model JobMatchEmailSend {
-  uid            String      @id @default(cuid())
+  uid            String            @id @default(cuid())
   runUid         String
-  run            JobMatchRun @relation(fields: [runUid], references: [uid], onDelete: Cascade)
+  run            JobMatchRun       @relation(fields: [runUid], references: [uid], onDelete: Cascade)
   roleUid        String
   teamUid        String
   recipientUid   String
   candidateCount Int
-  sentAt         DateTime    @default(now())
+  /// FIRST for rows written before kinds existed; such rows carry no memberUids and are not history.
+  kind           JobMatchEmailKind @default(FIRST)
+  /// The members the email named, so the next one knows who this lead has already seen (LAB-2837 feedback).
+  memberUids     String[]          @default([])
+  sentAt         DateTime          @default(now())
 
   @@unique([runUid, roleUid, recipientUid])
   @@index([recipientUid])
+  @@index([roleUid, recipientUid])
 }
