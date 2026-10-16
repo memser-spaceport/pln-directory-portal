@@ -28,6 +28,7 @@ import {
   isEmailDryRun,
   isLiveOpening,
   labelText,
+  isEmailTeamAllowed,
   parseEmailTeamAllowlist,
   pickSuggestedEmail,
   type MatchCriterionItem,
@@ -124,7 +125,7 @@ export class SuggestedCandidatesEmailService {
 
     const teamCache = new Map<string, { name: string | null; leads: Lead[] }>();
     for (const job of jobs) {
-      if (!isLiveOpening(job) || !job.teamUid || !allowlist.has(job.teamUid)) continue;
+      if (!isLiveOpening(job) || !job.teamUid || !isEmailTeamAllowed(allowlist, job.teamUid)) continue;
       const teamUid = job.teamUid;
 
       const listed = await listRunSuggestions(this.prisma, runUid, job.uid);
