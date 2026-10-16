@@ -1,16 +1,26 @@
 import { Injectable } from '@nestjs/common';
 import { SearchResult, SearchResultItem } from 'libs/contracts/src/schema/global-search';
 import { OpenSearchService } from '../opensearch/opensearch.service';
+import { PrismaService } from '../shared/prisma.service';
+import { directoryVisibleMemberWhere } from '../members/member-visibility';
 import { truncate } from '../utils/formatters';
 import { SearchMetrics, classifyError } from '../metrics/search.metrics';
 
 const MAX_SEARCH_RESULTS_PER_INDEX = 50;
 const AUTOMCOMPLETE_MAX_LENGTH = 50;
+const EMAIL_QUERY_MIN_LENGTH = 3;
+
+/** A query "looks like an email" when the trimmed text has an "@" and at least 3 characters. */
+export function isEmailQuery(text: string | undefined | null): boolean {
+  const trimmed = (text ?? '').trim();
+  return trimmed.length >= EMAIL_QUERY_MIN_LENGTH && trimmed.includes('@');
+}
 
 type FetchAllOptions = {
   strict?: boolean;
   canReadForum?: boolean;
   isAuthenticated?: boolean;
+  canReadContacts?: boolean; // caller holds member.contacts.read: enables the email lookup
   perIndexSize?: number; // default: MAX_SEARCH_RESULTS_PER_INDEX
   topN?: number; // default: 50 (controls result.top when no pagination)
   page?: number; // 1-based; optional combined pagination
@@ -22,7 +32,63 @@ const strictLabel = (v?: boolean) => String(!!v); // "true" | "false"
 
 @Injectable()
 export class SearchService {
-  constructor(private readonly openSearchService: OpenSearchService) {}
+  constructor(private readonly openSearchService: OpenSearchService, private readonly prisma: PrismaService) {}
+
+  /**
+   * Members whose main email contains the query text (case-insensitive).
+   * Only directory-visible members who show their email (`preferences.showEmail === true`) match.
+   * The email is used for matching only; it is never put in the result item.
+   */
+  async searchMembersByEmail(text: string, limit = MAX_SEARCH_RESULTS_PER_INDEX): Promise<SearchResultItem[]> {
+    const query = (text ?? '').trim();
+    if (!isEmailQuery(query)) {
+      return [];
+    }
+
+    const members = await this.prisma.member.findMany({
+      where: {
+        AND: [
+          directoryVisibleMemberWhere(),
+          { deletedAt: null },
+          { email: { contains: query, mode: 'insensitive' } },
+          { preferences: { path: ['showEmail'], equals: true } },
+        ],
+      },
+      select: {
+        uid: true,
+        name: true,
+        scheduleMeetingCount: true,
+        officeHours: true,
+        image: { select: { url: true } },
+      },
+      orderBy: { name: 'asc' },
+      take: limit,
+    });
+
+    return members.map((member) => {
+      const image = member.image?.url ?? '';
+      const officeHoursUrl = member.officeHours && member.officeHours.trim() ? member.officeHours.trim() : null;
+      const item: SearchResultItem = {
+        uid: member.uid,
+        name: member.name ?? '',
+        image,
+        index: 'members',
+        matches: [],
+        source: {
+          uid: member.uid,
+          name: member.name,
+          image,
+          scheduleMeetingCount: member.scheduleMeetingCount,
+          officeHoursUrl,
+          availableToConnect: Boolean(officeHoursUrl),
+        },
+      };
+      if (typeof member.scheduleMeetingCount === 'number') item.scheduleMeetingCount = member.scheduleMeetingCount;
+      if (officeHoursUrl) item.officeHoursUrl = officeHoursUrl;
+      item.availableToConnect = Boolean(officeHoursUrl);
+      return item;
+    });
+  }
 
   private removeForumResults(result: SearchResult): SearchResult {
     return {
@@ -394,6 +460,17 @@ export class SearchService {
 
           (result as any)[key].push(item);
           allHits.push({ ...item, score: typeof hit._score === 'number' ? hit._score : 0 });
+        }
+      }
+
+      // Email lookup (Postgres): only for callers with member.contacts.read and an email-like query.
+      // Email matches go first in `members`; a member found by both lookups shows once.
+      if (options?.canReadContacts && isEmailQuery(text)) {
+        const emailMembers = await this.searchMembersByEmail(text);
+        if (emailMembers.length > 0) {
+          const emailUids = new Set(emailMembers.map((m) => m.uid));
+          result.members = [...emailMembers, ...result.members.filter((m) => !emailUids.has(m.uid))];
+          allHits.push(...emailMembers.map((m) => ({ ...m, score: 0 })));
         }
       }
 
