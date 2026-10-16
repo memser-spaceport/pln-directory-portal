@@ -354,6 +354,11 @@ export const ANALYTICS_EVENTS = {
     APP_SESSION_OPEN: 'mcp-app-session-open',
     APP_SESSION_REVOKED: 'mcp-app-session-revoked',
   },
+  INVESTOR_DB: {
+    MANUAL_FIELDS_PATCHED: 'investor-db-manual-fields-patched',
+    MANUAL_FIELDS_PATCH_FAILED: 'investor-db-manual-fields-patch-failed',
+    MANUAL_FIELDS_PATCH_UNAUTHORIZED: 'investor-db-manual-fields-patch-unauthorized',
+  },
   AI_APPS: {
     RESOURCES_SAVED: 'ai_apps_resources_saved',
     RESOURCES_SAVE_REJECTED: 'ai_apps_resources_save_rejected',

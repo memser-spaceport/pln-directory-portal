@@ -1,7 +1,12 @@
-import { Body, Controller, Get, Logger, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Logger, Param, Patch, Post, Query, UseFilters, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { AnalyticsService } from '../analytics/service/analytics.service';
 import { SkipEmptyStringToNull } from '../decorators/skip-empty-string-to-null.decorator';
 import { ServiceAuthGuard } from '../guards/service-auth.guard';
+import {
+  ManualFieldsPatchAuthFilter,
+  trackServiceManualFieldsPatch,
+} from '../manual-field-lock/manual-field-lock.analytics';
 import { PatchManualFieldsDto, serviceActor } from '../manual-field-lock/manual-field-lock.service';
 import {
   IngestMasterProfileDto,
@@ -21,14 +26,20 @@ import { MasterProfileService } from './master-profile.service';
 export class MasterProfileServiceController {
   private readonly logger = new Logger(MasterProfileServiceController.name);
 
-  constructor(private readonly masterProfileService: MasterProfileService) {}
+  constructor(
+    private readonly masterProfileService: MasterProfileService,
+    private readonly analytics: AnalyticsService
+  ) {}
 
   @Patch('master-profiles/:uid')
   @SkipEmptyStringToNull()
+  @UseFilters(ManualFieldsPatchAuthFilter)
   async patchProfile(@Param('uid') uid: string, @Body() dto: PatchManualFieldsDto) {
     const fieldCount = dto?.fields && typeof dto.fields === 'object' ? Object.keys(dto.fields).length : 0;
     this.logger.log(`Received master-profile patch: uid=${uid} fields=${fieldCount}`);
-    return this.masterProfileService.patchFields(uid, dto?.fields, serviceActor(dto));
+    return trackServiceManualFieldsPatch(this.analytics, 'master_profile', uid, dto, () =>
+      this.masterProfileService.patchFields(uid, dto?.fields, serviceActor(dto))
+    );
   }
 
   @Post('master-profiles/ingest')
