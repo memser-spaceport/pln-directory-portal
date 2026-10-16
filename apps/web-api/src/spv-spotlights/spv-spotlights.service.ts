@@ -11,6 +11,7 @@ import { PrismaService } from '../shared/prisma.service';
 import {
   accessRequestConflict,
   asEmailTemplates,
+  dataRoomEmailSubject,
   normalizeEmail,
   resolveViewerAccess,
   ViewerAccess,
@@ -154,7 +155,9 @@ export class SpvSpotlightsService {
     if (claimed.count !== 1) {
       return { docSendUrl: spotlight.docSendUrl, alreadySent: true };
     }
-    const template = asEmailTemplates(spotlight.emailTemplates, spotlight.title).dataRoomAccess;
+    const resolved = asEmailTemplates(spotlight.emailTemplates, spotlight.title).dataRoomAccess;
+    const investorName = member.name?.trim() || '';
+    const template = { ...resolved, subject: dataRoomEmailSubject(resolved.subject, investorName) };
     try {
       await this.mailer.send({
         spotlight: {
@@ -170,11 +173,11 @@ export class SpvSpotlightsService {
         template,
         to: member.email,
         memberUid: member.uid,
-        memberName: member.name || '',
+        memberName: investorName,
         from: { email: template.fromEmail, name: template.fromName },
         cc: template.cc,
         replyTo: template.replyTo.trim() || template.fromEmail,
-        bccSender: false,
+        bccSender: true,
         extra: { docSendLink: spotlight.docSendUrl },
       });
     } catch (error) {

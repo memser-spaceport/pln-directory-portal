@@ -2,6 +2,7 @@ import {
   accessRequestConflict,
   assignSenders,
   batchSendDurationMs,
+  dataRoomEmailSubject,
   mergeTemplate,
   openNoticeCounts,
   replaceNbsp,
@@ -69,6 +70,19 @@ describe('mergeTemplate', () => {
   it('uses the fallback when a value is missing or empty', () => {
     expect(mergeTemplate('From {{firm|a fund}}, {{note | none}}', { note: '' })).toBe('From a fund, none');
     expect(mergeTemplate('From {{firm|a fund}}', { firm: 'Gamma' })).toBe('From Gamma');
+  });
+
+  it('uses the recipient name in the data room subject, or the shared line when the name is missing', () => {
+    const named = dataRoomEmailSubject('Connecting you to Netholabs SPV Team', 'Ada Lovelace');
+    expect(mergeTemplate(named, { teamName: 'Netholabs', investorName: 'Ada Lovelace' })).toBe(
+      'Connecting Netholabs SPV Team to Ada Lovelace'
+    );
+    const missing = dataRoomEmailSubject('Connecting you to Netholabs SPV Team', '');
+    expect(mergeTemplate(missing, { teamName: 'Netholabs' })).toBe('Connecting you to Netholabs SPV Team');
+    const placeholder = dataRoomEmailSubject('Connecting {{teamName}} SPV Team to {{investorName}}', 'there');
+    expect(mergeTemplate(placeholder, { teamName: 'Netholabs', investorName: 'there' })).toBe(
+      'Connecting you to Netholabs SPV Team'
+    );
   });
 
   it('keeps one branch of an if block', () => {
