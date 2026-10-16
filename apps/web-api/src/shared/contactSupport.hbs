@@ -6,6 +6,12 @@
     <p>A new contact support request has been submitted. The details are as follows:</p>
     <div style="margin-top: 20px; background-color: #f9f9f9; padding: 15px; border-radius: 5px;">
       <p><strong>Topic:</strong> {{ topic }}</p >
+      {{#if reportKind}}
+      <p><strong>Kind:</strong> {{ reportKind }}</p>
+      {{/if}}
+      {{#if priority}}
+      <p><strong>Priority:</strong> {{ priority }}</p>
+      {{/if}}
       <p><strong>Name:</strong> {{ name }}</p>
       <p><strong>Email:</strong> {{ email }}</p>
       <p><strong>Message:</strong></p>

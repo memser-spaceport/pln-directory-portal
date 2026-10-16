@@ -1,4 +1,5 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { AiAppFeedbackPriority } from '@prisma/client';
 import { ContactSupportRequestDto } from 'libs/contracts/src/schema';
 import { PrismaService } from '../shared/prisma.service';
 import { LogService } from '../shared/log.service';
@@ -15,6 +16,14 @@ import {
 } from './contact-support-html';
 
 const CONTACT_SUPPORT_SUBJECT = 'New Contact Support Request';
+
+/** The labels the LabOS feedback form shows next to each priority. */
+const PRIORITY_LABELS: Record<AiAppFeedbackPriority, string> = {
+  P0: 'P0 — Blocking — nobody can work around this',
+  P1: 'P1 — Serious — there is a workaround and it hurts',
+  P2: 'P2 — Normal — worth doing, not urgent',
+  P3: 'P3 — Someday — a good idea with no clock on it',
+};
 
 @Injectable()
 export class ContactSupportService {
@@ -43,6 +52,8 @@ export class ContactSupportService {
           name: request.name,
           message,
           metadata: request.metadata as any,
+          reportKind: request.reportKind,
+          priority: request.priority,
         },
       });
 
@@ -59,6 +70,8 @@ export class ContactSupportService {
               [
                 'New support request',
                 `Topic: ${escapeTelegramHtml(request.topic)}`,
+                ...(request.reportKind ? [`Kind: ${request.reportKind}`] : []),
+                ...(request.priority ? [`Priority: ${PRIORITY_LABELS[request.priority]}`] : []),
                 `Email: ${escapeTelegramHtml(request.email ?? '-')}`,
                 `Name: ${escapeTelegramHtml(request.name ?? '-')}`,
                 `Message: ${toSupportTelegramHtml(message ?? '-')}`,
@@ -98,6 +111,8 @@ export class ContactSupportService {
           path.join(__dirname, './shared/contactSupport.hbs'),
           {
             topic: supportRequest.topic,
+            reportKind: supportRequest.reportKind,
+            priority: supportRequest.priority ? PRIORITY_LABELS[supportRequest.priority] : null,
             email: supportRequest.email || 'Not provided',
             name: supportRequest.name || 'Not provided',
             message: toSupportEmailHtml(supportRequest.message || 'Not provided'),
