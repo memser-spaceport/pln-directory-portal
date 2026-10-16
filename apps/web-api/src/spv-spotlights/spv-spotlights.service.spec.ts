@@ -173,26 +173,34 @@ describe('sendDataRoomAccessEmail', () => {
     };
     const service = new SpvSpotlightsService(prisma as never, { send } as never);
 
-    const first = await service.sendDataRoomAccessEmail('netholabs', 'ada@example.com');
-    expect(first.docSendUrl).toBe('https://docsend.com/view/x');
-    expect(send).toHaveBeenCalledTimes(1);
-    expect(send.mock.calls[0][0]).toEqual(
-      expect.objectContaining({
-        bccSender: true,
-        replyTo: 'netholabsspv@plcapital.xyz',
-        from: { email: 'netholabsspv@plcapital.xyz', name: 'PL Capital, Netholabs SPV' },
-        cc: [],
-        extra: { docSendLink: 'https://docsend.com/view/x' },
-        template: expect.objectContaining({
-          subject: dataRoomEmailSubject('stored', 'Ada Lovelace'),
-        }),
-      })
-    );
+    const previousBcc = process.env.SPV_DATA_ROOM_BCC;
+    process.env.SPV_DATA_ROOM_BCC = 'ops@plnetwork.io, labos@plnetwork.io';
+    try {
+      const first = await service.sendDataRoomAccessEmail('netholabs', 'ada@example.com');
+      expect(first.docSendUrl).toBe('https://docsend.com/view/x');
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(send.mock.calls[0][0]).toEqual(
+        expect.objectContaining({
+          bccSender: true,
+          bcc: ['ops@plnetwork.io', 'labos@plnetwork.io'],
+          replyTo: 'netholabsspv@plcapital.xyz',
+          from: { email: 'netholabsspv@plcapital.xyz', name: 'PL Capital, Netholabs SPV' },
+          cc: [],
+          extra: { docSendLink: 'https://docsend.com/view/x' },
+          template: expect.objectContaining({
+            subject: dataRoomEmailSubject('stored', 'Ada Lovelace'),
+          }),
+        })
+      );
 
-    const second = await service.sendDataRoomAccessEmail('netholabs', 'ada@example.com');
-    expect(second.docSendUrl).toBe('https://docsend.com/view/x');
-    expect(second.alreadySent).toBe(true);
-    expect(send).toHaveBeenCalledTimes(1);
+      const second = await service.sendDataRoomAccessEmail('netholabs', 'ada@example.com');
+      expect(second.docSendUrl).toBe('https://docsend.com/view/x');
+      expect(second.alreadySent).toBe(true);
+      expect(send).toHaveBeenCalledTimes(1);
+    } finally {
+      if (previousBcc === undefined) delete process.env.SPV_DATA_ROOM_BCC;
+      else process.env.SPV_DATA_ROOM_BCC = previousBcc;
+    }
   });
 
   it('replaces a shared data room subject with one that includes the recipient', async () => {

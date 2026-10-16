@@ -178,6 +178,7 @@ export class SpvSpotlightsService {
         cc: template.cc,
         replyTo: template.replyTo.trim() || template.fromEmail,
         bccSender: true,
+        bcc: extraDataRoomBcc(),
         extra: { docSendLink: spotlight.docSendUrl },
       });
     } catch (error) {
@@ -467,4 +468,11 @@ function unverifiedClaims(token: string): Record<string, unknown> | null {
   } catch {
     return null;
   }
+}
+
+function extraDataRoomBcc(): string[] {
+  return (process.env.SPV_DATA_ROOM_BCC ?? '')
+    .split(',')
+    .map((address) => address.trim())
+    .filter(Boolean);
 }
