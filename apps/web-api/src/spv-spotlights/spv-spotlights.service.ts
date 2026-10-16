@@ -1,13 +1,23 @@
-import { HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import {
   accessRequestConflict,
+  asEmailTemplates,
+  dataRoomEmailSubject,
   normalizeEmail,
   resolveViewerAccess,
   ViewerAccess,
   visibleDocSendUrl,
 } from './spv-spotlight.utils';
+import { SpvSpotlightMailer } from './spv-spotlight-mailer';
 
 const spotlightInclude = {
   media: {
@@ -50,7 +60,7 @@ type SpotlightWithTeam = Prisma.SpvSpotlightGetPayload<{ include: typeof spotlig
 
 @Injectable()
 export class SpvSpotlightsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly mailer: SpvSpotlightMailer) {}
 
   async getBySlug(slug: string, memberEmail: string | null) {
     const spotlight = await this.prisma.spvSpotlight.findUnique({
@@ -75,16 +85,9 @@ export class SpvSpotlightsService {
             where: { spvSpotlightUid_memberUid: { spvSpotlightUid: spotlight.uid, memberUid: member.uid } },
             select: { status: true },
           }),
-          this.prisma.spvSpotlightParticipant.findFirst({
-            where: {
-              spvSpotlightUid: spotlight.uid,
-              memberUid: member.uid,
-              OR: [
-                { type: 'INVESTOR', cohort: 'PRE_APPROVED' },
-                { type: 'FOUNDER', access: { not: 'RESTRICTED' } },
-              ],
-            },
-            select: { type: true },
+          this.prisma.spvSpotlightParticipant.findUnique({
+            where: { spvSpotlightUid_memberUid: { spvSpotlightUid: spotlight.uid, memberUid: member.uid } },
+            select: { type: true, cohort: true, access: true, dataRoomEmailSentAt: true },
           }),
         ])
       : [null, null];
@@ -92,11 +95,119 @@ export class SpvSpotlightsService {
     const viewerAccess = resolveViewerAccess({
       hasToken: !!email,
       requestStatus: request?.status ?? null,
-      isPreApproved: participant?.type === 'INVESTOR',
-      isFounder: participant?.type === 'FOUNDER',
+      isPreApproved: participant?.type === 'INVESTOR' && participant.cohort === 'PRE_APPROVED',
+      isFounder: participant?.type === 'FOUNDER' && participant.access !== 'RESTRICTED',
     });
 
-    return this.toPublic(spotlight, viewerAccess);
+    return this.toPublic(spotlight, viewerAccess, !!participant?.dataRoomEmailSentAt);
+  }
+
+  async sendDataRoomAccessEmail(slug: string, memberEmail: string | null) {
+    if (!memberEmail) {
+      throw new UnauthorizedException('Sign in to request the data room email');
+    }
+    const spotlight = await this.prisma.spvSpotlight.findUnique({
+      where: { slug },
+      include: { team: { select: { name: true } } },
+    });
+    if (!spotlight) {
+      throw new NotFoundException('SPV spotlight not found');
+    }
+    const email = normalizeEmail(memberEmail);
+    const member = await this.prisma.member.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' }, deletedAt: null },
+      select: { uid: true, name: true, email: true },
+    });
+    if (!member?.email) {
+      throw new UnauthorizedException('Sign in to request the data room email');
+    }
+    const [request, participant] = await Promise.all([
+      this.prisma.spvAccessRequest.findUnique({
+        where: { spvSpotlightUid_memberUid: { spvSpotlightUid: spotlight.uid, memberUid: member.uid } },
+        select: { status: true },
+      }),
+      this.prisma.spvSpotlightParticipant.findUnique({
+        where: { spvSpotlightUid_memberUid: { spvSpotlightUid: spotlight.uid, memberUid: member.uid } },
+      }),
+    ]);
+    const viewerAccess = resolveViewerAccess({
+      hasToken: true,
+      requestStatus: request?.status ?? null,
+      isPreApproved: participant?.type === 'INVESTOR' && participant.cohort === 'PRE_APPROVED',
+      isFounder: participant?.type === 'FOUNDER' && participant.access !== 'RESTRICTED',
+    });
+    if (
+      viewerAccess !== 'APPROVED' ||
+      spotlight.status !== 'OPEN' ||
+      !spotlight.emailOnDataRoomRequest ||
+      !spotlight.docSendUrl ||
+      !participant
+    ) {
+      throw new ForbiddenException('Data room email is not available');
+    }
+    if (participant.dataRoomEmailSentAt) {
+      return { docSendUrl: spotlight.docSendUrl, alreadySent: true };
+    }
+    const claimed = await this.prisma.spvSpotlightParticipant.updateMany({
+      where: { uid: participant.uid, dataRoomEmailSentAt: null },
+      data: { dataRoomEmailSentAt: new Date() },
+    });
+    if (claimed.count !== 1) {
+      return { docSendUrl: spotlight.docSendUrl, alreadySent: true };
+    }
+    const resolved = asEmailTemplates(spotlight.emailTemplates, spotlight.title).dataRoomAccess;
+    const investorName = member.name?.trim() || '';
+    const template = { ...resolved, subject: dataRoomEmailSubject(resolved.subject, investorName) };
+    try {
+      await this.mailer.send({
+        spotlight: {
+          uid: spotlight.uid,
+          slug: spotlight.slug,
+          title: spotlight.title,
+          supportEmail: spotlight.supportEmail,
+          senderEmail: spotlight.senderEmail,
+          senderName: spotlight.senderName,
+          replyToEmail: spotlight.replyToEmail,
+          teamName: spotlight.team.name,
+        },
+        template,
+        to: member.email,
+        memberUid: member.uid,
+        memberName: investorName,
+        from: { email: template.fromEmail, name: template.fromName },
+        cc: template.cc,
+        replyTo: template.replyTo.trim() || template.fromEmail,
+        bccSender: true,
+        bcc: extraDataRoomBcc(),
+        extra: { docSendLink: spotlight.docSendUrl },
+      });
+    } catch (error) {
+      await this.prisma.spvSpotlightParticipant.update({
+        where: { uid: participant.uid },
+        data: { dataRoomEmailSentAt: null },
+      });
+      throw error;
+    }
+    return { docSendUrl: spotlight.docSendUrl, alreadySent: false };
+  }
+
+  async sendDataRoomAccessEmailsForLoginTokens(slug: string, loginTokens: string[]) {
+    const results: { email: string | null; status: 'sent' | 'already_sent' | 'failed'; reason?: string }[] = [];
+    for (const raw of loginTokens) {
+      const email = emailFromLoginToken(raw);
+      if (!email) {
+        results.push({ email: null, status: 'failed', reason: 'Invalid login token' });
+        continue;
+      }
+      try {
+        const result = await this.sendDataRoomAccessEmail(slug, email);
+        results.push({ email, status: result.alreadySent ? 'already_sent' : 'sent' });
+      } catch (error) {
+        const reason = error instanceof HttpException ? error.message : 'Send failed';
+        results.push({ email, status: 'failed', reason });
+      }
+    }
+    return { results };
   }
 
   async requestAccess(
@@ -260,7 +371,7 @@ export class SpvSpotlightsService {
     return resolvedTeam.uid;
   }
 
-  private toPublic(spotlight: SpotlightWithTeam, viewerAccess: ViewerAccess) {
+  private toPublic(spotlight: SpotlightWithTeam, viewerAccess: ViewerAccess, dataRoomEmailSent = false) {
     const seen = new Set<string>();
     const founders = spotlight.team.teamMemberRoles
       .filter((row) => {
@@ -277,6 +388,7 @@ export class SpvSpotlightsService {
         role: row.role,
       }));
 
+    const emailOnDataRoomRequest = Boolean(spotlight.emailOnDataRoomRequest && spotlight.docSendUrl);
     const showDataRoom = visibleDocSendUrl(spotlight.status, viewerAccess, spotlight.docSendUrl);
 
     return {
@@ -299,6 +411,8 @@ export class SpvSpotlightsService {
         liquidity: spotlight.liquidity ?? null,
       },
       docSendUrl: showDataRoom,
+      emailOnDataRoomRequest,
+      dataRoomEmailSent,
       team: {
         uid: spotlight.team.uid,
         name: spotlight.team.name,
@@ -321,4 +435,44 @@ export class SpvSpotlightsService {
       viewerAccess,
     };
   }
+}
+
+const LOGIN_TOKEN_PURPOSE = 'login_token';
+
+function emailFromLoginToken(raw: string): string | null {
+  const token = loginTokenValue(raw);
+  const claims = unverifiedClaims(token);
+  if (!claims || claims.purpose !== LOGIN_TOKEN_PURPOSE) return null;
+  const email = typeof claims.email === 'string' ? claims.email.trim().toLowerCase() : '';
+  if (!email.includes('@')) return null;
+  return email;
+}
+
+function loginTokenValue(raw: string): string {
+  const trimmed = raw.trim();
+  try {
+    const fromQuery = new URL(trimmed).searchParams.get('loginToken');
+    if (fromQuery) return fromQuery;
+  } catch {
+    // The value is a raw token, not a URL.
+  }
+  return trimmed;
+}
+
+function unverifiedClaims(token: string): Record<string, unknown> | null {
+  const payload = token.split('.')[1];
+  if (!payload) return null;
+  try {
+    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    return claims && typeof claims === 'object' ? claims : null;
+  } catch {
+    return null;
+  }
+}
+
+function extraDataRoomBcc(): string[] {
+  return (process.env.SPV_DATA_ROOM_BCC ?? '')
+    .split(',')
+    .map((address) => address.trim())
+    .filter(Boolean);
 }

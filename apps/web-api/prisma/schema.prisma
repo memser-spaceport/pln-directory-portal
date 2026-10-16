@@ -24,7 +24,7 @@ model Team {
   id                           Int                           @id @default(autoincrement())
   uid                          String                        @unique @default(cuid())
   name                         String                        @unique
-  logo                         Image?                        @relation(fields: [logoUid], references: [uid])
+  logo                         Image?                        @relation("TeamLogo", fields: [logoUid], references: [uid])
   logoUid                      String?
   blog                         String?
   officeHours                  String?
@@ -41,6 +41,9 @@ model Team {
   portfolioIsland              String?
   portfolioStartYear           Int?
   portfolioEndYear             Int?
+  /// White logo drawn on the Networks Map hex tiles; separate from the colour `logo`.
+  portfolioMapLogo             Image?                        @relation("TeamPortfolioMapLogo", fields: [portfolioMapLogoUid], references: [uid], onDelete: SetNull)
+  portfolioMapLogoUid          String?
   teamSize                     String?
   location                     String?
   status                       TeamStatus                    @default(ACTIVE)
@@ -566,7 +569,8 @@ model Image {
   createdAt               DateTime                     @default(now())
   updatedAt               DateTime                     @updatedAt
   // Reverse Relations:
-  Team                    Team[]
+  Team                    Team[]                       @relation("TeamLogo")
+  teamPortfolioMapLogos   Team[]                       @relation("TeamPortfolioMapLogo")
   Member                  Member[]
   Project                 Project[]
   eventLogo               PLEvent[]                    @relation("logo")
@@ -1593,6 +1597,8 @@ model SpvSpotlight {
   senderEmail   String?
   senderName    String?
   replyToEmail  String?
+  senders       Json            @default("[]")
+  emailOnDataRoomRequest Boolean @default(false)
   docSendUrl    String?
   summary       String?
   closesAt      DateTime?
@@ -1648,6 +1654,7 @@ model SpvSpotlightParticipant {
   followUpSentCount      Int                        @default(0)
   openNoticeSentAt       DateTime?
   openNoticeSentCount    Int                        @default(0)
+  dataRoomEmailSentAt    DateTime?
   emailTemplateVariables Json?
   createdAt              DateTime                   @default(now())
   updatedAt              DateTime                   @updatedAt
@@ -3380,6 +3387,30 @@ model WarmPathV2Note {
   @@index([targetProfileUid])
   @@index([warmPathUid])
   @@index([updatedAt])
+}
+
+/// Warm Intros v2 — a column set by MCP or the service API.
+/// Ingest replaces generated columns, then writes these values back.
+model ManualFieldLock {
+  uid String @id @default(cuid())
+
+  /// master_profile | connection_edge | warm_path_v2
+  subjectType String @db.VarChar(32)
+  subjectUid  String
+
+  field String @db.VarChar(64)
+  value Json
+
+  /// mcp | service
+  source     String  @db.VarChar(16)
+  actorUid   String? @db.VarChar(64)
+  actorEmail String? @db.VarChar(200)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([subjectType, subjectUid, field])
+  @@index([subjectType, subjectUid])
 }
 
 /// Investor Lists — a curated target set of investors (a "list"). Proximity is computed per list

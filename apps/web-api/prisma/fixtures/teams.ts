@@ -70,6 +70,7 @@ const teamsFactory = Factory.define<Omit<Team, 'id'>>(({ sequence, onCreate }) =
     portfolioIsland: null,
     portfolioStartYear: null,
     portfolioEndYear: null,
+    portfolioMapLogoUid: null,
     teamSize: faker.helpers.arrayElement([null, String(faker.datatype.number({ min: 1, max: 500 }))]),
     location: faker.helpers.arrayElement([null, faker.address.city()]),
     status: 'ACTIVE',
