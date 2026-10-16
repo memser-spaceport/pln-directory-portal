@@ -391,6 +391,21 @@ describe('SuggestedCandidatesEmailService', () => {
     expect(log).toHaveBeenCalledWith(expect.stringContaining('suggested-candidates email done: run run-1'));
   });
 
+  it('emails leads of every team when the allowlist is *', async () => {
+    process.env.JOB_MATCH_EMAIL_TEAM_UIDS = '*';
+    const { service, aws } = world();
+    const result = await service.sendForRun('run-1');
+
+    // As above, plus role-2: team-2 is not listed by uid, but * lets it through. role-3 is still closed.
+    expect(recipients(aws)).toEqual([
+      'l1@x:1 new match for Backend Engineer',
+      'l1@x:Top matches for your Designer role',
+      'l1@x:Top matches for your Rust Engineer role',
+      'l1@x:Your top matches for Old news are waiting',
+    ]);
+    expect(result).toEqual({ runUid: 'run-1', dryRun: false, sent: 4, skipped: 3 });
+  });
+
   it('names only new, listed, looking candidates in rank order', async () => {
     const { service, aws } = world();
     await service.sendForRun('run-1');

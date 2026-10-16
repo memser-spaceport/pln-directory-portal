@@ -31,6 +31,7 @@ import {
   normalizeCriterionLabel,
   parseCriteria,
   parseCriteriaLabels,
+  isEmailTeamAllowed,
   parseEmailTeamAllowlist,
   pickInterestNote,
   planTeamWork,
@@ -673,6 +674,28 @@ describe('parseEmailTeamAllowlist (LAB-2850)', () => {
 
   it('trims and dedupes', () => {
     expect([...parseEmailTeamAllowlist(' team-1 ,team-2,, team-1 ')]).toEqual(['team-1', 'team-2']);
+  });
+});
+
+describe('isEmailTeamAllowed', () => {
+  it('allows only the listed teams', () => {
+    const allowlist = parseEmailTeamAllowlist('team-1,team-2');
+    expect(isEmailTeamAllowed(allowlist, 'team-1')).toBe(true);
+    expect(isEmailTeamAllowed(allowlist, 'team-3')).toBe(false);
+  });
+
+  it('allows every team for *, alone or among uids', () => {
+    expect(isEmailTeamAllowed(parseEmailTeamAllowlist('*'), 'any-team')).toBe(true);
+    expect(isEmailTeamAllowed(parseEmailTeamAllowlist(' team-1 , * '), 'team-9')).toBe(true);
+  });
+
+  it('allows nobody when empty', () => {
+    expect(isEmailTeamAllowed(parseEmailTeamAllowlist(''), 'team-1')).toBe(false);
+  });
+
+  /* `*` is the only wildcard: a uid that merely contains it is still one uid. */
+  it('does not treat a partial * as every team', () => {
+    expect(isEmailTeamAllowed(parseEmailTeamAllowlist('team-*'), 'team-1')).toBe(false);
   });
 });
 
