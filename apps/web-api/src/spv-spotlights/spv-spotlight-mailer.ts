@@ -44,29 +44,40 @@ export class SpvSpotlightMailer {
     memberUid: string;
     memberName: string;
     extra?: Record<string, string>;
+    from?: { email: string; name: string | null };
+    cc?: string[];
+    replyTo?: string;
+    bccSender?: boolean;
+    bcc?: string[];
   }) {
     const email = normalizeEmail(input.to);
     const spotlightLink = await this.loginLink(input.spotlight.slug, email);
+    const memberName = input.memberName?.trim() || '';
+    const senderName = (input.from ? input.from.name : input.spotlight.senderName)?.trim() || '';
     const vars: Record<string, string> = {
-      investorName: input.memberName || '',
+      investorName: memberName,
+      firstName: memberName.split(/\s+/)[0] || '',
       investorEmail: email,
       spotlightTitle: input.spotlight.title,
       spotlightLink,
       teamName: input.spotlight.teamName,
       supportEmail: input.spotlight.supportEmail,
+      senderName,
       ...asStringRecord(input.extra),
     };
-    const senderEmail = resolveTeamPitchSenderEmail(input.spotlight.senderEmail);
-    const replyTo = input.spotlight.replyToEmail?.trim() || undefined;
+    const senderEmail = input.from?.email?.trim() || resolveTeamPitchSenderEmail(input.spotlight.senderEmail);
+    const replyTo = input.replyTo?.trim() || input.spotlight.replyToEmail?.trim() || undefined;
+    const cc = (input.cc ?? []).map((address) => address.trim()).filter(Boolean);
     const webBase = (process.env.WEB_UI_BASE_URL || 'https://os.pl.xyz').replace(/\/$/, '');
     await this.notificationServiceClient.sendNotification({
       isPriority: true,
       deliveryChannel: 'EMAIL',
       templateName: 'SPV_SPOTLIGHT_EMAIL',
       recipientsInfo: {
-        from: formatTeamPitchFromHeader(senderEmail, input.spotlight.senderName),
+        from: formatTeamPitchFromHeader(senderEmail, senderName),
         to: [email],
-        bcc: senderEmail ? [senderEmail] : [],
+        ...(cc.length ? { cc } : {}),
+        bcc: uniqueEmails([...(input.bccSender === false || !senderEmail ? [] : [senderEmail]), ...(input.bcc ?? [])]),
         ...(replyTo ? { replyTo } : {}),
       },
       deliveryPayload: {
@@ -92,4 +103,17 @@ export class SpvSpotlightMailer {
     });
     return spotlightLink;
   }
+}
+
+function uniqueEmails(addresses: string[]): string[] {
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const address of addresses) {
+    const trimmed = address.trim();
+    const key = trimmed.toLowerCase();
+    if (!trimmed || seen.has(key)) continue;
+    seen.add(key);
+    unique.push(trimmed);
+  }
+  return unique;
 }

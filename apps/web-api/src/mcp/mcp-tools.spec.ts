@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { isAllowedRedirectUri, isLoopbackRedirectUri, isRegisteredRedirectUri } from './mcp-redirect';
 import { pkceS256Challenge, verifyPkceS256 } from './mcp.crypto';
 import {
@@ -75,6 +75,8 @@ const WARM_INTRO_TOOL_NAMES = [
   'get_warm_path_note',
 ];
 
+const WRITE_TOOL_NAMES = ['update_master_profile', 'update_connection_edge', 'update_warm_path'];
+
 describe('toolsForPermissions', () => {
   const masterProfiles = {
     lookup: jest.fn(),
@@ -109,7 +111,54 @@ describe('toolsForPermissions', () => {
 
   it('shows Warm Intro tools with directory.admin.full', () => {
     const tools = toolsForPermissions(new Set(['directory.admin.full']), catalog);
-    expect(tools.map((t) => t.name)).toEqual(WARM_INTRO_TOOL_NAMES);
+    expect(tools.map((t) => t.name)).toEqual([...WARM_INTRO_TOOL_NAMES, ...WRITE_TOOL_NAMES]);
+  });
+
+  it('hides field-lock tools without investor_db.edit', () => {
+    const viewOnly = toolsForPermissions(new Set(['mcp.connect', 'investor_db.view']), catalog);
+    expect(viewOnly.map((t) => t.name)).toEqual(WARM_INTRO_TOOL_NAMES);
+  });
+
+  it('shows field-lock tools with investor_db.edit', () => {
+    const editOnly = toolsForPermissions(new Set(['investor_db.edit']), catalog);
+    expect(editOnly.map((t) => t.name)).toEqual(['whoami', ...WRITE_TOOL_NAMES]);
+  });
+});
+
+describe('field lock tools', () => {
+  const actor = {
+    memberUid: 'm1',
+    name: 'Ada',
+    email: 'ada@example.com',
+    permissions: new Set(['investor_db.edit']),
+    authorizationUid: 'auth-1',
+    clientName: 'Claude Code',
+  };
+
+  it('locks master profile fields for the signed-in member', async () => {
+    const patchFields = jest.fn().mockResolvedValue({ uid: 'u1', locked: ['bio'], unlocked: [], row: { uid: 'u1' } });
+    const tool = warmIntroTools({ patchFields } as unknown as MasterProfileService, {} as WarmIntrosV2Service).find(
+      (item) => item.name === 'update_master_profile'
+    );
+
+    const result = await tool?.execute(actor, { uid: ' u1 ', fields: { bio: 'Ada' } });
+
+    expect(patchFields).toHaveBeenCalledWith(
+      'u1',
+      { bio: 'Ada' },
+      { source: 'mcp', actorUid: 'm1', actorEmail: 'ada@example.com' }
+    );
+    expect(result).toEqual({ uid: 'u1', locked: ['bio'], unlocked: [], row: { uid: 'u1' } });
+  });
+
+  it('rejects a missing fields object', async () => {
+    const patchFields = jest.fn();
+    const tool = warmIntroTools({ patchFields } as unknown as MasterProfileService, {} as WarmIntrosV2Service).find(
+      (item) => item.name === 'update_master_profile'
+    );
+
+    await expect(tool?.execute(actor, { uid: 'u1' })).rejects.toBeInstanceOf(BadRequestException);
+    expect(patchFields).not.toHaveBeenCalled();
   });
 });
 

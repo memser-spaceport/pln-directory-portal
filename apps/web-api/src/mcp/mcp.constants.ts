@@ -1,5 +1,6 @@
 export const MCP_CONNECT_PERMISSION = 'mcp.connect';
 export const INVESTOR_DB_VIEW_PERMISSION = 'investor_db.view';
+export const INVESTOR_DB_EDIT_PERMISSION = 'investor_db.edit';
 
 export const MCP_PATH = '/mcp';
 export const MCP_SCOPE = 'labos';

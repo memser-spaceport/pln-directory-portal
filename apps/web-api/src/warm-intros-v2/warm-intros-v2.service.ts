@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { ManualFieldActor, ManualFieldLockService } from '../manual-field-lock/manual-field-lock.service';
 import { PrismaService } from '../shared/prisma.service';
 import {
   ConnectionEdgeInput,
@@ -106,7 +107,15 @@ function isSelfReferentialPath<T extends { targetProfileUid: string; bestConnect
 export class WarmIntrosV2Service {
   private readonly logger = new Logger(WarmIntrosV2Service.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly manualFieldLocks: ManualFieldLockService) {}
+
+  async patchEdgeFields(uid: string, fields: Record<string, unknown> | undefined, actor: ManualFieldActor) {
+    return this.manualFieldLocks.patch('connection_edge', uid, fields, actor);
+  }
+
+  async patchPathFields(uid: string, fields: Record<string, unknown> | undefined, actor: ManualFieldActor) {
+    return this.manualFieldLocks.patch('warm_path_v2', uid, fields, actor);
+  }
 
   async ingestEdges(dto: IngestConnectionEdgesDto): Promise<IngestWarmIntrosV2Response> {
     if (!Array.isArray(dto.edges)) {
@@ -145,6 +154,7 @@ export class WarmIntrosV2Service {
     let updated = 0;
 
     await this.prisma.$transaction(async (tx) => {
+      const updatedUids: string[] = [];
       for (const edge of dto.edges) {
         const fromProfileUid = edge.fromProfileUid.trim();
         const toProfileUid = edge.toProfileUid.trim();
@@ -171,6 +181,7 @@ export class WarmIntrosV2Service {
             },
             data,
           });
+          updatedUids.push(existing.uid);
           updated += 1;
         } else {
           await tx.connectionEdge.create({
@@ -178,6 +189,9 @@ export class WarmIntrosV2Service {
           });
           created += 1;
         }
+      }
+      if (updatedUids.length > 0) {
+        await this.manualFieldLocks.reapplyAll(tx, 'connection_edge', updatedUids);
       }
     });
 
@@ -230,6 +244,7 @@ export class WarmIntrosV2Service {
     let updated = 0;
 
     await this.prisma.$transaction(async (tx) => {
+      const updatedUids: string[] = [];
       for (const path of dto.paths) {
         const targetProfileUid = path.targetProfileUid.trim();
         const targetSet = path.targetSet.trim();
@@ -256,6 +271,7 @@ export class WarmIntrosV2Service {
             },
             data,
           });
+          updatedUids.push(existing.uid);
           updated += 1;
         } else {
           await tx.warmPathV2.create({
@@ -263,6 +279,9 @@ export class WarmIntrosV2Service {
           });
           created += 1;
         }
+      }
+      if (updatedUids.length > 0) {
+        await this.manualFieldLocks.reapplyAll(tx, 'warm_path_v2', updatedUids);
       }
     });
 

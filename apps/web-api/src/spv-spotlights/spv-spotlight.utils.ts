@@ -8,10 +8,28 @@ export type EmailTemplateKey =
   | 'inviteOutreach'
   | 'followUpOutreach'
   | 'approved'
-  | 'opened';
+  | 'opened'
+  | 'dataRoomAccess';
 
 export type EmailTemplate = { subject: string; body: string };
-export type EmailTemplates = Record<EmailTemplateKey, EmailTemplate>;
+export type InviteEmailTemplate = EmailTemplate & {
+  fromName: string;
+  cc: string[];
+  replyTo: string;
+};
+export type DataRoomAccessTemplate = EmailTemplate & {
+  fromEmail: string;
+  fromName: string;
+  cc: string[];
+  replyTo: string;
+};
+export type EmailTemplates = {
+  [K in Exclude<EmailTemplateKey, 'dataRoomAccess' | 'invitePreapproved' | 'followUpPreapproved'>]: EmailTemplate;
+} & {
+  invitePreapproved: InviteEmailTemplate;
+  followUpPreapproved: InviteEmailTemplate;
+  dataRoomAccess: DataRoomAccessTemplate;
+};
 
 export const EMAIL_TEMPLATE_KEYS: EmailTemplateKey[] = [
   'invitePreapproved',
@@ -20,7 +38,12 @@ export const EMAIL_TEMPLATE_KEYS: EmailTemplateKey[] = [
   'followUpOutreach',
   'approved',
   'opened',
+  'dataRoomAccess',
 ];
+
+export const LABOS_DEFAULT_SENDER_EMAIL = 'labos@plnetwork.io';
+
+export type SpotlightSender = { email: string; name: string };
 
 function spotlightEmailBody(message: string, buttonLabel: string): string {
   return [
@@ -40,15 +63,31 @@ function spotlightEmailBody(message: string, buttonLabel: string): string {
   ].join('\n');
 }
 
+const DATA_ROOM_NAMED_SUBJECT = 'Connecting {{teamName}} SPV Team to {{investorName}}';
+const DATA_ROOM_UNNAMED_SUBJECT = 'Connecting you to {{teamName}} SPV Team';
+
+export function dataRoomEmailSubject(subject: string, investorName = ''): string {
+  const name = investorName.trim();
+  if (!name || name.toLowerCase() === 'there') return DATA_ROOM_UNNAMED_SUBJECT;
+  if (/\{\{\s*(investorName|firstName)\b/.test(subject)) return subject;
+  return DATA_ROOM_NAMED_SUBJECT;
+}
+
 export function defaultEmailTemplates(title: string): EmailTemplates {
   return {
     invitePreapproved: {
       subject: `You're invited: ${title}`,
       body: spotlightEmailBody('You are invited to {{spotlightTitle}}.', 'View Spotlight'),
+      fromName: '',
+      cc: [],
+      replyTo: '',
     },
     followUpPreapproved: {
       subject: `Reminder: ${title}`,
       body: spotlightEmailBody('A reminder that {{spotlightTitle}} is available to you.', 'View Spotlight'),
+      fromName: '',
+      cc: [],
+      replyTo: '',
     },
     inviteOutreach: {
       subject: `Invitation: ${title}`,
@@ -66,7 +105,116 @@ export function defaultEmailTemplates(title: string): EmailTemplates {
       subject: `${title} is open`,
       body: spotlightEmailBody('{{spotlightTitle}} is now open.', 'View Spotlight'),
     },
+    dataRoomAccess: {
+      subject: DATA_ROOM_NAMED_SUBJECT,
+      body: dataRoomAccessBody(),
+      fromEmail: 'netholabsspv@plcapital.xyz',
+      fromName: 'PL Capital, Netholabs SPV',
+      cc: [],
+      replyTo: '',
+    },
   };
+}
+
+function dataRoomAccessBody(): string {
+  const paragraph = (html: string) =>
+    `<p style="margin:0 0 16px;font-family:Inter,Helvetica,Arial,sans-serif;font-size:15px;line-height:24px;color:#1c1e23;">${html}</p>`;
+  return [
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#ffffff;">',
+    '<tr><td style="padding:16px 24px 8px;">',
+    paragraph('Hi {{firstName}},'),
+    paragraph(
+      'Thanks for your interest in PLC Neurotech SPV – Netholabs I LLC. Here\'s the data room: <a href="{{docSendLink}}" target="_blank" style="color:#1b4dff;">{{docSendLink}}</a>'
+    ),
+    paragraph(
+      "DocSend will ask you to confirm your email the first time you open it. Please use this address so your access goes through. Inside you'll find the PL Capital SPV memo and the Netholabs company materials, including the deck, science primers and data collection videos."
+    ),
+    paragraph(
+      "If you'd like to go ahead, reply with the amount you'd like to commit. We'll send subscription documents through Carta, followed by an accredited-investor verification request from VerifyInvestor."
+    ),
+    paragraph(
+      "We're targeting a close on Friday 16 October, so timing is tight. I'm happy to talk it through if that's useful."
+    ),
+    paragraph('Thanks,<br>Juan<br>Protocol Labs Capital'),
+    '<p style="margin:0;font-family:Inter,Helvetica,Arial,sans-serif;font-size:13px;line-height:20px;color:#667085;">Only for accredited investors, and confidential. Not an offer to sell or a solicitation to buy any security, and not investment, legal, or tax advice.</p>',
+    '</td></tr>',
+    '</table>',
+  ].join('\n');
+}
+
+export function parseSenders(value: unknown): SpotlightSender[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const senders: SpotlightSender[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      continue;
+    }
+    const record = item as Record<string, unknown>;
+    const email = typeof record.email === 'string' ? record.email.trim() : '';
+    if (!email) {
+      continue;
+    }
+    senders.push({ email, name: typeof record.name === 'string' ? record.name.trim() : '' });
+  }
+  return senders;
+}
+
+export function resolveConfiguredSenders(
+  senders: unknown,
+  senderEmail: string | null | undefined,
+  senderName: string | null | undefined
+): SpotlightSender[] {
+  const parsed = parseSenders(senders);
+  if (parsed.length > 0) {
+    return parsed;
+  }
+  const email = senderEmail?.trim();
+  if (!email) {
+    return [];
+  }
+  return [{ email, name: senderName?.trim() || '' }];
+}
+
+export function primarySenderColumns(senders: SpotlightSender[]): {
+  senderEmail: string | null;
+  senderName: string | null;
+} {
+  const first = senders[0];
+  if (!first) {
+    return { senderEmail: null, senderName: null };
+  }
+  return { senderEmail: first.email, senderName: first.name || null };
+}
+
+export function assignSenders<T extends { memberUid: string }>(
+  recipients: T[],
+  senders: SpotlightSender[]
+): { recipient: T; sender: SpotlightSender }[] {
+  const ordered = [...recipients].sort((a, b) => a.memberUid.localeCompare(b.memberUid));
+  return ordered.map((recipient, index) => ({
+    recipient,
+    sender: senders[index % senders.length],
+  }));
+}
+
+export function senderSendIntervalMs(emailsPerMinute?: number): number {
+  if (!emailsPerMinute || emailsPerMinute < 1) {
+    return 0;
+  }
+  return Math.floor(60_000 / emailsPerMinute);
+}
+
+export function batchSendDurationMs(recipientCount: number, senderCount: number, emailsPerMinute: number): number {
+  if (recipientCount < 1 || senderCount < 1 || emailsPerMinute < 1) {
+    return 0;
+  }
+  const busiestSender = Math.ceil(recipientCount / senderCount);
+  if (busiestSender <= 1) {
+    return 0;
+  }
+  return (busiestSender - 1) * senderSendIntervalMs(emailsPerMinute);
 }
 
 export function resolveViewerAccess(input: {
@@ -109,8 +257,42 @@ export function accessRequestConflict(input: {
   return null;
 }
 
-export function mergeTemplate(template: string, vars: Record<string, string>): string {
+function hasTemplateValue(vars: Record<string, string>, key: string): boolean {
+  return Boolean(vars[key]?.trim());
+}
+
+function chooseEmailBranch(ifKey: string, inner: string, vars: Record<string, string>): string {
+  const parts: { key: string | null; body: string }[] = [];
+  const marker = /\{\{\s*else(?:\s+if\s+([a-zA-Z0-9_]+))?\s*\}\}/g;
+  let lastIndex = 0;
+  let key: string | null = ifKey;
+  for (const match of inner.matchAll(marker)) {
+    const at = match.index ?? 0;
+    parts.push({ key, body: inner.slice(lastIndex, at) });
+    key = match[1] ?? null;
+    lastIndex = at + match[0].length;
+    if (key === null) {
+      break;
+    }
+  }
+  parts.push({ key, body: inner.slice(lastIndex) });
+  for (const part of parts) {
+    if (part.key === null || hasTemplateValue(vars, part.key)) {
+      return part.body;
+    }
+  }
+  return '';
+}
+
+function applyEmailConditionals(template: string, vars: Record<string, string>): string {
   return template.replace(
+    /\{\{#if\s+([a-zA-Z0-9_]+)\s*\}\}([\s\S]*?)\{\{\s*\/if\s*\}\}/g,
+    (_match, key: string, inner: string) => chooseEmailBranch(key, inner, vars)
+  );
+}
+
+export function mergeTemplate(template: string, vars: Record<string, string>): string {
+  return applyEmailConditionals(template, vars).replace(
     /\{\{\s*([a-zA-Z0-9_]+)\s*(?:\|([^}]*))?\}\}/g,
     (_match, key: string, fallback?: string) => vars[key] || fallback?.trim() || ''
   );
@@ -129,6 +311,22 @@ export function sanitizeEmailHtml(html: string): string {
     .replace(/\s+on[a-z]+\s*=\s*[^\s>]+/gi, '');
 }
 
+function emailStringList(value: unknown): string[] | null {
+  if (Array.isArray(value)) {
+    return value
+      .filter((item): item is string => typeof item === 'string')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  if (typeof value === 'string') {
+    return value
+      .split(/[,;\n]/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return null;
+}
+
 export function asEmailTemplates(value: unknown, title: string): EmailTemplates {
   const defaults = defaultEmailTemplates(title);
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -142,10 +340,37 @@ export function asEmailTemplates(value: unknown, title: string): EmailTemplates 
       continue;
     }
     const record = entry as Record<string, unknown>;
-    result[key] = {
-      subject: typeof record.subject === 'string' && record.subject.trim() ? record.subject : defaults[key].subject,
-      body: typeof record.body === 'string' && record.body.trim() ? record.body : defaults[key].body,
-    };
+    const subject =
+      typeof record.subject === 'string' && record.subject.trim() ? record.subject : defaults[key].subject;
+    const body = typeof record.body === 'string' && record.body.trim() ? record.body : defaults[key].body;
+    if (key === 'dataRoomAccess') {
+      const cc = emailStringList(record.cc);
+      result.dataRoomAccess = {
+        subject,
+        body,
+        fromEmail:
+          typeof record.fromEmail === 'string' && record.fromEmail.trim()
+            ? record.fromEmail.trim()
+            : defaults.dataRoomAccess.fromEmail,
+        fromName: typeof record.fromName === 'string' ? record.fromName.trim() : defaults.dataRoomAccess.fromName,
+        cc: cc ?? defaults.dataRoomAccess.cc,
+        replyTo: typeof record.replyTo === 'string' ? record.replyTo.trim() : defaults.dataRoomAccess.replyTo,
+      };
+      continue;
+    }
+    if (key === 'invitePreapproved' || key === 'followUpPreapproved') {
+      const cc = emailStringList(record.cc);
+      const defaultsForKey = defaults[key];
+      result[key] = {
+        subject,
+        body,
+        fromName: typeof record.fromName === 'string' ? record.fromName.trim() : defaultsForKey.fromName,
+        cc: cc ?? defaultsForKey.cc,
+        replyTo: typeof record.replyTo === 'string' ? record.replyTo.trim() : defaultsForKey.replyTo,
+      };
+      continue;
+    }
+    result[key] = { subject, body };
   }
   return result;
 }
@@ -158,7 +383,10 @@ export function openNoticeCounts(recipients: { sent: boolean }[]): { willReceive
 }
 
 export function visibleDocSendUrl(status: string, viewerAccess: ViewerAccess, url: string | null): string | null {
-  return viewerAccess === 'APPROVED' && status === 'OPEN' ? url : null;
+  if (viewerAccess !== 'APPROVED' || status !== 'OPEN' || !url) {
+    return null;
+  }
+  return url;
 }
 
 export function normalizeEmail(email: string): string {

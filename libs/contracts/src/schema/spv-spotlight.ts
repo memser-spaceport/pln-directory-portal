@@ -17,18 +17,56 @@ export const SpvAccessRequestSchema = z.object({
 
 export class SpvAccessRequestDto extends createZodDto(SpvAccessRequestSchema) {}
 
+export const SpvDataRoomAccessEmailBatchSchema = z.object({
+  loginTokens: z.array(z.string().trim().min(1)).min(1).max(200),
+});
+
+export class SpvDataRoomAccessEmailBatchDto extends createZodDto(SpvDataRoomAccessEmailBatchSchema) {}
+
 const templateSchema = z.object({
   subject: z.string().trim().min(1),
   body: z.string().trim().min(1),
 });
 
+const optionalText = z.string().trim().max(120).nullish().transform((value) => value ?? '');
+const optionalReplyTo = z
+  .string()
+  .trim()
+  .nullish()
+  .transform((value) => value ?? '')
+  .refine((value) => value === '' || z.string().email().safeParse(value).success, 'Invalid email');
+const optionalCc = z
+  .array(z.string())
+  .nullish()
+  .transform((value) => (value ?? []).map((email) => email.trim()).filter(Boolean))
+  .refine((value) => value.every((email) => z.string().email().safeParse(email).success), 'Invalid email');
+
+const inviteTemplateSchema = templateSchema.extend({
+  fromName: optionalText.optional().default(''),
+  cc: optionalCc.optional().default([]),
+  replyTo: optionalReplyTo.optional().default(''),
+});
+
+const dataRoomTemplateSchema = templateSchema.extend({
+  fromEmail: z.string().trim().email(),
+  fromName: optionalText.optional().default(''),
+  cc: optionalCc.optional().default([]),
+  replyTo: optionalReplyTo.optional().default(''),
+});
+
+const senderSchema = z.object({
+  email: z.string().trim().email(),
+  name: z.string().trim().max(120).optional().default(''),
+});
+
 export const SpvEmailTemplatesSchema = z.object({
-  invitePreapproved: templateSchema,
-  followUpPreapproved: templateSchema,
+  invitePreapproved: inviteTemplateSchema,
+  followUpPreapproved: inviteTemplateSchema,
   inviteOutreach: templateSchema,
   followUpOutreach: templateSchema,
   approved: templateSchema,
   opened: templateSchema,
+  dataRoomAccess: dataRoomTemplateSchema,
 });
 
 const mediaItemSchema = z.object({
@@ -46,6 +84,8 @@ export const CreateSpvSpotlightSchema = z.object({
   supportEmail: z.string().email().optional().nullable(),
   senderEmail: z.string().email().optional().nullable(),
   senderName: z.string().max(120).optional().nullable(),
+  senders: z.array(senderSchema).max(20).optional(),
+  emailOnDataRoomRequest: z.boolean().optional(),
   replyToEmail: z.string().email().optional().nullable(),
   docSendUrl: z.string().url().optional().nullable(),
   summary: z.string().optional().nullable(),
@@ -125,6 +165,9 @@ export const SendSpvBulkSchema = z.object({
   includeAlreadyInvited: z.boolean().optional().default(false),
   includeAlreadyFollowedUp: z.boolean().optional().default(false),
   participantUids: z.array(z.string().min(1)).min(1).optional(),
+  useDefaultSender: z.boolean().optional(),
+  senderEmails: z.array(z.string().trim().email()).min(1).optional(),
+  emailsPerSenderPerMinute: z.number().int().min(1).max(1000).optional(),
 });
 
 export class SendSpvBulkDto extends createZodDto(SendSpvBulkSchema) {}
@@ -132,6 +175,9 @@ export class SendSpvBulkDto extends createZodDto(SendSpvBulkSchema) {}
 export const SendSpvOpenNoticeSchema = z.object({
   includeAlreadySent: z.boolean().optional().default(false),
   participantUids: z.array(z.string().min(1)).min(1).optional(),
+  useDefaultSender: z.boolean().optional(),
+  senderEmails: z.array(z.string().trim().email()).min(1).optional(),
+  emailsPerSenderPerMinute: z.number().int().min(1).max(1000).optional(),
 });
 
 export class SendSpvOpenNoticeDto extends createZodDto(SendSpvOpenNoticeSchema) {}

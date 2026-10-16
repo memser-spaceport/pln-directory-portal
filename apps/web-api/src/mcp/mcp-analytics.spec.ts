@@ -25,6 +25,9 @@ describe('mcpToolOperation', () => {
     ['get_warm_path_note', 'read'],
     ['submit_warm_path_feedback', 'write'],
     ['submit_warm_path_note', 'write'],
+    ['update_master_profile', 'write'],
+    ['update_connection_edge', 'write'],
+    ['update_warm_path', 'write'],
   ] as const)('%s is %s', (toolName, operation) => {
     expect(mcpToolOperation(toolName)).toBe(operation);
   });
@@ -65,6 +68,23 @@ describe('buildMcpToolAnalyticsProperties', () => {
     expect(searchInvestors).not.toHaveProperty('search');
   });
 
+  it('records counts and filters for list_portfolio_teams without the name query', () => {
+    const props = buildMcpToolAnalyticsProperties(
+      'list_portfolio_teams',
+      { q: 'agoric', island: 'digital-human-rights' },
+      { teams: [{ teamUid: 't1' }], total: 1, limit: 20, offset: 0, nextOffset: null }
+    );
+    expect(props).toEqual({
+      hasQuery: true,
+      island: 'digital-human-rights',
+      limit: 20,
+      offset: 0,
+      resultCount: 1,
+      total: 1,
+    });
+    expect(props).not.toHaveProperty('q');
+  });
+
   it('includes uids only for get tools', () => {
     expect(buildMcpToolAnalyticsProperties('get_master_profile', { uid: 'mp-1' })).toEqual({ uid: 'mp-1' });
     expect(
@@ -99,6 +119,16 @@ describe('buildMcpToolAnalyticsProperties', () => {
       connectorProfileUid: 'from1',
       isClear: true,
     });
+  });
+
+  it('counts locked fields and omits their values', () => {
+    const props = buildMcpToolAnalyticsProperties('update_master_profile', {
+      uid: 'u1',
+      fields: { bio: 'secret', currentOrg: 'PL' },
+    });
+    expect(props).toEqual({ uid: 'u1', fieldCount: 2 });
+    expect(props).not.toHaveProperty('bio');
+    expect(props).not.toHaveProperty('fields');
   });
 
   it('adds errorKind from the exception class name only', () => {

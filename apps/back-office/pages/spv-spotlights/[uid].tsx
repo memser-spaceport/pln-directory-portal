@@ -26,13 +26,55 @@ type TemplateKey =
   | 'inviteOutreach'
   | 'followUpOutreach'
   | 'approved'
-  | 'opened';
+  | 'opened'
+  | 'dataRoomAccess';
+
+type TemplateDraft = {
+  subject: string;
+  body: string;
+  fromEmail?: string;
+  fromName?: string;
+  cc?: string[];
+  replyTo?: string;
+};
 
 const TEMPLATE_LABELS: { key: TemplateKey; label: string }[] = [
   { key: 'invitePreapproved', label: 'Invite' },
   { key: 'followUpPreapproved', label: 'Follow-up' },
-  { key: 'opened', label: 'Spotlight is open' },
+  { key: 'dataRoomAccess', label: 'Data room access' },
 ];
+
+function formatBatchSendDuration(recipientCount: number, senderCount: number, emailsPerMinute: number): string | null {
+  if (!Number.isInteger(emailsPerMinute) || emailsPerMinute < 1 || senderCount < 1 || recipientCount < 1) {
+    return null;
+  }
+  const busiestSender = Math.ceil(recipientCount / senderCount);
+  const durationMs = busiestSender <= 1 ? 0 : (busiestSender - 1) * Math.floor(60_000 / emailsPerMinute);
+  if (durationMs < 1000) {
+    return 'Less than a minute';
+  }
+  const totalSeconds = Math.ceil(durationMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes === 0) {
+    return `About ${seconds} second${seconds === 1 ? '' : 's'}`;
+  }
+  if (seconds === 0) {
+    return `About ${minutes} minute${minutes === 1 ? '' : 's'}`;
+  }
+  return `About ${minutes} minute${minutes === 1 ? '' : 's'} ${seconds} second${seconds === 1 ? '' : 's'}`;
+}
+
+function readSenders(data: Record<string, unknown> | null): { email: string; name: string }[] {
+  if (!data || !Array.isArray(data.senders)) return [];
+  return data.senders.flatMap((item) => {
+    if (!item || typeof item !== 'object') return [];
+    const record = item as { email?: unknown; name?: unknown };
+    const email = typeof record.email === 'string' ? record.email.trim() : '';
+    if (!email) return [];
+    return [{ email, name: typeof record.name === 'string' ? record.name.trim() : '' }];
+  });
+}
 
 const SPV_DETAIL_FIELDS = [
   { key: 'fundName', label: 'Fund name' },
@@ -53,8 +95,6 @@ function overviewForm(data: Record<string, unknown>): Record<string, string> {
     slug: String(data.slug ?? ''),
     status: String(data.status ?? 'DRAFT'),
     supportEmail: String(data.supportEmail ?? ''),
-    senderName: String(data.senderName ?? ''),
-    senderEmail: String(data.senderEmail ?? ''),
     replyToEmail: String(data.replyToEmail ?? ''),
     docSendUrl: String(data.docSendUrl ?? ''),
     summary: String(data.summary ?? ''),
@@ -71,19 +111,26 @@ const OUTREACH_UI_ENABLED = false;
 
 const BUILT_IN_TOKENS = [
   'investorName',
+  'firstName',
   'investorEmail',
   'spotlightTitle',
   'spotlightLink',
   'teamName',
   'supportEmail',
+  'senderName',
+  'docSendLink',
 ];
+
+const TEMPLATE_SYNTAX = new Set(['else']);
 
 const requiredTokens = (template?: { subject: string; body: string }) => {
   const tokens = new Set<string>();
   for (const match of `${template?.subject ?? ''} ${template?.body ?? ''}`.matchAll(
     /\{\{\s*([a-zA-Z0-9_]+)\s*(\|[^}]*)?\}\}/g
   )) {
-    if (!match[2] && !BUILT_IN_TOKENS.includes(match[1])) tokens.add(match[1]);
+    if (!match[2] && !BUILT_IN_TOKENS.includes(match[1]) && !TEMPLATE_SYNTAX.has(match[1])) {
+      tokens.add(match[1]);
+    }
   }
   return [...tokens];
 };
@@ -181,7 +228,15 @@ const SpvSpotlightDetailPage = () => {
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [requests, setRequests] = useState<AccessRequest[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
-  const [templates, setTemplates] = useState<Record<TemplateKey, { subject: string; body: string }> | null>(null);
+  const [templates, setTemplates] = useState<Record<TemplateKey, TemplateDraft> | null>(null);
+  const [senders, setSenders] = useState<{ email: string; name: string }[]>([]);
+  const [emailOnDataRoomRequest, setEmailOnDataRoomRequest] = useState(false);
+  const [dataRoomCc, setDataRoomCc] = useState('');
+  const [inviteCc, setInviteCc] = useState('');
+  const [followUpCc, setFollowUpCc] = useState('');
+  const [useDefaultSender, setUseDefaultSender] = useState(true);
+  const [selectedSenderEmails, setSelectedSenderEmails] = useState<string[]>([]);
+  const [emailsPerSenderPerMinute, setEmailsPerSenderPerMinute] = useState('');
   const [previewTemplate, setPreviewTemplate] = useState<TemplateKey | null>(null);
   const [editingTemplateVars, setEditingTemplateVars] = useState<Participant | null>(null);
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
@@ -211,6 +266,11 @@ const SpvSpotlightDetailPage = () => {
       }))
     );
     setTemplates(data.emailTemplates);
+    setSenders(readSenders(data));
+    setEmailOnDataRoomRequest(Boolean(data.emailOnDataRoomRequest));
+    setDataRoomCc((data.emailTemplates?.dataRoomAccess?.cc ?? []).join(', '));
+    setInviteCc((data.emailTemplates?.invitePreapproved?.cc ?? []).join(', '));
+    setFollowUpCc((data.emailTemplates?.followUpPreapproved?.cc ?? []).join(', '));
   }, [authToken, uid]);
 
   const loadRequests = useCallback(async () => {
@@ -258,8 +318,10 @@ const SpvSpotlightDetailPage = () => {
       {
         ...form,
         supportEmail: form.supportEmail || null,
-        senderEmail: form.senderEmail || null,
-        senderName: form.senderName || null,
+        senders: senders
+          .filter((sender) => sender.email.trim())
+          .map((sender) => ({ email: sender.email.trim(), name: sender.name.trim() })),
+        emailOnDataRoomRequest,
         replyToEmail: form.replyToEmail || null,
         docSendUrl: form.docSendUrl || null,
         summary: form.summary || null,
@@ -319,14 +381,24 @@ const SpvSpotlightDetailPage = () => {
     mode: 'all' | 'selected',
     participantUids: string[]
   ) => {
+    const parsedRate = Number(emailsPerSenderPerMinute);
+    const emailsPerMinute = Number.isInteger(parsedRate) && parsedRate >= 1 ? parsedRate : undefined;
+    const senderPayload = {
+      ...(useDefaultSender ? { useDefaultSender: true } : { senderEmails: selectedSenderEmails }),
+      ...(emailsPerMinute ? { emailsPerSenderPerMinute: emailsPerMinute } : {}),
+    };
     const { data } =
       kind === 'open-notice'
-        ? await api.post(`${base}/open-notice`, { includeAlreadySent, participantUids }, { headers: authHeaders })
+        ? await api.post(
+            `${base}/open-notice`,
+            { includeAlreadySent, participantUids, ...senderPayload },
+            { headers: authHeaders }
+          )
         : await api.post(
             `${base}/participants/${kind === 'invites' ? 'send-invites-bulk' : 'send-follow-ups-bulk'}`,
             kind === 'invites'
-              ? { includeAlreadyInvited: includeAlreadySent, participantUids }
-              : { includeAlreadyFollowedUp: includeAlreadySent, participantUids },
+              ? { includeAlreadyInvited: includeAlreadySent, participantUids, ...senderPayload }
+              : { includeAlreadyFollowedUp: includeAlreadySent, participantUids, ...senderPayload },
             { headers: authHeaders }
           );
     const { sent, skipped, errors } = data.summary;
@@ -414,10 +486,47 @@ const SpvSpotlightDetailPage = () => {
     event.preventDefault();
     if (!templates) return;
     try {
-      const { data } = await api.patch(`${base}/email-templates`, { templates }, { headers: authHeaders });
-      const saved = data.templates as Record<TemplateKey, { subject: string; body: string }>;
+      const payload = {
+        ...templates,
+        invitePreapproved: {
+          subject: templates.invitePreapproved.subject,
+          body: templates.invitePreapproved.body,
+          fromName: templates.invitePreapproved.fromName ?? '',
+          replyTo: templates.invitePreapproved.replyTo ?? '',
+          cc: inviteCc
+            .split(/[,;\n]/)
+            .map((email) => email.trim())
+            .filter(Boolean),
+        },
+        followUpPreapproved: {
+          subject: templates.followUpPreapproved.subject,
+          body: templates.followUpPreapproved.body,
+          fromName: templates.followUpPreapproved.fromName ?? '',
+          replyTo: templates.followUpPreapproved.replyTo ?? '',
+          cc: followUpCc
+            .split(/[,;\n]/)
+            .map((email) => email.trim())
+            .filter(Boolean),
+        },
+        dataRoomAccess: {
+          subject: templates.dataRoomAccess.subject,
+          body: templates.dataRoomAccess.body,
+          fromEmail: templates.dataRoomAccess.fromEmail ?? '',
+          fromName: templates.dataRoomAccess.fromName ?? '',
+          replyTo: templates.dataRoomAccess.replyTo ?? '',
+          cc: dataRoomCc
+            .split(/[,;\n]/)
+            .map((email) => email.trim())
+            .filter(Boolean),
+        },
+      };
+      const { data } = await api.patch(`${base}/email-templates`, { templates: payload }, { headers: authHeaders });
+      const saved = data.templates as Record<TemplateKey, TemplateDraft>;
       const stripped = TEMPLATE_LABELS.some(({ key }) => saved[key].body !== templates[key].body);
       setTemplates(saved);
+      setDataRoomCc((saved.dataRoomAccess.cc ?? []).join(', '));
+      setInviteCc((saved.invitePreapproved.cc ?? []).join(', '));
+      setFollowUpCc((saved.followUpPreapproved.cc ?? []).join(', '));
       if (stripped) {
         toast.warning('Templates saved. Scripts, iframes or event handlers were removed from the HTML.');
       } else {
@@ -512,7 +621,10 @@ const SpvSpotlightDetailPage = () => {
     const slug = form.slug || 'spotlight';
     return {
       investorName: 'Alex Investor',
+      firstName: 'Alex',
       investorEmail: 'alex@example.com',
+      senderName: senders[0]?.name || '',
+      docSendLink: form.docSendUrl || 'https://docsend.com/view/example',
       spotlightTitle: form.title || 'Protocol Labs SPV Spotlight',
       spotlightLink: `${WEB_UI_BASE_URL.replace(/\/$/, '')}/spv-spotlight/${slug}`,
       teamName: teamName || 'Example Team',
@@ -520,7 +632,7 @@ const SpvSpotlightDetailPage = () => {
       role: 'Investor',
       organization: 'Example Fund',
     };
-  }, [spotlight, form.title, form.slug, form.supportEmail]);
+  }, [spotlight, form.title, form.slug, form.supportEmail, form.docSendUrl, senders]);
 
   if (!authToken || isLoading) return null;
 
@@ -576,7 +688,6 @@ const SpvSpotlightDetailPage = () => {
     );
   const isReachable = (participant: Participant) => participant.access !== 'RESTRICTED' && !!participant.member.email;
   const eligibleRecipients = inviteRecipients.filter(isReachable);
-  const openNoticeRecipients = investors.filter(isReachable);
   const kindRecipients = bulkSend?.kind === 'open-notice' ? investors : inviteRecipients;
   const eligibleUidSet = new Set(kindRecipients.filter(isReachable).map((participant) => participant.uid));
   const sendTargets =
@@ -594,6 +705,14 @@ const SpvSpotlightDetailPage = () => {
   const sendRecipients = includeAlreadySent
     ? sendEligible
     : sendEligible.filter((participant) => !wasSent(participant));
+  const parsedEmailsPerMinute = Number(emailsPerSenderPerMinute);
+  const emailsPerMinute =
+    Number.isInteger(parsedEmailsPerMinute) && parsedEmailsPerMinute >= 1 ? parsedEmailsPerMinute : undefined;
+  const batchSenderCount = useDefaultSender ? 1 : selectedSenderEmails.length;
+  const busiestSender = batchSenderCount > 0 ? Math.ceil(sendRecipients.length / batchSenderCount) : 0;
+  const batchDuration = emailsPerMinute
+    ? formatBatchSendDuration(sendRecipients.length, batchSenderCount, emailsPerMinute)
+    : null;
   const sendSkipped = sendTargets.length - sendEligible.length;
   const sendNoun =
     bulkSend?.kind === 'open-notice' ? 'open notice' : bulkSend?.kind === 'follow-ups' ? 'follow-up' : 'invite';
@@ -615,7 +734,15 @@ const SpvSpotlightDetailPage = () => {
     missingTokens.some((token) => !participant.emailTemplateVariables?.[token])
   );
   const openBulkSend = (kind: 'invites' | 'follow-ups' | 'open-notice', mode: 'all' | 'selected') => {
+    const configured = readSenders(spotlight);
     setIncludeAlreadySent(mode === 'selected');
+    if (configured.length > 0) {
+      setUseDefaultSender(false);
+      setSelectedSenderEmails([configured[0].email]);
+    } else {
+      setUseDefaultSender(true);
+      setSelectedSenderEmails([]);
+    }
     setBulkSend({ kind, mode });
   };
   const visibleFounders = founders.filter((participant) =>
@@ -636,6 +763,8 @@ const SpvSpotlightDetailPage = () => {
         })
       )
     );
+    setSenders(readSenders(spotlight));
+    setEmailOnDataRoomRequest(Boolean(spotlight.emailOnDataRoomRequest));
     setIsEditing(false);
   };
 
@@ -732,10 +861,90 @@ const SpvSpotlightDetailPage = () => {
                 <p className="text-xs text-gray-500">Changing status does not send email.</p>
               </div>
               {textField('supportEmail', 'Support Email', 'Leave blank to use the default support email.')}
-              {textField('senderEmail', 'Sender Email', 'From address used for investor invite and follow-up emails.')}
-              {textField('senderName', 'Sender Name')}
+              <div className={clsx(s.overviewField, s.fullWidth)}>
+                <label className={s.fieldLabel}>Senders</label>
+                {senders.length === 0 && !isEditing && (
+                  <div className={s.fieldValue}>LabOS default (labos@plnetwork.io)</div>
+                )}
+                <div className="flex w-full flex-col gap-2">
+                  {senders.map((sender, index) =>
+                    isEditing ? (
+                      <div key={index} className="flex gap-2">
+                        <input
+                          type="email"
+                          value={sender.email}
+                          onChange={(e) =>
+                            setSenders((current) =>
+                              current.map((row, rowIndex) =>
+                                rowIndex === index ? { ...row, email: e.target.value } : row
+                              )
+                            )
+                          }
+                          className={s.fieldInput}
+                          placeholder="name@example.com"
+                          aria-label={`Sender ${index + 1} email`}
+                        />
+                        <input
+                          type="text"
+                          value={sender.name}
+                          onChange={(e) =>
+                            setSenders((current) =>
+                              current.map((row, rowIndex) =>
+                                rowIndex === index ? { ...row, name: e.target.value } : row
+                              )
+                            )
+                          }
+                          className={s.fieldInput}
+                          placeholder="Display name"
+                          aria-label={`Sender ${index + 1} name`}
+                        />
+                        <button
+                          type="button"
+                          className="shrink-0 text-sm text-red-600"
+                          onClick={() => setSenders((current) => current.filter((_, rowIndex) => rowIndex !== index))}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <div key={index} className={s.fieldValue}>
+                        {sender.name ? `${sender.name} <${sender.email}>` : sender.email}
+                      </div>
+                    )
+                  )}
+                </div>
+                {isEditing && (
+                  <button
+                    type="button"
+                    className="mt-2 text-sm font-medium text-blue-600"
+                    onClick={() => setSenders((current) => [...current, { email: '', name: '' }])}
+                  >
+                    Add sender
+                  </button>
+                )}
+                <p className="text-xs text-gray-500">
+                  Batch emails can use one or more of these addresses, or the LabOS default.
+                </p>
+              </div>
               {textField('replyToEmail', 'Reply-To Email')}
               {textField('docSendUrl', 'DocSend URL')}
+              <div className={s.overviewField}>
+                <label className={s.fieldLabel}>Data room email</label>
+                {isEditing ? (
+                  <label className="flex items-start gap-3 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600"
+                      checked={emailOnDataRoomRequest}
+                      onChange={(e) => setEmailOnDataRoomRequest(e.target.checked)}
+                    />
+                    <span>Send the data room email when an investor clicks Request data room access</span>
+                  </label>
+                ) : (
+                  <div className={s.fieldValue}>{emailOnDataRoomRequest ? 'On' : 'Off'}</div>
+                )}
+                <p className="text-xs text-gray-500">Off keeps Access data room, which opens the DocSend link.</p>
+              </div>
               <div className={s.overviewField}>
                 <label className={s.fieldLabel}>Close Date (UTC)</label>
                 {isEditing ? (
@@ -923,16 +1132,6 @@ const SpvSpotlightDetailPage = () => {
                         >
                           Send Follow-ups to All
                         </button>
-                        {tab === 'investors' && (
-                          <button
-                            type="button"
-                            onClick={() => openBulkSend('open-notice', 'all')}
-                            disabled={!openNoticeRecipients.length}
-                            className={clsx(s.editButton, 'disabled:cursor-not-allowed disabled:opacity-50')}
-                          >
-                            Email that spotlight is open
-                          </button>
-                        )}
                       </div>
                     )}
                   </div>
@@ -1007,15 +1206,6 @@ const SpvSpotlightDetailPage = () => {
                   >
                     Send Follow-up to Selected
                   </button>
-                  {tab === 'investors' && (
-                    <button
-                      type="button"
-                      onClick={() => openBulkSend('open-notice', 'selected')}
-                      className={clsx(s.editButton, 'px-3 py-1.5')}
-                    >
-                      Send Open Notice to Selected
-                    </button>
-                  )}
                   <button
                     type="button"
                     onClick={removeSelected}
@@ -1264,11 +1454,13 @@ const SpvSpotlightDetailPage = () => {
                 )}
               </div>
               <p className="mb-6 text-sm text-gray-500">
-                This field is the message inside the card. The logo and the preferences footer come from the
-                notification template. Built-in tokens: investorName, investorEmail, spotlightTitle, spotlightLink,
-                teamName, supportEmail. Every email also replaces the investor&apos;s template variables (extra CSV
-                columns, using the column header as the token). Approval emails also have role and organization. Add a
-                fallback for empty values with {'{{firm|your fund}}'}. HTML is allowed.
+                The body is the email HTML. Built-in tokens: investorName, firstName, investorEmail, spotlightTitle,
+                spotlightLink, teamName, supportEmail, senderName, docSendLink. The invite and follow-up templates have
+                an optional From name, Cc, and Reply-to. The data room access template has its own From address, From
+                name, Cc, and Reply-to. Investor template variables use the CSV column header as the
+                token. Approval emails also have role and organization. Use {'{{firm|your fund}}'} when a value can be
+                empty. Use {'{{#if token}}'} … {'{{else if token}}'} … {'{{else}}'} … {'{{/if}}'} to choose one block
+                when a variable has a value. HTML is allowed.
               </p>
               <div className="flex flex-col gap-6">
                 {TEMPLATE_LABELS.map(({ key, label }) => (
@@ -1292,6 +1484,97 @@ const SpvSpotlightDetailPage = () => {
                         setTemplates({ ...templates, [key]: { ...templates[key], subject: e.target.value } })
                       }
                     />
+                    {(key === 'invitePreapproved' || key === 'followUpPreapproved') && (
+                      <div className="mt-3 flex flex-col gap-2">
+                        <input
+                          type="text"
+                          className={clsx(s.fieldInput, 'box-border w-full self-stretch')}
+                          value={templates[key].fromName ?? ''}
+                          placeholder="From name (optional)"
+                          aria-label={`${label} from name`}
+                          onChange={(e) =>
+                            setTemplates({
+                              ...templates,
+                              [key]: { ...templates[key], fromName: e.target.value },
+                            })
+                          }
+                        />
+                        <input
+                          type="text"
+                          className={clsx(s.fieldInput, 'box-border w-full self-stretch')}
+                          value={key === 'invitePreapproved' ? inviteCc : followUpCc}
+                          placeholder="Cc emails, separated by commas (optional)"
+                          aria-label={`${label} cc`}
+                          onChange={(e) =>
+                            key === 'invitePreapproved' ? setInviteCc(e.target.value) : setFollowUpCc(e.target.value)
+                          }
+                        />
+                        <input
+                          type="email"
+                          className={clsx(s.fieldInput, 'box-border w-full self-stretch')}
+                          value={templates[key].replyTo ?? ''}
+                          placeholder="Reply-to (optional)"
+                          aria-label={`${label} reply-to`}
+                          onChange={(e) =>
+                            setTemplates({
+                              ...templates,
+                              [key]: { ...templates[key], replyTo: e.target.value },
+                            })
+                          }
+                        />
+                      </div>
+                    )}
+                    {key === 'dataRoomAccess' && (
+                      <div className="mt-3 flex flex-col gap-2">
+                        <input
+                          type="email"
+                          className={clsx(s.fieldInput, 'box-border w-full self-stretch')}
+                          value={templates[key].fromEmail ?? ''}
+                          placeholder="From email"
+                          aria-label="Data room from email"
+                          onChange={(e) =>
+                            setTemplates({
+                              ...templates,
+                              dataRoomAccess: { ...templates.dataRoomAccess, fromEmail: e.target.value },
+                            })
+                          }
+                        />
+                        <input
+                          type="text"
+                          className={clsx(s.fieldInput, 'box-border w-full self-stretch')}
+                          value={templates[key].fromName ?? ''}
+                          placeholder="From name (optional)"
+                          aria-label="Data room from name"
+                          onChange={(e) =>
+                            setTemplates({
+                              ...templates,
+                              dataRoomAccess: { ...templates.dataRoomAccess, fromName: e.target.value },
+                            })
+                          }
+                        />
+                        <input
+                          type="text"
+                          className={clsx(s.fieldInput, 'box-border w-full self-stretch')}
+                          value={dataRoomCc}
+                          placeholder="Cc emails, separated by commas (optional)"
+                          aria-label="Data room cc"
+                          onChange={(e) => setDataRoomCc(e.target.value)}
+                        />
+                        <input
+                          type="email"
+                          className={clsx(s.fieldInput, 'box-border w-full self-stretch')}
+                          value={templates.dataRoomAccess.replyTo ?? ''}
+                          placeholder="Reply-to (optional)"
+                          aria-label="Data room reply-to"
+                          onChange={(e) =>
+                            setTemplates({
+                              ...templates,
+                              dataRoomAccess: { ...templates.dataRoomAccess, replyTo: e.target.value },
+                            })
+                          }
+                        />
+                      </div>
+                    )}
                     <textarea
                       className={clsx(s.fieldTextarea, 'min-h-[160px]')}
                       value={templates[key].body}
@@ -1343,7 +1626,7 @@ const SpvSpotlightDetailPage = () => {
             : 'No eligible investors in this set.'
         }
         confirmLabel={`Send ${sendRecipients.length} ${sendNoun}${sendRecipients.length === 1 ? '' : 's'}`}
-        confirmDisabled={sendRecipients.length === 0}
+        confirmDisabled={sendRecipients.length === 0 || (!useDefaultSender && selectedSenderEmails.length === 0)}
         isPending={isConfirmRunning}
         onClose={() => {
           if (!isConfirmRunning) setBulkSend(null);
@@ -1388,6 +1671,68 @@ const SpvSpotlightDetailPage = () => {
                   </div>
                 ))}
               </div>
+            )}
+            <fieldset className="space-y-2 rounded-md border border-gray-200 px-3 py-3">
+              <legend className="px-1 text-sm font-medium text-gray-900">From</legend>
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="radio"
+                  name="batch-sender"
+                  checked={useDefaultSender}
+                  disabled={isConfirmRunning}
+                  onChange={() => {
+                    setUseDefaultSender(true);
+                    setSelectedSenderEmails([]);
+                  }}
+                />
+                <span>LabOS default (labos@plnetwork.io)</span>
+              </label>
+              {readSenders(spotlight).map((sender) => (
+                <label key={sender.email} className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={!useDefaultSender && selectedSenderEmails.includes(sender.email)}
+                    disabled={isConfirmRunning}
+                    onChange={() => {
+                      setUseDefaultSender(false);
+                      setSelectedSenderEmails((current) =>
+                        current.includes(sender.email)
+                          ? current.filter((email) => email !== sender.email)
+                          : [...current, sender.email]
+                      );
+                    }}
+                  />
+                  <span>{sender.name ? `${sender.name} <${sender.email}>` : sender.email}</span>
+                </label>
+              ))}
+              <p className="text-xs text-gray-500">
+                One address sends the whole batch. Two or more split the investors evenly.
+              </p>
+            </fieldset>
+            <label className="block">
+              <span className="mb-1 block font-medium text-gray-900">Send rate</span>
+              <input
+                type="number"
+                min={1}
+                max={1000}
+                step={1}
+                value={emailsPerSenderPerMinute}
+                disabled={isConfirmRunning}
+                onChange={(event) => setEmailsPerSenderPerMinute(event.target.value)}
+                className="w-32 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
+                placeholder="No limit"
+                aria-describedby="batch-send-rate-hint"
+              />
+              <span id="batch-send-rate-hint" className="mt-1 block text-xs text-gray-500">
+                Emails per minute for each From address.
+              </span>
+            </label>
+            {batchDuration && (
+              <p className="rounded-md bg-gray-50 px-3 py-2 text-gray-800">
+                Each From address sends {emailsPerSenderPerMinute} email
+                {Number(emailsPerSenderPerMinute) === 1 ? '' : 's'} per minute. The fullest address has {busiestSender}{' '}
+                of {sendRecipients.length}. This batch takes {batchDuration.toLowerCase()}.
+              </p>
             )}
             <label className="flex cursor-pointer items-start gap-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-3">
               <input

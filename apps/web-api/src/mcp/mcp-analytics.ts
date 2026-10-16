@@ -3,7 +3,14 @@ import { ANALYTICS_EVENTS } from '../utils/constants';
 import { AI_APP_FEEDBACK_WRITE_TOOLS } from './mcp.constants';
 import type { McpTokenActor } from './mcp-oauth.service';
 
-const MCP_WRITE_TOOLS = new Set(['submit_warm_path_feedback', 'submit_warm_path_note', ...AI_APP_FEEDBACK_WRITE_TOOLS]);
+const MCP_WRITE_TOOLS = new Set([
+  'submit_warm_path_feedback',
+  'submit_warm_path_note',
+  'update_master_profile',
+  'update_connection_edge',
+  'update_warm_path',
+  ...AI_APP_FEEDBACK_WRITE_TOOLS,
+]);
 
 export type McpToolOperation = 'read' | 'write';
 
@@ -24,6 +31,11 @@ function numberProp(value: unknown): number | undefined {
 
 function countOf(value: unknown): number | undefined {
   return Array.isArray(value) ? value.length : undefined;
+}
+
+function fieldCount(value: unknown): number | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  return Object.keys(value).length;
 }
 
 function compact(props: Record<string, unknown>): Record<string, unknown> {
@@ -78,6 +90,12 @@ export function buildMcpToolAnalyticsProperties(
       props.connectorProfileUid = stringProp(args.connectorProfileUid);
       props.isClear = args.note === null;
       break;
+    case 'update_master_profile':
+    case 'update_connection_edge':
+    case 'update_warm_path':
+      props.uid = stringProp(args.uid);
+      props.fieldCount = fieldCount(args.fields);
+      break;
     case 'search_members':
     case 'search_teams':
     case 'search_projects':
@@ -88,6 +106,16 @@ export function buildMcpToolAnalyticsProperties(
       break;
     case 'list_my_ai_apps':
       props.resultCount = countOf(result?.apps);
+      break;
+    case 'list_portfolio_teams':
+      props.hasQuery = Boolean(stringProp(args.q));
+      props.island = stringProp(args.island);
+      props.limit = numberProp(result?.limit) ?? numberProp(args.limit);
+      props.offset = numberProp(result?.offset) ?? numberProp(args.offset);
+      props.resultCount = countOf(result?.teams);
+      if (typeof result?.total === 'number') {
+        props.total = result.total;
+      }
       break;
     case 'list_ai_app_feedback':
       props.appUid = stringProp(args.appUid);
