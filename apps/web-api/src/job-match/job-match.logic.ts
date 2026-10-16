@@ -714,7 +714,13 @@ export function pickSuggestedEmail<T extends { memberUid: string }>(args: {
   return waiting.length ? { kind: 'reminder', candidates: waiting } : null;
 }
 
-/** `JOB_MATCH_EMAIL_TEAM_UIDS`: comma-separated team uids, trimmed, empties dropped. Unset or empty is nobody. */
+/** `JOB_MATCH_EMAIL_TEAM_UIDS` entry that lets every team's leads be emailed. */
+export const ALL_EMAIL_TEAMS = '*';
+
+/**
+ * `JOB_MATCH_EMAIL_TEAM_UIDS`: comma-separated team uids, trimmed, empties dropped. Unset or empty is nobody;
+ * `*` is every team (see `isEmailTeamAllowed`).
+ */
 export function parseEmailTeamAllowlist(value: string | undefined): Set<string> {
   return new Set(
     (value ?? '')
@@ -722,6 +728,11 @@ export function parseEmailTeamAllowlist(value: string | undefined): Set<string> 
       .map((uid) => uid.trim())
       .filter(Boolean)
   );
+}
+
+/** Whether the allowlist lets this team's leads be emailed: the team is listed, or `*` is. */
+export function isEmailTeamAllowed(allowlist: ReadonlySet<string>, teamUid: string): boolean {
+  return allowlist.has(ALL_EMAIL_TEAMS) || allowlist.has(teamUid);
 }
 
 /** `JOB_MATCH_EMAIL_DRY_RUN`: on only for the exact string `true`. */
