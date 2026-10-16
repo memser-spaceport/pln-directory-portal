@@ -159,8 +159,13 @@ describe('sendDataRoomAccessEmail', () => {
           access: 'VIEW',
           dataRoomEmailSentAt: sentAt,
         })),
-        update: jest.fn().mockImplementation(async () => {
+        updateMany: jest.fn().mockImplementation(async () => {
+          if (sentAt) return { count: 0 };
           sentAt = new Date();
+          return { count: 1 };
+        }),
+        update: jest.fn().mockImplementation(async ({ data }) => {
+          sentAt = data.dataRoomEmailSentAt;
           return {};
         }),
       },
@@ -182,6 +187,78 @@ describe('sendDataRoomAccessEmail', () => {
 
     const second = await service.sendDataRoomAccessEmail('netholabs', 'ada@example.com');
     expect(second.docSendUrl).toBe('https://docsend.com/view/x');
+    expect(second.alreadySent).toBe(true);
     expect(send).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('sendDataRoomAccessEmailsForLoginTokens', () => {
+  const spotlight = {
+    uid: 'spv_1',
+    slug: 'netholabs',
+    status: 'OPEN',
+    title: 'Netholabs',
+    supportEmail: 'labos@plnetwork.io',
+    senderEmail: null,
+    senderName: null,
+    replyToEmail: null,
+    emailOnDataRoomRequest: true,
+    docSendUrl: 'https://docsend.com/view/x',
+    emailTemplates: null,
+    team: { name: 'Netholabs' },
+  };
+
+  function loginToken(email: string) {
+    const payload = Buffer.from(JSON.stringify({ email, purpose: 'login_token' })).toString('base64url');
+    return `header.${payload}.sig`;
+  }
+
+  it('sends once per investor and skips a token that was already sent', async () => {
+    const send = jest.fn().mockResolvedValue('link');
+    const sent = new Set<string>();
+    const prisma = {
+      spvSpotlight: { findUnique: jest.fn().mockResolvedValue(spotlight) },
+      member: {
+        findFirst: jest.fn().mockImplementation(async ({ where }) => ({
+          uid: where.email.equals,
+          name: 'Investor',
+          email: where.email.equals,
+        })),
+      },
+      spvAccessRequest: { findUnique: jest.fn().mockResolvedValue(null) },
+      spvSpotlightParticipant: {
+        findUnique: jest.fn().mockImplementation(async ({ where }) => ({
+          uid: where.spvSpotlightUid_memberUid.memberUid,
+          type: 'INVESTOR',
+          cohort: 'PRE_APPROVED',
+          access: 'VIEW',
+          dataRoomEmailSentAt: sent.has(where.spvSpotlightUid_memberUid.memberUid) ? new Date() : null,
+        })),
+        updateMany: jest.fn().mockImplementation(async ({ where }) => {
+          if (sent.has(where.uid)) return { count: 0 };
+          sent.add(where.uid);
+          return { count: 1 };
+        }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+    };
+    const service = new SpvSpotlightsService(prisma as never, { send } as never);
+    const ada = loginToken('Ada@Example.com');
+    const repeated = `https://directory.plnetwork.io/spv-spotlight/netholabs?loginToken=${encodeURIComponent(ada)}`;
+
+    const result = await service.sendDataRoomAccessEmailsForLoginTokens('netholabs', [
+      ada,
+      repeated,
+      loginToken('bob@example.com'),
+      'not-a-token',
+    ]);
+
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(result.results).toEqual([
+      { email: 'ada@example.com', status: 'sent' },
+      { email: 'ada@example.com', status: 'already_sent' },
+      { email: 'bob@example.com', status: 'sent' },
+      { email: null, status: 'failed', reason: 'Invalid login token' },
+    ]);
   });
 });

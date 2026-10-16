@@ -145,35 +145,65 @@ export class SpvSpotlightsService {
       throw new ForbiddenException('Data room email is not available');
     }
     if (participant.dataRoomEmailSentAt) {
-      return { docSendUrl: spotlight.docSendUrl };
+      return { docSendUrl: spotlight.docSendUrl, alreadySent: true };
     }
-    const template = asEmailTemplates(spotlight.emailTemplates, spotlight.title).dataRoomAccess;
-    await this.mailer.send({
-      spotlight: {
-        uid: spotlight.uid,
-        slug: spotlight.slug,
-        title: spotlight.title,
-        supportEmail: spotlight.supportEmail,
-        senderEmail: spotlight.senderEmail,
-        senderName: spotlight.senderName,
-        replyToEmail: spotlight.replyToEmail,
-        teamName: spotlight.team.name,
-      },
-      template,
-      to: member.email,
-      memberUid: member.uid,
-      memberName: member.name || '',
-      from: { email: template.fromEmail, name: template.fromName },
-      cc: template.cc,
-      replyTo: template.replyTo.trim() || template.fromEmail,
-      bccSender: false,
-      extra: { docSendLink: spotlight.docSendUrl },
-    });
-    await this.prisma.spvSpotlightParticipant.update({
-      where: { uid: participant.uid },
+    const claimed = await this.prisma.spvSpotlightParticipant.updateMany({
+      where: { uid: participant.uid, dataRoomEmailSentAt: null },
       data: { dataRoomEmailSentAt: new Date() },
     });
-    return { docSendUrl: spotlight.docSendUrl };
+    if (claimed.count !== 1) {
+      return { docSendUrl: spotlight.docSendUrl, alreadySent: true };
+    }
+    const template = asEmailTemplates(spotlight.emailTemplates, spotlight.title).dataRoomAccess;
+    try {
+      await this.mailer.send({
+        spotlight: {
+          uid: spotlight.uid,
+          slug: spotlight.slug,
+          title: spotlight.title,
+          supportEmail: spotlight.supportEmail,
+          senderEmail: spotlight.senderEmail,
+          senderName: spotlight.senderName,
+          replyToEmail: spotlight.replyToEmail,
+          teamName: spotlight.team.name,
+        },
+        template,
+        to: member.email,
+        memberUid: member.uid,
+        memberName: member.name || '',
+        from: { email: template.fromEmail, name: template.fromName },
+        cc: template.cc,
+        replyTo: template.replyTo.trim() || template.fromEmail,
+        bccSender: false,
+        extra: { docSendLink: spotlight.docSendUrl },
+      });
+    } catch (error) {
+      await this.prisma.spvSpotlightParticipant.update({
+        where: { uid: participant.uid },
+        data: { dataRoomEmailSentAt: null },
+      });
+      throw error;
+    }
+    return { docSendUrl: spotlight.docSendUrl, alreadySent: false };
+  }
+
+  async sendDataRoomAccessEmailsForLoginTokens(slug: string, loginTokens: string[]) {
+    const results: { email: string | null; status: 'sent' | 'already_sent' | 'failed'; reason?: string }[] = [];
+    for (const raw of loginTokens) {
+      const email = emailFromLoginToken(raw);
+      if (!email) {
+        results.push({ email: null, status: 'failed', reason: 'Invalid login token' });
+        continue;
+      }
+      try {
+        const result = await this.sendDataRoomAccessEmail(slug, email);
+        results.push({ email, status: result.alreadySent ? 'already_sent' : 'sent' });
+      } catch (error) {
+        const reason = error instanceof HttpException ? error.message : 'Send failed';
+        results.push({ email, status: 'failed', reason });
+      }
+    }
+    return { results };
   }
 
   async requestAccess(
@@ -400,5 +430,38 @@ export class SpvSpotlightsService {
       })),
       viewerAccess,
     };
+  }
+}
+
+const LOGIN_TOKEN_PURPOSE = 'login_token';
+
+function emailFromLoginToken(raw: string): string | null {
+  const token = loginTokenValue(raw);
+  const claims = unverifiedClaims(token);
+  if (!claims || claims.purpose !== LOGIN_TOKEN_PURPOSE) return null;
+  const email = typeof claims.email === 'string' ? claims.email.trim().toLowerCase() : '';
+  if (!email.includes('@')) return null;
+  return email;
+}
+
+function loginTokenValue(raw: string): string {
+  const trimmed = raw.trim();
+  try {
+    const fromQuery = new URL(trimmed).searchParams.get('loginToken');
+    if (fromQuery) return fromQuery;
+  } catch {
+    // The value is a raw token, not a URL.
+  }
+  return trimmed;
+}
+
+function unverifiedClaims(token: string): Record<string, unknown> | null {
+  const payload = token.split('.')[1];
+  if (!payload) return null;
+  try {
+    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    return claims && typeof claims === 'object' ? claims : null;
+  } catch {
+    return null;
   }
 }
