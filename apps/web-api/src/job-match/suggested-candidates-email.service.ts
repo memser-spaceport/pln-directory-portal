@@ -22,14 +22,17 @@ import {
   type ListedSuggestion,
 } from './job-match-suggestions';
 import { JOB_MATCH_RUN_COMPLETED, type JobMatchRunCompletedPayload } from './job-match.events';
+import type { JobMatchEmailKind } from '@prisma/client';
 import {
   MATCH_JOB_SELECT,
   isEmailDryRun,
   isLiveOpening,
   labelText,
-  newSuggestions,
   parseEmailTeamAllowlist,
+  pickSuggestedEmail,
   type MatchCriterionItem,
+  type SuggestedEmailKind,
+  type SuggestedEmailPick,
 } from './job-match.logic';
 import {
   hasSuggestedCandidatesTokenSecret,
@@ -41,9 +44,12 @@ export type SuggestedCandidatesSendResult = {
   dryRun: boolean;
   /** Emails sent through SES; in a dry run or with IS_EMAIL_ENABLED off, the emails logged or previewed instead. */
   sent: number;
-  /** Leads of roles with new suggestions who got no email: opted out, already emailed for the run, or failed. */
+  /** Leads of roles with suggestions who got no email: opted out, already emailed for the run, or failed. */
   skipped: number;
 };
+
+const DB_KIND: Record<SuggestedEmailKind, JobMatchEmailKind> = { first: 'FIRST', new: 'NEW', reminder: 'REMINDER' };
+const EMAIL_KIND: Record<JobMatchEmailKind, SuggestedEmailKind> = { FIRST: 'first', NEW: 'new', REMINDER: 'reminder' };
 
 type Lead = { uid: string; name: string; email: string };
 
@@ -51,8 +57,10 @@ type Mode = 'dry-run' | 'preview' | 'send';
 
 /**
  * The weekly suggested-candidates email to team leads (LAB-2850). Runs after a full job-match run completes
- * (event) or on demand (service route). Gates, in order: team allowlist, live role on an allowlisted team, new
- * suggestions, lead opted in and not already emailed for the run, dry run, IS_EMAIL_ENABLED.
+ * (event) or on demand (service route). Gates, in order: team allowlist, live role on an allowlisted team, listed
+ * suggestions, lead opted in and not already emailed for the run, an email to send (`pickSuggestedEmail`: first,
+ * new or a one-off reminder, judged against what this lead was already emailed for the role), dry run,
+ * IS_EMAIL_ENABLED.
  */
 @Injectable()
 export class SuggestedCandidatesEmailService {
@@ -105,12 +113,11 @@ export class SuggestedCandidatesEmailService {
 
     const roleRows = await this.prisma.jobMatchRow.findMany({
       where: { kind: 'ROLE', runUid },
-      select: { roleUid: true, createdAt: true },
+      select: { roleUid: true },
     });
-    const roleRowAt = new Map(roleRows.map((row) => [row.roleUid, row.createdAt]));
     const jobs = roleRows.length
       ? await this.prisma.jobOpening.findMany({
-          where: { uid: { in: [...roleRowAt.keys()] } },
+          where: { uid: { in: roleRows.map((row) => row.roleUid) } },
           select: { ...MATCH_JOB_SELECT, teamUid: true, status: true, publishedAt: true },
         })
       : [];
@@ -122,14 +129,6 @@ export class SuggestedCandidatesEmailService {
 
       const listed = await listRunSuggestions(this.prisma, runUid, job.uid);
       if (!listed.length) continue;
-      const previous = await this.previousSuggestedUids(runUid, job.uid, roleRowAt.get(job.uid));
-      const notLooking = await this.notLookingUids(listed.map(({ row }) => row.memberUid));
-      const { fresh, total } = newSuggestions(
-        listed.map((item) => ({ ...item, memberUid: item.row.memberUid })),
-        previous,
-        notLooking
-      );
-      if (!fresh.length) continue;
 
       let team = teamCache.get(teamUid);
       if (!team) {
@@ -139,25 +138,40 @@ export class SuggestedCandidatesEmailService {
       if (!team.leads.length) continue;
 
       const optedIn = await this.preference.enabledFor(team.leads.map((lead) => lead.uid));
-      const alreadySent = new Set(
-        (
-          await this.prisma.jobMatchEmailSend.findMany({
-            where: { runUid, roleUid: job.uid },
-            select: { recipientUid: true },
-          })
-        ).map((row) => row.recipientUid)
-      );
+      // Every lead's earlier emails for the role, newest first: this run's claims and the history `pick` reads.
+      const sentForRole = await this.prisma.jobMatchEmailSend.findMany({
+        where: { roleUid: job.uid },
+        orderBy: { sentAt: 'desc' },
+        select: { runUid: true, recipientUid: true, kind: true, memberUids: true },
+      });
+      const items = listed.map((item) => ({ ...item, memberUid: item.row.memberUid }));
+      const memberUids = items.map((item) => item.memberUid);
+      const notLooking = await this.notLookingUids(memberUids);
+      let contacted: Set<string> | undefined;
 
       // The role's current criteria, read once per role and only when an email is rendered.
       let criteria: MatchCriterionItem[] | undefined;
       for (const lead of team.leads) {
-        if (!optedIn.has(lead.uid) || alreadySent.has(lead.uid)) {
+        const mine = sentForRole.filter((send) => send.recipientUid === lead.uid);
+        if (!optedIn.has(lead.uid) || mine.some((send) => send.runUid === runUid)) {
           result.skipped++;
           continue;
         }
+        contacted ??= await this.contactedUids(job.uid, memberUids);
+        const pick = pickSuggestedEmail({
+          listed: items,
+          notLooking,
+          // A row from before kinds existed names nobody, so it is not history.
+          history: mine
+            .filter((send) => send.memberUids.length > 0)
+            .map((send) => ({ kind: EMAIL_KIND[send.kind], memberUids: send.memberUids })),
+          contacted,
+        });
+        if (!pick) continue;
+
         if (mode === 'dry-run') {
           this.logger.log(
-            `DRY RUN would email ${lead.uid} ${lead.email} about role ${job.uid} "${job.roleTitle}" (team ${teamUid}): ${fresh.length} new of ${total}`
+            `DRY RUN would email ${lead.uid} ${lead.email} about role ${job.uid} "${job.roleTitle}" (team ${teamUid}): ${pick.kind}, ${pick.candidates.length} named of ${items.length} listed`
           );
           result.sent++;
           continue;
@@ -165,7 +179,7 @@ export class SuggestedCandidatesEmailService {
 
         criteria ??= (await currentRoleCriteria(this.prisma, job)).all;
         const email = renderSuggestedCandidatesEmail(
-          emailInput({ lead, teamUid, teamName: team.name ?? job.companyName, job, fresh, total, baseUrl, criteria })
+          emailInput({ lead, teamUid, teamName: team.name ?? job.companyName, job, pick, baseUrl, criteria })
         );
         if (mode === 'preview') {
           this.preview(email, lead, job.uid);
@@ -176,7 +190,8 @@ export class SuggestedCandidatesEmailService {
           runUid,
           roleUid: job.uid,
           teamUid,
-          candidateCount: fresh.length,
+          kind: DB_KIND[pick.kind],
+          memberUids: pick.candidates.map((item) => item.memberUid),
         });
         if (delivered) result.sent++;
         else result.skipped++;
@@ -196,12 +211,12 @@ export class SuggestedCandidatesEmailService {
   private async claimAndSend(
     email: RenderedEmail,
     lead: Lead,
-    claim: { runUid: string; roleUid: string; teamUid: string; candidateCount: number }
+    claim: { runUid: string; roleUid: string; teamUid: string; kind: JobMatchEmailKind; memberUids: string[] }
   ): Promise<boolean> {
     let claimUid: string;
     try {
       const row = await this.prisma.jobMatchEmailSend.create({
-        data: { ...claim, recipientUid: lead.uid },
+        data: { ...claim, candidateCount: claim.memberUids.length, recipientUid: lead.uid },
         select: { uid: true },
       });
       claimUid = row.uid;
@@ -226,29 +241,21 @@ export class SuggestedCandidatesEmailService {
       });
       return false;
     }
-    trackSuggestedCandidatesEmailSent(this.analytics, this.logger, { recipientUid: lead.uid, ...claim });
+    trackSuggestedCandidatesEmailSent(this.analytics, this.logger, {
+      recipientUid: lead.uid,
+      runUid: claim.runUid,
+      roleUid: claim.roleUid,
+      teamUid: claim.teamUid,
+      kind: EMAIL_KIND[claim.kind],
+      candidateCount: claim.memberUids.length,
+    });
     return true;
   }
 
-  /** Raw SUGGESTION member uids of the role's previous ROLE row (any run before this one); null when none. */
-  private async previousSuggestedUids(
-    runUid: string,
-    roleUid: string,
-    currentAt: Date | undefined
-  ): Promise<Set<string> | null> {
-    const previous = await this.prisma.jobMatchRow.findFirst({
-      where: {
-        kind: 'ROLE',
-        roleUid,
-        runUid: { not: runUid },
-        ...(currentAt ? { createdAt: { lt: currentAt } } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-      select: { runUid: true },
-    });
-    if (!previous) return null;
-    const rows = await this.prisma.jobMatchRow.findMany({
-      where: { kind: 'SUGGESTION', runUid: previous.runUid, roleUid },
+  /** Who a lead of the team has already contacted about the role, among `memberUids` (LAB-2847). */
+  private async contactedUids(roleUid: string, memberUids: string[]): Promise<Set<string>> {
+    const rows = await this.prisma.jobMatchContact.findMany({
+      where: { roleUid, memberUid: { in: memberUids } },
       select: { memberUid: true },
     });
     return new Set(rows.map((row) => row.memberUid));
@@ -303,19 +310,20 @@ function emailInput(args: {
   teamUid: string;
   teamName: string;
   job: { uid: string; roleTitle: string };
-  fresh: ListedSuggestion[];
-  total: number;
+  pick: SuggestedEmailPick<ListedSuggestion>;
   baseUrl: string;
   criteria: readonly MatchCriterionItem[];
 }): SuggestedCandidatesEmailInput {
   const token = issueSuggestedCandidatesUnsubscribeToken(args.lead.uid);
+  const { pick } = args;
   return {
+    ...(pick.kind === 'new' ? { kind: 'new', alreadySeenCount: pick.alreadySeenCount } : { kind: pick.kind }),
     leadName: args.lead.name,
     teamUid: args.teamUid,
     teamName: args.teamName,
     roleUid: args.job.uid,
     roleTitle: args.job.roleTitle,
-    candidates: args.fresh.map(({ row, person, label }) => ({
+    candidates: pick.candidates.map(({ row, person, label }) => ({
       memberUid: row.memberUid,
       name: person.name,
       role: person.role,
@@ -329,7 +337,6 @@ function emailInput(args: {
         matched: item.matched,
       })),
     })),
-    totalMatchCount: args.total,
     preferencesUrl: `${args.baseUrl}/settings/email`,
     unsubscribeUrl: `${args.baseUrl}/settings/email/unsubscribed?token=${encodeURIComponent(token)}`,
   };

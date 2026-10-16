@@ -12,7 +12,15 @@ import { ANALYTICS_EVENTS } from '../utils/constants';
 export function trackSuggestedCandidatesEmailSent(
   analytics: AnalyticsService,
   logger: Logger,
-  args: { recipientUid: string; roleUid: string; teamUid: string; runUid: string; candidateCount: number }
+  args: {
+    recipientUid: string;
+    roleUid: string;
+    teamUid: string;
+    runUid: string;
+    /** first | new | reminder (LAB-2837 feedback). */
+    kind: string;
+    candidateCount: number;
+  }
 ): void {
   trackSafely(analytics, logger, {
     name: ANALYTICS_EVENTS.JOB_BOARD.SUGGESTED_CANDIDATES_EMAIL_SENT,
@@ -21,6 +29,7 @@ export function trackSuggestedCandidatesEmailSent(
       role_uid: args.roleUid,
       team_uid: args.teamUid,
       run_uid: args.runUid,
+      email_kind: args.kind,
       candidate_count: args.candidateCount,
     },
   });

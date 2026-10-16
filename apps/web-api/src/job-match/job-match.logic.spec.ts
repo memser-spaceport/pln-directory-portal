@@ -24,7 +24,7 @@ import {
   jobMatchBlocker,
   labelFor,
   mapPool,
-  newSuggestions,
+  pickSuggestedEmail,
   normalizeTeamUids,
   parseCandidateNotes,
   normalizeCriterionGroup,
@@ -567,35 +567,100 @@ describe('structured criteria (LAB-2854)', () => {
   });
 });
 
-describe('newSuggestions (LAB-2850)', () => {
+describe('pickSuggestedEmail (LAB-2837 feedback)', () => {
   const listed = ['a', 'b', 'c', 'd'].map((memberUid, index) => ({ memberUid, rank: index + 1 }));
   const none = new Set<string>();
+  const uids = (items: { memberUid: string }[]) => items.map((item) => item.memberUid);
+  const pick = (
+    history: { kind: 'first' | 'new' | 'reminder'; memberUids: string[] }[],
+    extra: { notLooking?: Set<string>; contacted?: Set<string>; list?: typeof listed } = {}
+  ) =>
+    pickSuggestedEmail({
+      listed: extra.list ?? listed,
+      notLooking: extra.notLooking ?? none,
+      history,
+      contacted: extra.contacted ?? none,
+    });
 
-  it('drops members the previous run suggested', () => {
-    const { fresh, total } = newSuggestions(listed, new Set(['a', 'c', 'z']), none);
-    expect(fresh.map((item) => item.memberUid)).toEqual(['b', 'd']);
-    expect(total).toBe(4);
+  it('first: everyone listed, in rank order, when the lead was never emailed about the role', () => {
+    const result = pick([]);
+    expect(result?.kind).toBe('first');
+    expect(uids(result!.candidates)).toEqual(['a', 'b', 'c', 'd']);
   });
 
-  it('treats every listed member as new on the first run', () => {
-    expect(newSuggestions(listed, null, none).fresh.map((item) => item.memberUid)).toEqual(['a', 'b', 'c', 'd']);
+  it('never names or counts a "Not looking" member, and sends nothing when nobody else is listed', () => {
+    expect(uids(pick([], { notLooking: new Set(['b']) })!.candidates)).toEqual(['a', 'c', 'd']);
+    const result = pick([{ kind: 'first', memberUids: ['a'] }], { notLooking: new Set(['c']) });
+    expect(result).toEqual({ kind: 'new', candidates: [listed[1], listed[3]], alreadySeenCount: 1 });
+    expect(pick([], { notLooking: new Set(['a', 'b', 'c', 'd']) })).toBeNull();
   });
 
-  it('never names a "Not looking" member but still counts them in the total', () => {
-    const { fresh, total } = newSuggestions(listed, null, new Set(['b']));
-    expect(fresh.map((item) => item.memberUid)).toEqual(['a', 'c', 'd']);
-    expect(total).toBe(4);
+  it('new: only the people never named in any earlier email, plus how many seen ones are listed', () => {
+    const result = pick([
+      { kind: 'new', memberUids: ['c'] },
+      { kind: 'first', memberUids: ['a', 'z'] },
+    ]);
+    expect(result?.kind).toBe('new');
+    expect(uids(result!.candidates)).toEqual(['b', 'd']);
+    expect(result).toMatchObject({ alreadySeenCount: 2 });
   });
 
-  it('is empty when every listed member was suggested before', () => {
-    const { fresh, total } = newSuggestions(listed, new Set(['a', 'b', 'c', 'd']), none);
-    expect(fresh).toEqual([]);
-    expect(total).toBe(4);
+  it('new: someone named weeks ago who drops out and comes back is not new again', () => {
+    // b was in the first email, dropped out the week c and d were new, and is listed again now.
+    const result = pick([
+      { kind: 'new', memberUids: ['c', 'd'] },
+      { kind: 'first', memberUids: ['a', 'b'] },
+    ]);
+    expect(result?.kind).toBe('reminder');
+    expect(uids(result!.candidates)).toEqual(['a', 'b', 'c', 'd']);
   });
 
-  it('keeps rank order', () => {
-    const shuffledPrevious = new Set(['b']);
-    expect(newSuggestions(listed, shuffledPrevious, none).fresh.map((item) => item.rank)).toEqual([1, 3, 4]);
+  it('new: counts contacted people among the already seen — they are still on the page', () => {
+    const result = pick([{ kind: 'first', memberUids: ['a', 'b'] }], { contacted: new Set(['a']) });
+    expect(result).toMatchObject({ kind: 'new', alreadySeenCount: 2 });
+    expect(uids(result!.candidates)).toEqual(['c', 'd']);
+  });
+
+  it('reminder: nobody new, after a first or new email, naming who is listed and not contacted', () => {
+    for (const kind of ['first', 'new'] as const) {
+      const result = pick([{ kind, memberUids: ['a', 'b', 'c', 'd'] }], { contacted: new Set(['b']) });
+      expect(result?.kind).toBe('reminder');
+      expect(uids(result!.candidates)).toEqual(['a', 'c', 'd']);
+    }
+  });
+
+  it('reminder: once — nothing after a reminder until someone new appears', () => {
+    const all = ['a', 'b', 'c', 'd'];
+    expect(
+      pick([
+        { kind: 'reminder', memberUids: all },
+        { kind: 'first', memberUids: all },
+      ])
+    ).toBeNull();
+    const back = pick(
+      [
+        { kind: 'reminder', memberUids: all },
+        { kind: 'first', memberUids: all },
+      ],
+      { list: [...listed, { memberUid: 'e', rank: 5 }] }
+    );
+    expect(back?.kind).toBe('new');
+    expect(uids(back!.candidates)).toEqual(['e']);
+  });
+
+  it('reminder: nothing when everyone listed has been contacted', () => {
+    expect(
+      pick([{ kind: 'first', memberUids: ['a', 'b', 'c', 'd'] }], { contacted: new Set(['a', 'b', 'c', 'd']) })
+    ).toBeNull();
+  });
+
+  it('reads only the newest email for the reminder rule, whatever came before', () => {
+    const result = pick([
+      { kind: 'new', memberUids: ['d'] },
+      { kind: 'reminder', memberUids: ['a'] },
+      { kind: 'first', memberUids: ['a', 'b', 'c'] },
+    ]);
+    expect(result?.kind).toBe('reminder');
   });
 });
 

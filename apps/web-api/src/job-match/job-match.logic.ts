@@ -669,20 +669,49 @@ export function asMarkedCriteria(value: unknown): MarkedCriterion[] {
   });
 }
 
+/** One earlier weekly email to a lead for a role: which kind, and the members it named. */
+export type SentSuggestedEmail = { kind: SuggestedEmailKind; memberUids: readonly string[] };
+
+export type SuggestedEmailKind = 'first' | 'new' | 'reminder';
+
+export type SuggestedEmailPick<T> =
+  | { kind: 'first'; candidates: T[] }
+  | { kind: 'new'; candidates: T[]; alreadySeenCount: number }
+  | { kind: 'reminder'; candidates: T[] };
+
 /**
- * The candidates a suggested-candidates email names (LAB-2850, design D2). `listed` is what the Suggested tab
- * lists for the role from this run, in rank order. A member is new when the role's previous run did not
- * suggest them at all (`previous` holds that run's raw SUGGESTION member uids; `null` means no previous run)
- * and their job-search status is not "Not looking". `total` counts every listed candidate, "Not looking"
- * included, because it is the number the tab shows.
+ * Which weekly suggested-candidates email a lead gets for a role, and who it names (LAB-2837 feedback). `listed` is
+ * what the Suggested tab lists for the role from this run, in rank order; "Not looking" members are never named or
+ * counted. `history` is this lead's earlier emails for the role, newest first; `contacted` is who a lead of the team
+ * has already contacted about the role.
+ *
+ * - No history: `first`, everyone listed.
+ * - Someone listed was never named in any earlier email to this lead: `new`, only them, plus how many listed people
+ *   the lead has already seen (contacted ones included — they are still on the page).
+ * - Nobody new: a `reminder` of who is listed and not yet contacted — once: not after a reminder, and not when
+ *   nobody is left to remind about.
+ *
+ * Null means no email.
  */
-export function newSuggestions<T extends { memberUid: string }>(
-  listed: readonly T[],
-  previous: ReadonlySet<string> | null,
-  notLooking: ReadonlySet<string>
-): { fresh: T[]; total: number } {
-  const fresh = listed.filter((item) => !previous?.has(item.memberUid) && !notLooking.has(item.memberUid));
-  return { fresh, total: listed.length };
+export function pickSuggestedEmail<T extends { memberUid: string }>(args: {
+  listed: readonly T[];
+  notLooking: ReadonlySet<string>;
+  history: readonly SentSuggestedEmail[];
+  contacted: ReadonlySet<string>;
+}): SuggestedEmailPick<T> | null {
+  const eligible = args.listed.filter((item) => !args.notLooking.has(item.memberUid));
+  if (!eligible.length) return null;
+  if (!args.history.length) return { kind: 'first', candidates: eligible };
+
+  const seen = new Set(args.history.flatMap((email) => email.memberUids));
+  const fresh = eligible.filter((item) => !seen.has(item.memberUid));
+  if (fresh.length) {
+    return { kind: 'new', candidates: fresh, alreadySeenCount: eligible.length - fresh.length };
+  }
+
+  if (args.history[0].kind === 'reminder') return null;
+  const waiting = eligible.filter((item) => !args.contacted.has(item.memberUid));
+  return waiting.length ? { kind: 'reminder', candidates: waiting } : null;
 }
 
 /** `JOB_MATCH_EMAIL_TEAM_UIDS`: comma-separated team uids, trimmed, empties dropped. Unset or empty is nobody. */
