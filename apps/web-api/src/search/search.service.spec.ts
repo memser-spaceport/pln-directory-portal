@@ -89,6 +89,18 @@ describe('SearchService email lookup (LAB-2881)', () => {
     expect(result.top.slice(0, 3).map((m) => m.uid)).toEqual(['m1', 'm3', 'm2']);
   });
 
+  it('escapes LIKE wildcards, so "%" and "_" match only themselves', async () => {
+    await service.fetchAllIndices('%@%', { canReadContacts: true, isAuthenticated: true });
+    await service.fetchAllIndices('b_c@', { canReadContacts: true, isAuthenticated: true });
+
+    expect(memberFindMany.mock.calls[0][0].where.AND).toEqual(
+      expect.arrayContaining([{ email: { contains: '\\%@\\%', mode: 'insensitive' } }])
+    );
+    expect(memberFindMany.mock.calls[1][0].where.AND).toEqual(
+      expect.arrayContaining([{ email: { contains: 'b\\_c@', mode: 'insensitive' } }])
+    );
+  });
+
   it('does no email lookup without member.contacts.read; name and bio matching stays', async () => {
     searchWithLimit.mockImplementation(async (index: string) =>
       osHits(index, [{ _id: 'm2', _source: { name: 'Bio Match', image: '' } }])

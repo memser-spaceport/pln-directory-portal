@@ -10,6 +10,11 @@ const MAX_SEARCH_RESULTS_PER_INDEX = 50;
 const AUTOMCOMPLETE_MAX_LENGTH = 50;
 const EMAIL_QUERY_MIN_LENGTH = 3;
 
+/** Prisma `contains` does not escape LIKE wildcards; escape them so "%" and "_" match literally. */
+function escapeLikePattern(text: string): string {
+  return text.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
 /** A query "looks like an email" when the trimmed text has an "@" and at least 3 characters. */
 export function isEmailQuery(text: string | undefined | null): boolean {
   const trimmed = (text ?? '').trim();
@@ -50,7 +55,7 @@ export class SearchService {
         AND: [
           directoryVisibleMemberWhere(),
           { deletedAt: null },
-          { email: { contains: query, mode: 'insensitive' } },
+          { email: { contains: escapeLikePattern(query), mode: 'insensitive' } },
           { preferences: { path: ['showEmail'], equals: true } },
         ],
       },
