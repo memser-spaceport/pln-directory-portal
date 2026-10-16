@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@prisma/client';
 import { generateText } from 'ai';
 import { HIDDEN_JOB_OPENING_STATUSES } from '../job-openings/job-openings-query.service';
@@ -10,13 +11,18 @@ import {
   JEV_MODEL,
   JEV_URL,
   TEAM_CONCURRENCY,
-  asStringList,
+  asCriteria,
   blurbPrompt,
   companyKey,
+  criteriaLabelPrompt,
   criteriaPrompt,
+  criterionStatements,
+  currentRoleTextHash,
+  enabledCriteria,
   fitsFromAnswers,
   formatRunDate,
   hasSignal,
+  isLegacyCriteriaPayload,
   jevQuestions,
   jobMatchBlocker,
   type JobMatchBlockerOptions,
@@ -24,6 +30,7 @@ import {
   mapPool,
   parseCandidateNotes,
   parseCriteria,
+  parseCriteriaLabels,
   pickInterestNote,
   planTeamWork,
   profileText,
@@ -31,14 +38,17 @@ import {
   reusableFits,
   rolePosting,
   roleTextHash,
+  scoreHash,
   scorePayload,
   selectTop,
   utcRunDate,
   withRetry,
+  type MatchCriterionItem,
   type MatchExperience,
   type MatchJob,
   type MatchMember,
 } from './job-match.logic';
+import { JOB_MATCH_RUN_COMPLETED, type JobMatchRunCompletedPayload } from './job-match.events';
 
 const BLANK = '';
 
@@ -74,7 +84,11 @@ export class JobMatchRunner {
   private heldRunUid: string | null = null;
   private heldRunDate: string | null = null;
 
-  constructor(private readonly prisma: PrismaService, private readonly ai: AiProviderService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ai: AiProviderService,
+    private readonly events: EventEmitter2
+  ) {}
 
   async start(teamUids?: string[], blockerOptions?: JobMatchBlockerOptions): Promise<JobMatchStartResult> {
     const blocker = jobMatchBlocker(blockerOptions);
@@ -186,11 +200,20 @@ export class JobMatchRunner {
       this.logger.log(`job match run ${runUid} finished ${teams.length} requested teams`);
       return;
     }
+    const finishedAt = new Date();
     await this.prisma.jobMatchRun.update({
       where: { uid: runUid },
-      data: { status: 'COMPLETED', lockedUntil: null, finishedAt: new Date(), error: null },
+      data: { status: 'COMPLETED', lockedUntil: null, finishedAt, error: null },
     });
     this.logger.log(`job match run ${runUid} completed`);
+    // Only a full run that just reached COMPLETED starts the suggested-candidates email (LAB-2850). The listener
+    // runs async and swallows its own errors, so the email can neither fail the run nor hold its lock.
+    const completed: JobMatchRunCompletedPayload = {
+      runUid,
+      runDate: this.heldRunDate ?? formatRunDate(utcRunDate()),
+      completedAt: finishedAt.toISOString(),
+    };
+    this.events.emit(JOB_MATCH_RUN_COMPLETED, completed);
   }
 
   async processTeam(runUid: string, team: TeamRow): Promise<void> {
@@ -215,7 +238,27 @@ export class JobMatchRunner {
     }
 
     const members = (await this.loadMembers(team.uid, team.name)).filter(hasSignal);
-    const roleHashes = new Map(jobs.map((job) => [job.uid, roleTextHash(rolePosting(job))]));
+    // A lead's disabled criteria (LAB-2846) and criteria prompt (LAB-2853) change the hash stored with each fit
+    // for that role, so fits scored with another criteria set or prompt are not reused. A role without an
+    // override keeps its posting hash.
+    const postingHashes = new Map(jobs.map((job) => [job.uid, currentRoleTextHash(job)]));
+    const { disabledByUid, promptByUid } = await this.loadCriteriaOverrides(postingHashes);
+    // Statements only: labels and groups (LAB-2854) are display data and never reach a hash or a prompt.
+    const criteriaByUid = new Map<string, string[]>();
+    for (const job of jobs) {
+      if (disabledByUid.has(job.uid) || promptByUid.has(job.uid)) {
+        criteriaByUid.set(job.uid, criterionStatements(await this.criteriaFor(runUid, job)));
+      }
+    }
+    const roleHashes = new Map<string, string>(
+      jobs.map((job): [string, string] => {
+        const postingHash = postingHashes.get(job.uid) ?? currentRoleTextHash(job);
+        const all = criteriaByUid.get(job.uid);
+        if (!all) return [job.uid, postingHash];
+        const enabled = enabledCriteria(all, disabledByUid.get(job.uid) ?? []);
+        return [job.uid, scoreHash(postingHash, enabled, all, promptByUid.get(job.uid) ?? null)];
+      })
+    );
     const storedScores = await this.prisma.jobMatchRow.findMany({
       where: { teamUid: team.uid, kind: 'SCORE' },
       select: { memberUid: true, payload: true },
@@ -246,9 +289,11 @@ export class JobMatchRunner {
 
     const toScore = new Set(plan.membersToScore);
     const jobsForCriteria = toScore.size ? jobs : jobs.filter((job) => plan.rolesToFinish.includes(job.uid));
-    const criteriaByUid = new Map<string, string[]>();
+    const enabledByUid = new Map<string, string[]>();
     for (const job of jobsForCriteria) {
-      criteriaByUid.set(job.uid, await this.criteriaFor(runUid, job));
+      const all = criteriaByUid.get(job.uid) ?? criterionStatements(await this.criteriaFor(runUid, job));
+      criteriaByUid.set(job.uid, all);
+      enabledByUid.set(job.uid, enabledCriteria(all, disabledByUid.get(job.uid) ?? []));
     }
 
     const pending = members.filter((member) => toScore.has(member.uid));
@@ -259,7 +304,9 @@ export class JobMatchRunner {
         const text = profileText(member);
         const have = scoresByMember.get(member.uid) ?? {};
         const missing = jobs.filter((job) => !Object.prototype.hasOwnProperty.call(have, job.uid));
-        const answers = await withRetry(member.uid, () => this.jev(text, jevQuestions(missing, criteriaByUid)));
+        const answers = await withRetry(member.uid, () =>
+          this.jev(text, jevQuestions(missing, enabledByUid, promptByUid))
+        );
         const scores = {
           ...have,
           ...fitsFromAnswers(
@@ -295,7 +342,8 @@ export class JobMatchRunner {
         runUid,
         team.uid,
         job,
-        criteriaByUid.get(job.uid) ?? [],
+        enabledByUid.get(job.uid) ?? [],
+        promptByUid.get(job.uid) ?? null,
         members,
         scoresByMember,
         interestByRole.get(job.uid) ?? new Map()
@@ -304,17 +352,26 @@ export class JobMatchRunner {
     await this.markTeamComplete(runUid, team.uid);
   }
 
-  private async criteriaFor(runUid: string, job: MatchJob): Promise<string[]> {
+  /**
+   * The role's criteria for its current posting: the newest CRITERIA row when it has at least 4, else a fresh
+   * extraction stored as `[{ statement, label, group }]` (LAB-2854). A cached row from before LAB-2854 (a plain
+   * `string[]`) is labelled once, see `labelLegacyCriteria`.
+   */
+  private async criteriaFor(runUid: string, job: MatchJob): Promise<MatchCriterionItem[]> {
     const posting = rolePosting(job);
     const hash = roleTextHash(posting);
     const cached = await this.prisma.jobMatchRow.findFirst({
       where: { kind: 'CRITERIA', roleUid: job.uid, roleTextHash: hash },
       select: { payload: true },
+      orderBy: { createdAt: 'desc' },
     });
-    const cachedCriteria = asStringList(cached?.payload);
-    if (cachedCriteria.length >= 4) return cachedCriteria.slice(0, 6);
+    const cachedCriteria = asCriteria(cached?.payload).slice(0, 6);
+    if (cachedCriteria.length >= 4) {
+      if (!isLegacyCriteriaPayload(cached?.payload)) return cachedCriteria;
+      return this.labelLegacyCriteria(runUid, job, hash, cachedCriteria);
+    }
 
-    const text = await withRetry(job.roleTitle, () => this.claude(criteriaPrompt(posting), 400));
+    const text = await withRetry(job.roleTitle, () => this.claude(criteriaPrompt(posting), 800));
     const criteria = parseCriteria(text);
     try {
       await this.prisma.jobMatchRow.create({
@@ -326,11 +383,80 @@ export class JobMatchRunner {
     return criteria;
   }
 
+  /**
+   * Adds a label and a group to a legacy (`string[]`) criteria list with one model call, and stores the result as a
+   * new CRITERIA row under the same posting hash, which every reader then picks as the newest (LAB-2854). The
+   * statements are the criteria's identity, so the answer is used only when it returns them exactly; otherwise,
+   * or when the call fails, the run goes on with the statements unlabelled and the next run tries again. Either
+   * way the statements, and so the enabled list and the score hash, are the ones the legacy row held.
+   */
+  private async labelLegacyCriteria(
+    runUid: string,
+    job: MatchJob,
+    hash: string,
+    legacy: MatchCriterionItem[]
+  ): Promise<MatchCriterionItem[]> {
+    const statements = criterionStatements(legacy);
+    let labelled: MatchCriterionItem[] | null = null;
+    try {
+      labelled = parseCriteriaLabels(
+        await this.claude(criteriaLabelPrompt(job.roleTitle, statements), 600),
+        statements
+      );
+    } catch (error) {
+      this.logger.warn(`job match criteria labels for role ${job.uid} failed: ${errorText(error)}`);
+      return legacy;
+    }
+    if (!labelled) {
+      this.logger.warn(`job match criteria labels for role ${job.uid} changed the statements; kept unlabelled`);
+      return legacy;
+    }
+    // The same run may already hold the legacy row (a run claimed again after a deploy), so upsert on its key.
+    // A failed write only costs the labels this time; the run keeps them in memory either way.
+    try {
+      await this.prisma.jobMatchRow.upsert({
+        where: matchKey('CRITERIA', { runUid, roleUid: job.uid, roleTextHash: hash }),
+        create: { kind: 'CRITERIA', runUid, roleUid: job.uid, roleTextHash: hash, payload: labelled },
+        update: { payload: labelled },
+      });
+    } catch (error) {
+      this.logger.warn(`job match criteria labels for role ${job.uid} not stored: ${errorText(error)}`);
+    }
+    return labelled;
+  }
+
+  /**
+   * Disabled criteria (LAB-2846) and the lead's criteria prompt (LAB-2853) per role, from overrides saved against
+   * each role's current posting hash. A role with no disabled criteria is absent from `disabledByUid`; a role
+   * with no (or a blank) prompt is absent from `promptByUid`.
+   */
+  private async loadCriteriaOverrides(
+    postingHashes: ReadonlyMap<string, string>
+  ): Promise<{ disabledByUid: Map<string, string[]>; promptByUid: Map<string, string> }> {
+    const disabledByUid = new Map<string, string[]>();
+    const promptByUid = new Map<string, string>();
+    if (!postingHashes.size) return { disabledByUid, promptByUid };
+    const overrides = await this.prisma.jobMatchCriteriaOverride.findMany({
+      where: {
+        OR: [...postingHashes].map(([roleUid, roleTextHash]) => ({ roleUid, roleTextHash })),
+      },
+      select: { roleUid: true, roleTextHash: true, disabled: true, prompt: true },
+    });
+    for (const row of overrides) {
+      if (postingHashes.get(row.roleUid) !== row.roleTextHash) continue;
+      if (row.disabled.length) disabledByUid.set(row.roleUid, row.disabled);
+      const prompt = row.prompt?.trim();
+      if (prompt) promptByUid.set(row.roleUid, prompt);
+    }
+    return { disabledByUid, promptByUid };
+  }
+
   private async finishRole(
     runUid: string,
     teamUid: string,
     job: MatchJob,
     criteria: string[],
+    leadPrompt: string | null,
     members: MatchMember[],
     scoresByMember: Map<string, Record<string, number>>,
     interest: ReadonlyMap<string, string | null>
@@ -348,7 +474,9 @@ export class JobMatchRunner {
         const member = byUid.get(row.memberUid);
         return member ? [{ member, fit: row.fit }] : [];
       });
-      const text = await withRetry(job.roleTitle, () => this.claude(blurbPrompt(job, criteria, people), 2000));
+      const text = await withRetry(job.roleTitle, () =>
+        this.claude(blurbPrompt(job, criteria, people, leadPrompt), 2000)
+      );
       notes = parseCandidateNotes(
         text,
         people.map((row) => ({ memberUid: row.member.uid, criteriaCount: criteria.length }))

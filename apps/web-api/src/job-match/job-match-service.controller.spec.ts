@@ -1,12 +1,15 @@
 jest.mock('ai', () => ({ generateText: jest.fn() }));
+// The send service injects the analytics service, whose PostHog client is ESM-only under jest.
+jest.mock('../analytics/service/analytics.service', () => ({ AnalyticsService: class AnalyticsService {} }));
 
-import { InternalServerErrorException } from '@nestjs/common';
+import { BadRequestException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { JobMatchServiceController } from './job-match-service.controller';
 
 describe('JobMatchServiceController', () => {
   const env = { ...process.env };
   const runner = { start: jest.fn() };
-  const controller = new JobMatchServiceController(runner as never);
+  const email = { completedRun: jest.fn(), sendForRun: jest.fn() };
+  const controller = new JobMatchServiceController(runner as never, email as never);
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -35,5 +38,42 @@ describe('JobMatchServiceController', () => {
     process.env.ANTHROPIC_AUTH_MODE = 'api_key';
     await expect(controller.run()).rejects.toBeInstanceOf(InternalServerErrorException);
     expect(runner.start).not.toHaveBeenCalled();
+  });
+
+  describe('POST job-match/suggested-candidates-email (LAB-2850)', () => {
+    const result = { runUid: 'run-9', dryRun: true, sent: 2, skipped: 1 };
+
+    beforeEach(() => {
+      email.sendForRun.mockResolvedValue(result);
+    });
+
+    it('sends for the latest completed run when the body is empty or missing', async () => {
+      email.completedRun.mockResolvedValue({ uid: 'run-9' });
+      await expect(controller.sendSuggestedCandidatesEmail({})).resolves.toEqual(result);
+      await expect(controller.sendSuggestedCandidatesEmail(undefined)).resolves.toEqual(result);
+      expect(email.completedRun).toHaveBeenCalledWith(undefined);
+      expect(email.sendForRun).toHaveBeenCalledWith('run-9');
+    });
+
+    it('sends for the given completed run', async () => {
+      email.completedRun.mockResolvedValue({ uid: 'run-3' });
+      await controller.sendSuggestedCandidatesEmail({ runUid: 'run-3' });
+      expect(email.completedRun).toHaveBeenCalledWith('run-3');
+      expect(email.sendForRun).toHaveBeenCalledWith('run-3');
+    });
+
+    it('404s an unknown or unfinished run and sends nothing', async () => {
+      email.completedRun.mockResolvedValue(null);
+      await expect(controller.sendSuggestedCandidatesEmail({ runUid: 'nope' })).rejects.toBeInstanceOf(
+        NotFoundException
+      );
+      await expect(controller.sendSuggestedCandidatesEmail({})).rejects.toBeInstanceOf(NotFoundException);
+      expect(email.sendForRun).not.toHaveBeenCalled();
+    });
+
+    it.each([[{ runUid: 42 }], [{ runUid: '' }], ['run-1']])('400s body %p', async (body) => {
+      await expect(controller.sendSuggestedCandidatesEmail(body)).rejects.toBeInstanceOf(BadRequestException);
+      expect(email.completedRun).not.toHaveBeenCalled();
+    });
   });
 });

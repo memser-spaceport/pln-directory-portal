@@ -375,6 +375,10 @@ export const ANALYTICS_EVENTS = {
     PUBLISHED_VIA_INTEGRATION: 'job-published-via-integration',
     CLOSED_VIA_INTEGRATION: 'job-closed-via-integration',
     CLAIMED: 'job-claimed',
+    /** A real (not dry-run, not preview) weekly suggested-candidates email to one lead for one role (LAB-2853). */
+    SUGGESTED_CANDIDATES_EMAIL_SENT: 'suggested-candidates-email-sent',
+    /** A lead turned the suggested-candidates email off through the email's unsubscribe link (LAB-2853). */
+    SUGGESTED_CANDIDATES_EMAIL_UNSUBSCRIBED: 'suggested-candidates-email-unsubscribed',
   },
 };
 
