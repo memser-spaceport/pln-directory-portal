@@ -417,7 +417,6 @@
     - version: bumped by every change request so an older worker run never marks the row SYNCED over it
     - createdAt / updatedAt
   - Unique constraints on [sourceType, sourceUid] and linearIssueId; index on [status, nextAttemptAt]
-  - Linear target of an AI App lives on AiApp: linearTeamId (a private team), linearProjectId (optional), linearTargetSetAt (only feedback created after it is pushed)
 
 ### Image Management
 - Image: Manages dynamic image assets in the system like pfps

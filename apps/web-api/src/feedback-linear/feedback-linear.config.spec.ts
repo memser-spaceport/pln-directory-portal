@@ -4,6 +4,7 @@ import {
   feedbackLinearMaxAttempts,
   getFeedbackLinearConfig,
   getFeedbackLinearCredentials,
+  getFeedbackLinearMemberAppsTarget,
   isFeedbackLinearConfigured,
 } from './feedback-linear.config';
 
@@ -16,6 +17,8 @@ const KEYS = [
   'FEEDBACK_LINEAR_LABEL_ID',
   'FEEDBACK_LINEAR_IMAGE_HOSTS',
   'FEEDBACK_LINEAR_MAX_ATTEMPTS',
+  'FEEDBACK_LINEAR_MEMBER_APPS_TEAM_ID',
+  'FEEDBACK_LINEAR_MEMBER_APPS_PROJECT_ID',
   'AWS_S3_IMAGE_BUCKET_NAME',
   'AWS_REGION',
   'AWS_S3_DOMAIN',
@@ -101,6 +104,20 @@ describe('feedback-linear config', () => {
         maxAttempts: 8,
       });
       expect(isFeedbackLinearConfigured()).toBe(false);
+    });
+  });
+
+  describe('member apps target', () => {
+    it('is null without a team', () => {
+      process.env.FEEDBACK_LINEAR_MEMBER_APPS_PROJECT_ID = 'proj';
+      expect(getFeedbackLinearMemberAppsTarget()).toBeNull();
+    });
+
+    it('returns the team and the optional project', () => {
+      process.env.FEEDBACK_LINEAR_MEMBER_APPS_TEAM_ID = 'team';
+      expect(getFeedbackLinearMemberAppsTarget()).toEqual({ teamId: 'team', projectId: null });
+      process.env.FEEDBACK_LINEAR_MEMBER_APPS_PROJECT_ID = 'proj';
+      expect(getFeedbackLinearMemberAppsTarget()).toEqual({ teamId: 'team', projectId: 'proj' });
     });
   });
 

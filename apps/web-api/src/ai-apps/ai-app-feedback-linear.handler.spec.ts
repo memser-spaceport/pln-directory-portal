@@ -42,7 +42,6 @@ describe('AiAppFeedbackLinearHandler', () => {
     member: { findUnique: jest.Mock };
     aiAppFeedbackComment: { findUnique: jest.Mock };
   };
-  let linear: { userByEmail: jest.Mock };
   let images: { rehost: jest.Mock };
   let teamMeta: { intakeStateId: jest.Mock; labelId: jest.Mock; typeLabelId: jest.Mock };
   let registry: FeedbackLinearHandlerRegistry;
@@ -92,7 +91,7 @@ describe('AiAppFeedbackLinearHandler', () => {
             Promise.resolve(
               where.uid === 'reporter-1'
                 ? { uid: 'reporter-1', name: 'Ada', email: 'ada@pl.test' }
-                : { email: 'owner@pl.test' }
+                : { uid: 'owner-1', name: 'Olga' }
             )
           ),
       },
@@ -100,7 +99,6 @@ describe('AiAppFeedbackLinearHandler', () => {
         findUnique: jest.fn().mockResolvedValue({ text: '<p>Fixed in <strong>v2</strong></p>' }),
       },
     };
-    linear = { userByEmail: jest.fn().mockResolvedValue({ id: 'linear-owner', teamIds: [] }) };
     images = {
       rehost: jest
         .fn()
@@ -115,13 +113,7 @@ describe('AiAppFeedbackLinearHandler', () => {
       typeLabelId: jest.fn().mockImplementation((_team, name) => Promise.resolve(name === 'Bug' ? 'bug-label' : null)),
     };
     registry = new FeedbackLinearHandlerRegistry();
-    handler = new AiAppFeedbackLinearHandler(
-      prisma as never,
-      registry,
-      linear as never,
-      images as never,
-      teamMeta as never
-    );
+    handler = new AiAppFeedbackLinearHandler(prisma as never, registry, images as never, teamMeta as never);
   });
 
   afterEach(() => {
@@ -146,11 +138,13 @@ describe('AiAppFeedbackLinearHandler', () => {
       title: '[Ops Board] Filters reset on refresh',
       labelIds: ['user-feedback-label', 'bug-label'],
       priority: 1,
-      assigneeId: 'linear-owner',
       createAsUser: 'Ada',
     });
     const sections = draft.description.split('\n\n');
-    expect(sections[0]).toBe('Reported by [Ada](https://labos.test/members/reporter-1) · Ops Board · prod');
+    expect(sections[0]).toBe(
+      'Reported by [Ada](https://labos.test/members/reporter-1) · Ops Board, owner [Olga](https://labos.test/members/owner-1) · prod'
+    );
+    expect(draft).not.toHaveProperty('assigneeId');
     const order = ['## What they said', '## Screenshots', '## Context', '## Expected result', '[Open in LabOS]'].map(
       (heading) => draft.description.indexOf(heading)
     );
@@ -207,10 +201,14 @@ describe('AiAppFeedbackLinearHandler', () => {
     expect(draft.description.split('\n\n')[0]).toContain('· production');
   });
 
-  it('leaves the issue unassigned when the owner has no Linear account', async () => {
-    linear.userByEmail.mockResolvedValue(null);
+  it('leaves out the owner when the owner is gone', async () => {
+    prisma.member.findUnique.mockImplementation(({ where }) =>
+      Promise.resolve(where.uid === 'reporter-1' ? { uid: 'reporter-1', name: 'Ada', email: 'ada@pl.test' } : null)
+    );
     const draft = await handler.buildIssue(row());
-    expect(draft).not.toHaveProperty('assigneeId');
+    expect(draft.description.split('\n\n')[0]).toBe(
+      'Reported by [Ada](https://labos.test/members/reporter-1) · Ops Board · prod'
+    );
   });
 
   it('uses the team intake state', async () => {
