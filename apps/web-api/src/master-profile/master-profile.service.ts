@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { ManualFieldActor, ManualFieldLockService } from '../manual-field-lock/manual-field-lock.service';
 import { PrismaService } from '../shared/prisma.service';
 import {
   IngestMasterProfileDto,
@@ -26,7 +27,7 @@ function likeContains(value: string): string {
 export class MasterProfileService {
   private readonly logger = new Logger(MasterProfileService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly manualFieldLocks: ManualFieldLockService) {}
 
   async ingest(dto: IngestMasterProfileDto): Promise<IngestMasterProfileResponse> {
     if (!Array.isArray(dto.profiles)) {
@@ -53,6 +54,7 @@ export class MasterProfileService {
     let updated = 0;
 
     await this.prisma.$transaction(async (tx) => {
+      const updatedUids: string[] = [];
       for (const profile of dto.profiles) {
         const personKey = profile.personKey.trim();
         const data = this.toUpsertData(profile);
@@ -62,11 +64,15 @@ export class MasterProfileService {
         });
         if (existing) {
           await tx.masterProfile.update({ where: { personKey }, data });
+          updatedUids.push(existing.uid);
           updated += 1;
         } else {
           await tx.masterProfile.create({ data: { personKey, ...data } });
           created += 1;
         }
+      }
+      if (updatedUids.length > 0) {
+        await this.manualFieldLocks.reapplyAll(tx, 'master_profile', updatedUids);
       }
     });
 
@@ -83,6 +89,10 @@ export class MasterProfileService {
       created,
       updated,
     };
+  }
+
+  async patchFields(uid: string, fields: Record<string, unknown> | undefined, actor: ManualFieldActor) {
+    return this.manualFieldLocks.patch('master_profile', uid, fields, actor);
   }
 
   async getByUid(uid: string) {
