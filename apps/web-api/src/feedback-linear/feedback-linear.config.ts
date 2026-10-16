@@ -80,6 +80,23 @@ export function getFeedbackLinearCredentials(): FeedbackLinearCredentials | null
   return { clientId, clientSecret, imageHosts: feedbackLinearImageHosts(), maxAttempts: feedbackLinearMaxAttempts() };
 }
 
+export interface FeedbackLinearMemberAppsTarget {
+  teamId: string;
+  projectId: string | null;
+}
+
+/**
+ * The one Linear team (and optional project) every member AI App's private
+ * feedback goes to, or null when it is not set (those pushes are then off).
+ */
+export function getFeedbackLinearMemberAppsTarget(): FeedbackLinearMemberAppsTarget | null {
+  const teamId = env('FEEDBACK_LINEAR_MEMBER_APPS_TEAM_ID');
+  if (!teamId) {
+    return null;
+  }
+  return { teamId, projectId: env('FEEDBACK_LINEAR_MEMBER_APPS_PROJECT_ID') };
+}
+
 /** The platform-feedback config, or null when it is not configured (platform pushes are then off). */
 export function getFeedbackLinearConfig(): FeedbackLinearConfig | null {
   const clientId = env('FEEDBACK_LINEAR_CLIENT_ID');

@@ -9,11 +9,7 @@
   - `submitFeedback` creates the `AiAppFeedback` row; its HTML already carries a readable pin list with crop `<img>`s, written by v2's `appendPinsHtml`.
   - Status changes from all three routes go through `applyFeedbackStatus`. The agent/MCP closing note is created as an `AiAppFeedbackComment` (`CLOSING_NOTE`) right after it, in `updateAgentFeedbackStatus`.
   - `deleteFeedbackItem` hard-deletes; pins and comments cascade.
-- **Manage gate:** `findManageableApp` in `ai-apps-access.service.ts` is private; the same rule is `isCreatorOrDirectoryAdmin` on `AiAppsService`.
-- **Feedback lists:**
-  - for managers: `queryFeedback` (via `listFeedback`), `listAccessibleFeedback`, `listAgentFeedback`, `listFeedbackForMcp`
-  - for the reporter: `listMyFeedback`
-- **Linear team facts:** each team has `private`, `triageEnabled`, and `states` with `type` ∈ {triage, backlog, unstarted, started, completed, canceled} and a `position`. Labels can be team-level or workspace-level. Users can be filtered by email and have `teams`.
+- **Linear team facts:** each team has `private`, `triageEnabled`, and `states` with `type` ∈ {triage, backlog, unstarted, started, completed, canceled} and a `position`. Labels can be team-level or workspace-level.
 
 ## Goals / Non-Goals
 
@@ -24,7 +20,7 @@
 **Non-Goals:**
 - Linear → LabOS sync (webhooks), mirroring text edits or replies other than the closing note, and backfilling older items.
 - Any change to the platform (contact-support) behavior, beyond the shared module learning the update step.
-- A Linear user picker for the assignee: it is matched by email only.
+- Any LabOS-visible surface (settings, routes, response fields), and an assignee: the owner may not be in the member-apps team, so they are named in the body instead.
 
 ## Decisions
 
@@ -82,33 +78,24 @@ Helpers:
 - `typeLabelId(team, name)` (parent group `Type`)
 - `labelId(team, 'User feedback')`
 
-The platform handler switches to it with no behavior change. The client gains `team(id)` (with states, labels and projects), `teams()`, `userByEmail(email)` (active only, with team ids), `issueUpdate` and `commentCreate`.
+The platform handler switches to it with no behavior change. The client gains `team(id)` (with states, labels and projects), `issueUpdate` and `commentCreate`.
 
-### D5. Target routes in a new `AiAppsLinearService`
-In `apps/web-api/src/ai-apps/ai-apps-linear.service.ts`:
-- `GET /v1/ai-apps/linear/teams` (`UserTokenCheckGuard` + `RbacGuard` READ). It is declared above the `:uid` routes so `linear` is never read as a uid.
-  - **Directory admin:** every private team.
-  - **Otherwise:** `userByEmail(member.email)`, then the private teams among that user's teams. No member email or no Linear user gives `[]`.
-  - Projects per team are capped at 250.
-  - The 1-hour team-meta cache is not used here: the list must reflect new teams quickly, and it is only called from the settings modal.
-- `GET` / `PUT /v1/ai-apps/:uid/linear-target` (same guards, `ZodValidationPipe` from `@abitia/zod-dto`):
-  - manager gate = `isCreatorOrDirectoryAdmin`, with 404 for missing or `DELETED`
-  - PUT validates through `team(id)`: missing → 400 "Linear team <id> not found", not private → 400, project not in the team → 400
-  - it saves `linearTeamId`, `linearProjectId` and `linearTargetSetAt = now()`; clearing nulls all three
-  - a set re-queues the app's `FAILED` rows: `updateMany` on `sourceType = AI_APP_FEEDBACK`, `sourceUid in <app's feedback uids>`, `status = FAILED`
-- 503 = `ServiceUnavailableException` when credentials are missing.
-- **Privacy note:** listing only the requester's own teams keeps one app owner from seeing every private team name in the workspace. That is tighter than the ticket's wording, by decision.
+### D5. One member-apps team from env, no LabOS surface
+The target is `getFeedbackLinearMemberAppsTarget()`: `FEEDBACK_LINEAR_MEMBER_APPS_TEAM_ID` and an optional `FEEDBACK_LINEAR_MEMBER_APPS_PROJECT_ID`, frozen on each outbox row at enqueue. LabOS has no setting, route or response field for it.
+- **Alternatives:**
+  - A per-app, owner-chosen private team, with `GET /linear/teams`, `GET`/`PUT /:uid/linear-target`, `AiApp` columns and a LabOS modal plus issue chips (LAB-2874). It was built and removed on 2026-10-16, because the feature must not change the UI. Feedback stays as invisible as the Telegram copy of support requests.
+  - Platform feedback only: it leaves owners without the member-app items.
 
 ### D6. Hooks in `AiAppsService`
 Each hook calls an injected `AiAppFeedbackLinearSync` (in `ai-apps/`) whose methods catch and log every error, so no LabOS response changes.
-- **`submitFeedback`:** after create, `sync.onSubmitted(app, feedback)`. It enqueues when the item is `FEEDBACK`, credentials exist, `app.linearTeamId` is set and `feedback.createdAt >= app.linearTargetSetAt`. Team and project are frozen on the row.
+- **`submitFeedback`:** after create, `sync.onSubmitted(feedback)`. It enqueues when the item is `FEEDBACK` and the credentials and member-apps team are configured. Team and project are frozen on the row.
 - **`applyFeedbackStatus`:** after the update, `sync.onStatusChanged(feedbackUid, from, to)`. `to = IMPLEMENTED` gives COMPLETED; `from = IMPLEMENTED` with `to ∈ {NEW, VIEWED}` gives INTAKE; anything else is nothing.
 - **`updateAgentFeedbackStatus`:** after the `CLOSING_NOTE` comment is created, `sync.onClosingNote(feedbackUid, comment.uid)`. This sets the pending comment (with a new UUID) and requests COMPLETED again (a no-op on state if already applied).
 - **`deleteFeedbackItem`:** after delete, `sync.onDeleted(feedbackUid)` → CANCELED.
 
 ### D7. `AI_APP_FEEDBACK` handler
 `AiAppFeedbackLinearHandler`, in `ai-apps/`, registered in `onModuleInit`.
-- **Loads:** the item (missing → permanent), its app and the reporter `Member`, plus the owner `Member`'s email for the assignee lookup.
+- **Loads:** the item (missing → permanent), its app, the reporter `Member` and the owner `Member` (name + profile link in the reporter line).
 - **Body:** `toLinearMarkdown` (shared from contact-support) and `LinearImageUploader.rehost`.
   - **Reporter line:** `Reported by [name](profile) · <app name> · <env from context or ENVIRONMENT>`
   - **Context:** a JSON block of `context`, truncated to 2000 characters
@@ -118,29 +105,26 @@ Each hook calls an injected `AiAppFeedbackLinearSync` (in `ai-apps/`) whose meth
 - **Title:** `[<app name>] <first line ≤ 80>`, through the shared `feedbackIssueTitle(message, fallback, prefix)` (gains a prefix parameter).
 - **Labels:** the team's `User feedback` label if present, and Type from `reportKind` (`bug` → Bug, `request` → Improvement, else none).
 - **Priority:** mapped from `priority`.
-- **Assignee:** `userByEmail(owner.email)?.id`.
+- **Assignee:** none.
 - **State:** `intakeStateId(team)`.
 - **`createAsUser`:** the reporter name.
 - **`buildComment`:** the `CLOSING_NOTE` comment's text as markdown, prefixed `Closing note from LabOS:`.
 
-### D8. `linearIssue` on manager responses
-`AiAppFeedbackLinearSync.attach(rows)` runs one `findMany` on the outbox by `sourceUid in rows` (`sourceType = AI_APP_FEEDBACK`) and maps each row to `{ status, identifier, url, lastError }`, or `null`. It is applied to the return values of `listFeedback`, `listAccessibleFeedback`, `listAgentFeedback` and `listFeedbackForMcp`. `listMyFeedback` is untouched, so the field is absent there.
-
 ## Risks / Trade-offs
 
-- **[The Linear app can't see the chosen private team]** Private teams are visible to the app only if it was given access. → `teams` returns only what the app can reach, so an owner who doesn't see their team must ask an admin to add the app (documented). PUT validation catches stale ids.
-- **[Email match picks the wrong Linear user]** → It only sets the assignee, only matches active users, and Linear emails are unique per workspace.
+- **[The Linear app can't see the member-apps team]** Private teams are visible to the app only if it was given access. → Pushes fail permanently with "Linear team … not found or not shared with the Linear app" in `lastError`; LAB-2870 shares the team when it sets the env var.
+- **[Owners don't see their feedback in Linear unless they are in the member-apps team]** → Accepted by decision: owners keep LabOS as their view, and the team is the triage place.
 - **[Comment and state edits from Linear users are overwritten]** If someone moves the issue in Linear, a later LabOS status change moves it again. → Accepted: LabOS → Linear is one-way by decision, and only explicit LabOS transitions trigger an update.
 - **[Version race]** A worker that finishes after a newer request leaves the row `PENDING`. → By design, the next tick converges.
 - **[Linear `issueUpdate` on a deleted issue]** → It fails permanently after max attempts and is visible as `FAILED` with `lastError`. Acceptable.
 
 ## Migration Plan
 
-1. One additive migration: three `AiApp` columns; `FeedbackLinearIssue` columns with defaults; `SKIPPED` added to `FeedbackLinearStatus` (`ALTER TYPE … ADD VALUE`, non-destructive). Existing platform rows get `targetState = INTAKE` and `appliedState = null`.
+1. One additive migration: `FeedbackLinearIssue` columns with defaults; `SKIPPED` added to `FeedbackLinearStatus` (`ALTER TYPE … ADD VALUE`, non-destructive). Existing platform rows get `targetState = INTAKE` and `appliedState = null`.
    - No backfill: LAB-2871 has not reached any deployed environment, so no `SYNCED` rows exist. The worker sets `appliedState = INTAKE` whenever it creates an issue.
-2. Deploy is inert without credentials. Owners opt in per app from LabOS (LAB-2874).
+2. Deploy is inert without credentials and `FEEDBACK_LINEAR_MEMBER_APPS_TEAM_ID`; LAB-2870 sets them per environment.
 
-**Rollback:** clear app targets, or unset the credentials.
+**Rollback:** unset `FEEDBACK_LINEAR_MEMBER_APPS_TEAM_ID` (member-app pushes stop), or the credentials (all pushes stop).
 
 ## Open Questions
 

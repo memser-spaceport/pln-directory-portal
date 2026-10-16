@@ -49,7 +49,7 @@ import {
   type PublicFeedbackPin,
 } from './ai-app-feedback-pins';
 import type { FeedbackContext, FeedbackPinInput } from './dto/submit-feedback.dto';
-import { AiAppFeedbackLinearIssue, AiAppFeedbackLinearSync } from './ai-app-feedback-linear-sync.service';
+import { AiAppFeedbackLinearSync } from './ai-app-feedback-linear-sync.service';
 import {
   AiAppLogPhase,
   AiAppTargetEnvironment,
@@ -1925,7 +1925,7 @@ export class AiAppsService {
         ...(extras.priority ? { priority: extras.priority } : {}),
       },
     });
-    await this.feedbackLinear?.onSubmitted(app, feedback);
+    await this.feedbackLinear?.onSubmitted(feedback);
     const [withAuthor] = await this.withMember([feedback]);
     if (isComment && app.memberUid !== memberUid) {
       await this.notifyFeedbackConversation(app, { ...feedback, hasPins: true }, app.memberUid, {
@@ -2189,20 +2189,12 @@ export class AiAppsService {
     const withMembers = await this.withMember(rows);
     const comments = options.withComments ? await this.withMember(rows.flatMap((row) => row.comments ?? [])) : [];
     let offset = 0;
-    const result = withMembers.map(({ _count, comments: own, ...row }) => {
+    return withMembers.map(({ _count, comments: own, ...row }) => {
       const count = own?.length ?? 0;
       const thread = options.withComments ? { comments: comments.slice(offset, offset + count) } : {};
       offset += count;
       return { ...row, ...thread, commentCount: _count?.comments ?? 0 };
     });
-    return this.withLinearIssue(result);
-  }
-
-  /** Managers' rows carry the item's Linear issue (or null); see AiAppFeedbackLinearSync. */
-  private async withLinearIssue<T extends { uid: string }>(
-    rows: T[]
-  ): Promise<Array<T & { linearIssue?: AiAppFeedbackLinearIssue | null }>> {
-    return this.feedbackLinear ? this.feedbackLinear.attach(rows) : rows;
   }
 
   /**
@@ -2336,14 +2328,12 @@ export class AiAppsService {
     });
     const withMembers = await this.withMember(feedback);
     // `pinCount` lets the list offer "Show on page" without sending every pin.
-    return this.withLinearIssue(
-      withMembers.map(({ _count, ...row }) => ({
-        ...row,
-        appName: appNameByUid.get(row.appUid) ?? '',
-        pinCount: _count?.pins ?? 0,
-        commentCount: _count?.comments ?? 0,
-      }))
-    );
+    return withMembers.map(({ _count, ...row }) => ({
+      ...row,
+      appName: appNameByUid.get(row.appUid) ?? '',
+      pinCount: _count?.pins ?? 0,
+      commentCount: _count?.comments ?? 0,
+    }));
   }
 
   /**

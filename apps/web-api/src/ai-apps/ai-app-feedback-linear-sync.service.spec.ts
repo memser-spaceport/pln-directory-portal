@@ -4,40 +4,32 @@ jest.mock('../push-notifications/push-notifications.service', () => ({
   PushNotificationsService: jest.fn().mockImplementation(() => ({ create: jest.fn() })),
 }));
 jest.mock('../analytics/service/analytics.service', () => ({ AnalyticsService: jest.fn() }));
-jest.mock('../shared/prisma.service', () => ({ PrismaService: jest.fn() }));
 jest.mock('../feedback-linear/feedback-linear-outbox.service', () => ({ FeedbackLinearOutboxService: jest.fn() }));
 
 import { AiAppFeedbackLinearSync } from './ai-app-feedback-linear-sync.service';
 import { AiAppsService } from './ai-apps.service';
 
-const TARGET_SET_AT = new Date('2026-10-15T10:00:00Z');
-const APP = {
-  uid: 'app-1',
-  memberUid: 'creator-1',
-  appId: 'demo',
-  name: 'Ops Board',
-  access: 'OPEN',
-  status: 'READY',
-  linearTeamId: 'team-1',
-  linearProjectId: 'proj-1',
-  linearTargetSetAt: TARGET_SET_AT,
-};
+const APP = { uid: 'app-1', memberUid: 'creator-1', appId: 'demo', name: 'Ops Board', access: 'OPEN', status: 'READY' };
 
 describe('AiAppFeedbackLinearSync', () => {
   const saved: Record<string, string | undefined> = {};
   let outbox: { enqueue: jest.Mock; requestState: jest.Mock };
-  let prisma: { feedbackLinearIssue: { findMany: jest.Mock } };
   let sync: AiAppFeedbackLinearSync;
-
-  const after = new Date(TARGET_SET_AT.getTime() + 1000);
+  const KEYS = [
+    'FEEDBACK_LINEAR_CLIENT_ID',
+    'FEEDBACK_LINEAR_CLIENT_SECRET',
+    'FEEDBACK_LINEAR_MEMBER_APPS_TEAM_ID',
+    'FEEDBACK_LINEAR_MEMBER_APPS_PROJECT_ID',
+  ];
 
   beforeEach(() => {
-    for (const key of ['FEEDBACK_LINEAR_CLIENT_ID', 'FEEDBACK_LINEAR_CLIENT_SECRET']) saved[key] = process.env[key];
+    for (const key of KEYS) saved[key] = process.env[key];
     process.env.FEEDBACK_LINEAR_CLIENT_ID = 'cid';
     process.env.FEEDBACK_LINEAR_CLIENT_SECRET = 'secret';
+    process.env.FEEDBACK_LINEAR_MEMBER_APPS_TEAM_ID = 'team-1';
+    process.env.FEEDBACK_LINEAR_MEMBER_APPS_PROJECT_ID = 'proj-1';
     outbox = { enqueue: jest.fn().mockResolvedValue(undefined), requestState: jest.fn().mockResolvedValue(true) };
-    prisma = { feedbackLinearIssue: { findMany: jest.fn().mockResolvedValue([]) } };
-    sync = new AiAppFeedbackLinearSync(outbox as never, prisma as never);
+    sync = new AiAppFeedbackLinearSync(outbox as never);
   });
 
   afterEach(() => {
@@ -48,8 +40,8 @@ describe('AiAppFeedbackLinearSync', () => {
   });
 
   describe('onSubmitted', () => {
-    it('queues private feedback created after the target, frozen to the app target', async () => {
-      await sync.onSubmitted(APP as never, { uid: 'fb-1', kind: 'FEEDBACK', createdAt: after });
+    it('queues every private feedback item for the member-apps team and project', async () => {
+      await sync.onSubmitted({ uid: 'fb-1', kind: 'FEEDBACK' });
       expect(outbox.enqueue).toHaveBeenCalledTimes(1);
       expect(outbox.enqueue).toHaveBeenCalledWith({
         sourceType: 'AI_APP_FEEDBACK',
@@ -59,40 +51,32 @@ describe('AiAppFeedbackLinearSync', () => {
       });
     });
 
+    it('queues with no project when none is configured', async () => {
+      delete process.env.FEEDBACK_LINEAR_MEMBER_APPS_PROJECT_ID;
+      await sync.onSubmitted({ uid: 'fb-1', kind: 'FEEDBACK' });
+      expect(outbox.enqueue).toHaveBeenCalledWith(expect.objectContaining({ teamId: 'team-1', projectId: null }));
+    });
+
     it('never queues a COMMENT', async () => {
-      await sync.onSubmitted(APP as never, { uid: 'c-1', kind: 'COMMENT', createdAt: after });
+      await sync.onSubmitted({ uid: 'c-1', kind: 'COMMENT' });
       expect(outbox.enqueue).not.toHaveBeenCalled();
     });
 
-    it('never queues on an app without a target', async () => {
-      await sync.onSubmitted({ ...APP, linearTeamId: null, linearTargetSetAt: null } as never, {
-        uid: 'fb-1',
-        kind: 'FEEDBACK',
-        createdAt: after,
-      });
-      expect(outbox.enqueue).not.toHaveBeenCalled();
-    });
-
-    it('never queues an item created before the target was set', async () => {
-      await sync.onSubmitted(APP as never, {
-        uid: 'fb-1',
-        kind: 'FEEDBACK',
-        createdAt: new Date(TARGET_SET_AT.getTime() - 1),
-      });
+    it('never queues without a member-apps team', async () => {
+      delete process.env.FEEDBACK_LINEAR_MEMBER_APPS_TEAM_ID;
+      await sync.onSubmitted({ uid: 'fb-1', kind: 'FEEDBACK' });
       expect(outbox.enqueue).not.toHaveBeenCalled();
     });
 
     it('never queues without Linear credentials', async () => {
       delete process.env.FEEDBACK_LINEAR_CLIENT_ID;
-      await sync.onSubmitted(APP as never, { uid: 'fb-1', kind: 'FEEDBACK', createdAt: after });
+      await sync.onSubmitted({ uid: 'fb-1', kind: 'FEEDBACK' });
       expect(outbox.enqueue).not.toHaveBeenCalled();
     });
 
     it('swallows an outbox error', async () => {
       outbox.enqueue.mockRejectedValue(new Error('db down'));
-      await expect(
-        sync.onSubmitted(APP as never, { uid: 'fb-1', kind: 'FEEDBACK', createdAt: after })
-      ).resolves.toBeUndefined();
+      await expect(sync.onSubmitted({ uid: 'fb-1', kind: 'FEEDBACK' })).resolves.toBeUndefined();
     });
   });
 
@@ -128,41 +112,6 @@ describe('AiAppFeedbackLinearSync', () => {
   it('cancels on delete', async () => {
     await sync.onDeleted('fb-1');
     expect(outbox.requestState).toHaveBeenCalledWith('AI_APP_FEEDBACK', 'fb-1', 'CANCELED', undefined);
-  });
-
-  describe('attach', () => {
-    it('maps synced, pending and absent rows', async () => {
-      prisma.feedbackLinearIssue.findMany.mockResolvedValue([
-        { sourceUid: 'a', status: 'SYNCED', identifier: 'ABC-12', url: 'https://linear.app/x/ABC-12', lastError: null },
-        { sourceUid: 'b', status: 'PENDING', identifier: null, url: null, lastError: 'Linear responded 503' },
-      ]);
-      const rows = await sync.attach([{ uid: 'a' }, { uid: 'b' }, { uid: 'c' }]);
-      expect(rows).toEqual([
-        {
-          uid: 'a',
-          linearIssue: { status: 'SYNCED', identifier: 'ABC-12', url: 'https://linear.app/x/ABC-12', lastError: null },
-        },
-        {
-          uid: 'b',
-          linearIssue: { status: 'PENDING', identifier: null, url: null, lastError: 'Linear responded 503' },
-        },
-        { uid: 'c', linearIssue: null },
-      ]);
-      expect(prisma.feedbackLinearIssue.findMany.mock.calls[0][0].where).toEqual({
-        sourceType: 'AI_APP_FEEDBACK',
-        sourceUid: { in: ['a', 'b', 'c'] },
-      });
-    });
-
-    it('returns null issues when the lookup fails', async () => {
-      prisma.feedbackLinearIssue.findMany.mockRejectedValue(new Error('db down'));
-      await expect(sync.attach([{ uid: 'a' }])).resolves.toEqual([{ uid: 'a', linearIssue: null }]);
-    });
-
-    it('skips the query for no rows', async () => {
-      await expect(sync.attach([])).resolves.toEqual([]);
-      expect(prisma.feedbackLinearIssue.findMany).not.toHaveBeenCalled();
-    });
   });
 });
 
@@ -204,7 +153,6 @@ describe('AiAppsService → Linear sync hooks', () => {
       onStatusChanged: jest.fn().mockResolvedValue(undefined),
       onClosingNote: jest.fn().mockResolvedValue(undefined),
       onDeleted: jest.fn().mockResolvedValue(undefined),
-      attach: jest.fn().mockImplementation((rows) => rows.map((row) => ({ ...row, linearIssue: null }))),
       ...syncOverrides,
     };
     const service = new AiAppsService(
@@ -221,7 +169,7 @@ describe('AiAppsService → Linear sync hooks', () => {
   it('hands each submission to the sync with the app and the created row', async () => {
     const { service, sync } = build();
     await service.submitFeedback('member-1', 'app-1', '<p>hi</p>');
-    expect(sync.onSubmitted).toHaveBeenCalledWith(APP, expect.objectContaining({ uid: 'fb-1', kind: 'FEEDBACK' }));
+    expect(sync.onSubmitted).toHaveBeenCalledWith(expect.objectContaining({ uid: 'fb-1', kind: 'FEEDBACK' }));
   });
 
   it('reports every status change with its previous status', async () => {
@@ -244,18 +192,13 @@ describe('AiAppsService → Linear sync hooks', () => {
     expect(sync.onDeleted).toHaveBeenCalledWith('fb-1');
   });
 
-  it('attaches linearIssue to the owner list and the cross-app review list', async () => {
+  it('adds nothing to any feedback list: Linear is invisible in LabOS', async () => {
     const { service } = build();
     const own = await service.listFeedback('creator-1', 'app-1');
-    expect(own[0]).toHaveProperty('linearIssue', null);
     const all = await service.listAccessibleFeedback('creator-1');
-    expect(all[0]).toHaveProperty('linearIssue', null);
-  });
-
-  it("never attaches linearIssue to the reporter's own list", async () => {
-    const { service, sync } = build();
     const mine = await service.listMyFeedback('member-1');
-    expect(mine[0]).not.toHaveProperty('linearIssue');
-    expect(sync.attach).not.toHaveBeenCalled();
+    for (const rows of [own, all, mine]) {
+      expect(rows[0]).not.toHaveProperty('linearIssue');
+    }
   });
 });

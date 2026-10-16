@@ -2,7 +2,7 @@
 
 ## Overview
 
-LabOS feedback becomes a Linear issue. Platform feedback goes to the LabOS team, which can triage it and hand it to Horizon AutoDev. Feedback on a member's AI App goes to that app owner's chosen team.
+LabOS feedback becomes a Linear issue. Platform feedback goes to the LabOS team, which can triage it and hand it to Horizon AutoDev. Feedback on members' AI Apps goes to one member-apps team. Nothing about it is visible in LabOS: feedback is left exactly as before, and the issue is created in the background, like the Telegram message for support requests.
 Code: `apps/web-api/src/feedback-linear/` (shared) and `apps/web-api/src/ai-apps/ai-app-feedback-linear*` (AI Apps). Specs: OpenSpec capabilities `feedback-linear-sync` and `ai-app-feedback-linear`.
 
 Pushes are asynchronous. A submission saves its row and an outbox row, and returns. A background worker
@@ -13,7 +13,7 @@ because of it.
 
 | Source | Which items | Linear team / state | Project |
 |---|---|---|---|
-| `POST /v1/ai-apps/:uid/feedback` | `FEEDBACK` items (not `COMMENT`s) on an app with a Linear target, created after the target was set | The app's `linearTeamId`, in the team's triage state when triage is on, else its first backlog state | The app's `linearProjectId` |
+| `POST /v1/ai-apps/:uid/feedback` | Every `FEEDBACK` item (not `COMMENT`s) on any member app | `FEEDBACK_LINEAR_MEMBER_APPS_TEAM_ID`, in the team's triage state when triage is on, else its first backlog state | `FEEDBACK_LINEAR_MEMBER_APPS_PROJECT_ID`, if set |
 | `POST /v1/contact-support` | Topics `Give feedback`, `Share an idea`, `Report a bug`, `AI Apps Feedback` (the AI Apps drawer's "LabOS - AI Apps" option) from a **verified member** | `FEEDBACK_LINEAR_PLATFORM_TEAM_ID`, state `FEEDBACK_LINEAR_PLATFORM_STATE_ID` | `FEEDBACK_LINEAR_AI_APPS_PROJECT_ID` for `AI Apps Feedback`, none otherwise |
 
 - **Not pushed:** `Contact support`, `Ask a question` and any other topic. Telegram and email are sent for every
@@ -23,7 +23,7 @@ because of it.
 - **Intake state:** issues land in the configured backlog-type state (LAB `Backlog` in prod). Never configure
   Todo or a started state. The AutoDev gate acts on Todo, and an issue must be triaged first.
 
-- **AI App target:** the app's creator or a directory admin sets it with `PUT /v1/ai-apps/:uid/linear-target`, choosing from `GET /v1/ai-apps/linear/teams`. Only private teams are allowed, and the list shows only the caller's own Linear teams (all private teams for a directory admin). See `docs/AI_APPS.md` → "Feedback → Linear". Horizon AutoDev builds only LabOS repos, so member-app feedback goes to the owner, never to LAB.
+- **Member-apps team:** one team for every app, set by env. Horizon AutoDev builds only LabOS repos, so this should be a team the AI App owners work in, not LAB.
 
 ## Issue content
 
@@ -51,11 +51,11 @@ because of it.
 
 Same layout, with these differences:
 - **Title:** `[<app name>] <first line>`.
-- **Reporter line:** names the app and the environment from the item's `context`.
+- **Reporter line:** names the app, its owner (linked to their LabOS profile) and the environment from the item's `context`.
 - **Pins:** appear as the item's text already lists them, with pin crops under Screenshots.
 - **Last line:** an `[Open in LabOS]` link to the item.
 - **Labels:** the team's `User feedback` label when it has one, plus Type from `reportKind` (`bug` → Bug, `request` → Improvement, otherwise none).
-- **Assignee:** the app owner's active Linear user, matched by email; otherwise unassigned.
+- **Unassigned:** the owner may not be in the member-apps team, so they are named in the body instead.
 
 ### Privacy
 
@@ -86,7 +86,7 @@ LabOS → Linear only; changes made in Linear never change LabOS.
 
 All three status routes (LabOS, agent, MCP) go through `applyFeedbackStatus`. Changes are requests on the same outbox row (see Delivery), so they apply even when they happen before the issue exists, and are retried like creation.
 
-Owner/admin feedback responses (`GET /v1/ai-apps/:uid/feedback`, `GET /v1/ai-apps/feedback`, the agent and MCP lists) carry `linearIssue: { status, identifier, url, lastError }`, or `null` when the item has no push. The reporter's own list (`/feedback/mine`) never does.
+LabOS responses don't change: no feedback list carries anything about Linear.
 
 ## Delivery
 
@@ -126,9 +126,10 @@ WHERE status = 'FAILED'
 
 ## Configuration
 
-- **Credentials only:** the client id and secret alone turn on the worker and AI App feedback, since AI Apps pick their own teams.
+- **Credentials only:** the client id and secret turn on the worker.
+- **Member-app feedback:** also needs `FEEDBACK_LINEAR_MEMBER_APPS_TEAM_ID`.
 - **Platform feedback:** also needs the platform team and intake state.
-- **Nothing set:** the API boots, and contact-support and AI App feedback behave exactly as without this feature. The AI App Linear routes return 503.
+- **Nothing set:** the API boots, and contact-support and AI App feedback behave exactly as without this feature.
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -136,6 +137,8 @@ WHERE status = 'FAILED'
 | `FEEDBACK_LINEAR_PLATFORM_TEAM_ID` | – | Team for platform feedback (LAB in prod; a private test team in dev) |
 | `FEEDBACK_LINEAR_PLATFORM_STATE_ID` | – | Intake state, a backlog-type state of that team |
 | `FEEDBACK_LINEAR_AI_APPS_PROJECT_ID` | none | Project for `AI Apps Feedback` issues |
+| `FEEDBACK_LINEAR_MEMBER_APPS_TEAM_ID` | – | Team for feedback on members' AI Apps; unset = not sent |
+| `FEEDBACK_LINEAR_MEMBER_APPS_PROJECT_ID` | none | Project in that team |
 | `FEEDBACK_LINEAR_LABEL_ID` | none | The `User feedback` label |
 | `FEEDBACK_LINEAR_IMAGE_HOSTS` | `<AWS_S3_IMAGE_BUCKET_NAME>.s3.<AWS_REGION>.amazonaws.com`, plus the `AWS_S3_DOMAIN` and `WORKER_IMAGE_URL` hosts | Comma-separated hosts images may be downloaded from |
 | `FEEDBACK_LINEAR_SYNC_CRON` | `*/15 * * * * *` | Worker schedule (6-field cron) |

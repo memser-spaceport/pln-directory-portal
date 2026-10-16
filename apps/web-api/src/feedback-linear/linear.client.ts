@@ -53,7 +53,6 @@ export interface LinearIssueCreateInput {
   projectId?: string;
   labelIds?: string[];
   priority?: number;
-  assigneeId?: string;
   createAsUser?: string;
 }
 
@@ -85,19 +84,6 @@ export interface LinearTeamDetails {
   /** The team's own labels plus workspace labels. */
   labels: LinearTeamLabel[];
   projects: LinearProjectRef[];
-}
-
-export interface LinearTeamSummary {
-  id: string;
-  key: string;
-  name: string;
-  private: boolean;
-  projects: LinearProjectRef[];
-}
-
-export interface LinearUserRef {
-  id: string;
-  teamIds: string[];
 }
 
 export interface LinearUploadTarget {
@@ -196,43 +182,6 @@ export class LinearClient {
       labels: [...data.team.labels.nodes, ...(data.issueLabels?.nodes ?? [])].map(toLabel),
       projects: data.team.projects.nodes,
     };
-  }
-
-  /** Every team the Linear app can see, with its projects. */
-  async teams(): Promise<LinearTeamSummary[]> {
-    const data = await this.graphql<{
-      teams: {
-        nodes: { id: string; key: string; name: string; private: boolean; projects: { nodes: LinearProjectRef[] } }[];
-      };
-    }>(
-      `query FeedbackTeams {
-        teams(first: 100) { nodes { id key name private projects(first: 50) { nodes { id name } } } }
-      }`,
-      {}
-    );
-    return data.teams.nodes.map((team) => ({
-      id: team.id,
-      key: team.key,
-      name: team.name,
-      private: team.private,
-      projects: team.projects.nodes,
-    }));
-  }
-
-  /** The active Linear user with this email (case-insensitive) and their team ids, or null. */
-  async userByEmail(email: string): Promise<LinearUserRef | null> {
-    const data = await this.graphql<{
-      users: { nodes: { id: string; teams: { nodes: { id: string }[] } }[] };
-    }>(
-      `query FeedbackUserByEmail($email: String!) {
-        users(first: 1, filter: { email: { eqIgnoreCase: $email }, active: { eq: true } }) {
-          nodes { id teams(first: 100) { nodes { id } } }
-        }
-      }`,
-      { email }
-    );
-    const user = data.users.nodes[0];
-    return user ? { id: user.id, teamIds: user.teams.nodes.map((team) => team.id) } : null;
   }
 
   async issueUpdate(id: string, input: { stateId: string }): Promise<void> {

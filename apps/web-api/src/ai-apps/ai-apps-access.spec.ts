@@ -334,7 +334,6 @@ describe('per-app reads for a non-allowed member', () => {
       {} as any,
       {} as any,
       {} as any,
-      {} as any,
       {} as any
     );
     const req = { memberUid: VIEWER };
@@ -833,7 +832,6 @@ describe('sidecar access check with public paths (controller)', () => {
       rbacService as any,
       accessService,
       {} as any,
-      {} as any,
       {} as any
     );
     return { controller, prisma };
@@ -1008,7 +1006,6 @@ describe('sidecar access check with an app session (controller)', () => {
       rbacService as any,
       accessService,
       sessionService as any,
-      {} as any,
       {} as any
     );
     return { controller, sessionService };
