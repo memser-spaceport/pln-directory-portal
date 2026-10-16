@@ -1705,14 +1705,17 @@ model DemoDayFeedback {
 }
 
 model ContactSupportRequest {
-  id        Int      @id @default(autoincrement())
-  uid       String   @unique @default(cuid())
-  topic     String
-  email     String?
-  name      String?
-  message   String?
-  metadata  Json?
-  createdAt DateTime @default(now())
+  id         Int                      @id @default(autoincrement())
+  uid        String                   @unique @default(cuid())
+  topic      String
+  email      String?
+  name       String?
+  message    String?
+  metadata   Json?
+  /// LabOS Feedback only: the kind and priority picked on the feedback form.
+  reportKind AiAppFeedbackReportKind?
+  priority   AiAppFeedbackPriority?
+  createdAt  DateTime                 @default(now())
 }
 
 // Push Notification Categories - for real-time WebSocket notifications
