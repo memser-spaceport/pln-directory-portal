@@ -63,6 +63,16 @@ function spotlightEmailBody(message: string, buttonLabel: string): string {
   ].join('\n');
 }
 
+const DATA_ROOM_NAMED_SUBJECT = 'Connecting {{teamName}} SPV Team to {{investorName}}';
+const DATA_ROOM_UNNAMED_SUBJECT = 'Connecting you to {{teamName}} SPV Team';
+
+export function dataRoomEmailSubject(subject: string, investorName = ''): string {
+  const name = investorName.trim();
+  if (!name || name.toLowerCase() === 'there') return DATA_ROOM_UNNAMED_SUBJECT;
+  if (/\{\{\s*(investorName|firstName)\b/.test(subject)) return subject;
+  return DATA_ROOM_NAMED_SUBJECT;
+}
+
 export function defaultEmailTemplates(title: string): EmailTemplates {
   return {
     invitePreapproved: {
@@ -96,7 +106,7 @@ export function defaultEmailTemplates(title: string): EmailTemplates {
       body: spotlightEmailBody('{{spotlightTitle}} is now open.', 'View Spotlight'),
     },
     dataRoomAccess: {
-      subject: 'Netholabs SPV: your data room link',
+      subject: DATA_ROOM_NAMED_SUBJECT,
       body: dataRoomAccessBody(),
       fromEmail: 'netholabsspv@plcapital.xyz',
       fromName: 'PL Capital, Netholabs SPV',

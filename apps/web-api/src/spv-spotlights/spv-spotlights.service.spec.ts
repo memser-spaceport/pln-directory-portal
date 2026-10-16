@@ -1,4 +1,5 @@
 import { SpvSpotlightsService } from './spv-spotlights.service';
+import { dataRoomEmailSubject } from './spv-spotlight.utils';
 
 jest.mock('../notifications/notification-service.client', () => ({
   NotificationServiceClient: class NotificationServiceClient {},
@@ -182,6 +183,9 @@ describe('sendDataRoomAccessEmail', () => {
         from: { email: 'netholabsspv@plcapital.xyz', name: 'PL Capital, Netholabs SPV' },
         cc: [],
         extra: { docSendLink: 'https://docsend.com/view/x' },
+        template: expect.objectContaining({
+          subject: dataRoomEmailSubject('stored', 'Ada Lovelace'),
+        }),
       })
     );
 
@@ -189,6 +193,43 @@ describe('sendDataRoomAccessEmail', () => {
     expect(second.docSendUrl).toBe('https://docsend.com/view/x');
     expect(second.alreadySent).toBe(true);
     expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it('replaces a shared data room subject with one that includes the recipient', async () => {
+    const send = jest.fn().mockResolvedValue('link');
+    const prisma = {
+      spvSpotlight: {
+        findUnique: jest.fn().mockResolvedValue({
+          ...spotlight,
+          emailTemplates: {
+            dataRoomAccess: { subject: 'Connecting you to Netholabs SPV Team', body: '<p>Hi</p>' },
+          },
+        }),
+      },
+      member: {
+        findFirst: jest.fn().mockResolvedValue({ uid: 'mem_1', name: 'Ada Lovelace', email: 'ada@example.com' }),
+      },
+      spvAccessRequest: { findUnique: jest.fn().mockResolvedValue(null) },
+      spvSpotlightParticipant: {
+        findUnique: jest.fn().mockResolvedValue({
+          uid: 'part_1',
+          type: 'INVESTOR',
+          cohort: 'PRE_APPROVED',
+          access: 'VIEW',
+          dataRoomEmailSentAt: null,
+        }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+    };
+    const service = new SpvSpotlightsService(prisma as never, { send } as never);
+
+    await service.sendDataRoomAccessEmail('netholabs', 'ada@example.com');
+
+    expect(send.mock.calls[0][0].template.subject).toBe(
+      dataRoomEmailSubject('Connecting you to Netholabs SPV Team', 'Ada Lovelace')
+    );
+    expect(send.mock.calls[0][0].memberName).toBe('Ada Lovelace');
   });
 });
 
