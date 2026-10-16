@@ -7,11 +7,13 @@ import { MembersModule } from '../members/members.module';
 import { RecommendationsModule } from '../recommendations/recommendations.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AccessControlV2Module } from '../access-control-v2/access-control-v2.module';
+import { SuggestedCandidatesEmailPreferenceModule } from './suggested-candidates-email-preference.module';
 
 @Module({
   imports: [
     SharedModule,
     AccessControlV2Module,
+    SuggestedCandidatesEmailPreferenceModule,
     RecommendationsModule,
     forwardRef(() => MembersModule),
     forwardRef(() => NotificationsModule),

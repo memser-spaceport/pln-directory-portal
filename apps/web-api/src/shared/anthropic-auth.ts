@@ -28,6 +28,7 @@ export class AnthropicAuth {
   private accessToken?: string;
   private accessTokenExpiresAt = 0;
   private refreshPromise?: Promise<string>;
+  private lastUsedAssertion?: string;
 
   get mode(): AnthropicAuthMode {
     const value = (process.env.ANTHROPIC_AUTH_MODE || 'api_key').toLowerCase();
@@ -90,10 +91,7 @@ export class AnthropicAuth {
     const workspaceId = process.env.ANTHROPIC_WORKSPACE_ID;
     const tokenFile = process.env.ANTHROPIC_IDENTITY_TOKEN_FILE || DEFAULT_TOKEN_FILE;
 
-    const assertion = (await fs.readFile(tokenFile, 'utf8')).trim();
-    if (!assertion) {
-      throw new Error(`Anthropic identity token file is empty: ${tokenFile}`);
-    }
+    const assertion = await this.waitForUnusedIdentityToken(tokenFile);
 
     const response = await fetch(process.env.ANTHROPIC_TOKEN_ENDPOINT || DEFAULT_TOKEN_ENDPOINT, {
       method: 'POST',
@@ -128,6 +126,24 @@ export class AnthropicAuth {
     this.accessToken = body.access_token;
     this.accessTokenExpiresAt = Date.now() + Math.max(expiresInSeconds, 1) * 1000;
     return this.accessToken;
+  }
+
+  /** A projected JWT can only be exchanged once by Anthropic. */
+  private async waitForUnusedIdentityToken(tokenFile: string): Promise<string> {
+    const deadline = Date.now() + 120_000;
+    while (true) {
+      const assertion = (await fs.readFile(tokenFile, 'utf8')).trim();
+      if (!assertion) throw new Error(`Anthropic identity token file is empty: ${tokenFile}`);
+      if (assertion !== this.lastUsedAssertion) {
+        // Reserve this assertion before sending it to Anthropic; never retry a used jti.
+        this.lastUsedAssertion = assertion;
+        return assertion;
+      }
+      if (Date.now() >= deadline) {
+        throw new Error('Timed out waiting for Kubernetes to rotate Anthropic identity token');
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 1_000));
+    }
   }
 
   private requiredEnv(name: string): string {
