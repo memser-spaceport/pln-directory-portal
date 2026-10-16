@@ -22,6 +22,7 @@ import { MembersService } from '../members/members.service';
 import { LogService } from '../shared/log.service';
 import { buildMultiRelationMapping, buildRelationMapping, copyObj } from '../utils/helper/helper';
 import { normalizeBlueskyHandler, normalizeCrunchbaseHandler } from './team-handle-normalizer';
+import { syncTeamLocations } from './team-locations';
 import { CacheService } from '../utils/cache/cache.service';
 import { AskService } from '../asks/asks.service';
 import { TeamsHooksService } from './teams.hooks.service';
@@ -544,6 +545,7 @@ export class TeamsService {
       'dateFounded',
       'teamSize',
       'location',
+      'locations',
       'status',
       'officeHours',
       'shortDescription',
@@ -557,6 +559,7 @@ export class TeamsService {
       'priority',
     ];
     copyObj(teamData, team, directFields);
+    Object.assign(team, await syncTeamLocations({ tx, teamUid, data: team }));
 
     if (team.jobReferEmail !== undefined) {
       team.jobReferEmail = this.normalizeJobReferEmail(team.jobReferEmail);

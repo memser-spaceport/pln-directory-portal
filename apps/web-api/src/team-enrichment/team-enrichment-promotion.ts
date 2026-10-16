@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
+import { syncTeamLocations } from '../teams/team-locations';
 import { FieldEnrichmentMeta, FieldEnrichmentStatus, FieldMetaKey } from './team-enrichment.types';
 
 type FieldsMetaMap = Partial<Record<FieldMetaKey, FieldEnrichmentMeta>>;
@@ -148,7 +149,7 @@ export async function executePromotion(
   if (payload.teamUpdate) {
     await tx.team.update({
       where: { uid: teamUid },
-      data: payload.teamUpdate,
+      data: await syncTeamLocations({ tx, teamUid, data: payload.teamUpdate }),
     });
   }
   if (payload.investmentFocus !== null) {
