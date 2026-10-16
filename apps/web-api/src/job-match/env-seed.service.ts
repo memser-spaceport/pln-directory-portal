@@ -20,8 +20,15 @@ import { currentRoleTextHash, isLiveOpening, MATCH_JOB_SELECT } from './job-matc
  */
 const SEED_RUN = 'env-seed-run';
 const SEED_RUN_PREV = 'env-seed-run-prev';
+/**
+ * A third run, the newest, listing the same people as SEED_RUN (LAB-2837 feedback). Sending the three runs in
+ * order — prev, run, next — gives a lead the three weekly emails: first (prev's two), new (run's other three,
+ * "Plus 2 already seen") and a reminder (nobody new). The Suggested tab shows this run.
+ */
+const SEED_RUN_NEXT = 'env-seed-run-next';
 const SEED_RUN_DATE = new Date('2000-01-05');
 const SEED_RUN_PREV_DATE = new Date('2000-01-04');
+const SEED_RUN_NEXT_DATE = new Date('2000-01-06');
 const SUGGESTIONS = 5;
 const IN_PREVIOUS_RUN = 2; // the first two suggestions also appear in the previous run, so three count as new
 
@@ -122,19 +129,22 @@ export class JobMatchEnvSeedService implements OnApplicationBootstrap {
     }
     if (!plans.length) return { roles: 0, suggestions: 0 };
 
-    // Start clean: the seed owns these two runs; cascade removes their rows (and any email claims on them).
-    await this.prisma.jobMatchRun.deleteMany({ where: { uid: { in: [SEED_RUN, SEED_RUN_PREV] } } });
+    // Start clean: the seed owns these three runs; cascade removes their rows (and any email claims on them).
+    await this.prisma.jobMatchRun.deleteMany({ where: { uid: { in: [SEED_RUN, SEED_RUN_PREV, SEED_RUN_NEXT] } } });
     const now = Date.now();
     await this.prisma.jobMatchRun.create({
       data: {
         uid: SEED_RUN_PREV,
         runDate: SEED_RUN_PREV_DATE,
         status: 'COMPLETED',
-        finishedAt: new Date(now - 7 * 864e5),
+        finishedAt: new Date(now - 14 * 864e5),
       },
     });
     await this.prisma.jobMatchRun.create({
-      data: { uid: SEED_RUN, runDate: SEED_RUN_DATE, status: 'COMPLETED', finishedAt: new Date(now) },
+      data: { uid: SEED_RUN, runDate: SEED_RUN_DATE, status: 'COMPLETED', finishedAt: new Date(now - 7 * 864e5) },
+    });
+    await this.prisma.jobMatchRun.create({
+      data: { uid: SEED_RUN_NEXT, runDate: SEED_RUN_NEXT_DATE, status: 'COMPLETED', finishedAt: new Date(now) },
     });
 
     let roles = 0;
@@ -299,7 +309,8 @@ export class JobMatchEnvSeedService implements OnApplicationBootstrap {
   /** CRITERIA, previous-run and latest-run rows for each role of a plan; returns the suggestions written. */
   private async seedRoles(plan: RoleSeed, now: number): Promise<number> {
     let suggestions = 0;
-    const previousAt = new Date(now - 7 * 864e5);
+    const previousAt = new Date(now - 14 * 864e5);
+    const latestAt = new Date(now - 7 * 864e5);
     for (const job of plan.roles) {
       const criteria = criteriaFor(job.roleTitle);
       const base = { teamUid: plan.teamUid, roleUid: job.uid };
@@ -328,19 +339,25 @@ export class JobMatchEnvSeedService implements OnApplicationBootstrap {
         });
       }
 
-      // Latest run: newest ROLE marker plus all suggestions, in rank order.
-      await this.prisma.jobMatchRow.create({ data: { ...base, runUid: SEED_RUN, kind: 'ROLE' } });
-      for (const [index, member] of plan.members.entries()) {
-        await this.prisma.jobMatchRow.create({
-          data: {
-            ...base,
-            runUid: SEED_RUN,
-            kind: 'SUGGESTION',
-            memberUid: member.uid,
-            ...this.suggestion(index, criteria),
-          },
-        });
-        suggestions += 1;
+      // The run a week later, then the newest (shown on the tab): ROLE marker plus all suggestions, in rank order.
+      for (const [runUid, createdAt] of [
+        [SEED_RUN, latestAt],
+        [SEED_RUN_NEXT, new Date(now)],
+      ] as const) {
+        await this.prisma.jobMatchRow.create({ data: { ...base, runUid, kind: 'ROLE', createdAt } });
+        for (const [index, member] of plan.members.entries()) {
+          await this.prisma.jobMatchRow.create({
+            data: {
+              ...base,
+              runUid,
+              kind: 'SUGGESTION',
+              memberUid: member.uid,
+              ...this.suggestion(index, criteria),
+              createdAt,
+            },
+          });
+          if (runUid === SEED_RUN_NEXT) suggestions += 1;
+        }
       }
     }
     return suggestions;
