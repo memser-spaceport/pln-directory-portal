@@ -178,7 +178,7 @@ describe('sendDataRoomAccessEmail', () => {
     expect(send).toHaveBeenCalledTimes(1);
     expect(send.mock.calls[0][0]).toEqual(
       expect.objectContaining({
-        bccSender: false,
+        bccSender: true,
         replyTo: 'netholabsspv@plcapital.xyz',
         from: { email: 'netholabsspv@plcapital.xyz', name: 'PL Capital, Netholabs SPV' },
         cc: [],

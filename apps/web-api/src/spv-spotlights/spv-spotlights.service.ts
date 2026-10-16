@@ -177,7 +177,7 @@ export class SpvSpotlightsService {
         from: { email: template.fromEmail, name: template.fromName },
         cc: template.cc,
         replyTo: template.replyTo.trim() || template.fromEmail,
-        bccSender: false,
+        bccSender: true,
         extra: { docSendLink: spotlight.docSendUrl },
       });
     } catch (error) {
