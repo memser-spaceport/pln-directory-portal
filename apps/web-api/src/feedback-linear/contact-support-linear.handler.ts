@@ -71,15 +71,14 @@ export class ContactSupportLinearHandler implements FeedbackLinearSourceHandler,
     const { markdown, images } = toLinearMarkdown(message);
     const imageLines = await this.images.rehost(images, config.imageHosts);
 
+    // Kind and Priority are stored on the request; older clients send them in metadata.
+    const reportKind = request.reportKind ?? metadata.reportKind;
     const labelIds: string[] = [];
     if (config.labelId) labelIds.push(config.labelId);
-    const typeLabelId = await this.teamMeta.typeLabelId(
-      row.teamId,
-      feedbackTypeName(request.topic, metadata.reportKind)
-    );
+    const typeLabelId = await this.teamMeta.typeLabelId(row.teamId, feedbackTypeName(request.topic, reportKind));
     if (typeLabelId) labelIds.push(typeLabelId);
 
-    const priority = feedbackPriority(metadata.priority);
+    const priority = feedbackPriority(request.priority ?? metadata.priority);
     const description = hideEmail(
       this.body({
         memberName: member.name,

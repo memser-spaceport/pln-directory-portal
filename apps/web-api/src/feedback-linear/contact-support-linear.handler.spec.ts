@@ -121,9 +121,12 @@ describe('contact-support → Linear issue', () => {
   });
 
   describe('topics', () => {
-    it.each(['Give feedback', 'Share an idea', 'Report a bug', 'AI Apps Feedback'])('%s is pushed', (topic) => {
-      expect(isFeedbackLinearPlatformTopic(topic)).toBe(true);
-    });
+    it.each(['Give feedback', 'Share an idea', 'Report a bug', 'LabOS Feedback', 'AI Apps Feedback'])(
+      '%s is pushed',
+      (topic) => {
+        expect(isFeedbackLinearPlatformTopic(topic)).toBe(true);
+      }
+    );
 
     it.each(['Contact support', 'Ask a question', 'report a bug', ''])('%s is not pushed', (topic) => {
       expect(isFeedbackLinearPlatformTopic(topic)).toBe(false);
@@ -202,6 +205,32 @@ describe('contact-support → Linear issue', () => {
       priority: 2,
       labelIds: ['user-feedback-label', 'bug-label'],
     });
+  });
+
+  it('reads Kind and Priority from the request columns, before metadata', async () => {
+    prisma.contactSupportRequest.findUnique.mockResolvedValue(
+      request({
+        topic: 'LabOS Feedback',
+        reportKind: 'bug',
+        priority: 'P0',
+        metadata: { uid: 'm1', reportKind: 'request', priority: 'P3' },
+      })
+    );
+    const draft = await handler.buildIssue(row());
+    expect(draft).toMatchObject({ priority: 1, labelIds: ['user-feedback-label', 'bug-label'] });
+  });
+
+  it('falls back to Kind and Priority in metadata from older clients', async () => {
+    prisma.contactSupportRequest.findUnique.mockResolvedValue(
+      request({
+        topic: 'LabOS Feedback',
+        reportKind: null,
+        priority: null,
+        metadata: { uid: 'm1', reportKind: 'bug', priority: 'P2' },
+      })
+    );
+    const draft = await handler.buildIssue(row());
+    expect(draft).toMatchObject({ priority: 3, labelIds: ['user-feedback-label', 'bug-label'] });
   });
 
   it('sets no project and no priority when the request has none', async () => {

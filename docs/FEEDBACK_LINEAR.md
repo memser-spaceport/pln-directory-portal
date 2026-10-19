@@ -14,7 +14,7 @@ because of it.
 | Source | Which items | Linear team / state | Project |
 |---|---|---|---|
 | `POST /v1/ai-apps/:uid/feedback` | Every `FEEDBACK` item (not `COMMENT`s) on any member app | `FEEDBACK_LINEAR_MEMBER_APPS_TEAM_ID`, in the team's triage state when triage is on, else its first backlog state | `FEEDBACK_LINEAR_MEMBER_APPS_PROJECT_ID`, if set |
-| `POST /v1/contact-support` | Topics `Give feedback`, `Share an idea`, `Report a bug`, `AI Apps Feedback` (the AI Apps drawer's "LabOS - AI Apps" option) from a **verified member** | `FEEDBACK_LINEAR_PLATFORM_TEAM_ID`, state `FEEDBACK_LINEAR_PLATFORM_STATE_ID` | `FEEDBACK_LINEAR_AI_APPS_PROJECT_ID` for `AI Apps Feedback`, none otherwise |
+| `POST /v1/contact-support` | Topics `Give feedback`, `Share an idea`, `Report a bug`, `LabOS Feedback` (the feedback drawer's LabOS option, on every page) and `AI Apps Feedback` (the same option from older clients) from a **verified member** | `FEEDBACK_LINEAR_PLATFORM_TEAM_ID`, state `FEEDBACK_LINEAR_PLATFORM_STATE_ID` | `FEEDBACK_LINEAR_AI_APPS_PROJECT_ID` for `AI Apps Feedback`, none otherwise |
 
 - **Not pushed:** `Contact support`, `Ask a question` and any other topic. Telegram and email are sent for every
   topic, as before.
@@ -37,6 +37,7 @@ because of it.
   5. `## Context`: `metadata.context` as JSON, when present
   6. `## Expected result`: a placeholder to fill in during triage, before moving to Todo
   7. The `ContactSupportRequest` uid
+- **Kind and Priority:** read from the request's `reportKind`/`priority`, falling back to `metadata.reportKind`/`metadata.priority` from older clients.
 - **Labels:** `FEEDBACK_LINEAR_LABEL_ID` (`User feedback`) plus one Type label, matched by name among the team's
   labels in the `Type` group:
   - `Report a bug`, or `metadata.reportKind = bug` → `Bug`

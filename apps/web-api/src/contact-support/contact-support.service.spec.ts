@@ -68,16 +68,19 @@ describe('ContactSupportService → Linear enqueue', () => {
     }
   });
 
-  it.each(['Give feedback', 'Share an idea', 'Report a bug'])('queues %s once, with no project', async (topic) => {
-    await expect(submit({ topic })).resolves.toEqual({ uid: 'cs1' });
-    expect(outbox.enqueue).toHaveBeenCalledTimes(1);
-    expect(outbox.enqueue).toHaveBeenCalledWith({
-      sourceType: 'CONTACT_SUPPORT',
-      sourceUid: 'cs1',
-      teamId: 'lab-team',
-      projectId: null,
-    });
-  });
+  it.each(['Give feedback', 'Share an idea', 'Report a bug', 'LabOS Feedback'])(
+    'queues %s once, with no project',
+    async (topic) => {
+      await expect(submit({ topic })).resolves.toEqual({ uid: 'cs1' });
+      expect(outbox.enqueue).toHaveBeenCalledTimes(1);
+      expect(outbox.enqueue).toHaveBeenCalledWith({
+        sourceType: 'CONTACT_SUPPORT',
+        sourceUid: 'cs1',
+        teamId: 'lab-team',
+        projectId: null,
+      });
+    }
+  );
 
   it('queues AI Apps Feedback into the AI Apps project', async () => {
     await submit({ topic: 'AI Apps Feedback' });
