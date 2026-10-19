@@ -3,7 +3,7 @@
 ## Overview
 
 LabOS feedback becomes a Linear issue. Platform feedback goes to the LabOS team, which can triage it and hand it to Horizon AutoDev. Feedback on members' AI Apps goes to one member-apps team. Nothing about it is visible in LabOS: feedback is left exactly as before, and the issue is created in the background, like the Telegram message for support requests.
-Code: `apps/web-api/src/feedback-linear/` (shared) and `apps/web-api/src/ai-apps/ai-app-feedback-linear*` (AI Apps). Specs: OpenSpec capabilities `feedback-linear-sync` and `ai-app-feedback-linear`.
+Code: `apps/web-api/src/feedback-linear/` (shared) and `apps/web-api/src/ai-apps/ai-app-feedback-linear*` (AI Apps).
 
 Pushes are asynchronous. A submission saves its row and an outbox row, and returns. A background worker
 creates the Linear issue later, retrying on failure. Submitting feedback never waits on Linear and never fails
