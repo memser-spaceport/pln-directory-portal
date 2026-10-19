@@ -371,8 +371,9 @@ export class JobMatchRunner {
       return this.labelLegacyCriteria(runUid, job, hash, cachedCriteria);
     }
 
-    const text = await withRetry(job.roleTitle, () => this.claude(criteriaPrompt(posting), 800));
-    const criteria = parseCriteria(text);
+    const criteria = await withRetry(job.roleTitle, async () =>
+      parseCriteria(await this.claude(criteriaPrompt(posting), 800))
+    );
     try {
       await this.prisma.jobMatchRow.create({
         data: { kind: 'CRITERIA', runUid, roleUid: job.uid, roleTextHash: hash, payload: criteria },
@@ -474,13 +475,13 @@ export class JobMatchRunner {
         const member = byUid.get(row.memberUid);
         return member ? [{ member, fit: row.fit }] : [];
       });
-      const text = await withRetry(job.roleTitle, () =>
-        this.claude(blurbPrompt(job, criteria, people, leadPrompt), 2000)
-      );
-      notes = parseCandidateNotes(
-        text,
-        people.map((row) => ({ memberUid: row.member.uid, criteriaCount: criteria.length }))
-      );
+      notes = await withRetry(job.roleTitle, async () => {
+        const text = await this.claude(blurbPrompt(job, criteria, people, leadPrompt), 2000);
+        return parseCandidateNotes(
+          text,
+          people.map((row) => ({ memberUid: row.member.uid, criteriaCount: criteria.length }))
+        );
+      });
     }
 
     const suggestions = ranked.map((row, index) => {

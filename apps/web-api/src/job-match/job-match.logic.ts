@@ -383,9 +383,59 @@ export function normalizeCriterionLabel(value: unknown): string | undefined {
 function jsonArray(text: string, what: string): unknown[] {
   const match = text.match(/\[[\s\S]*\]/);
   if (!match) throw new Error(`${what} were not a JSON array: ${text.slice(0, 200)}`);
-  const rows = JSON.parse(match[0]);
+  const rows = parseModelJson(match[0]);
   if (!Array.isArray(rows)) throw new Error(`${what} were not a JSON array`);
   return rows;
+}
+
+/** Model JSON is often one bad quote or a trailing comma. Parse it, then repair and parse once more. */
+function parseModelJson(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    try {
+      return JSON.parse(repairModelJson(raw));
+    } catch {
+      throw error;
+    }
+  }
+}
+
+/**
+ * A `"` inside a string is a closer only when the next token is `,`, `}`, `]`, or `:`.
+ * Anything else is an unescaped quote. Trailing commas before `}` or `]` are removed.
+ */
+function repairModelJson(raw: string): string {
+  const text = raw.replace(/,\s*([}\]])/g, '$1');
+  let out = '';
+  let inString = false;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (inString && char === '\\') {
+      out += char + (text[i + 1] ?? '');
+      i += 1;
+      continue;
+    }
+    if (char !== '"') {
+      out += char;
+      continue;
+    }
+    if (!inString) {
+      inString = true;
+      out += char;
+      continue;
+    }
+    let next = i + 1;
+    while (next < text.length && /\s/.test(text[next])) next += 1;
+    const closer = text[next] ?? '';
+    if (closer === ',' || closer === '}' || closer === ']' || closer === ':' || closer === '') {
+      inString = false;
+      out += char;
+    } else {
+      out += '\\"';
+    }
+  }
+  return out;
 }
 
 /**
@@ -624,12 +674,10 @@ export function parseCandidateNotes(
   text: string,
   expected: { memberUid: string; criteriaCount: number }[]
 ): Map<string, { blurb: string; matched: boolean[] }> {
-  const match = text.match(/\[[\s\S]*\]/);
-  if (!match) throw new Error(`blurbs were not a JSON array: ${text.slice(0, 200)}`);
-  const rows = JSON.parse(match[0]);
-  if (!Array.isArray(rows)) throw new Error('blurbs were not a JSON array');
+  const rows = jsonArray(text, 'blurbs');
   const byUid = new Map<string, { blurb: string; matched: boolean[] }>();
-  for (const row of rows) {
+  for (const item of rows) {
+    const row = item && typeof item === 'object' ? (item as Record<string, unknown>) : null;
     if (!row || typeof row.memberUid !== 'string' || typeof row.blurb !== 'string' || !Array.isArray(row.matched)) {
       throw new Error('blurb row is missing memberUid, blurb, or matched');
     }

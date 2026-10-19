@@ -250,6 +250,14 @@ describe('job match logic', () => {
     ).toThrow(/matched length/);
   });
 
+  it('repairs an unescaped quote and a trailing comma in model JSON', () => {
+    const notes = parseCandidateNotes(
+      '[{"memberUid":"m1","blurb":"Knows "Go".","matched":[true,false,true,true,],}]',
+      [{ memberUid: 'm1', criteriaCount: 4 }]
+    );
+    expect(notes.get('m1')).toEqual({ blurb: 'Knows "Go".', matched: [true, false, true, true] });
+  });
+
   it('treats a published non-hidden role with a team as live', () => {
     expect(isLiveOpening({ status: JobOpeningStatus.CONFIRMED, publishedAt: new Date(), teamUid: 'team' })).toBe(true);
     expect(isLiveOpening({ status: JobOpeningStatus.STALE, publishedAt: new Date(), teamUid: 'team' })).toBe(false);
