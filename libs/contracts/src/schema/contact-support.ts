@@ -7,6 +7,8 @@ const ContactSupportRequestSchema = z.object({
   name: z.string().optional(),
   message: z.string().optional(),
   metadata: z.record(z.unknown()).optional(),
+  reportKind: z.enum(['bug', 'request', 'question', 'chore']).optional(),
+  priority: z.enum(['P0', 'P1', 'P2', 'P3']).optional(),
 });
 
 const ContactSupportResponseSchema = z.object({

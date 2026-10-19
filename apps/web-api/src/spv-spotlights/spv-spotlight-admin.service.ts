@@ -303,12 +303,12 @@ export class SpvSpotlightAdminService {
         current.dataRoomAccess = savedDataRoomTemplate(value);
         continue;
       }
-      if (key === 'invitePreapproved') {
-        const value = templates.invitePreapproved;
+      if (key === 'invitePreapproved' || key === 'followUpPreapproved') {
+        const value = templates[key];
         if (!value) {
           continue;
         }
-        current.invitePreapproved = savedInviteTemplate(value);
+        current[key] = savedInviteTemplate(value);
         continue;
       }
       const value = templates[key];
@@ -892,12 +892,13 @@ export class SpvSpotlightAdminService {
         run: async () => {
           try {
             const sender = senderByMember?.get(participant.member.uid);
-            const invite = key === 'invitePreapproved' ? templates.invitePreapproved : null;
-            const inviteFromName = invite?.fromName.trim() ?? '';
+            const envelope =
+              key === 'invitePreapproved' || key === 'followUpPreapproved' ? templates[key] : null;
+            const envelopeFromName = envelope?.fromName.trim() ?? '';
             const from = sender
-              ? { email: sender.email, name: inviteFromName || sender.name || null }
-              : inviteFromName
-                ? { email: resolveTeamPitchSenderEmail(spotlight.senderEmail), name: inviteFromName }
+              ? { email: sender.email, name: envelopeFromName || sender.name || null }
+              : envelopeFromName
+                ? { email: resolveTeamPitchSenderEmail(spotlight.senderEmail), name: envelopeFromName }
                 : undefined;
             await this.mailer.send({
               spotlight: this.mailContext(spotlight),
@@ -907,8 +908,8 @@ export class SpvSpotlightAdminService {
               memberName: participant.member.name || '',
               extra: asStringRecord(participant.emailTemplateVariables),
               ...(from ? { from } : {}),
-              ...(invite
-                ? { cc: invite.cc, ...(invite.replyTo.trim() ? { replyTo: invite.replyTo.trim() } : {}) }
+              ...(envelope
+                ? { cc: envelope.cc, ...(envelope.replyTo.trim() ? { replyTo: envelope.replyTo.trim() } : {}) }
                 : {}),
             });
             await this.prisma.spvSpotlightParticipant.update({

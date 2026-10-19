@@ -354,6 +354,11 @@ export const ANALYTICS_EVENTS = {
     APP_SESSION_OPEN: 'mcp-app-session-open',
     APP_SESSION_REVOKED: 'mcp-app-session-revoked',
   },
+  INVESTOR_DB: {
+    MANUAL_FIELDS_PATCHED: 'investor-db-manual-fields-patched',
+    MANUAL_FIELDS_PATCH_FAILED: 'investor-db-manual-fields-patch-failed',
+    MANUAL_FIELDS_PATCH_UNAUTHORIZED: 'investor-db-manual-fields-patch-unauthorized',
+  },
   AI_APPS: {
     RESOURCES_SAVED: 'ai_apps_resources_saved',
     RESOURCES_SAVE_REJECTED: 'ai_apps_resources_save_rejected',
@@ -370,6 +375,10 @@ export const ANALYTICS_EVENTS = {
     PUBLISHED_VIA_INTEGRATION: 'job-published-via-integration',
     CLOSED_VIA_INTEGRATION: 'job-closed-via-integration',
     CLAIMED: 'job-claimed',
+    /** A real (not dry-run, not preview) weekly suggested-candidates email to one lead for one role (LAB-2853). */
+    SUGGESTED_CANDIDATES_EMAIL_SENT: 'suggested-candidates-email-sent',
+    /** A lead turned the suggested-candidates email off through the email's unsubscribe link (LAB-2853). */
+    SUGGESTED_CANDIDATES_EMAIL_UNSUBSCRIBED: 'suggested-candidates-email-unsubscribed',
   },
 };
 

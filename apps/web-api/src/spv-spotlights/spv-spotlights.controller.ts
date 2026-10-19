@@ -12,9 +12,10 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '@abitia/zod-dto';
+import { InternalAuthGuard } from '../guards/auth.guard';
 import { OptionalUserTokenCheckGuard, UserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { NoCache } from '../decorators/no-cache.decorator';
-import { SpvAccessRequestDto } from 'libs/contracts/src/schema/spv-spotlight';
+import { SpvAccessRequestDto, SpvDataRoomAccessEmailBatchDto } from 'libs/contracts/src/schema/spv-spotlight';
 import { SpvSpotlightsService } from './spv-spotlights.service';
 
 @ApiTags('SPV Spotlights')
@@ -38,6 +39,15 @@ export class SpvSpotlightsController {
       throw new UnauthorizedException('Sign in to request the data room email');
     }
     return this.spvSpotlightsService.sendDataRoomAccessEmail(slug, req.userEmail);
+  }
+
+  @Post(':slug/internal/data-room-access-emails')
+  @HttpCode(200)
+  @UseGuards(InternalAuthGuard)
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async sendDataRoomAccessEmails(@Param('slug') slug: string, @Body() body: SpvDataRoomAccessEmailBatchDto) {
+    return this.spvSpotlightsService.sendDataRoomAccessEmailsForLoginTokens(slug, body.loginTokens);
   }
 
   @Post(':slug/access-requests')

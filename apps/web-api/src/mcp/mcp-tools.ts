@@ -1,10 +1,11 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
 import { ADMIN_PERMISSIONS, FORUM_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
+import { ManualFieldActor } from '../manual-field-lock/manual-field-lock.service';
 import { MasterProfileService } from '../master-profile/master-profile.service';
 import { relationKindFromHopChain } from '../warm-intros-v2/warm-intros-v2-enrich.util';
 import { WarmIntrosV2Service } from '../warm-intros-v2/warm-intros-v2.service';
-import { INVESTOR_DB_VIEW_PERMISSION } from './mcp.constants';
+import { INVESTOR_DB_EDIT_PERMISSION, INVESTOR_DB_VIEW_PERMISSION } from './mcp.constants';
 
 export type McpActorContext = {
   memberUid: string;
@@ -18,7 +19,7 @@ export type McpActorContext = {
 export type McpToolDef = {
   name: string;
   description: string;
-  visibility: 'always' | 'investor_db' | 'forum';
+  visibility: 'always' | 'investor_db' | 'investor_db_edit' | 'forum';
   inputSchema?: Record<string, z.ZodTypeAny>;
   execute: (ctx: McpActorContext, args?: Record<string, unknown>) => Promise<Record<string, unknown>>;
 };
@@ -170,6 +171,48 @@ export function warmIntroTools(masterProfiles: MasterProfileService, warmIntros:
       },
       execute: async (ctx, args) => getWarmPathNote(warmIntros, ctx, args),
     },
+    {
+      name: 'update_master_profile',
+      description:
+        'Lock one or more MasterProfile columns. The next job rerun keeps these values. Pass null for a field to remove its lock and leave the current value. Send "" to clear text, or {} or [] to clear a JSON column. Identity columns (uid, personKey, createdAt, updatedAt) are rejected.',
+      visibility: 'investor_db_edit',
+      inputSchema: {
+        uid: z.string().min(1).describe('Master profile uid from search_master_profiles or get_master_profile'),
+        fields: z
+          .record(z.any())
+          .describe('Columns to lock. Null removes that column lock and leaves the current value.'),
+      },
+      execute: async (ctx, args) =>
+        masterProfiles.patchFields(stringArg(args?.uid) ?? '', fieldsArg(args?.fields), mcpActor(ctx)),
+    },
+    {
+      name: 'update_connection_edge',
+      description:
+        'Lock one or more ConnectionEdge columns. The next job rerun keeps these values. Pass null for a field to remove its lock and leave the current value. Identity columns (uid, fromProfileUid, toProfileUid, relationKind, createdAt, updatedAt) are rejected.',
+      visibility: 'investor_db_edit',
+      inputSchema: {
+        uid: z.string().min(1).describe('Connection edge uid'),
+        fields: z
+          .record(z.any())
+          .describe('Columns to lock. Null removes that column lock and leaves the current value.'),
+      },
+      execute: async (ctx, args) =>
+        warmIntros.patchEdgeFields(stringArg(args?.uid) ?? '', fieldsArg(args?.fields), mcpActor(ctx)),
+    },
+    {
+      name: 'update_warm_path',
+      description:
+        'Lock one or more WarmPathV2 columns (score, hopChain, connectors, and the other generated columns). The next job rerun keeps these values. Pass null for a field to remove its lock and leave the current value. Identity columns (uid, targetProfileUid, targetSet, rank, createdAt, updatedAt) are rejected. An edge lock does not change this path.',
+      visibility: 'investor_db_edit',
+      inputSchema: {
+        uid: z.string().min(1).describe('Warm path uid from get_warm_intro_investor'),
+        fields: z
+          .record(z.any())
+          .describe('Columns to lock. Null removes that column lock and leaves the current value.'),
+      },
+      execute: async (ctx, args) =>
+        warmIntros.patchPathFields(stringArg(args?.uid) ?? '', fieldsArg(args?.fields), mcpActor(ctx)),
+    },
   ];
 }
 
@@ -292,6 +335,18 @@ function feedbackActor(ctx: McpActorContext) {
   return { uid: ctx.memberUid, email: ctx.email };
 }
 
+function mcpActor(ctx: McpActorContext): ManualFieldActor {
+  return { source: 'mcp', actorUid: ctx.memberUid, actorEmail: ctx.email };
+}
+
+function fieldsArg(value: unknown): Record<string, unknown> {
+  const fields = recordArg(value);
+  if (!fields) {
+    throw new BadRequestException('fields object is required');
+  }
+  return fields;
+}
+
 function noteArg(value: unknown): string | null {
   if (value === null) return null;
   if (typeof value === 'string') return value;
@@ -369,6 +424,9 @@ export function isToolVisible(tool: McpToolDef, permissions: Set<string>): boole
   }
   if (tool.visibility === 'forum') {
     return permissions.has(FORUM_PERMISSIONS.READ);
+  }
+  if (tool.visibility === 'investor_db_edit') {
+    return permissions.has(INVESTOR_DB_EDIT_PERMISSION) || permissions.has(ADMIN_PERMISSIONS.DIRECTORY_FULL);
   }
   return permissions.has(INVESTOR_DB_VIEW_PERMISSION) || permissions.has(ADMIN_PERMISSIONS.DIRECTORY_FULL);
 }

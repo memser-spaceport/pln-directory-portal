@@ -24,9 +24,10 @@ export type DataRoomAccessTemplate = EmailTemplate & {
   replyTo: string;
 };
 export type EmailTemplates = {
-  [K in Exclude<EmailTemplateKey, 'dataRoomAccess' | 'invitePreapproved'>]: EmailTemplate;
+  [K in Exclude<EmailTemplateKey, 'dataRoomAccess' | 'invitePreapproved' | 'followUpPreapproved'>]: EmailTemplate;
 } & {
   invitePreapproved: InviteEmailTemplate;
+  followUpPreapproved: InviteEmailTemplate;
   dataRoomAccess: DataRoomAccessTemplate;
 };
 
@@ -62,6 +63,16 @@ function spotlightEmailBody(message: string, buttonLabel: string): string {
   ].join('\n');
 }
 
+const DATA_ROOM_NAMED_SUBJECT = 'Connecting {{teamName}} SPV Team to {{investorName}}';
+const DATA_ROOM_UNNAMED_SUBJECT = 'Connecting you to {{teamName}} SPV Team';
+
+export function dataRoomEmailSubject(subject: string, investorName = ''): string {
+  const name = investorName.trim();
+  if (!name || name.toLowerCase() === 'there') return DATA_ROOM_UNNAMED_SUBJECT;
+  if (/\{\{\s*(investorName|firstName)\b/.test(subject)) return subject;
+  return DATA_ROOM_NAMED_SUBJECT;
+}
+
 export function defaultEmailTemplates(title: string): EmailTemplates {
   return {
     invitePreapproved: {
@@ -74,6 +85,9 @@ export function defaultEmailTemplates(title: string): EmailTemplates {
     followUpPreapproved: {
       subject: `Reminder: ${title}`,
       body: spotlightEmailBody('A reminder that {{spotlightTitle}} is available to you.', 'View Spotlight'),
+      fromName: '',
+      cc: [],
+      replyTo: '',
     },
     inviteOutreach: {
       subject: `Invitation: ${title}`,
@@ -92,7 +106,7 @@ export function defaultEmailTemplates(title: string): EmailTemplates {
       body: spotlightEmailBody('{{spotlightTitle}} is now open.', 'View Spotlight'),
     },
     dataRoomAccess: {
-      subject: 'Netholabs SPV: your data room link',
+      subject: DATA_ROOM_NAMED_SUBJECT,
       body: dataRoomAccessBody(),
       fromEmail: 'netholabsspv@plcapital.xyz',
       fromName: 'PL Capital, Netholabs SPV',
@@ -344,14 +358,15 @@ export function asEmailTemplates(value: unknown, title: string): EmailTemplates 
       };
       continue;
     }
-    if (key === 'invitePreapproved') {
+    if (key === 'invitePreapproved' || key === 'followUpPreapproved') {
       const cc = emailStringList(record.cc);
-      result.invitePreapproved = {
+      const defaultsForKey = defaults[key];
+      result[key] = {
         subject,
         body,
-        fromName: typeof record.fromName === 'string' ? record.fromName.trim() : defaults.invitePreapproved.fromName,
-        cc: cc ?? defaults.invitePreapproved.cc,
-        replyTo: typeof record.replyTo === 'string' ? record.replyTo.trim() : defaults.invitePreapproved.replyTo,
+        fromName: typeof record.fromName === 'string' ? record.fromName.trim() : defaultsForKey.fromName,
+        cc: cc ?? defaultsForKey.cc,
+        replyTo: typeof record.replyTo === 'string' ? record.replyTo.trim() : defaultsForKey.replyTo,
       };
       continue;
     }

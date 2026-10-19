@@ -41,7 +41,6 @@ type TemplateDraft = {
 const TEMPLATE_LABELS: { key: TemplateKey; label: string }[] = [
   { key: 'invitePreapproved', label: 'Invite' },
   { key: 'followUpPreapproved', label: 'Follow-up' },
-  { key: 'opened', label: 'Spotlight is open' },
   { key: 'dataRoomAccess', label: 'Data room access' },
 ];
 
@@ -234,6 +233,7 @@ const SpvSpotlightDetailPage = () => {
   const [emailOnDataRoomRequest, setEmailOnDataRoomRequest] = useState(false);
   const [dataRoomCc, setDataRoomCc] = useState('');
   const [inviteCc, setInviteCc] = useState('');
+  const [followUpCc, setFollowUpCc] = useState('');
   const [useDefaultSender, setUseDefaultSender] = useState(true);
   const [selectedSenderEmails, setSelectedSenderEmails] = useState<string[]>([]);
   const [emailsPerSenderPerMinute, setEmailsPerSenderPerMinute] = useState('');
@@ -270,6 +270,7 @@ const SpvSpotlightDetailPage = () => {
     setEmailOnDataRoomRequest(Boolean(data.emailOnDataRoomRequest));
     setDataRoomCc((data.emailTemplates?.dataRoomAccess?.cc ?? []).join(', '));
     setInviteCc((data.emailTemplates?.invitePreapproved?.cc ?? []).join(', '));
+    setFollowUpCc((data.emailTemplates?.followUpPreapproved?.cc ?? []).join(', '));
   }, [authToken, uid]);
 
   const loadRequests = useCallback(async () => {
@@ -497,6 +498,16 @@ const SpvSpotlightDetailPage = () => {
             .map((email) => email.trim())
             .filter(Boolean),
         },
+        followUpPreapproved: {
+          subject: templates.followUpPreapproved.subject,
+          body: templates.followUpPreapproved.body,
+          fromName: templates.followUpPreapproved.fromName ?? '',
+          replyTo: templates.followUpPreapproved.replyTo ?? '',
+          cc: followUpCc
+            .split(/[,;\n]/)
+            .map((email) => email.trim())
+            .filter(Boolean),
+        },
         dataRoomAccess: {
           subject: templates.dataRoomAccess.subject,
           body: templates.dataRoomAccess.body,
@@ -515,6 +526,7 @@ const SpvSpotlightDetailPage = () => {
       setTemplates(saved);
       setDataRoomCc((saved.dataRoomAccess.cc ?? []).join(', '));
       setInviteCc((saved.invitePreapproved.cc ?? []).join(', '));
+      setFollowUpCc((saved.followUpPreapproved.cc ?? []).join(', '));
       if (stripped) {
         toast.warning('Templates saved. Scripts, iframes or event handlers were removed from the HTML.');
       } else {
@@ -676,7 +688,6 @@ const SpvSpotlightDetailPage = () => {
     );
   const isReachable = (participant: Participant) => participant.access !== 'RESTRICTED' && !!participant.member.email;
   const eligibleRecipients = inviteRecipients.filter(isReachable);
-  const openNoticeRecipients = investors.filter(isReachable);
   const kindRecipients = bulkSend?.kind === 'open-notice' ? investors : inviteRecipients;
   const eligibleUidSet = new Set(kindRecipients.filter(isReachable).map((participant) => participant.uid));
   const sendTargets =
@@ -1121,16 +1132,6 @@ const SpvSpotlightDetailPage = () => {
                         >
                           Send Follow-ups to All
                         </button>
-                        {tab === 'investors' && (
-                          <button
-                            type="button"
-                            onClick={() => openBulkSend('open-notice', 'all')}
-                            disabled={!openNoticeRecipients.length}
-                            className={clsx(s.editButton, 'disabled:cursor-not-allowed disabled:opacity-50')}
-                          >
-                            Email that spotlight is open
-                          </button>
-                        )}
                       </div>
                     )}
                   </div>
@@ -1205,15 +1206,6 @@ const SpvSpotlightDetailPage = () => {
                   >
                     Send Follow-up to Selected
                   </button>
-                  {tab === 'investors' && (
-                    <button
-                      type="button"
-                      onClick={() => openBulkSend('open-notice', 'selected')}
-                      className={clsx(s.editButton, 'px-3 py-1.5')}
-                    >
-                      Send Open Notice to Selected
-                    </button>
-                  )}
                   <button
                     type="button"
                     onClick={removeSelected}
@@ -1463,9 +1455,9 @@ const SpvSpotlightDetailPage = () => {
               </div>
               <p className="mb-6 text-sm text-gray-500">
                 The body is the email HTML. Built-in tokens: investorName, firstName, investorEmail, spotlightTitle,
-                spotlightLink, teamName, supportEmail, senderName, docSendLink. The invite template has its own From
-                name, Cc, and Reply-to. The data room access template has its own From address, From name, Cc, and
-                Reply-to. Investor template variables use the CSV column header as the
+                spotlightLink, teamName, supportEmail, senderName, docSendLink. The invite and follow-up templates have
+                an optional From name, Cc, and Reply-to. The data room access template has its own From address, From
+                name, Cc, and Reply-to. Investor template variables use the CSV column header as the
                 token. Approval emails also have role and organization. Use {'{{firm|your fund}}'} when a value can be
                 empty. Use {'{{#if token}}'} … {'{{else if token}}'} … {'{{else}}'} … {'{{/if}}'} to choose one block
                 when a variable has a value. HTML is allowed.
@@ -1492,39 +1484,41 @@ const SpvSpotlightDetailPage = () => {
                         setTemplates({ ...templates, [key]: { ...templates[key], subject: e.target.value } })
                       }
                     />
-                    {key === 'invitePreapproved' && (
+                    {(key === 'invitePreapproved' || key === 'followUpPreapproved') && (
                       <div className="mt-3 flex flex-col gap-2">
                         <input
                           type="text"
                           className={clsx(s.fieldInput, 'box-border w-full self-stretch')}
-                          value={templates.invitePreapproved.fromName ?? ''}
+                          value={templates[key].fromName ?? ''}
                           placeholder="From name (optional)"
-                          aria-label="Invite from name"
+                          aria-label={`${label} from name`}
                           onChange={(e) =>
                             setTemplates({
                               ...templates,
-                              invitePreapproved: { ...templates.invitePreapproved, fromName: e.target.value },
+                              [key]: { ...templates[key], fromName: e.target.value },
                             })
                           }
                         />
                         <input
                           type="text"
                           className={clsx(s.fieldInput, 'box-border w-full self-stretch')}
-                          value={inviteCc}
+                          value={key === 'invitePreapproved' ? inviteCc : followUpCc}
                           placeholder="Cc emails, separated by commas (optional)"
-                          aria-label="Invite cc"
-                          onChange={(e) => setInviteCc(e.target.value)}
+                          aria-label={`${label} cc`}
+                          onChange={(e) =>
+                            key === 'invitePreapproved' ? setInviteCc(e.target.value) : setFollowUpCc(e.target.value)
+                          }
                         />
                         <input
                           type="email"
                           className={clsx(s.fieldInput, 'box-border w-full self-stretch')}
-                          value={templates.invitePreapproved.replyTo ?? ''}
+                          value={templates[key].replyTo ?? ''}
                           placeholder="Reply-to (optional)"
-                          aria-label="Invite reply-to"
+                          aria-label={`${label} reply-to`}
                           onChange={(e) =>
                             setTemplates({
                               ...templates,
-                              invitePreapproved: { ...templates.invitePreapproved, replyTo: e.target.value },
+                              [key]: { ...templates[key], replyTo: e.target.value },
                             })
                           }
                         />

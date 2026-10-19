@@ -48,6 +48,7 @@ export class SpvSpotlightMailer {
     cc?: string[];
     replyTo?: string;
     bccSender?: boolean;
+    bcc?: string[];
   }) {
     const email = normalizeEmail(input.to);
     const spotlightLink = await this.loginLink(input.spotlight.slug, email);
@@ -76,7 +77,7 @@ export class SpvSpotlightMailer {
         from: formatTeamPitchFromHeader(senderEmail, senderName),
         to: [email],
         ...(cc.length ? { cc } : {}),
-        bcc: input.bccSender === false || !senderEmail ? [] : [senderEmail],
+        bcc: uniqueEmails([...(input.bccSender === false || !senderEmail ? [] : [senderEmail]), ...(input.bcc ?? [])]),
         ...(replyTo ? { replyTo } : {}),
       },
       deliveryPayload: {
@@ -102,4 +103,17 @@ export class SpvSpotlightMailer {
     });
     return spotlightLink;
   }
+}
+
+function uniqueEmails(addresses: string[]): string[] {
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const address of addresses) {
+    const trimmed = address.trim();
+    const key = trimmed.toLowerCase();
+    if (!trimmed || seen.has(key)) continue;
+    seen.add(key);
+    unique.push(trimmed);
+  }
+  return unique;
 }

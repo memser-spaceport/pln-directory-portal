@@ -17,6 +17,12 @@ export const SpvAccessRequestSchema = z.object({
 
 export class SpvAccessRequestDto extends createZodDto(SpvAccessRequestSchema) {}
 
+export const SpvDataRoomAccessEmailBatchSchema = z.object({
+  loginTokens: z.array(z.string().trim().min(1)).min(1).max(200),
+});
+
+export class SpvDataRoomAccessEmailBatchDto extends createZodDto(SpvDataRoomAccessEmailBatchSchema) {}
+
 const templateSchema = z.object({
   subject: z.string().trim().min(1),
   body: z.string().trim().min(1),
@@ -55,7 +61,7 @@ const senderSchema = z.object({
 
 export const SpvEmailTemplatesSchema = z.object({
   invitePreapproved: inviteTemplateSchema,
-  followUpPreapproved: templateSchema,
+  followUpPreapproved: inviteTemplateSchema,
   inviteOutreach: templateSchema,
   followUpOutreach: templateSchema,
   approved: templateSchema,

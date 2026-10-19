@@ -1096,6 +1096,8 @@ model NotificationSetting {
   industryTagList        String[]  @default([])
   technologyList         String[]  @default([])
   keywordList            String[]  @default([])
+  /// Weekly suggested-candidates email to team leads; on unless turned off (LAB-2850).
+  suggestedCandidatesEmailEnabled Boolean @default(true)
 }
 
 model LinkedInProfile {
@@ -1703,14 +1705,17 @@ model DemoDayFeedback {
 }
 
 model ContactSupportRequest {
-  id        Int      @id @default(autoincrement())
-  uid       String   @unique @default(cuid())
-  topic     String
-  email     String?
-  name      String?
-  message   String?
-  metadata  Json?
-  createdAt DateTime @default(now())
+  id         Int                      @id @default(autoincrement())
+  uid        String                   @unique @default(cuid())
+  topic      String
+  email      String?
+  name       String?
+  message    String?
+  metadata   Json?
+  /// LabOS Feedback only: the kind and priority picked on the feedback form.
+  reportKind AiAppFeedbackReportKind?
+  priority   AiAppFeedbackPriority?
+  createdAt  DateTime                 @default(now())
 }
 
 /// Where a feedback item pushed to Linear came from.
@@ -3448,6 +3453,30 @@ model WarmPathV2Note {
   @@index([updatedAt])
 }
 
+/// Warm Intros v2 — a column set by MCP or the service API.
+/// Ingest replaces generated columns, then writes these values back.
+model ManualFieldLock {
+  uid String @id @default(cuid())
+
+  /// master_profile | connection_edge | warm_path_v2
+  subjectType String @db.VarChar(32)
+  subjectUid  String
+
+  field String @db.VarChar(64)
+  value Json
+
+  /// mcp | service
+  source     String  @db.VarChar(16)
+  actorUid   String? @db.VarChar(64)
+  actorEmail String? @db.VarChar(200)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([subjectType, subjectUid, field])
+  @@index([subjectType, subjectUid])
+}
+
 /// Investor Lists — a curated target set of investors (a "list"). Proximity is computed per list
 /// (PathfinderPath.targetSet == an InvestorList.targetSet). The 5,000+ InvestorOutreachRecord DB is the
 /// universe; lists are curated subsets. v1: "Neuro Fund I LP Pipeline" (graphed) + "Gold PLC Co-Investors".
@@ -4669,6 +4698,7 @@ model JobMatchRun {
   startedAt   DateTime          @default(now())
   finishedAt  DateTime?
   rows        JobMatchRow[]
+  emailSends  JobMatchEmailSend[]
 }
 
 enum JobMatchRunStatus {
@@ -4719,4 +4749,59 @@ model JobMatchRow {
   @@index([runUid, teamUid, kind])
   @@index([kind, roleUid, createdAt])
   @@index([kind, roleUid, roleTextHash])
+}
+
+/// A lead's disabled match criteria (LAB-2846) and criteria prompt (LAB-2853) for one role posting.
+/// Keyed by the posting hash, so an edited posting simply stops matching its old override.
+model JobMatchCriteriaOverride {
+  uid          String   @id @default(cuid())
+  roleUid      String
+  roleTextHash String
+  disabled     String[]
+  /// The lead's free-text "who you're looking for" (LAB-2853): trimmed, at most 500 characters, null when none.
+  prompt       String?
+  updatedByUid String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([roleUid, roleTextHash])
+}
+
+/// A lead's intro email to a suggested candidate for one role; at most one per role and member (LAB-2846).
+model JobMatchContact {
+  uid       String   @id @default(cuid())
+  roleUid   String
+  memberUid String
+  senderUid String
+  message   String
+  createdAt DateTime @default(now())
+
+  @@unique([roleUid, memberUid])
+}
+
+/// Which weekly suggested-candidates email a lead got for a role (LAB-2837 feedback).
+enum JobMatchEmailKind {
+  FIRST
+  NEW
+  REMINDER
+}
+
+/// One suggested-candidates email per run, role and recipient (LAB-2850).
+model JobMatchEmailSend {
+  uid            String            @id @default(cuid())
+  runUid         String
+  run            JobMatchRun       @relation(fields: [runUid], references: [uid], onDelete: Cascade)
+  roleUid        String
+  teamUid        String
+  recipientUid   String
+  candidateCount Int
+  /// FIRST for rows written before kinds existed; such rows carry no memberUids and are not history.
+  kind           JobMatchEmailKind @default(FIRST)
+  /// The members the email named, so the next one knows who this lead has already seen (LAB-2837 feedback).
+  memberUids     String[]          @default([])
+  sentAt         DateTime          @default(now())
+
+  @@unique([runUid, roleUid, recipientUid])
+  @@index([recipientUid])
+  @@index([roleUid, recipientUid])
 }

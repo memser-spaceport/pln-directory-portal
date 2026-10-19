@@ -26,12 +26,15 @@ import {
   InvestorSettingsResponse,
   UpdateDemoDaySubscriptionSettingsDto,
   DemoDaySubscriptionSettingsResponseDto,
+  SuggestedCandidatesEmailSettingsResponseDto,
+  UpdateSuggestedCandidatesEmailSettingsSchema,
 } from 'libs/contracts/src/schema/notification-settings';
 import { MembersService } from '../members/members.service';
 import { ZodValidationPipe } from '@abitia/zod-dto';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
+import { SuggestedCandidatesEmailPreferenceService } from './suggested-candidates-email-preference.service';
 
 @ApiTags('NotificationSettings')
 @UseGuards(UserTokenValidation)
@@ -41,7 +44,8 @@ export class NotificationSettingsController {
     private notificationSettingsService: NotificationSettingsService,
     private memberService: MembersService,
     private notificationServiceClient: NotificationServiceClient,
-    private accessControlV2Service: AccessControlV2Service
+    private accessControlV2Service: AccessControlV2Service,
+    private suggestedCandidatesEmailPreference: SuggestedCandidatesEmailPreferenceService
   ) {}
 
   @Get(':memberUid')
@@ -273,5 +277,37 @@ export class NotificationSettingsController {
       memberUid,
       memberExternalId: authenticatedUser.externalId,
     });
+  }
+
+  /** The weekly suggested-candidates email preference (LAB-2850), stored in the Directory database. */
+  @Get(':memberUid/suggested-candidates-email')
+  @NoCache()
+  async getSuggestedCandidatesEmailSettings(
+    @Param('memberUid') memberUid: string,
+    @Req() request: Request
+  ): Promise<SuggestedCandidatesEmailSettingsResponseDto> {
+    const authenticatedUser = await this.memberService.findMemberFromEmail(request['userEmail']);
+    if (authenticatedUser.uid !== memberUid && !this.memberService.checkIfAdminUser(authenticatedUser)) {
+      throw new ForbiddenException(`User isn't authorized to get the suggested candidates email settings`);
+    }
+    return this.suggestedCandidatesEmailPreference.get(memberUid);
+  }
+
+  /** Body checked with `safeParse` and an explicit 400 (a thrown ZodError would surface as a 500). LAB-2850. */
+  @Put(':memberUid/suggested-candidates-email')
+  async updateSuggestedCandidatesEmailSettings(
+    @Param('memberUid') memberUid: string,
+    @Body() body: unknown,
+    @Req() request: Request
+  ): Promise<SuggestedCandidatesEmailSettingsResponseDto> {
+    const authenticatedUser = await this.memberService.findMemberFromEmail(request['userEmail']);
+    if (authenticatedUser.uid !== memberUid && !this.memberService.checkIfAdminUser(authenticatedUser)) {
+      throw new ForbiddenException(`User isn't authorized to update the suggested candidates email settings`);
+    }
+    const parsed = UpdateSuggestedCandidatesEmailSettingsSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException('suggestedCandidatesEmailEnabled must be a boolean');
+    }
+    return this.suggestedCandidatesEmailPreference.set(memberUid, parsed.data.suggestedCandidatesEmailEnabled);
   }
 }

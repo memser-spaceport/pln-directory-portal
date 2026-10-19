@@ -1,5 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { ManualFieldLockService } from '../manual-field-lock/manual-field-lock.service';
 import { MasterProfileService } from './master-profile.service';
 import { PrismaService } from '../shared/prisma.service';
 
@@ -34,10 +35,11 @@ describe('MasterProfileService', () => {
     $queryRaw: queryRaw,
     masterProfile: { findUnique, findFirst, findMany, create, update },
   } as unknown as PrismaService;
+  const reapplyAll = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new MasterProfileService(prismaMock);
+    service = new MasterProfileService(prismaMock, { reapplyAll } as unknown as ManualFieldLockService);
   });
 
   describe('ingest', () => {
@@ -104,6 +106,21 @@ describe('MasterProfileService', () => {
         created: 1,
         updated: 1,
       });
+      expect(reapplyAll).toHaveBeenCalledTimes(1);
+      expect(reapplyAll).toHaveBeenCalledWith(expect.anything(), 'master_profile', ['u1']);
+    });
+
+    it('does not reapply locks when the profile is new', async () => {
+      findUnique.mockResolvedValue(null);
+      create.mockResolvedValue({ uid: 'u-new' });
+
+      await service.ingest({
+        profiles: [{ personKey: 'k-new', types: ['investor'], canonicalName: 'Ada' }],
+      });
+
+      expect(create).toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
+      expect(reapplyAll).not.toHaveBeenCalled();
     });
   });
 
