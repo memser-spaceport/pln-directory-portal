@@ -2,21 +2,31 @@
 // One PostHog event per SES Send / Open / Click: `<email-type>-sent|opened|clicked` (LAB-2918).
 import { createHash } from 'node:crypto';
 
-// Dev senders (SSM /dev/*/SES_SOURCE_EMAIL): dev and prod share one SES account and one topic.
-const DEFAULT_EXCLUDED_SOURCES = [
+// Dev and prod share one SES account and one topic. The SES tag `ses:caller-identity` names the IAM role
+// that sent the email: `<service>-dev-irsa` / `-uat-irsa` in dev and UAT, `preprod_dev_noderole` in feature envs,
+// `<service>-prod-irsa` / `prod_noderole` in production.
+export const NON_PROD_CALLER = /(^|[-_])(dev|uat|preprod|stage|sandbox)([-_]|$)/i;
+
+// Dev senders (SSM /dev/*/SES_SOURCE_EMAIL), the fallback when the caller says nothing.
+const DEFAULT_DEV_SOURCES = [
   'dev_member-services@plnetwork.io',
   'dev-member-services@plnetwork.io',
   'pl-dev-support@plnetwork.io',
 ].join(',');
 
 const config = () => ({
-  posthogHost: (process.env.POSTHOG_HOST || '').replace(/\/+$/, ''),
+  // Which emails this function takes: "prod" or "dev" (dev, UAT and feature envs).
+  targetEnv: (process.env.TARGET_ENV || 'prod').toLowerCase() === 'dev' ? 'dev' : 'prod',
+  // POSTHOG_HOST and POSTHOG_API_KEY are read from SSM `<prefix>/POSTHOG_HOST` and `<prefix>/POSTHOG_API_KEY`,
+  // e.g. /prod/directory-service. Env values, when set, win over SSM.
+  ssmPrefix: (process.env.POSTHOG_SSM_PREFIX || '').replace(/\/+$/, ''),
+  posthogHost: process.env.POSTHOG_HOST || '',
   posthogApiKey: process.env.POSTHOG_API_KEY || '',
   // Anything but "false" logs what would be sent and sends nothing.
   dryRun: (process.env.DRY_RUN ?? 'true').toLowerCase() !== 'false',
   // "skip" drops emails no rule recognises; "generic" sends them as other-email-*.
   unmatched: (process.env.UNMATCHED_EMAILS || 'skip').toLowerCase(),
-  excludedSources: csv(process.env.EXCLUDED_SOURCES ?? DEFAULT_EXCLUDED_SOURCES),
+  devSources: csv(process.env.DEV_SOURCES ?? DEFAULT_DEV_SOURCES),
 });
 
 const EVENT_SUFFIX = { Send: 'sent', Open: 'opened', Click: 'clicked' };
@@ -64,7 +74,7 @@ export const SUBJECT_RULES = [
   ['team-edit-email', [/Team Edit Request processed successfully/i]],
   ['demo-day-feedback-email', [/Feedback from .+ for your team/]],
   ['team-pitch-followup-email', [/Follow-up:/]],
-  ['spv-spotlight-email', [/\bSPV Team\b/]],
+  ['spv-spotlight-email', [/\bSPV Team\b/, /\bon PL Spotlight\b/]],
 ];
 
 // Senders used by one email type only. SPV Spotlight subjects are typed by admins, so the sender is
@@ -105,6 +115,13 @@ export function classify(mail) {
   return { prefix: null, matchedBy: 'none', tag };
 }
 
+/** "dev" when the sending role or the sender address belongs to dev, UAT or a feature env, otherwise "prod". */
+export function senderEnv(mail, devSources) {
+  const caller = mail?.tags?.['ses:caller-identity']?.[0] || '';
+  if (NON_PROD_CALLER.test(caller)) return 'dev';
+  return devSources.includes(bareAddress(mail?.source)) ? 'dev' : 'prod';
+}
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** SNS MessageId is already a UUID and stays the same on redelivery, so PostHog can drop duplicates. */
@@ -125,14 +142,16 @@ export function toPosthogEvent(ses, snsMessageId, cfg = config()) {
   const sesEventType = ses?.eventType;
   const source = bareAddress(mail.source);
   const caller = mail.tags?.['ses:caller-identity']?.[0] || '';
-  const log = { sesEventType, messageId: mail.messageId, source, caller };
+  const env = senderEnv(mail, cfg.devSources);
+  const log = { sesEventType, messageId: mail.messageId, source, caller, env };
 
   const suffix = EVENT_SUFFIX[sesEventType];
   if (!suffix) return { skip: 'event-type', log };
-  if (cfg.excludedSources.includes(source)) return { skip: 'excluded-source', log };
 
+  // Classified before the env check so the logs show the type of the other env's emails too.
   const { prefix, matchedBy, tag } = classify(mail);
   Object.assign(log, { emailType: prefix, matchedBy, tag });
+  if (env !== cfg.targetEnv) return { skip: 'other-env', log };
   if (!prefix && cfg.unmatched !== 'generic') {
     // The subject shows which rule is missing; it is logged only for unmatched emails.
     return { skip: 'unmatched', log: { ...log, subject: mail.commonHeaders?.subject } };
@@ -169,11 +188,43 @@ export function toPosthogEvent(ses, snsMessageId, cfg = config()) {
   };
 }
 
+const SSM_TTL_MS = 5 * 60 * 1000;
+let ssmCache = { prefix: '', at: 0, values: {} };
+
+// Replaceable in tests. The Lambda Node.js runtime ships AWS SDK v3, so the zip carries no dependencies.
+let readSsm = async (names) => {
+  const { SSMClient, GetParametersCommand } = await import('@aws-sdk/client-ssm');
+  const out = await new SSMClient({}).send(new GetParametersCommand({ Names: names, WithDecryption: true }));
+  if (out.InvalidParameters?.length) throw new Error(`SSM parameters not found: ${out.InvalidParameters.join(', ')}`);
+  return Object.fromEntries(out.Parameters.map((p) => [p.Name, p.Value]));
+};
+export const setSsmReader = (fn) => {
+  readSsm = fn;
+  ssmCache = { prefix: '', at: 0, values: {} };
+};
+
+/** PostHog host and key: env first, then SSM under POSTHOG_SSM_PREFIX (cached for five minutes). */
+export async function posthogTarget(cfg) {
+  let { posthogHost: host, posthogApiKey: apiKey } = cfg;
+  if ((!host || !apiKey) && cfg.ssmPrefix) {
+    if (ssmCache.prefix !== cfg.ssmPrefix || Date.now() - ssmCache.at > SSM_TTL_MS) {
+      const values = await readSsm([`${cfg.ssmPrefix}/POSTHOG_HOST`, `${cfg.ssmPrefix}/POSTHOG_API_KEY`]);
+      ssmCache = { prefix: cfg.ssmPrefix, at: Date.now(), values };
+    }
+    host ||= ssmCache.values[`${cfg.ssmPrefix}/POSTHOG_HOST`];
+    apiKey ||= ssmCache.values[`${cfg.ssmPrefix}/POSTHOG_API_KEY`];
+  }
+  if (!host || !apiKey)
+    throw new Error('No PostHog host/key: set POSTHOG_SSM_PREFIX or POSTHOG_HOST + POSTHOG_API_KEY');
+  return { host: host.replace(/\/+$/, ''), apiKey };
+}
+
 async function capture(cfg, batch) {
-  const res = await fetch(`${cfg.posthogHost}/batch/`, {
+  const { host, apiKey } = await posthogTarget(cfg);
+  const res = await fetch(`${host}/batch/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ api_key: cfg.posthogApiKey, batch }),
+    body: JSON.stringify({ api_key: apiKey, batch }),
     signal: AbortSignal.timeout(5000),
   });
   if (!res.ok) throw new Error(`PostHog /batch/ returned ${res.status}: ${(await res.text()).slice(0, 300)}`);
@@ -181,9 +232,6 @@ async function capture(cfg, batch) {
 
 export const handler = async (event) => {
   const cfg = config();
-  if (!cfg.dryRun && (!cfg.posthogHost || !cfg.posthogApiKey)) {
-    throw new Error('POSTHOG_HOST and POSTHOG_API_KEY are required when DRY_RUN=false');
-  }
 
   const batch = [];
   for (const record of event?.Records || []) {
@@ -195,7 +243,7 @@ export const handler = async (event) => {
       continue;
     }
     const result = toPosthogEvent(ses, record?.Sns?.MessageId, cfg);
-    console.log(JSON.stringify({ dryRun: cfg.dryRun, skip: result.skip, ...result.log }));
+    console.log(JSON.stringify({ dryRun: cfg.dryRun, targetEnv: cfg.targetEnv, skip: result.skip, ...result.log }));
     if (result.event) batch.push(result.event);
   }
 

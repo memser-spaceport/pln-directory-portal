@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { classify, toPosthogEvent, handler, bareAddress } from './index.mjs';
+import { classify, toPosthogEvent, handler, bareAddress, senderEnv, posthogTarget, setSsmReader } from './index.mjs';
 
-const cfg = { dryRun: true, unmatched: 'skip', excludedSources: ['dev_member-services@plnetwork.io'] };
+const cfg = { dryRun: true, unmatched: 'skip', targetEnv: 'prod', devSources: ['dev_member-services@plnetwork.io'] };
 
 function sesEvent(
   eventType,
@@ -44,6 +44,7 @@ test('subjects from the senders map to the ticket prefixes', () => {
     'Team Edit Request processed successfully': 'team-edit-email',
     'Feedback from Ann for your team': 'demo-day-feedback-email',
     '[Demo Day] Feedback from Ann for your team': 'demo-day-feedback-email',
+    'Re: Netholabs on PL Spotlight: Last chance': 'spv-spotlight-email',
     'Follow-up: Acme pitch': 'team-pitch-followup-email',
   };
   for (const [subject, prefix] of Object.entries(cases)) {
@@ -124,11 +125,44 @@ test('Delivery, Bounce and the rest are skipped', () => {
   }
 });
 
-test('dev senders are skipped', () => {
-  assert.equal(
-    toPosthogEvent(sesEvent('Send', { source: 'dev_member-services@plnetwork.io' }), SNS_ID, cfg).skip,
-    'excluded-source'
-  );
+test('the sending role or a dev sender tells dev from prod', () => {
+  const env = (caller, source = 'member-services@plnetwork.io') =>
+    senderEnv({ source, tags: { 'ses:caller-identity': [caller] } }, cfg.devSources);
+  assert.equal(env('notification-service-prod-irsa'), 'prod');
+  assert.equal(env('prod_noderole'), 'prod');
+  assert.equal(env('notification-service-dev-irsa'), 'dev');
+  assert.equal(env('notification-service-uat-irsa'), 'dev');
+  assert.equal(env('preprod_dev_noderole'), 'dev');
+  assert.equal(env('directory-service-prod-irsa', 'dev_member-services@plnetwork.io'), 'dev');
+});
+
+test('each function takes only its own env and still logs the type of the other', () => {
+  const dev = sesEvent('Send', {
+    tags: { 'ses:caller-identity': ['notification-service-dev-irsa'], 'email-type': ['FORUM_MENTION'] },
+  });
+  const skipped = toPosthogEvent(dev, SNS_ID, cfg);
+  assert.equal(skipped.skip, 'other-env');
+  assert.equal(skipped.log.emailType, 'forum-mention-email');
+  assert.equal(skipped.log.env, 'dev');
+  assert.equal(toPosthogEvent(dev, SNS_ID, { ...cfg, targetEnv: 'dev' }).event.event, 'forum-mention-email-sent');
+  assert.equal(toPosthogEvent(sesEvent('Send'), SNS_ID, { ...cfg, targetEnv: 'dev' }).skip, 'other-env');
+});
+
+test('the PostHog key comes from SSM under the prefix, env values win, and SSM is cached', async () => {
+  const reads = [];
+  setSsmReader(async (names) => {
+    reads.push(names);
+    return {
+      '/dev/directory-service/POSTHOG_HOST': 'https://ph.example.com/',
+      '/dev/directory-service/POSTHOG_API_KEY': 'phc_dev',
+    };
+  });
+  const ssmCfg = { ...cfg, ssmPrefix: '/dev/directory-service', posthogHost: '', posthogApiKey: '' };
+  assert.deepEqual(await posthogTarget(ssmCfg), { host: 'https://ph.example.com', apiKey: 'phc_dev' });
+  await posthogTarget(ssmCfg);
+  assert.deepEqual(reads, [['/dev/directory-service/POSTHOG_HOST', '/dev/directory-service/POSTHOG_API_KEY']]);
+  assert.equal((await posthogTarget({ ...ssmCfg, posthogApiKey: 'phc_env' })).apiKey, 'phc_env');
+  await assert.rejects(posthogTarget({ ...cfg, ssmPrefix: '', posthogHost: '', posthogApiKey: '' }), /No PostHog/);
 });
 
 test('unmatched emails are skipped, or sent as other-email-* in generic mode', () => {

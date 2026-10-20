@@ -26,24 +26,39 @@ The rest of the event:
 
 - `distinct_id` is the first `To` address, lowercased.
 - `uuid` is the SNS MessageId, so an SNS retry does not create a duplicate.
-- Emails from the dev senders in `EXCLUDED_SOURCES` are skipped, because dev and prod share the SES account.
+- Dev and prod share the SES account and the topic, so each email is attributed to an environment. The SES tag `ses:caller-identity` names the IAM role that sent it:
+  - prod: `<service>-prod-irsa`, `prod_noderole`;
+  - not prod: `<service>-dev-irsa`, `-uat-irsa`, `preprod_dev_noderole` (feature envs).
+
+  The dev sender addresses in `DEV_SOURCES` are the fallback. A function takes only the emails of its `TARGET_ENV` and skips the rest with `other-env`.
 
 Every record writes one JSON log line with these fields:
 
-- `sesEventType`, `emailType`, `matchedBy`
-- `source`, `caller` (the `ses:caller-identity` tag)
+- `sesEventType`, `emailType`, `matchedBy`, `tag`
+- `source`, `caller` (the `ses:caller-identity` tag), `env`, `targetEnv`
 - `skip`, with the skip reason
 
 The line has no recipient address.
+
+## Functions
+
+Two functions, one per environment, are subscribed to `sns-track`:
+
+| Function | `TARGET_ENV` | `POSTHOG_SSM_PREFIX` | PostHog project |
+| -- | -- | -- | -- |
+| `ses-events-to-posthog` | `prod` | `/prod/directory-service` | prod |
+| `ses-events-to-posthog-dev` | `dev` | `/dev/directory-service` | dev |
 
 ## Environment variables
 
 See `.env.example`.
 
+- `TARGET_ENV`: `prod` (default) or `dev`, which also covers UAT and feature envs.
+- `POSTHOG_SSM_PREFIX`: the host and the key are read from SSM `<prefix>/POSTHOG_HOST` and `<prefix>/POSTHOG_API_KEY`, the same parameters directory-service uses. They are cached for five minutes.
+- `POSTHOG_HOST`, `POSTHOG_API_KEY`: optional; when set, they win over SSM.
 - `DRY_RUN`: anything except `false` only logs.
-- `POSTHOG_HOST`, `POSTHOG_API_KEY`: the project to send to.
 - `UNMATCHED_EMAILS`: `skip` (default) or `generic`, which sends unrecognised emails as `other-email-*`.
-- `EXCLUDED_SOURCES`: comma-separated sender addresses to ignore. When unset, it defaults to the dev senders.
+- `DEV_SOURCES`: comma-separated dev sender addresses. When unset, it defaults to the dev `SES_SOURCE_EMAIL` values.
 
 ## Deployment (manual, like lambda-opensearch-sync)
 
@@ -52,18 +67,19 @@ yarn test   # or: node --test
 zip -FS lambda-ses-posthog.zip index.mjs package.json
 ```
 
-1. Create the function `ses-events-to-posthog` (Node.js 22.x, arm64, 128 MB, timeout 10 s). It has no dependencies and needs no VPC.
+1. Create the function (Node.js 22.x, arm64, 128 MB, timeout 10 s). It has no dependencies, because the runtime ships AWS SDK v3, and it needs no VPC.
 2. Upload `lambda-ses-posthog.zip` and set the handler to `index.handler`.
-3. Set the environment variables. Start with `DRY_RUN=true`.
-4. SNS → topic `sns-track` → Create subscription → protocol `AWS Lambda` → this function.
+3. The execution role needs `ssm:GetParameters` on `<prefix>/POSTHOG_*` and `kms:Decrypt` on the `aws/ssm` key through SSM, plus CloudWatch Logs.
+4. Set the environment variables. Start with `DRY_RUN=true`.
+5. SNS → topic `sns-track` → Create subscription → protocol `AWS Lambda` → this function.
 
 Rollout:
 
-1. **Dry run.** Run for a day with `DRY_RUN=true` and read the logs (queries below).
-2. **Dev project.** Set `DRY_RUN=false` with the dev PostHog project key and check the events.
-3. **Prod project.** Switch to the prod key.
+1. **Dev.** `ses-events-to-posthog-dev` with `DRY_RUN=false`; check the events in the dev PostHog project.
+2. **Prod dry run.** `ses-events-to-posthog` with `DRY_RUN=true`; read the logs (queries below).
+3. **Prod.** Set `DRY_RUN=false` on `ses-events-to-posthog`.
 
-To turn it off, delete the SNS subscription.
+To turn a function off, delete its SNS subscription.
 
 ### CloudWatch Logs Insights
 
@@ -81,6 +97,6 @@ fields subject
 ```
 
 ```
-fields source, caller
-| stats count() by source, caller
+fields source, caller, env
+| stats count() by source, caller, env
 ```
