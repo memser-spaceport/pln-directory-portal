@@ -2,6 +2,7 @@ import {
   clipTelegramText,
   escapeTelegramHtml,
   stripInlineDataImages,
+  supportPageLine,
   TELEGRAM_MESSAGE_MAX_LENGTH,
   toSupportEmailHtml,
   toSupportTelegramHtml,
@@ -90,9 +91,50 @@ describe('toSupportTelegramHtml', () => {
     expect(text).toBe('See this\nhttps://cdn.test/shot.png');
   });
 
+  it('shows a hosted data-flat-src instead of the raw src, in either attribute order', () => {
+    const srcFirst = toSupportTelegramHtml(
+      '<p><img src="https://cdn.test/raw.png" data-annotations="%7B%7D" data-flat-src="https://cdn.test/flat.png"></p>'
+    );
+    const flatFirst = toSupportTelegramHtml(
+      '<p><img data-flat-src="https://cdn.test/flat.png" alt="Screenshot" src="https://cdn.test/raw.png"></p>'
+    );
+    expect(srcFirst).toBe('https://cdn.test/flat.png');
+    expect(flatFirst).toBe('https://cdn.test/flat.png');
+  });
+
+  it('falls back to the raw src when data-flat-src is missing or not hosted', () => {
+    expect(toSupportTelegramHtml('<p><img src="https://cdn.test/raw.png" data-annotations="%7B%7D"></p>')).toBe(
+      'https://cdn.test/raw.png'
+    );
+    expect(
+      toSupportTelegramHtml('<p><img data-flat-src="javascript:alert(1)" src="https://cdn.test/raw.png"></p>')
+    ).toBe('https://cdn.test/raw.png');
+  });
+
+  it('does not read the src inside data-flat-src as the image src', () => {
+    expect(toSupportTelegramHtml('<p><img data-flat-src="data:image/png;base64,AAAA" alt="x"></p>')).toBe('[image]');
+  });
+
   it('replaces data-URI images with a placeholder instead of the payload', () => {
     const text = toSupportTelegramHtml('<p>Shot</p><p><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA"></p>');
     expect(text).toBe('Shot\n[image]');
+  });
+});
+
+describe('supportPageLine', () => {
+  it('returns the escaped page URL for an http(s) page', () => {
+    expect(supportPageLine({ page: 'https://directory.plnetwork.io/members/abc?tab=a&b=<c>' })).toBe(
+      'Page: https://directory.plnetwork.io/members/abc?tab=a&amp;b=&lt;c&gt;'
+    );
+    expect(supportPageLine({ page: 'http://localhost:4200/home' })).toBe('Page: http://localhost:4200/home');
+  });
+
+  it('returns undefined when the page is missing or not http(s)', () => {
+    expect(supportPageLine(undefined)).toBeUndefined();
+    expect(supportPageLine({})).toBeUndefined();
+    expect(supportPageLine({ page: 42 })).toBeUndefined();
+    expect(supportPageLine({ page: 'javascript:alert(1)' })).toBeUndefined();
+    expect(supportPageLine({ page: '' })).toBeUndefined();
   });
 });
 
