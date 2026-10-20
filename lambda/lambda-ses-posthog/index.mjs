@@ -64,7 +64,14 @@ export const SUBJECT_RULES = [
   ['team-edit-email', [/Team Edit Request processed successfully/i]],
   ['demo-day-feedback-email', [/Feedback from .+ for your team/]],
   ['team-pitch-followup-email', [/Follow-up:/]],
+  ['spv-spotlight-email', [/\bSPV Team\b/]],
 ];
+
+// Senders used by one email type only. SPV Spotlight subjects are typed by admins, so the sender is
+// the surer sign until the email-type tag reaches production.
+export const SOURCE_PREFIXES = {
+  'labos@plnetwork.io': 'spv-spotlight-email',
+};
 
 const KNOWN_PREFIXES = new Set([...Object.values(TEMPLATE_PREFIXES), ...SUBJECT_RULES.map(([prefix]) => prefix)]);
 
@@ -82,13 +89,15 @@ export function bareAddress(value) {
   return (angled ? angled[1] : value).trim().toLowerCase();
 }
 
-/** Email type of a SES `mail` object: the `email-type` tag first, then the subject. */
+/** Email type of a SES `mail` object: the `email-type` tag first, then the sender, then the subject. */
 export function classify(mail) {
   const tag = mail?.tags?.['email-type']?.[0];
   if (tag) {
     if (TEMPLATE_PREFIXES[tag]) return { prefix: TEMPLATE_PREFIXES[tag], matchedBy: 'tag', tag };
     if (KNOWN_PREFIXES.has(tag)) return { prefix: tag, matchedBy: 'tag', tag };
   }
+  const sourcePrefix = SOURCE_PREFIXES[bareAddress(mail?.source)];
+  if (sourcePrefix) return { prefix: sourcePrefix, matchedBy: 'source', tag };
   const subject = mail?.commonHeaders?.subject || '';
   for (const [prefix, patterns] of SUBJECT_RULES) {
     if (patterns.some((re) => re.test(subject))) return { prefix, matchedBy: 'subject', tag };

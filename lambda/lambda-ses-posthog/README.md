@@ -14,12 +14,13 @@ SES already publishes these events. The identities `plnetwork.io` and `protocol.
 
 Every other SES event (Delivery, Bounce, Complaint and the rest) is skipped.
 
-The function finds the email type in two steps:
+The function finds the email type in three steps:
 
 1. **Tag.** If the SES message tag `email-type` holds a pl-notification-service template name, it maps that name through `TEMPLATE_PREFIXES`. If the tag already holds a prefix such as `digest-email`, it uses the tag as is.
-2. **Subject.** Otherwise it tries the patterns in `SUBJECT_RULES`.
+2. **Sender.** A sender used by one email type only, listed in `SOURCE_PREFIXES`. For now that is `labos@plnetwork.io`, which is SPV Spotlight.
+3. **Subject.** Otherwise it tries the patterns in `SUBJECT_RULES`.
 
-Emails that neither step recognises are handled by `UNMATCHED_EMAILS`. By default they are skipped and their subject is logged.
+Emails that no step recognises are handled by `UNMATCHED_EMAILS`. By default they are skipped and their subject is logged.
 
 The rest of the event:
 

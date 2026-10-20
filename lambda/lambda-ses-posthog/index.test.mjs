@@ -51,6 +51,22 @@ test('subjects from the senders map to the ticket prefixes', () => {
   }
 });
 
+test('SPV Spotlight emails match by the LabOS sender or the data room subject', () => {
+  const bySender = classify({
+    source: 'LabOS <labos@plnetwork.io>',
+    commonHeaders: { subject: 'Anything the admin typed' },
+  });
+  assert.deepEqual(bySender, { prefix: 'spv-spotlight-email', matchedBy: 'source', tag: undefined });
+  assert.equal(
+    classify({ commonHeaders: { subject: 'Connecting Netholabs SPV Team to Ada Lovelace' } }).prefix,
+    'spv-spotlight-email'
+  );
+  assert.equal(
+    classify({ commonHeaders: { subject: 'Connecting you to Netholabs SPV Team' } }).prefix,
+    'spv-spotlight-email'
+  );
+});
+
 test('admin alerts and unknown subjects match nothing', () => {
   for (const subject of ['A new query received', 'A new support request received', 'Hello']) {
     assert.equal(classify({ commonHeaders: { subject } }).prefix, null, subject);
