@@ -148,6 +148,42 @@ export class AuthService implements OnModuleInit {
     return this.mapAuthTokensToMemberSession(id_token, access_token, refresh_token, { isAutoLogin: true });
   }
 
+  async impersonateMember(email: string) {
+    const normalizedEmail = email.trim().toLowerCase();
+    const member = await this.membersService.findMemberByEmail(normalizedEmail);
+    if (!member || member.deletedAt) {
+      throw new NotFoundException('Member not found for this email');
+    }
+
+    const loginToken = await this.issueLoginToken(normalizedEmail);
+    let authTokens;
+    try {
+      const resp = await this.authCall('redeem_login_token', () =>
+        axios.post(`${process.env.AUTH_API_URL}/auth/login-token/redeem`, { token: loginToken })
+      );
+      authTokens = resp.data;
+    } catch (error) {
+      this.handleAuthErrors(error);
+      throw error;
+    }
+
+    const { id_token, access_token, refresh_token } = authTokens ?? {};
+    if (!access_token || !refresh_token || !id_token) {
+      throw new InternalServerErrorException('Auth service did not return session tokens');
+    }
+
+    const decoded = this.decodeAuthIdToken(id_token);
+    if (!decoded.email || decoded.email.toLowerCase() !== normalizedEmail) {
+      throw new InternalServerErrorException('Auth service returned a session for a different account');
+    }
+
+    return {
+      authToken: access_token,
+      refreshToken: refresh_token,
+      userInfo: this.memberToUserInfo(member),
+    };
+  }
+
   private async mapAuthTokensToMemberSession(
     id_token: string,
     access_token: string,
