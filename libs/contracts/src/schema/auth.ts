@@ -68,7 +68,7 @@ const RedeemLoginTokenRequestSchema = z.object({
 });
 
 const ImpersonateMemberRequestSchema = z.object({
-  email: z.string().trim().email(),
+  email: z.string().email(),
 });
 
 export class AuthRequestDto extends createZodDto(AuthRequestSchema) {}
