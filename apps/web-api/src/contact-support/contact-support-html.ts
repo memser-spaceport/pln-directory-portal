@@ -4,7 +4,11 @@ import { decodeHtmlEntities } from '../utils/html-entities';
 export const TELEGRAM_MESSAGE_MAX_LENGTH = 4096;
 
 const DATA_URI_IMG = /<img\b[^>]*\bsrc=["']data:[^"']+["'][^>]*>/gi;
-const IMG_SRC_ATTR = /\bsrc=["']([^"']+)["']/i;
+// `src` only as its own attribute: `\b` alone would also match the tail of `data-flat-src`.
+const IMG_SRC_ATTR = /\ssrc=["']([^"']+)["']/i;
+/** The screenshot with the member's drawings in it, written by the feedback drawer next to the raw `src`. */
+const IMG_FLAT_SRC_ATTR = /\sdata-flat-src=["']([^"']+)["']/i;
+const HOSTED_URL = /^https?:\/\//i;
 const HTML_TOKEN = /<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>|[^<]+|</g;
 const HREF_ATTR = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i;
 const SAFE_HREF = /^(https?:\/\/|mailto:)/i;
@@ -59,10 +63,26 @@ export function toSupportEmailHtml(message: string): string {
   return escapeHtml(message).replace(/\r\n|\n|\r/g, '<br>');
 }
 
-/** Hosted images become their URL (Telegram previews it); anything else is a placeholder. */
+/**
+ * Hosted images become their URL (Telegram previews it); anything else is a placeholder.
+ * A hosted `data-flat-src` wins over `src`, so the preview shows the drawings.
+ */
 function telegramImageText(tag: string): string {
+  const flatSrc = IMG_FLAT_SRC_ATTR.exec(tag)?.[1];
+  if (flatSrc && HOSTED_URL.test(flatSrc)) {
+    return escapeTelegramHtml(decodeHtmlEntities(flatSrc));
+  }
   const src = IMG_SRC_ATTR.exec(tag)?.[1];
-  return src && /^https?:\/\//i.test(src) ? escapeTelegramHtml(decodeHtmlEntities(src)) : '[image]';
+  return src && HOSTED_URL.test(src) ? escapeTelegramHtml(decodeHtmlEntities(src)) : '[image]';
+}
+
+/** The `Page: <url>` line for the page the request was sent from, or undefined when `page` is not an http(s) URL. */
+export function supportPageLine(metadata: Record<string, unknown> | undefined): string | undefined {
+  const page = metadata?.page;
+  if (typeof page !== 'string' || !HOSTED_URL.test(page.trim())) {
+    return undefined;
+  }
+  return `Page: ${escapeTelegramHtml(page.trim())}`;
 }
 
 function readHref(tag: string): string | undefined {
