@@ -165,6 +165,10 @@ jobs:
       - name: Deploy using Helm
         run: |
           helm upgrade --install ${{ env.HELM_RELEASE }} infra/deployment/chart/ \
+            --set resources.requests.cpu=150m \
+            --set resources.limits.cpu=800m \
+            --set resources.requests.memory=1280Mi \
+            --set resources.limits.memory=2Gi \
             -f infra/deployment/chart/${{ env.APP_MODE }}_secret_values.yaml \
             --set image.repository=${{ env.ECR_REGISTRY }} \
             --set image.tag=${{ env.IMAGE_TAG }} \
