@@ -4605,9 +4605,22 @@ model McpAuthorization {
   accessExpiresAt  DateTime?
   member           Member        @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
   authCodes        McpAuthCode[]
+  usedRefreshTokens McpUsedRefreshToken[]
 
   @@unique([memberUid, clientId])
   @@index([memberUid, revokedAt])
+}
+
+/// Hash of a refresh token this grant already rotated (LAB-2895). Presenting one again revokes the grant.
+/// Cleared on a new consent; rows older than the refresh-token lifetime are pruned daily.
+model McpUsedRefreshToken {
+  tokenHash        String           @id
+  authorizationUid String
+  usedAt           DateTime         @default(now())
+  authorization    McpAuthorization @relation(fields: [authorizationUid], references: [uid], onDelete: Cascade)
+
+  @@index([authorizationUid])
+  @@index([usedAt])
 }
 
 /// Short-lived authorization codes (PKCE S256).

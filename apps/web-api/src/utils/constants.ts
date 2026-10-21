@@ -353,6 +353,7 @@ export const ANALYTICS_EVENTS = {
     PL_INFRA_LIST_READ: 'mcp-pl-infra-list-read',
     APP_SESSION_OPEN: 'mcp-app-session-open',
     APP_SESSION_REVOKED: 'mcp-app-session-revoked',
+    REFRESH_TOKEN_REUSE: 'mcp-refresh-token-reuse',
   },
   INVESTOR_DB: {
     MANUAL_FIELDS_PATCHED: 'investor-db-manual-fields-patched',

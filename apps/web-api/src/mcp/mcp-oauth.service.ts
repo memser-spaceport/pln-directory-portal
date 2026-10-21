@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../shared/prisma.service';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
 import { AiAppsSessionService } from '../ai-apps/ai-apps-session.service';
@@ -63,6 +64,25 @@ type TokenInput = {
   client_id?: string;
   resource?: string;
 };
+
+function newTokenSet() {
+  const accessToken = generateSecret(MCP_TOKEN_PREFIX.access);
+  const refreshToken = generateSecret(MCP_TOKEN_PREFIX.refresh);
+  return {
+    hashes: {
+      accessTokenHash: hashSecret(accessToken),
+      refreshTokenHash: hashSecret(refreshToken),
+      accessExpiresAt: new Date(Date.now() + MCP_ACCESS_TOKEN_TTL_SEC * 1000),
+    },
+    response: {
+      access_token: accessToken,
+      token_type: 'Bearer',
+      expires_in: MCP_ACCESS_TOKEN_TTL_SEC,
+      refresh_token: refreshToken,
+      scope: MCP_SCOPE,
+    },
+  };
+}
 
 @Injectable()
 export class McpOAuthService {
@@ -340,6 +360,8 @@ export class McpOAuthService {
       where: { uid: codeRow.uid },
       data: { consumedAt: new Date() },
     });
+    // A new consent starts a new token family: tokens rotated before it can no longer revoke it.
+    await this.prisma.mcpUsedRefreshToken.deleteMany({ where: { authorizationUid: codeRow.authorizationUid } });
 
     return this.issueTokens(codeRow.authorizationUid);
   }
@@ -348,41 +370,93 @@ export class McpOAuthService {
     if (!input.refresh_token) {
       throw new BadRequestException('refresh_token is required');
     }
+    const presentedHash = hashSecret(input.refresh_token);
     const authorization = await this.prisma.mcpAuthorization.findUnique({
-      where: { refreshTokenHash: hashSecret(input.refresh_token) },
+      where: { refreshTokenHash: presentedHash },
     });
     if (!authorization || authorization.revokedAt) {
+      await this.revokeOnReuse(presentedHash);
       throw new UnauthorizedException('Invalid refresh_token');
     }
     const { allowed } = await this.accessControl.hasPermission(authorization.memberUid, MCP_CONNECT_PERMISSION);
     if (!allowed) {
       throw new ForbiddenException(`Missing permission: ${MCP_CONNECT_PERMISSION}`);
     }
-    return this.issueTokens(authorization.uid);
+    const tokens = await this.rotateTokens(authorization.uid, presentedHash);
+    if (!tokens) {
+      // Another refresh with the same token won the rotation, so this one is a reuse.
+      await this.revokeOnReuse(presentedHash);
+      throw new UnauthorizedException('Invalid refresh_token');
+    }
+    return tokens;
   }
 
+  /** First tokens of a grant (code exchange). */
   private async issueTokens(authorizationUid: string) {
-    const accessToken = generateSecret(MCP_TOKEN_PREFIX.access);
-    const refreshToken = generateSecret(MCP_TOKEN_PREFIX.refresh);
-    const accessExpiresAt = new Date(Date.now() + MCP_ACCESS_TOKEN_TTL_SEC * 1000);
-
+    const tokens = newTokenSet();
     await this.prisma.mcpAuthorization.update({
       where: { uid: authorizationUid },
-      data: {
-        accessTokenHash: hashSecret(accessToken),
-        refreshTokenHash: hashSecret(refreshToken),
-        accessExpiresAt,
-        revokedAt: null,
-      },
+      data: { ...tokens.hashes, revokedAt: null },
     });
+    return tokens.response;
+  }
 
-    return {
-      access_token: accessToken,
-      token_type: 'Bearer',
-      expires_in: MCP_ACCESS_TOKEN_TTL_SEC,
-      refresh_token: refreshToken,
-      scope: MCP_SCOPE,
-    };
+  /**
+   * Swaps the current refresh token for a new pair and remembers the old one, in one transaction. The update is
+   * conditioned on the presented token still being current, so of two concurrent refreshes only one succeeds; the
+   * other gets null.
+   */
+  private async rotateTokens(authorizationUid: string, presentedHash: string) {
+    const tokens = newTokenSet();
+    return this.prisma.$transaction(async (tx) => {
+      const rotated = await tx.mcpAuthorization.updateMany({
+        where: { uid: authorizationUid, refreshTokenHash: presentedHash, revokedAt: null },
+        data: tokens.hashes,
+      });
+      if (rotated.count !== 1) {
+        return null;
+      }
+      await tx.mcpUsedRefreshToken.create({ data: { tokenHash: presentedHash, authorizationUid } });
+      return tokens.response;
+    });
+  }
+
+  /**
+   * A refresh token that is not current: if this grant already rotated it, someone holds a copy, so the grant is
+   * revoked (OAuth 2.1 refresh-token reuse detection). Unknown tokens and already-revoked grants change nothing.
+   */
+  private async revokeOnReuse(presentedHash: string) {
+    const used = await this.prisma.mcpUsedRefreshToken.findUnique({
+      where: { tokenHash: presentedHash },
+      include: { authorization: { select: { uid: true, memberUid: true, clientName: true, revokedAt: true } } },
+    });
+    if (!used || used.authorization.revokedAt) {
+      return;
+    }
+    const { uid, memberUid, clientName } = used.authorization;
+    await this.revokeAuthorization(uid);
+    try {
+      await this.analytics.trackEvent({
+        name: ANALYTICS_EVENTS.MCP.REFRESH_TOKEN_REUSE,
+        distinctId: memberUid,
+        properties: { memberUid, authorizationUid: uid, clientName },
+      });
+    } catch (error) {
+      this.logger.warn(`Failed to track ${ANALYTICS_EVENTS.MCP.REFRESH_TOKEN_REUSE}`, error);
+    }
+  }
+
+  /** Drops remembered refresh-token hashes older than the refresh-token lifetime. */
+  @Cron('45 3 * * *', { name: 'mcp-used-refresh-token-cleanup' })
+  async cleanupUsedRefreshTokens(): Promise<void> {
+    try {
+      const { count } = await this.prisma.mcpUsedRefreshToken.deleteMany({
+        where: { usedAt: { lt: new Date(Date.now() - MCP_REFRESH_TOKEN_TTL_MS) } },
+      });
+      this.logger.log(`MCP used refresh-token cleanup: ${count} rows removed`);
+    } catch (error) {
+      this.logger.error(`MCP used refresh-token cleanup failed: ${(error as Error).message}`);
+    }
   }
 
   private async revokeAuthorization(uid: string) {

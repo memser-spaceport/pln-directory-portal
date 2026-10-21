@@ -36,6 +36,11 @@ function buildService(
       findUnique: jest.fn(),
       update: jest.fn().mockResolvedValue({}),
     },
+    mcpUsedRefreshToken: {
+      create: jest.fn().mockResolvedValue({}),
+      findUnique: jest.fn().mockResolvedValue(null),
+      deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
     member: { findUnique: jest.fn().mockResolvedValue(MEMBER) },
     $transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma)),
     ...overrides.prisma,
