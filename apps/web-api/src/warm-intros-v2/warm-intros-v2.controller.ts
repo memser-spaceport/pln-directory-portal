@@ -21,6 +21,7 @@ import {
   UpsertWarmPathFeedbackDto,
 } from './dto/warm-path-feedback.dto';
 import { UpsertWarmPathNoteDto } from './dto/warm-path-note.dto';
+import { WarmIntrosV2RunService } from './warm-intros-v2-run.service';
 import { WarmIntrosV2Service } from './warm-intros-v2.service';
 
 const VIEW_PERMS = {
@@ -60,8 +61,16 @@ export class WarmIntrosV2Controller {
   constructor(
     private readonly warmIntrosV2Service: WarmIntrosV2Service,
     private readonly rbacService: RbacService,
-    private readonly accessControlV2Service: AccessControlV2Service
+    private readonly accessControlV2Service: AccessControlV2Service,
+    private readonly runs: WarmIntrosV2RunService,
   ) {}
+
+  @NoCache()
+  @Get('runs/latest')
+  @RequirePermissions(VIEW_PERMS)
+  latestRun() {
+    return this.runs.latest();
+  }
 
   @NoCache()
   @Get('paths')
