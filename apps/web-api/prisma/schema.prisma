@@ -2754,6 +2754,11 @@ model TeamNewsItem {
   viewCount         Int                 @default(0)
   /// Set when a team member or admin posts from the team profile; null for enrichment-ingested items.
   postedByMemberUid String?
+  /// Absolute https og:image / twitter:image of the source page; null when it has none.
+  imageUrl          String?
+  /// Set when the image fetch was tried (with or without a result), so a page
+  /// without an image is not fetched again.
+  imageCheckedAt    DateTime?
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
   forumLinks        TeamNewsForumLink[]

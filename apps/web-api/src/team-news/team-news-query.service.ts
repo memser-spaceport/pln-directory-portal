@@ -718,6 +718,7 @@ export class TeamNewsQueryService {
       editorialRank: number | null;
       viewCount: number;
       postedByMemberUid: string | null;
+      imageUrl: string | null;
       createdAt: Date;
       team: {
         uid: string;
@@ -779,6 +780,7 @@ export class TeamNewsQueryService {
       editorialRank: row.editorialRank ?? null,
       viewCount: row.viewCount,
       isTeamPosted: row.postedByMemberUid != null,
+      imageUrl: row.imageUrl ?? null,
     };
   }
 

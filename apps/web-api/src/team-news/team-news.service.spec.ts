@@ -6,10 +6,16 @@ jest.mock('../push-notifications/push-notifications.service', () => ({
   PushNotificationsService: jest.fn().mockImplementation(() => ({ create: jest.fn() })),
 }));
 
+// TeamNewsPostSummaryService imports the ESM-only `ai` package, which jest cannot load.
+jest.mock('ai', () => ({
+  generateText: jest.fn(),
+}));
+
 import type { PrismaService } from '../shared/prisma.service';
 import type { PushNotificationsService } from '../push-notifications/push-notifications.service';
 import { TeamNewsService } from './team-news.service';
 import type { TeamNewsPostSummaryService } from './team-news-post-summary.service';
+import type { TeamNewsImageService } from './team-news-image.service';
 
 type PrismaMock = {
   teamNewsItem: { findUnique: jest.Mock };
@@ -20,6 +26,8 @@ const buildPrismaMock = (): PrismaMock => ({
   teamNewsItem: { findUnique: jest.fn() },
   teamNewsForumLink: { findUnique: jest.fn(), upsert: jest.fn() },
 });
+
+const buildImageMock = () => ({ fillImages: jest.fn().mockResolvedValue(undefined) });
 
 const buildPushMock = () => ({ create: jest.fn().mockResolvedValue(undefined) });
 
@@ -45,7 +53,8 @@ describe('TeamNewsService.createForumLink', () => {
     service = new TeamNewsService(
       prisma as unknown as PrismaService,
       buildPushMock() as unknown as PushNotificationsService,
-      buildSummaryMock() as unknown as TeamNewsPostSummaryService
+      buildSummaryMock() as unknown as TeamNewsPostSummaryService,
+      buildImageMock() as unknown as TeamNewsImageService
     );
   });
 
@@ -183,7 +192,8 @@ describe('TeamNewsService.ingestTeamNews notifications', () => {
     service = new TeamNewsService(
       prisma as unknown as PrismaService,
       push as unknown as PushNotificationsService,
-      buildSummaryMock() as unknown as TeamNewsPostSummaryService
+      buildSummaryMock() as unknown as TeamNewsPostSummaryService,
+      buildImageMock() as unknown as TeamNewsImageService
     );
   });
 
@@ -327,7 +337,8 @@ describe('TeamNewsService.ingestTeamNews multi-source', () => {
     service = new TeamNewsService(
       prisma as unknown as PrismaService,
       buildPushMock() as unknown as PushNotificationsService,
-      buildSummaryMock() as unknown as TeamNewsPostSummaryService
+      buildSummaryMock() as unknown as TeamNewsPostSummaryService,
+      buildImageMock() as unknown as TeamNewsImageService
     );
   });
 
@@ -354,6 +365,7 @@ describe('TeamNewsService.ingestTeamNews multi-source', () => {
         sourceUrl: plrd,
         sourceUrls: [plrd, youtube],
       }),
+      select: { uid: true },
     });
   });
 
@@ -479,5 +491,91 @@ describe('TeamNewsService.ingestTeamNews multi-source', () => {
         tags: ['podcast', 'talk'],
       }),
     });
+  });
+});
+
+describe('TeamNewsService.ingestTeamNews image fill', () => {
+  let service: TeamNewsService;
+  let prisma: IngestPrismaMock;
+  let image: ReturnType<typeof buildImageMock>;
+
+  beforeEach(() => {
+    prisma = buildIngestPrismaMock();
+    image = buildImageMock();
+    service = new TeamNewsService(
+      prisma as unknown as PrismaService,
+      buildPushMock() as unknown as PushNotificationsService,
+      buildSummaryMock() as unknown as TeamNewsPostSummaryService,
+      image as unknown as TeamNewsImageService
+    );
+  });
+
+  it('fills images for the created items only', async () => {
+    prisma.teamNewsItem.findUnique.mockResolvedValue(null);
+    prisma.teamNewsItem.create.mockResolvedValueOnce({ uid: 'news-a' }).mockResolvedValueOnce({ uid: 'news-b' });
+
+    await service.ingestTeamNews({
+      runId: 'run-img',
+      items: [
+        ingestItem({ sourceUrl: 'https://x/1', eventDate: '2026-06-01T00:00:00.000Z' }),
+        ingestItem({ sourceUrl: 'https://x/2', eventDate: '2026-06-20T00:00:00.000Z', title: 'Other news' }),
+      ],
+    });
+
+    expect(image.fillImages).toHaveBeenCalledTimes(1);
+    expect(image.fillImages).toHaveBeenCalledWith(['news-a', 'news-b']);
+  });
+
+  it('does not fetch an image for an item that merges into an existing row', async () => {
+    prisma.teamNewsItem.findUnique.mockResolvedValue({
+      id: 1,
+      sourceUrl: 'https://news.example.com/a',
+      sourceUrls: ['https://news.example.com/a'],
+      title: 'ARIA raised a seed round',
+      summary: null,
+      contentHtml: null,
+      tags: [],
+    });
+
+    await service.ingestTeamNews({ runId: 'run-merge', items: [ingestItem()] });
+
+    expect(prisma.teamNewsItem.update).toHaveBeenCalled();
+    expect(image.fillImages).not.toHaveBeenCalled();
+  });
+
+  it('returns without waiting for the image fill of 50 items', async () => {
+    prisma.teamNewsItem.findUnique.mockResolvedValue(null);
+    let uid = 0;
+    prisma.teamNewsItem.create.mockImplementation(async () => ({ uid: `news-${uid++}` }));
+    let finished = false;
+    image.fillImages.mockImplementation(() => new Promise<void>(() => undefined)); // never settles
+
+    const items = Array.from({ length: 50 }, (_, i) =>
+      ingestItem({
+        sourceUrl: `https://x/${i}`,
+        title: `item ${i}`,
+        eventDate: new Date(Date.UTC(2026, 0, 1) + i * 30 * 24 * 3600 * 1000).toISOString(),
+      })
+    );
+    const result = await service.ingestTeamNews({ runId: 'run-50', items }).then((r) => {
+      finished = true;
+      return r;
+    });
+
+    expect(finished).toBe(true);
+    expect(result.created).toBe(50);
+    expect(image.fillImages).toHaveBeenCalledTimes(1);
+    expect(image.fillImages.mock.calls[0][0]).toHaveLength(50);
+  });
+
+  it('still succeeds when the image fill rejects', async () => {
+    prisma.teamNewsItem.findUnique.mockResolvedValue(null);
+    prisma.teamNewsItem.create.mockResolvedValue({ uid: 'news-a' });
+    image.fillImages.mockRejectedValue(new Error('fill failed'));
+
+    const result = await service.ingestTeamNews({ runId: 'run-err', items: [ingestItem()] });
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(result.created).toBe(1);
   });
 });

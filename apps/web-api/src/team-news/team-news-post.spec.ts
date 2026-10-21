@@ -13,6 +13,7 @@ import type { PrismaService } from '../shared/prisma.service';
 import type { PushNotificationsService } from '../push-notifications/push-notifications.service';
 import { TeamNewsService } from './team-news.service';
 import type { TeamNewsPostSummaryService } from './team-news-post-summary.service';
+import type { TeamNewsImageService } from './team-news-image.service';
 
 type PrismaMock = {
   team: { findUnique: jest.Mock };
@@ -25,6 +26,8 @@ const buildPrismaMock = (): PrismaMock => ({
   teamNewsItem: { findMany: jest.fn(), create: jest.fn(), count: jest.fn() },
   teamNewsEnrichment: { upsert: jest.fn() },
 });
+
+const buildImageMock = () => ({ fillImages: jest.fn().mockResolvedValue(undefined) });
 
 const buildPushMock = () => ({ create: jest.fn().mockResolvedValue(undefined) });
 
@@ -51,7 +54,8 @@ describe('TeamNewsService.createTeamPostedNews', () => {
     service = new TeamNewsService(
       prisma as unknown as PrismaService,
       push as unknown as PushNotificationsService,
-      summary as unknown as TeamNewsPostSummaryService
+      summary as unknown as TeamNewsPostSummaryService,
+      buildImageMock() as unknown as TeamNewsImageService
     );
 
     prisma.team.findUnique.mockResolvedValue({ uid: 'team-1', status: TeamStatus.ACTIVE });
@@ -147,5 +151,33 @@ describe('TeamNewsService.createTeamPostedNews', () => {
         }),
       })
     );
+  });
+});
+
+describe('TeamNewsService.createTeamPostedNews image fill', () => {
+  it('fills the image of the created post without waiting for it', async () => {
+    const prisma = buildPrismaMock();
+    const image = buildImageMock();
+    image.fillImages.mockImplementation(() => new Promise<void>(() => undefined)); // never settles
+    const service = new TeamNewsService(
+      prisma as unknown as PrismaService,
+      buildPushMock() as unknown as PushNotificationsService,
+      buildSummaryMock() as unknown as TeamNewsPostSummaryService,
+      image as unknown as TeamNewsImageService
+    );
+    prisma.team.findUnique.mockResolvedValue({ uid: 'team-1', status: TeamStatus.ACTIVE });
+    prisma.teamNewsItem.findMany.mockResolvedValue([]);
+    prisma.teamNewsItem.create.mockResolvedValue({ uid: 'news-new' });
+    prisma.teamNewsItem.count.mockResolvedValue(1);
+    prisma.teamNewsEnrichment.upsert.mockResolvedValue({});
+
+    const result = await service.createTeamPostedNews(
+      'team-1',
+      { title: 'Launch', url: 'https://example.com/post' },
+      { uid: 'member-1', isDirectoryAdmin: true }
+    );
+
+    expect(result).toEqual({ uid: 'news-new' });
+    expect(image.fillImages).toHaveBeenCalledWith(['news-new']);
   });
 });
