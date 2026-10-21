@@ -54,11 +54,16 @@ describe('AiAppMemberContextGuard', () => {
 
   it('marks an agent session so member context can expose the flag', async () => {
     const { guard, sessionService } = build();
-    sessionService.authenticateAppRequest.mockResolvedValue({ memberUid: 'm-1', appId: 'foo', isAgent: true });
+    sessionService.authenticateAppRequest.mockResolvedValue({
+      memberUid: 'm-1',
+      appId: 'foo',
+      isAgent: true,
+      agentAccess: 'read',
+    });
     const req: any = { headers: { authorization: `Bearer ${appToken('foo')}` }, cookies: {} };
     await expect(guard.canActivate(context(req))).resolves.toBe(true);
     expect(req.memberUid).toBe('m-1');
-    expect(req.aiAppAgent).toBe(true);
+    expect(req.aiAppAgent).toEqual({ agentAccess: 'read' });
     expect(req.aiAppTestingUser).toBeUndefined();
   });
 

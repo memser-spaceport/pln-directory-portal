@@ -1317,7 +1317,13 @@ Response shape (\`member\`):
 \`\`\`
 
 Fields may be \`null\`/empty, and new fields may be added over time — ignore
-anything you don't recognize. The response deliberately contains **no contact
+anything you don't recognize.
+
+When the member's own AI agent opens the app for them (through LabOS MCP), the
+response also has \`"isAgent": true\` and \`"agentAccess"\`: \`"read"\` means the
+member gave their agent read-only access, so the app should not let that
+caller change data; \`"write"\` means the member allowed changes. A normal
+browser visit has neither field. The response deliberately contains **no contact
 info** (no email, no office-hours link) — don't build features that assume a
 way to reach the member, and don't ask them to type contact details in to
 compensate.

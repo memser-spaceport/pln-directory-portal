@@ -1,16 +1,7 @@
 import { AnalyticsService } from '../analytics/service/analytics.service';
 import { ANALYTICS_EVENTS } from '../utils/constants';
-import { AI_APP_FEEDBACK_WRITE_TOOLS } from './mcp.constants';
+import { MCP_WRITE_TOOLS } from './mcp.constants';
 import type { McpTokenActor } from './mcp-oauth.service';
-
-const MCP_WRITE_TOOLS = new Set([
-  'submit_warm_path_feedback',
-  'submit_warm_path_note',
-  'update_master_profile',
-  'update_connection_edge',
-  'update_warm_path',
-  ...AI_APP_FEEDBACK_WRITE_TOOLS,
-]);
 
 export type McpToolOperation = 'read' | 'write';
 

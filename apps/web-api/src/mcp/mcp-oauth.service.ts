@@ -24,6 +24,8 @@ export type McpTokenActor = {
   email: string | null;
   name: string;
   clientName: string;
+  /** False on a read-only grant (LAB-2902). */
+  canWrite: boolean;
 };
 
 type RegisterBody = {
@@ -52,6 +54,7 @@ type ApproveInput = {
   codeChallengeMethod: string;
   state?: string;
   resource?: string;
+  allowChanges?: boolean;
 };
 
 type TokenInput = {
@@ -191,6 +194,7 @@ export class McpOAuthService {
       throw new ForbiddenException('Member not found');
     }
 
+    const canWrite = input.allowChanges === true;
     const authorization = await this.prisma.mcpAuthorization.upsert({
       where: { memberUid_clientId: { memberUid, clientId: input.clientId } },
       create: {
@@ -198,11 +202,13 @@ export class McpOAuthService {
         clientId: input.clientId,
         clientName: client.clientName,
         connectedAt: new Date(),
+        canWrite,
       },
       update: {
         clientName: client.clientName,
         connectedAt: new Date(),
         revokedAt: null,
+        canWrite,
       },
     });
 
@@ -308,6 +314,7 @@ export class McpOAuthService {
       email: authorization.member.email,
       name: authorization.member.name,
       clientName: authorization.clientName,
+      canWrite: authorization.canWrite,
     };
   }
 

@@ -186,6 +186,7 @@ describe('AiAppsStarterKitService buildZip', () => {
     expect(skill).toContain('res.status === 404');
     expect(skill).toContain('Authorization: `Bearer ${token}`');
     expect(skill).not.toContain('scoped to the shared apps');
+    expect(skill).toContain('"agentAccess"');
     // The snippet is copied into apps verbatim: it must be valid JavaScript as rendered.
     const snippet = skill.split('```js')[1].split('```')[0];
     expect(() => new Function(snippet)).not.toThrow();

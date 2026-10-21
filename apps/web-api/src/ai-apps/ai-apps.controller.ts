@@ -328,7 +328,7 @@ export class AiAppsController {
     if (!req.aiAppAgent) {
       return context;
     }
-    return { isAgent: true as const, ...context };
+    return { isAgent: true as const, agentAccess: req.aiAppAgent.agentAccess, ...context };
   }
 
   /**

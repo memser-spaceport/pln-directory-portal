@@ -8,6 +8,8 @@ export const ApproveMcpOAuthSchema = z.object({
   codeChallengeMethod: z.literal('S256'),
   state: z.string().optional(),
   resource: z.string().optional(),
+  /** The member ticked "make changes for me". Absent or false = read-only grant (LAB-2902). */
+  allowChanges: z.boolean().optional(),
 });
 
 export class ApproveMcpOAuthDto extends createZodDto(ApproveMcpOAuthSchema) {}

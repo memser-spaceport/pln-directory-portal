@@ -75,7 +75,7 @@ describe('AiAppsController GET /me wiring', () => {
     expect(aiAppsService.getMemberContext).not.toHaveBeenCalled();
   });
 
-  it('adds isAgent for an agent session and omits it for a browser session', async () => {
+  it('adds isAgent and agentAccess for an agent session and omits them for a browser session', async () => {
     const member = { uid: 'm-1', name: 'Ada' };
     const aiAppsService = { getMemberContext: jest.fn().mockResolvedValue({ member }) };
     const controller = new AiAppsController(
@@ -87,10 +87,16 @@ describe('AiAppsController GET /me wiring', () => {
       {} as any,
       {} as any
     );
-    await expect(controller.getMemberContext({ memberUid: 'm-1', aiAppAgent: true })).resolves.toEqual({
+    await expect(
+      controller.getMemberContext({ memberUid: 'm-1', aiAppAgent: { agentAccess: 'read' } })
+    ).resolves.toEqual({
       isAgent: true,
+      agentAccess: 'read',
       member,
     });
+    await expect(
+      controller.getMemberContext({ memberUid: 'm-1', aiAppAgent: { agentAccess: 'write' } })
+    ).resolves.toEqual({ isAgent: true, agentAccess: 'write', member });
     await expect(controller.getMemberContext({ memberUid: 'm-1' })).resolves.toEqual({ member });
   });
 
