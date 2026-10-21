@@ -86,6 +86,9 @@ export const TeamNewsItemSchema = z.object({
   viewCount: z.number().int().min(0),
   // True when posted from the team profile by a member or directory admin.
   isTeamPosted: z.boolean(),
+  // Absolute https og:image / twitter:image of the source page, captured when
+  // the item is created. Null when the page has none or was not checked yet.
+  imageUrl: z.string().nullable(),
 });
 
 export const CreateTeamNewsPostRequestSchema = z.object({

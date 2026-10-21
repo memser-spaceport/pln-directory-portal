@@ -211,6 +211,22 @@ describe('TeamNewsQueryService — viewCount', () => {
     expect(teamNewsItemFindMany).toHaveBeenCalledTimes(1);
   });
 
+  it('maps imageUrl from the row onto the DTO', async () => {
+    teamNewsItemFindMany.mockResolvedValue([makeRow({ imageUrl: 'https://cdn.example.com/og.jpg' })]);
+
+    const result = await service.listTeamNewsByTeam('team-1', { page: 1, limit: 50 });
+
+    expect(result.items[0].imageUrl).toBe('https://cdn.example.com/og.jpg');
+  });
+
+  it('returns imageUrl null when the row has no image', async () => {
+    teamNewsItemFindMany.mockResolvedValue([makeRow({ imageUrl: null })]);
+
+    const result = await service.listTeamNewsByTeam('team-1', { page: 1, limit: 50 });
+
+    expect(result.items[0].imageUrl).toBeNull();
+  });
+
   it('defaults viewCount to 0 for an item with no impressions yet', async () => {
     const result = await service.listTeamNewsByTeam('team-1', { page: 1, limit: 50 });
 
@@ -691,6 +707,33 @@ describe('TeamNewsQueryService.getDigestNewsPicks', () => {
 
     expect(result.picks['member-1'].map((i) => i.uid)).toEqual(['newer-a', 'b', 'c']);
     expect(result.windowCount).toBe(5);
+  });
+
+  it('carries imageUrl on every picked item (a string or null)', async () => {
+    teamNewsItemFindMany.mockResolvedValue([
+      makeRow({
+        uid: 'with-image',
+        teamUid: 'team-a',
+        imageUrl: 'https://cdn.example.com/og.jpg',
+        team: { uid: 'team-a', name: 'A', logo: null, teamFocusAreas: [] },
+      }),
+      makeRow({
+        uid: 'no-image',
+        teamUid: 'team-b',
+        imageUrl: null,
+        team: { uid: 'team-b', name: 'B', logo: null, teamFocusAreas: [] },
+      }),
+    ]);
+    getForYouTeamUidsForMembers.mockResolvedValue(new Map([['member-1', ['team-a', 'team-b']]]));
+
+    const result = await service.getDigestNewsPicks({
+      memberUids: ['member-1'],
+      sinceCreatedAt: since,
+      untilCreatedAt: until,
+    });
+
+    const byUid = Object.fromEntries(result.picks['member-1'].map((i) => [i.uid, i.imageUrl]));
+    expect(byUid).toEqual({ 'with-image': 'https://cdn.example.com/og.jpg', 'no-image': null });
   });
 
   it('does not pad a 1-item For You list with global items', async () => {
