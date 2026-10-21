@@ -14,7 +14,11 @@ export const MCP_TOKEN_PREFIX = {
   refresh: 'mcp_rt',
   code: 'mcp_ac',
   client: 'mcp_client',
+  memberProof: 'mcp_mp',
 } as const;
+
+/** A member proof (LAB-2900) is redeemable once, within this window. */
+export const MCP_MEMBER_PROOF_TTL_SECONDS = 5 * 60;
 
 export function mcpIssuerUrl(): string {
   return (process.env.WEB_API_BASE_URL || '').replace(/\/+$/, '');
