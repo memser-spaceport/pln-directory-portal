@@ -22,7 +22,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AiAppFeedbackStatus } from '@prisma/client';
-import { ApiTags, ApiConsumes } from '@nestjs/swagger';
+import { ApiTags, ApiConsumes, ApiQuery } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { ZodValidationPipe } from '@abitia/zod-dto';
 import { Request, Response } from 'express';
@@ -311,11 +311,18 @@ export class AiAppsController {
    * here also accepts the LabOS `authToken` cookie — it is scoped to the parent
    * domain, so it rides along on same-site requests from `<appId>.<domain>` and
    * an app can simply `fetch(meEndpoint, { credentials: 'include' })`. Guests
-   * get 401 (no token), members without AI Apps access get 403. Declared before
-   * `:uid` so the literal path wins.
+   * get 401 (no token), members without AI Apps access get 403. An app's server
+   * names itself with `?appId=`; an app session minted for another app then
+   * gets 401, with or without `Origin`. Declared before `:uid` so the literal
+   * path wins.
    */
   @NoCache()
   @Throttle(AI_APPS_SIDECAR_THROTTLE_LIMIT, AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS)
+  @ApiQuery({
+    name: 'appId',
+    required: false,
+    description: 'The calling app. An app session minted for a different app is refused with 401.',
+  })
   @Get('me')
   @UseGuards(AiAppMemberContextGuard, AiAppMeRbacGuard)
   @RequirePermissions(READ)

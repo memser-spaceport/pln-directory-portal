@@ -701,6 +701,9 @@ one app works nowhere else. The pieces:
   matches the origin), and `GET /v1/ai-apps/access-check` via the gate's `X-AI-App-Session` header (same permission
   and per-app access rule as a LabOS token). `AiAppSessionScopeMiddleware` 401s the token on every other route before
   any guard or auth-service call.
+- **Naming the calling app.** `GET /v1/ai-apps/me?appId=<appId>` lets an app's server say which app is asking. An app
+  session minted for a different app then gets `401 Invalid or expired app session`, with or without `Origin`. Without
+  `appId`, `/me` decides from the session and `Origin` alone. Kit 1.18 tells app servers to send it.
 - **Fleet migration.** `GET /v1/ai-apps/admin/auth-gate` lists each app target's gate version; `POST
   admin/auth-gate/refresh` (`dryRun`, `batchSize`, `appUids`, `target`, `maxFailures`) upgrades gates in place via
   the orchestrator (same image and values), verifies each one (`/_pln/gate`, `/_health`, unchanged unauthenticated

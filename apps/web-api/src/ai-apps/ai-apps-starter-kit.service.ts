@@ -1335,9 +1335,11 @@ compensate.
   session/auth system on top.
 - Call it client-side. If you must know the member on your server, the
   \`authToken\` cookie arrives on every request to the app: decode it (URL-decode,
-  strip the surrounding double quotes) and forward it to \`memberContextEndpoint\`
-  as \`Authorization: Bearer <token>\`. It is a session for this app only — it
-  works for this endpoint and nothing else. Never store or log the token, and
+  strip the surrounding double quotes) and forward it to
+  \`memberContextEndpoint + "?appId=<appId>"\` (your \`appId\` from
+  \`pln-app.config.json\`) as \`Authorization: Bearer <token>\`. It is a session
+  for this app only — it works for this endpoint and nothing else, and naming
+  your \`appId\` makes LabOS refuse (401) a session minted for another app. Never store or log the token, and
   never send it — or the member's data — to any third-party service.
 - Keep the token in memory for the current page only — don't persist it to
   localStorage, files, or your own backend.

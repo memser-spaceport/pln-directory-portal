@@ -11,7 +11,7 @@
  */
 
 /** Starter kit version shown in the README, ZIP filename, and LabOS UI. Bump when the kit contents or flow change. */
-export const AI_APPS_STARTER_KIT_VERSION = '1.17';
+export const AI_APPS_STARTER_KIT_VERSION = '1.18';
 
 /**
  * Member-readable notes for the CURRENT kit version, served by the open
@@ -19,10 +19,7 @@ export const AI_APPS_STARTER_KIT_VERSION = '1.17';
  * before offering it. Replace (don't append) when bumping the version.
  */
 export const AI_APPS_STARTER_KIT_WHATS_NEW: string[] = [
-  'Your agent now checks for starter-kit updates at the start of a chat and offers to apply them, only after you say yes.',
-  'Updates change only kit files (agent instructions, skills, design system, styles), never your app code in app/.',
-  'Kit files you edited yourself are listed before anything is overwritten.',
-  'If your agent loses track of a LabOS approval mid-way, it now picks it back up instead of asking you to approve again.',
+  'When your app checks the signed-in member from its own server, it now names itself, so LabOS refuses a session meant for another app.',
 ];
 
 /** Max members on one private app's whitelist (the owner and directory admins never count). */
