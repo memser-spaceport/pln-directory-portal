@@ -5,6 +5,7 @@ import * as iconv from 'iconv-lite';
 import { Prisma } from '@prisma/client';
 import { ParticipantsRequest } from '../teams/dto/members.dto';
 import { normalizeBlueskyHandler, normalizeCrunchbaseHandler } from '../teams/team-handle-normalizer';
+import { syncTeamLocations } from '../teams/team-locations';
 
 type ImportParams = {
   csvBuffer: Buffer;
@@ -268,7 +269,7 @@ export class AdminTeamsService {
         synced.teamSize = String(synced.teamSize);
       }
 
-      await tx.team.update({ where: { uid }, data: synced });
+      await tx.team.update({ where: { uid }, data: await syncTeamLocations({ tx, teamUid: uid, data: synced }) });
     });
   }
 
@@ -385,7 +386,6 @@ export class AdminTeamsService {
         WHERE v.uid = t.uid
       `;
 
-
       this.logger.log(`Fast update chunk: updated=${toUpdate.length}, missing=${missingInThisChunk.length}`);
     }
 
@@ -475,7 +475,7 @@ function syncTierPriorityOnWrite(
     if (computedTier !== Number(data.tier)) {
       warn(
         `[AdminTeams] Conflicting tier/priority provided (tier=${data.tier}, priority=${data.priority}). ` +
-        `Using priority and overwriting tier -> ${computedTier}.`
+          `Using priority and overwriting tier -> ${computedTier}.`
       );
       data.tier = computedTier;
     }
@@ -483,4 +483,3 @@ function syncTierPriorityOnWrite(
 
   return data;
 }
-
