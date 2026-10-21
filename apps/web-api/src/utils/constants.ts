@@ -351,6 +351,8 @@ export const ANALYTICS_EVENTS = {
   MCP: {
     TOOL_INVOKED: 'mcp-tool-invoked',
     PL_INFRA_LIST_READ: 'mcp-pl-infra-list-read',
+    MEMBER_PROOF_ISSUED: 'mcp-member-proof-issued',
+    MEMBER_PROOF_REDEEMED: 'mcp-member-proof-redeemed',
     APP_SESSION_OPEN: 'mcp-app-session-open',
     APP_SESSION_REVOKED: 'mcp-app-session-revoked',
     REFRESH_TOKEN_REUSE: 'mcp-refresh-token-reuse',

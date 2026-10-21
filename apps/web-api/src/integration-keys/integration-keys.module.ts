@@ -29,6 +29,6 @@ import { MemberSignInService } from './member-sign-in.service';
     AtsPushService,
     MemberSignInService,
   ],
-  exports: [IntegrationKeysService, IntegrationKeyGuard, AtsPushService],
+  exports: [IntegrationKeysService, IntegrationKeyGuard, AtsPushService, MemberSignInService],
 })
 export class IntegrationKeysModule {}
