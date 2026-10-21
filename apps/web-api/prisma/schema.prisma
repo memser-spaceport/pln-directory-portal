@@ -45,7 +45,9 @@ model Team {
   portfolioMapLogo             Image?                        @relation("TeamPortfolioMapLogo", fields: [portfolioMapLogoUid], references: [uid], onDelete: SetNull)
   portfolioMapLogoUid          String?
   teamSize                     String?
+  /// The HQ: always locations[0], kept for readers that take a single place (enrichment, back-office, SPV).
   location                     String?
+  locations                    String[]                      @default([])
   status                       TeamStatus                    @default(ACTIVE)
   shortDescription             String?
   longDescription              String?
