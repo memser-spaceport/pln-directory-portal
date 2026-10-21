@@ -605,6 +605,7 @@ describe('TeamNewsQueryService.getDigestNewsPicks', () => {
   let service: TeamNewsQueryService;
 
   const teamNewsItemFindMany = jest.fn();
+  const teamNewsItemFindFirst = jest.fn();
   const teamNewsForumLinkFindMany = jest.fn();
   const teamNewsUpvoteGroupBy = jest.fn();
   const teamNewsUpvoteFindMany = jest.fn();
@@ -642,13 +643,14 @@ describe('TeamNewsQueryService.getDigestNewsPicks', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     teamNewsItemFindMany.mockResolvedValue([]);
+    teamNewsItemFindFirst.mockResolvedValue(null);
     teamNewsForumLinkFindMany.mockResolvedValue([]);
     teamNewsUpvoteGroupBy.mockResolvedValue([]);
     teamNewsUpvoteFindMany.mockResolvedValue([]);
     getForYouTeamUidsForMembers.mockResolvedValue(new Map());
     service = new TeamNewsQueryService(
       {
-        teamNewsItem: { findMany: teamNewsItemFindMany },
+        teamNewsItem: { findMany: teamNewsItemFindMany, findFirst: teamNewsItemFindFirst },
         teamNewsForumLink: { findMany: teamNewsForumLinkFindMany },
         teamNewsUpvote: { groupBy: teamNewsUpvoteGroupBy, findMany: teamNewsUpvoteFindMany },
       } as unknown as PrismaService,
@@ -798,6 +800,55 @@ describe('TeamNewsQueryService.getDigestNewsPicks', () => {
     });
 
     expect(result.picks['member-1'].map((i) => i.uid)).toEqual(['n1', 'n2', 'n3']);
+  });
+
+  it('returns the Top Stories lead as topStory, mapped like the picks', async () => {
+    teamNewsItemFindFirst.mockResolvedValue(
+      makeRow({ uid: 'lead', editorialRank: 1, imageUrl: 'https://cdn.example.com/lead.jpg' })
+    );
+
+    const result = await service.getDigestNewsPicks({
+      memberUids: ['member-1'],
+      sinceCreatedAt: since,
+      untilCreatedAt: until,
+    });
+
+    expect(result.topStory).toEqual(
+      expect.objectContaining({
+        uid: 'lead',
+        editorialRank: 1,
+        imageUrl: 'https://cdn.example.com/lead.jpg',
+        teamName: 'Acme Labs',
+      })
+    );
+  });
+
+  it('asks for editorialRank 1 within the last 14 days, without excluded teams', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-10-21T12:00:00.000Z'));
+    try {
+      await service.getDigestNewsPicks({ memberUids: ['member-1'], sinceCreatedAt: since, untilCreatedAt: until });
+    } finally {
+      jest.useRealTimers();
+    }
+
+    const { where } = teamNewsItemFindFirst.mock.calls[0][0];
+    expect(where.editorialRank).toBe(1);
+    expect(where.eventDate).toEqual({ gte: new Date('2026-10-07T12:00:00.000Z') });
+    expect(where.NOT).toBeDefined();
+  });
+
+  it('returns topStory null when there is no lead, and leaves picks unchanged', async () => {
+    teamNewsItemFindMany.mockResolvedValue([makeRow({ uid: 'n1' })]);
+
+    const result = await service.getDigestNewsPicks({
+      memberUids: ['member-1'],
+      sinceCreatedAt: since,
+      untilCreatedAt: until,
+    });
+
+    expect(result.topStory).toBeNull();
+    expect(result.picks['member-1'].map((i) => i.uid)).toEqual(['n1']);
+    expect(result.windowCount).toBe(1);
   });
 
   it('queries the watermark createdAt window without a 50-item cap', async () => {
