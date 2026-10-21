@@ -100,3 +100,11 @@
 ## Keep This File Current
 
 When a PR changes the stack (runtime or framework versions, package manager, scripts, Prisma schemas, test or lint tooling, folder conventions), the same PR updates this file. The Horizon build agent follows this rule, and its review checks it. A weekly check compares this file with the code and opens a doc-only PR when they drift apart.
+
+## OpenSpec
+
+A PR that changes how a module works must update that module's spec at `openspec/specs/<capability>/spec.md` in the same PR.
+If that spec does not exist yet, the PR creates it.
+This applies to agent PRs and to human PRs.
+A PR that does not change module behaviour (refactor, styles, tests, or docs) does not need a spec change.
+Archive the matching change under `openspec/changes/` in that same PR, so `openspec/specs/` updates when the code merges.
