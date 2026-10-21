@@ -100,10 +100,15 @@ export function isNonPublicAddress(address: string): boolean {
   return true;
 }
 
-// A public host name can still resolve to an internal address.
-async function resolvesToPublicAddresses(pageUrl: string): Promise<boolean> {
+// A public host name can still resolve to an internal address. The lookup
+// stops with the fetch deadline (signal), so a slow resolver cannot extend it.
+async function resolvesToPublicAddresses(pageUrl: string, signal: AbortSignal): Promise<boolean> {
   try {
-    const addresses = await dns.lookup(pageHost(new URL(pageUrl)), { all: true });
+    const aborted = new Promise<never>((_, reject) => {
+      if (signal.aborted) reject(new Error('aborted'));
+      signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+    });
+    const addresses = await Promise.race([dns.lookup(pageHost(new URL(pageUrl)), { all: true }), aborted]);
     return addresses.length > 0 && addresses.every((entry) => !isNonPublicAddress(entry.address));
   } catch {
     return false;
@@ -154,7 +159,7 @@ export async function fetchOgImageUrl(pageUrl: string): Promise<string | null> {
   try {
     let currentUrl = pageUrl;
     for (let hop = 0; hop <= OG_MAX_REDIRECTS; hop++) {
-      if (!(await resolvesToPublicAddresses(currentUrl))) {
+      if (!(await resolvesToPublicAddresses(currentUrl, controller.signal))) {
         return null;
       }
       const response = await fetch(currentUrl, {

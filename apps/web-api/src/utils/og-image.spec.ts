@@ -137,6 +137,19 @@ describe('fetchOgImageUrl', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('stops a slow DNS lookup at the 5 s deadline and makes no request', async () => {
+    jest.useFakeTimers();
+    try {
+      lookupMock.mockReturnValue(new Promise(() => undefined)); // never resolves
+      const result = fetchOgImageUrl('https://slow-dns.example.com/a');
+      jest.advanceTimersByTime(5000);
+      await expect(result).resolves.toBeNull();
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('makes no request when the host name does not resolve', async () => {
     lookupMock.mockRejectedValue(new Error('ENOTFOUND'));
     await expect(fetchOgImageUrl('https://missing.example.com/a')).resolves.toBeNull();
