@@ -12,6 +12,19 @@ const nextConfig = {
     ADMIN_LOGIN_PASSWORD: process.env.ADMIN_LOGIN_PASSWORD,
     WEB_UI_BASE_URL: process.env.WEB_UI_BASE_URL,
   },
+  /*
+   * The back-office is an internal admin tool, never a search result (LAB-2924). Google indexed admin.os.pl.xyz, and
+   * Search Console listed it on os.pl.xyz's domain property. A response header covers every route and asset; robots.txt
+   * is left alone, because a crawler blocked from a page never sees that page's noindex.
+   */
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
+      },
+    ];
+  },
   nx: {
     // Set this to true if you would like to to use SVGR
     // See: https://github.com/gregberge/svgr
