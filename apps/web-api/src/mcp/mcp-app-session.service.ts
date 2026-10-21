@@ -26,7 +26,12 @@ export class McpAppSessionService {
       throw new NotFoundException('Unknown app');
     }
     await this.access.checkAccess(actor.memberUid, appId, 'GET', { app }, 'prod');
-    const grant = await this.sessions.openAgentSession(actor.memberUid, appId, actor.authorizationUid);
+    const grant = await this.sessions.openAgentSession(
+      actor.memberUid,
+      appId,
+      actor.authorizationUid,
+      actor.canWrite ? 'write' : 'read'
+    );
     void this.analytics.trackEvent({
       name: ANALYTICS_EVENTS.MCP.APP_SESSION_OPEN,
       distinctId: actor.memberUid,

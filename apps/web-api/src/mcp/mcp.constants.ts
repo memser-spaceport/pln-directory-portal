@@ -31,3 +31,16 @@ export function mcpConsentUrl(): string {
 
 /** AI Apps feedback tools that change data; `mcp-tool-invoked` counts them as writes. */
 export const AI_APP_FEEDBACK_WRITE_TOOLS = ['update_ai_app_feedback_status'];
+
+/**
+ * Every MCP tool that changes data. `mcp-tool-invoked` counts these as writes, and a read-only grant does not list
+ * them (LAB-2902). A new tool that changes data goes here.
+ */
+export const MCP_WRITE_TOOLS: ReadonlySet<string> = new Set([
+  'submit_warm_path_feedback',
+  'submit_warm_path_note',
+  'update_master_profile',
+  'update_connection_edge',
+  'update_warm_path',
+  ...AI_APP_FEEDBACK_WRITE_TOOLS,
+]);

@@ -158,6 +158,40 @@ describe('McpOAuthService', () => {
     expect(tokens.token_type).toBe('Bearer');
   });
 
+  it.each([
+    ['ticked', true, true],
+    ['unticked', false, false],
+    ['absent', undefined, false],
+  ])('stores the access level the member chose at consent (%s)', async (_label, allowChanges, canWrite) => {
+    const { service, prisma } = buildService();
+    await service.approve(MEMBER.uid, {
+      clientId: CLIENT.clientId,
+      redirectUri: CLIENT.redirectUris[0],
+      codeChallenge: 'abc',
+      codeChallengeMethod: 'S256',
+      ...(allowChanges === undefined ? {} : { allowChanges }),
+    });
+    const { create, update } = prisma.mcpAuthorization.upsert.mock.calls[0][0];
+    expect(create.canWrite).toBe(canWrite);
+    expect(update.canWrite).toBe(canWrite);
+  });
+
+  it('returns the grant access level with the token actor', async () => {
+    const { service, prisma } = buildService();
+    const row = {
+      uid: 'auth-1',
+      memberUid: MEMBER.uid,
+      clientName: CLIENT.clientName,
+      revokedAt: null,
+      accessExpiresAt: new Date(Date.now() + 60_000),
+      member: MEMBER,
+    };
+    prisma.mcpAuthorization.findUnique.mockResolvedValueOnce({ ...row, canWrite: false });
+    await expect(service.authenticateAccessToken('mcp_at_read')).resolves.toMatchObject({ canWrite: false });
+    prisma.mcpAuthorization.findUnique.mockResolvedValueOnce({ ...row, canWrite: true });
+    await expect(service.authenticateAccessToken('mcp_at_write')).resolves.toMatchObject({ canWrite: true });
+  });
+
   it('rejects a bad PKCE verifier', async () => {
     const verifier = 'a'.repeat(43);
     const challenge = pkceS256Challenge(verifier);

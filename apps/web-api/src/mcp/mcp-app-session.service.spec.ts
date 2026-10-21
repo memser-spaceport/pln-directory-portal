@@ -15,6 +15,7 @@ const ACTOR = {
   email: 'ada@example.com',
   name: 'Ada',
   clientName: 'Claude',
+  canWrite: true,
 };
 const APP = { uid: 'app-row', memberUid: 'owner-1', access: 'OPEN', publicPaths: [], previewAccess: 'PRIVATE' };
 const GRANT = { token: 'app-session-token', expiresAt: new Date('2026-11-06T12:00:00Z') };
@@ -32,6 +33,13 @@ function build() {
 }
 
 describe('McpAppSessionService', () => {
+  it('mints a read-level session for a read-only grant', async () => {
+    const { service, oauth, sessions } = build();
+    oauth.authenticateAccessToken.mockResolvedValue({ ...ACTOR, canWrite: false });
+    await expect(service.mint('mcp_at_live', 'foo')).resolves.toEqual(GRANT);
+    expect(sessions.openAgentSession).toHaveBeenCalledWith('member-1', 'foo', 'auth-1', 'read');
+  });
+
   it('mints an agent session for the member and records the open', async () => {
     const { service, oauth, access, sessions, analytics } = build();
     const grant = await service.mint('mcp_at_live', 'foo');
@@ -41,7 +49,7 @@ describe('McpAppSessionService', () => {
     expect(JSON.stringify(grant)).not.toContain('mcp_at_live');
     expect(oauth.authenticateAccessToken).toHaveBeenCalledWith('mcp_at_live');
     expect(access.checkAccess).toHaveBeenCalledWith('member-1', 'foo', 'GET', { app: APP }, 'prod');
-    expect(sessions.openAgentSession).toHaveBeenCalledWith('member-1', 'foo', 'auth-1');
+    expect(sessions.openAgentSession).toHaveBeenCalledWith('member-1', 'foo', 'auth-1', 'write');
     expect(analytics.trackEvent).toHaveBeenCalledWith({
       name: 'mcp-app-session-open',
       distinctId: 'member-1',
