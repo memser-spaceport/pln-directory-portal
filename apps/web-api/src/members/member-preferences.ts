@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { parseNewsCategories } from '../team-news/utils/news-categories';
 
 /**
  * Keys the GET response *injects* rather than stores.
@@ -35,7 +36,8 @@ export const DERIVED_PREFERENCE_KEYS = [
  * enforce is that the body is a plain object, so a string or an array cannot
  * reach a `jsonb` merge.
  *
- * @throws BadRequestException when the body is not a plain object.
+ * @throws BadRequestException when the body is not a plain object, or when it
+ *   carries an invalid `newsCategories` (see parseNewsCategories).
  */
 export function toPreferencePatch(body: unknown): Record<string, unknown> {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
@@ -45,6 +47,11 @@ export function toPreferencePatch(body: unknown): Record<string, unknown> {
   const patch: Record<string, unknown> = { ...(body as Record<string, unknown>) };
   for (const key of DERIVED_PREFERENCE_KEYS) {
     delete patch[key];
+  }
+  /* The one validated key (LAB-2940): the digest and For You read it, so a
+     typo or an empty list must not reach the blob. */
+  if ('newsCategories' in patch) {
+    patch.newsCategories = parseNewsCategories(patch.newsCategories);
   }
   return patch;
 }

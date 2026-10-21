@@ -133,17 +133,17 @@ describe('updatePreference', () => {
         const prisma = buildPrisma({ showEmail: true });
 
         await expect(new PreferenceService(prisma).updatePreference('m1', body)).rejects.toBeInstanceOf(
-          BadRequestException,
+          BadRequestException
         );
         expect(prisma.column.value).toEqual({ showEmail: true });
-      },
+      }
     );
 
     it('404s when no row matched rather than reporting success', async () => {
       const prisma = buildPrisma({}, false);
 
       await expect(new PreferenceService(prisma).updatePreference('nope', { showEmail: true })).rejects.toBeInstanceOf(
-        NotFoundException,
+        NotFoundException
       );
     });
   });
@@ -175,5 +175,25 @@ describe('the SQL merge statement', () => {
 
   it('handles a NULL column', () => {
     expect(STATEMENT).toContain(`COALESCE("preferences", '{}'::jsonb)`);
+  });
+});
+
+describe('newsCategories (LAB-2940)', () => {
+  it('stores a valid list, de-duplicated in enum order, next to the other settings', async () => {
+    const prisma = buildPrisma({ showEmail: true });
+
+    await new PreferenceService(prisma).updatePreference('m1', { newsCategories: ['OTHER', 'FUNDING', 'OTHER'] });
+
+    expect(prisma.column.value).toEqual({ showEmail: true, newsCategories: ['FUNDING', 'OTHER'] });
+  });
+
+  it.each([[[]], [['DEALS']], ['FUNDING']])('rejects %p and stores nothing', async (newsCategories) => {
+    const prisma = buildPrisma({ showEmail: true });
+
+    await expect(new PreferenceService(prisma).updatePreference('m1', { newsCategories })).rejects.toBeInstanceOf(
+      BadRequestException
+    );
+    expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    expect(prisma.column.value).toEqual({ showEmail: true });
   });
 });

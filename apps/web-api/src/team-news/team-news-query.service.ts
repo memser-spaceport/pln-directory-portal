@@ -21,6 +21,7 @@ import { buildTeamNewsEventDateWhere } from './team-news-event-date.where';
 import { TEAM_NEWS_EXCLUDED_TEAM_NAMES } from './team-news-public-list.config';
 import { TeamNewsSuggestionsService } from './team-news-suggestions.service';
 import { selectForYouNewsItems } from './select-for-you-news-items';
+import { narrowsNews, readNewsCategories } from './utils/news-categories';
 
 const EMPTY_DISCUSSION: TeamNewsDiscussion = { count: 0, latestTopicUrl: null };
 const POPULAR_WINDOW_DAYS = 14;
@@ -515,10 +516,19 @@ export class TeamNewsQueryService {
         ? await this.suggestionsService.getForYouTeamUidsForMembers(uniqueMemberUids)
         : new Map<string, string[]>();
 
+    // LAB-2940: members who switched categories off get only the rest, in their
+    // For You picks and in the newest-items fallback alike.
+    const categoriesByMember = await this.loadNarrowingNewsCategories(uniqueMemberUids);
+
     const picks: Record<string, TeamNewsItemDto[]> = {};
     for (const memberUid of uniqueMemberUids) {
-      const forYouItems = selectForYouNewsItems(items, new Set(forYouByMember.get(memberUid) ?? [])).slice(0, limit);
-      picks[memberUid] = forYouItems.length > 0 ? forYouItems : fallback;
+      const categories = categoriesByMember.get(memberUid);
+      const memberItems = categories ? items.filter((item) => categories.has(item.eventType)) : items;
+      const forYouItems = selectForYouNewsItems(memberItems, new Set(forYouByMember.get(memberUid) ?? [])).slice(
+        0,
+        limit
+      );
+      picks[memberUid] = forYouItems.length > 0 ? forYouItems : categories ? memberItems.slice(0, limit) : fallback;
     }
 
     return {
@@ -529,6 +539,24 @@ export class TeamNewsQueryService {
       picks,
       topStory,
     };
+  }
+
+  /**
+   * News categories (LAB-2940) of the members who narrowed them. Members on
+   * every category are left out, so their picks stay exactly as before.
+   */
+  private async loadNarrowingNewsCategories(memberUids: string[]): Promise<Map<string, Set<string>>> {
+    if (memberUids.length === 0) return new Map();
+    const rows = await this.prisma.member.findMany({
+      where: { uid: { in: memberUids } },
+      select: { uid: true, preferences: true },
+    });
+    const result = new Map<string, Set<string>>();
+    for (const row of rows) {
+      const categories = readNewsCategories(row.preferences);
+      if (narrowsNews(categories)) result.set(row.uid, new Set(categories));
+    }
+    return result;
   }
 
   /**
