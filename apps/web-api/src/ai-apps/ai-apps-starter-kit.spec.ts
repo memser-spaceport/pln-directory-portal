@@ -143,7 +143,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('kit 1.15: deploys answer 202 and the agent polls statusEndpoint for the real outcome', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.17');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.18');
     const config = JSON.parse(entries.get('pln-app.config.json') as string);
     expect(config.statusEndpoint).toContain('/v1/ai-apps/{appUid}/deployments/{deploymentId}');
     expect(config.notes).toContain('poll statusEndpoint');
@@ -180,9 +180,10 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('kit 1.14: member context comes from same-origin /_pln/me, with the Bearer fallback for older gates', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.17');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.18');
     const skill = entries.get('.claude/skills/pln-member-context/SKILL.md') as string;
     expect(skill).toContain("fetch('/_pln/me', { credentials: 'same-origin' })");
+    expect(skill).toContain('memberContextEndpoint + "?appId=<appId>"');
     expect(skill).toContain('res.status === 404');
     expect(skill).toContain('Authorization: `Bearer ${token}`');
     expect(skill).not.toContain('scoped to the shared apps');
@@ -275,9 +276,9 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('kit 1.15: writes the feedback endpoint templates and teaches the feedback flow', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.17');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.18');
     const config = JSON.parse(entries.get('pln-app.config.json') as string);
-    expect(config.kitVersion).toBe('1.17');
+    expect(config.kitVersion).toBe('1.18');
     expect(config.feedbackEndpoint).toContain('/v1/ai-apps/{appUid}/agent/feedback');
     expect(config.feedbackStatusEndpoint).toContain('/v1/ai-apps/{appUid}/agent/feedback/{feedbackUid}');
 
@@ -296,7 +297,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('kit 1.16: teaches written feedback, replies and the closing note, and never public comments', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.17');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.18');
     const skill = entries.get('.claude/skills/app-feedback/SKILL.md') as string;
     expect(skill).toContain('`kind: "FEEDBACK"`');
     expect(skill).toContain('"kind": "FEEDBACK"');
@@ -518,7 +519,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('defaults apps to all PL Infra members and asks about private access before the first deploy (kit 1.13+)', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.17');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.18');
     const readme = entries.get('README.md') as string;
     expect(readme).toContain('New apps are open to **all PL Infra members**');
     expect(readme).toContain('**Manage access**');
@@ -538,7 +539,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('kit 1.16: ships a short Preview testing-users skill, listed in the kit README only', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.17');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.18');
     const skill = entries.get('.claude/skills/preview-testing-users/SKILL.md') as string;
     expect(skill).toContain('name: preview-testing-users');
     expect(skill).toContain('Preview only');
@@ -559,7 +560,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('documents public endpoints and that the app must secure them (kit 1.13+)', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.17');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.18');
     const deploySkill = entries.get('.claude/skills/deploy-to-labs/SKILL.md') as string;
     expect(deploySkill).toContain('## Public endpoints (paths without LabOS sign-in)');
     expect(deploySkill).toContain(
