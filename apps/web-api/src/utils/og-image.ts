@@ -11,16 +11,41 @@ export function extractSocialImageUrl(html: string, pageUrl: string): string | n
     matchMetaContent(html, 'property', 'twitter:image') ??
     matchMetaContent(html, 'name', 'twitter:image:src');
 
-  const raw = (og || twitter || '').trim();
+  // Attribute values are HTML: "a?x=1&amp;y=2" means "a?x=1&y=2". Stored
+  // undecoded, the "&amp;" is escaped again wherever the URL is rendered
+  // (the digest template) and the image request loses its parameters.
+  const raw = decodeHtmlEntities((og || twitter || '').trim());
   if (!raw) {
     return null;
   }
 
   try {
-    return new URL(raw, pageUrl).href;
+    return preferJpegForTwitterImage(new URL(raw, pageUrl)).href;
   } catch {
     return null;
   }
+}
+
+const NAMED_ENTITIES: Record<string, string> = { amp: '&', quot: '"', apos: "'", lt: '<', gt: '>' };
+
+/** Decode the character references an attribute value can carry, once. */
+export function decodeHtmlEntities(value: string): string {
+  return value.replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z]+);/gi, (match, ref: string) => {
+    if (ref[0] === '#') {
+      const code = ref[1] === 'x' || ref[1] === 'X' ? parseInt(ref.slice(2), 16) : parseInt(ref.slice(1), 10);
+      return Number.isFinite(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : match;
+    }
+    return NAMED_ENTITIES[ref.toLowerCase()] ?? match;
+  });
+}
+
+// X/Twitter serves its og:image as WebP, which Outlook desktop cannot show.
+// pbs.twimg.com serves the same image as JPEG on request.
+function preferJpegForTwitterImage(url: URL): URL {
+  if (url.hostname === 'pbs.twimg.com' && url.searchParams.get('format') === 'webp') {
+    url.searchParams.set('format', 'jpg');
+  }
+  return url;
 }
 
 function matchMetaContent(html: string, attr: 'property' | 'name', value: string): string | null {

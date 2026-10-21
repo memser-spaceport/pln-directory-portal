@@ -3,7 +3,13 @@ jest.mock('dns', () => ({
 }));
 
 import { promises as dns } from 'dns';
-import { extractSocialImageUrl, fetchOgImageUrl, isAllowedOgPageUrl, isNonPublicAddress } from './og-image';
+import {
+  decodeHtmlEntities,
+  extractSocialImageUrl,
+  fetchOgImageUrl,
+  isAllowedOgPageUrl,
+  isNonPublicAddress,
+} from './og-image';
 
 const lookupMock = dns.lookup as unknown as jest.Mock;
 
@@ -34,6 +40,41 @@ describe('extractSocialImageUrl', () => {
 
   it('returns null when no social image meta is present', () => {
     expect(extractSocialImageUrl('<html></html>', pageUrl)).toBeNull();
+  });
+
+  // Real values seen on team news sources (LAB-2929 feature-env probe).
+  it('decodes &amp; in the content attribute', () => {
+    const html = `<meta property="og:image" content="https://www.iroh.computer/api/og?title=Blog&amp;subtitle=Buzz:%20share" />`;
+    expect(extractSocialImageUrl(html, pageUrl)).toBe(
+      'https://www.iroh.computer/api/og?title=Blog&subtitle=Buzz:%20share'
+    );
+  });
+
+  it('decodes numeric character references', () => {
+    const html = `<meta property="og:image" content="https://cdn.example.com/a.jpg?w=600&#38;h=315&#x26;q=80" />`;
+    expect(extractSocialImageUrl(html, pageUrl)).toBe('https://cdn.example.com/a.jpg?w=600&h=315&q=80');
+  });
+
+  it('asks X/Twitter for JPEG instead of WebP', () => {
+    const html = `<meta property="og:image" content="https://pbs.twimg.com/media/HSvgje3agAAhmL1?format=webp&amp;name=large" />`;
+    expect(extractSocialImageUrl(html, pageUrl)).toBe(
+      'https://pbs.twimg.com/media/HSvgje3agAAhmL1?format=jpg&name=large'
+    );
+  });
+
+  it('leaves WebP from other hosts alone', () => {
+    const html = `<meta property="og:image" content="https://media.crypto.news/2025/10/a.webp?format=webp" />`;
+    expect(extractSocialImageUrl(html, pageUrl)).toBe('https://media.crypto.news/2025/10/a.webp?format=webp');
+  });
+});
+
+describe('decodeHtmlEntities', () => {
+  it('decodes named, decimal and hex references once', () => {
+    expect(decodeHtmlEntities('a&amp;b&quot;c&#39;d&#x2F;e&amp;amp;')).toBe(`a&b"c'd/e&amp;`);
+  });
+
+  it('leaves unknown or invalid references as they are', () => {
+    expect(decodeHtmlEntities('&nbsp; &#0; &bogus; & plain')).toBe('&nbsp; &#0; &bogus; & plain');
   });
 });
 
