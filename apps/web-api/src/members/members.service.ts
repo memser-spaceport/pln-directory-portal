@@ -28,6 +28,7 @@ import { buildMultiRelationMapping, copyObj } from '../utils/helper/helper';
 import { CacheService } from '../utils/cache/cache.service';
 import { MembersHooksService } from './members.hooks.service';
 import { toPreferencePatch } from './member-preferences';
+import { readNewsCategories } from '../team-news/utils/news-categories';
 import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
 import { OfficeHoursService } from '../office-hours/office-hours.service';
 import { TeamsService } from '../teams/teams.service';
@@ -1902,6 +1903,8 @@ export class MembersService {
     preferences.twitter = !!member.twitterHandler;
     preferences.bluesky = !!member.blueskyHandler;
     preferences.subscription = !!member.isSubscribedToNewsletter;
+    // Always present (LAB-2940): the stored list, or every category by default.
+    preferences.newsCategories = readNewsCategories(member.preferences);
     return preferences;
   }
 
