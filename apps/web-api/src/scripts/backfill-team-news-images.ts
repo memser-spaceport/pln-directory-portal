@@ -53,7 +53,7 @@ export async function backfillTeamNewsImages(
     }
 
     await imageService.fillImages(rows.map((row) => row.uid));
-    console.log(`  filled ${processed} items so far`);
+    console.log(`  sent ${processed} items to the image fill so far`);
   }
 
   return { processed };
@@ -66,7 +66,8 @@ async function main() {
     console.log(`Backfill team news images: last ${days} days${dryRun ? ' (dry run)' : ''}`);
     const imageService = new TeamNewsImageService(prisma as unknown as PrismaService);
     const { processed } = await backfillTeamNewsImages(prisma, imageService, { days, dryRun });
-    console.log(`Done: ${processed} items ${dryRun ? 'would be processed' : 'processed'}`);
+    // fillImages logs and skips a row it cannot fill; such a row stays unchecked for the next run.
+    console.log(`Done: ${processed} items ${dryRun ? 'would be sent' : 'sent'} to the image fill`);
   } finally {
     await prisma.$disconnect();
   }

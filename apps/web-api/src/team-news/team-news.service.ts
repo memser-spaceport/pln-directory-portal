@@ -167,10 +167,11 @@ export class TeamNewsService {
       }
     }
 
+    // Not awaited: image fetches must not delay the ingest response. Started
+    // first, so that a failure below does not leave the new rows unchecked.
+    this.fillImagesInBackground(createdUids);
     await this.recomputeRecentNewsCounts(teamsTouched);
     await this.notifyRun(dto, createdByTeam);
-    // Not awaited: image fetches must not delay the ingest response.
-    this.fillImagesInBackground(createdUids);
 
     this.logger.log(
       `Team-news ingest complete (runId=${dto.runId ?? 'none'}, source=${dto.source ?? 'none'}): ` +
@@ -665,8 +666,8 @@ export class TeamNewsService {
       select: { uid: true },
     });
 
-    await this.recomputeRecentNewsCounts(new Set([teamUid]));
     this.fillImagesInBackground([created.uid]);
+    await this.recomputeRecentNewsCounts(new Set([teamUid]));
 
     return { uid: created.uid };
   }

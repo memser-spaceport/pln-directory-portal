@@ -1,4 +1,11 @@
-import { extractSocialImageUrl, fetchOgImageUrl, isAllowedOgPageUrl } from './og-image';
+jest.mock('dns', () => ({
+  promises: { lookup: jest.fn() },
+}));
+
+import { promises as dns } from 'dns';
+import { extractSocialImageUrl, fetchOgImageUrl, isAllowedOgPageUrl, isNonPublicAddress } from './og-image';
+
+const lookupMock = dns.lookup as unknown as jest.Mock;
 
 describe('extractSocialImageUrl', () => {
   const pageUrl = 'https://www.plrd.org/talks/jbp-allison-duettmann';
@@ -39,6 +46,8 @@ describe('isAllowedOgPageUrl', () => {
     'http://news.example.com/a',
     'ftp://news.example.com/a',
     'https://localhost/a',
+    'https://localhost./a',
+    'https://news.example.com:8443/a',
     'https://api.localhost/a',
     'http://localhost/a',
     'https://127.0.0.1/a',
@@ -57,6 +66,28 @@ const fakeHeaders = (values: Record<string, string>) => ({
   get: (name: string) => values[name.toLowerCase()] ?? null,
 });
 
+describe('isNonPublicAddress', () => {
+  it.each([
+    '127.0.0.1',
+    '10.1.2.3',
+    '172.16.0.1',
+    '192.168.1.1',
+    '169.254.169.254',
+    '100.64.0.1',
+    '0.0.0.0',
+    '::1',
+    'fd00::1',
+    'fe80::1',
+    '::ffff:127.0.0.1',
+  ])('treats %s as non-public', (ip) => {
+    expect(isNonPublicAddress(ip)).toBe(true);
+  });
+
+  it.each(['93.184.216.34', '8.8.8.8', '2606:4700:4700::1111'])('treats %s as public', (ip) => {
+    expect(isNonPublicAddress(ip)).toBe(false);
+  });
+});
+
 describe('fetchOgImageUrl', () => {
   const originalFetch = global.fetch;
   let fetchMock: jest.Mock;
@@ -70,6 +101,8 @@ describe('fetchOgImageUrl', () => {
   });
 
   beforeEach(() => {
+    lookupMock.mockReset();
+    lookupMock.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
     fetchMock = jest.fn();
     global.fetch = fetchMock as unknown as typeof fetch;
   });
@@ -97,6 +130,43 @@ describe('fetchOgImageUrl', () => {
       expect(fetchMock).not.toHaveBeenCalled();
     }
   );
+
+  it('makes no request when the host name resolves to a private address', async () => {
+    lookupMock.mockResolvedValue([{ address: '10.0.0.7', family: 4 }]);
+    await expect(fetchOgImageUrl('https://internal.example.com/a')).resolves.toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('makes no request when the host name does not resolve', async () => {
+    lookupMock.mockRejectedValue(new Error('ENOTFOUND'));
+    await expect(fetchOgImageUrl('https://missing.example.com/a')).resolves.toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('reads at most 200 000 characters of a streamed body', async () => {
+    const encoder = new TextEncoder();
+    const chunk = encoder.encode(
+      '<meta property="og:image" content="https://cdn.example.com/a.jpg" />' + 'x'.repeat(150_000)
+    );
+    let reads = 0;
+    const cancel = jest.fn().mockResolvedValue(undefined);
+    fetchMock.mockResolvedValue({
+      ...htmlResponse(''),
+      body: {
+        getReader: () => ({
+          read: jest.fn(async () => {
+            reads++;
+            return { done: false, value: chunk };
+          }),
+          cancel,
+        }),
+      },
+    });
+
+    await expect(fetchOgImageUrl('https://news.example.com/a')).resolves.toBe('https://cdn.example.com/a.jpg');
+    expect(reads).toBe(2);
+    expect(cancel).toHaveBeenCalled();
+  });
 
   it('returns null when the image is not https', async () => {
     fetchMock.mockResolvedValue(htmlResponse('<meta property="og:image" content="http://cdn.example.com/a.jpg" />'));

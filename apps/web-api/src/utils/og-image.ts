@@ -1,3 +1,4 @@
+import { promises as dns } from 'dns';
 import { isIP } from 'net';
 
 /**
@@ -42,9 +43,12 @@ const OG_FETCH_TIMEOUT_MS = 5000;
 const OG_MAX_REDIRECTS = 3;
 const OG_USER_AGENT = 'PLDirectory/1.0';
 
+const OG_MAX_HTML_CHARS = 200_000;
+
 /**
  * Page URLs come from member-supplied team posts, so only public https hosts
- * are fetched: no other scheme, no IP-literal host and no localhost.
+ * are fetched: no other scheme, no other port, no IP-literal host and no
+ * localhost.
  */
 export function isAllowedOgPageUrl(pageUrl: string): boolean {
   let url: URL;
@@ -53,14 +57,77 @@ export function isAllowedOgPageUrl(pageUrl: string): boolean {
   } catch {
     return false;
   }
-  if (url.protocol !== 'https:') {
+  if (url.protocol !== 'https:' || url.port !== '') {
     return false;
   }
-  const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  const host = pageHost(url);
   if (!host || host === 'localhost' || host.endsWith('.localhost')) {
     return false;
   }
   return isIP(host) === 0;
+}
+
+function pageHost(url: URL): string {
+  return url.hostname
+    .toLowerCase()
+    .replace(/^\[|\]$/g, '')
+    .replace(/\.$/, '');
+}
+
+/** True for loopback, private, link-local, CGNAT, multicast and unspecified addresses. */
+export function isNonPublicAddress(address: string): boolean {
+  const ip = address.toLowerCase();
+  const mappedV4 = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(ip);
+  if (mappedV4) {
+    return isNonPublicAddress(mappedV4[1]);
+  }
+  if (isIP(ip) === 4) {
+    const [a, b] = ip.split('.').map(Number);
+    return (
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      a >= 224
+    );
+  }
+  if (isIP(ip) === 6) {
+    return ip === '::' || ip === '::1' || /^f[cd]/.test(ip) || /^fe[89ab]/.test(ip) || ip.startsWith('ff');
+  }
+  return true;
+}
+
+// A public host name can still resolve to an internal address.
+async function resolvesToPublicAddresses(pageUrl: string): Promise<boolean> {
+  try {
+    const addresses = await dns.lookup(pageHost(new URL(pageUrl)), { all: true });
+    return addresses.length > 0 && addresses.every((entry) => !isNonPublicAddress(entry.address));
+  } catch {
+    return false;
+  }
+}
+
+// Read at most OG_MAX_HTML_CHARS of the body: the meta tags are in the head.
+async function readHtmlHead(response: Response): Promise<string> {
+  const reader = response.body?.getReader?.();
+  if (!reader) {
+    return (await response.text()).slice(0, OG_MAX_HTML_CHARS);
+  }
+  const decoder = new TextDecoder();
+  let html = '';
+  try {
+    while (html.length < OG_MAX_HTML_CHARS) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      html += decoder.decode(value, { stream: true });
+    }
+  } finally {
+    reader.cancel().catch(() => undefined);
+  }
+  return html.slice(0, OG_MAX_HTML_CHARS);
 }
 
 function isHttpsUrl(value: string): boolean {
@@ -87,6 +154,9 @@ export async function fetchOgImageUrl(pageUrl: string): Promise<string | null> {
   try {
     let currentUrl = pageUrl;
     for (let hop = 0; hop <= OG_MAX_REDIRECTS; hop++) {
+      if (!(await resolvesToPublicAddresses(currentUrl))) {
+        return null;
+      }
       const response = await fetch(currentUrl, {
         method: 'GET',
         redirect: 'manual',
@@ -119,9 +189,7 @@ export async function fetchOgImageUrl(pageUrl: string): Promise<string | null> {
         return null;
       }
 
-      const html = await response.text();
-      // Only need the head for meta tags; cap size for safety.
-      const head = html.slice(0, 200_000);
+      const head = await readHtmlHead(response);
       const imageUrl = extractSocialImageUrl(head, response.url || currentUrl);
       return imageUrl && isHttpsUrl(imageUrl) ? imageUrl : null;
     }
