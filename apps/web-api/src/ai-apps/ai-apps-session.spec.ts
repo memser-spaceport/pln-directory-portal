@@ -7,7 +7,9 @@ import { BadRequestException } from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
 import { AiAppsSessionService, isAiAppSessionToken } from './ai-apps-session.service';
 import {
+  AI_APPS_AGENT_SESSION_MAX_MS,
   AI_APPS_SESSION_IDLE_MS,
+  AI_APPS_SESSION_MAX_MS,
   AI_APPS_SESSION_TOUCH_MS,
   AI_APPS_TESTING_SESSION_MAX_MS,
   buildAppUrl,
@@ -201,15 +203,19 @@ describe('AiAppsSessionService', () => {
     expect(await service.isLiveTestingSessionForOtherApp(member.token, 'bar')).toBe(false);
   });
 
-  it('mints an agent session with the browser lifetime, an agent claim, and the MCP authorization id', async () => {
+  it('mints a 1-hour agent session with an agent claim and the MCP authorization id', async () => {
     const { service, sessions } = build();
     jest.useFakeTimers('modern');
     jest.setSystemTime(new Date('2026-10-07T12:00:00Z'));
     const browser = await service.exchangeToken('m-1', 'foo');
     const agent = await service.openAgentSession('m-1', 'foo', 'auth-1');
 
-    expect(agent.expiresAt.getTime()).toBe(browser.expiresAt.getTime());
-    expect(sessions[1].idleExpiresAt.getTime()).toBe(sessions[0].idleExpiresAt.getTime());
+    const minted = new Date('2026-10-07T12:00:00Z').getTime();
+    expect(agent.expiresAt.getTime()).toBe(minted + AI_APPS_AGENT_SESSION_MAX_MS);
+    expect(sessions[1].idleExpiresAt.getTime()).toBe(minted + AI_APPS_AGENT_SESSION_MAX_MS);
+    expect(claimsOf(agent.token).exp).toBe((minted + AI_APPS_AGENT_SESSION_MAX_MS) / 1000);
+    expect(browser.expiresAt.getTime()).toBe(minted + AI_APPS_SESSION_MAX_MS);
+    expect(sessions[0].idleExpiresAt.getTime()).toBe(minted + AI_APPS_SESSION_IDLE_MS);
     expect(sessions[0].isAgent).toBe(false);
     expect(sessions[0].mcpAuthorizationUid).toBeUndefined();
     expect(sessions[1].isAgent).toBe(true);
@@ -229,6 +235,24 @@ describe('AiAppsSessionService', () => {
     expect(await service.validate('bar', agent.token)).toBeNull();
     expect(await service.validate('foo', browser.token)).toEqual({ memberUid: 'm-1' });
     expect(JSON.stringify(sessions)).not.toContain(agent.token);
+  });
+
+  it('ends an agent session 1 hour after mint even when it is used, without sliding it', async () => {
+    const { service, prisma } = build();
+    jest.useFakeTimers('modern');
+    jest.setSystemTime(new Date('2026-10-21T10:00:00Z'));
+    const agent = await service.openAgentSession('m-1', 'foo', 'auth-1');
+
+    jest.setSystemTime(new Date('2026-10-21T10:59:00Z'));
+    expect(await service.validate('foo', agent.token)).toEqual({ memberUid: 'm-1', isAgent: true });
+    expect(prisma.aiAppSession.update).not.toHaveBeenCalled();
+
+    jest.setSystemTime(new Date('2026-10-21T11:00:00Z'));
+    expect(await service.validate('foo', agent.token)).toBeNull();
+
+    const next = await service.openAgentSession('m-1', 'foo', 'auth-1');
+    expect(next.expiresAt.getTime()).toBe(new Date('2026-10-21T12:00:00Z').getTime());
+    expect(await service.validate('foo', next.token)).toEqual({ memberUid: 'm-1', isAgent: true });
   });
 
   it('ends agent sessions for one MCP authorization and leaves browser and other-agent sessions', async () => {

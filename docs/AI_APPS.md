@@ -692,6 +692,10 @@ one app works nowhere else. The pieces:
   returns a 60 s single-use code bound to `appId` + `target` and the target's callback origin, then the gate calls
   `POST sessions/redeem` `{ code, appId, target }`. `POST sessions/revoke` (member JWT) ends all of a member's app
   sessions; LabOS calls it on sign-out.
+- **Agent sessions.** An agent connected through LabOS MCP mints one with `POST /v1/mcp/app-sessions` `{ appId }`
+  (Bearer MCP access token). It carries `isAgent: true`, stores the MCP authorization that minted it (revoking the
+  agent ends it), and lasts a fixed 1 hour from mint (`AI_APPS_AGENT_SESSION_MAX_MS`, no env override): use does not
+  extend it, and the agent mints a new one when it ends.
 - **Using one.** Only on `GET /v1/ai-apps/me` (`AiAppMemberContextGuard`: live for the app it names, and `Origin`, if
   sent, must be one of that app's prod/dev origins), `POST /v1/ai-apps/track` (attributed only when the session
   matches the origin), and `GET /v1/ai-apps/access-check` via the gate's `X-AI-App-Session` header (same permission

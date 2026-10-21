@@ -79,6 +79,11 @@ const positiveNumberFromEnv = (name: string, fallback: number) => {
 export const AI_APPS_SESSION_IDLE_MS = positiveNumberFromEnv('AI_APPS_SESSION_IDLE_HOURS', 24) * 60 * 60 * 1000;
 /** Hard upper bound of a session, whatever its use. */
 export const AI_APPS_SESSION_MAX_MS = positiveNumberFromEnv('AI_APPS_SESSION_MAX_DAYS', 30) * 24 * 60 * 60 * 1000;
+/**
+ * Fixed lifetime of a session an agent mints (LAB-2911). It does not slide; the agent mints a new one. No env
+ * override, so a config value cannot lengthen it.
+ */
+export const AI_APPS_AGENT_SESSION_MAX_MS = 60 * 60 * 1000;
 /** Sliding the idle expiry writes at most this often per session. */
 export const AI_APPS_SESSION_TOUCH_MS = 5 * 60 * 1000;
 /** A sign-in code must be redeemed within this window, once. */
