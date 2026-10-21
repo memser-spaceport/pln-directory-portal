@@ -11,6 +11,7 @@ import {
   clipTelegramText,
   escapeTelegramHtml,
   stripInlineDataImages,
+  supportPageLine,
   toSupportEmailHtml,
   toSupportTelegramHtml,
 } from './contact-support-html';
@@ -64,6 +65,7 @@ export class ContactSupportService {
         this.logger.info(`New contact support request created with topic "${request.topic}" and ref id ${result.uid}`);
 
         try {
+          const pageLine = supportPageLine(request.metadata);
           await this.notificationServiceClient.sendTelegramOutboxMessage({
             channelType: 'SUPPORT',
             text: clipTelegramText(
@@ -75,6 +77,8 @@ export class ContactSupportService {
                 `Email: ${escapeTelegramHtml(request.email ?? '-')}`,
                 `Name: ${escapeTelegramHtml(request.name ?? '-')}`,
                 `Message: ${toSupportTelegramHtml(message ?? '-')}`,
+                // After the message: Telegram previews the first link, which should stay the screenshot.
+                ...(pageLine ? [pageLine] : []),
                 escapeTelegramHtml(this.formatSupportEmails()),
               ].join('\n')
             ),
