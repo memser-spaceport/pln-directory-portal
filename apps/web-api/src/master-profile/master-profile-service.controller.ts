@@ -65,4 +65,9 @@ export class MasterProfileServiceController {
     this.logger.log(`Received master-profile lookup batch: ids=${n}`);
     return this.masterProfileService.lookupBatch(dto);
   }
+
+  @Get('master-profiles/:uid')
+  getByUid(@Param('uid') uid: string) {
+    return this.masterProfileService.getByUid(uid);
+  }
 }

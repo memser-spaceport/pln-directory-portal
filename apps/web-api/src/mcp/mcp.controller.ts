@@ -78,7 +78,7 @@ export class McpController {
       ...directoryTools(this.members, this.teams, this.projects, this.plEvents, this.search),
       ...aiAppFeedbackTools(this.aiApps),
       ...portfolioTools(this.portfolio),
-    ]);
+    ], actor.canWrite);
 
     const server = new McpServer({ name: 'LabOS', version: '1.0.0' });
     const ctx = {
@@ -88,6 +88,7 @@ export class McpController {
       permissions,
       authorizationUid: actor.authorizationUid,
       clientName: actor.clientName,
+      agentAccess: actor.canWrite ? ('write' as const) : ('read' as const),
     };
     for (const tool of tools) {
       const config: { description: string; inputSchema?: Record<string, unknown> } = {

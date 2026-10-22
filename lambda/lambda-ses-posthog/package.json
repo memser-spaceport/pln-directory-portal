@@ -1,0 +1,12 @@
+{
+  "name": "lambda-ses-posthog",
+  "version": "1.0.0",
+  "description": "Sends SES Send/Open/Click events from the sns-track topic to PostHog",
+  "main": "index.mjs",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "zip": "zip -FS lambda-ses-posthog.zip index.mjs package.json"
+  },
+  "license": "ISC"
+}

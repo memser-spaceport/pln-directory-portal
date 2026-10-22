@@ -5,7 +5,7 @@ import { ManualFieldActor } from '../manual-field-lock/manual-field-lock.service
 import { MasterProfileService } from '../master-profile/master-profile.service';
 import { relationKindFromHopChain } from '../warm-intros-v2/warm-intros-v2-enrich.util';
 import { WarmIntrosV2Service } from '../warm-intros-v2/warm-intros-v2.service';
-import { INVESTOR_DB_EDIT_PERMISSION, INVESTOR_DB_VIEW_PERMISSION } from './mcp.constants';
+import { INVESTOR_DB_EDIT_PERMISSION, INVESTOR_DB_VIEW_PERMISSION, MCP_WRITE_TOOLS } from './mcp.constants';
 
 export type McpActorContext = {
   memberUid: string;
@@ -14,6 +14,8 @@ export type McpActorContext = {
   permissions: Set<string>;
   authorizationUid: string;
   clientName: string;
+  /** What the member let this agent do at consent (LAB-2902). */
+  agentAccess: 'read' | 'write';
 };
 
 export type McpToolDef = {
@@ -32,12 +34,14 @@ const FEEDBACK_NOTE_MAX = 600;
 
 export const WHOAMI_TOOL: McpToolDef = {
   name: 'whoami',
-  description: 'Return the Directory member this agent is acting as.',
+  description:
+    'Return the Directory member this agent is acting as, and agentAccess: "read" (read-only grant) or "write" (the member allowed changes).',
   visibility: 'always',
   execute: async (ctx) => ({
     memberUid: ctx.memberUid,
     name: ctx.name,
     email: ctx.email,
+    agentAccess: ctx.agentAccess,
   }),
 };
 
@@ -431,6 +435,11 @@ export function isToolVisible(tool: McpToolDef, permissions: Set<string>): boole
   return permissions.has(INVESTOR_DB_VIEW_PERMISSION) || permissions.has(ADMIN_PERMISSIONS.DIRECTORY_FULL);
 }
 
-export function toolsForPermissions(permissions: Set<string>, catalog: McpToolDef[] = [WHOAMI_TOOL]): McpToolDef[] {
-  return catalog.filter((tool) => isToolVisible(tool, permissions));
+/** Tools the member's permissions allow; a read-only grant (`canWrite: false`) also drops every write tool. */
+export function toolsForPermissions(
+  permissions: Set<string>,
+  catalog: McpToolDef[] = [WHOAMI_TOOL],
+  canWrite = true
+): McpToolDef[] {
+  return catalog.filter((tool) => isToolVisible(tool, permissions) && (canWrite || !MCP_WRITE_TOOLS.has(tool.name)));
 }

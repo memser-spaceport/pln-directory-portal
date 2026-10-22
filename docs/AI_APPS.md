@@ -692,11 +692,19 @@ one app works nowhere else. The pieces:
   returns a 60 s single-use code bound to `appId` + `target` and the target's callback origin, then the gate calls
   `POST sessions/redeem` `{ code, appId, target }`. `POST sessions/revoke` (member JWT) ends all of a member's app
   sessions; LabOS calls it on sign-out.
+- **Agent sessions.** An agent connected through LabOS MCP mints one with `POST /v1/mcp/app-sessions` `{ appId }`
+  (Bearer MCP access token). It carries `isAgent: true` and `agentAccess` (`read` or `write`: the grant's level chosen
+  at MCP consent; `/me` returns both), stores the MCP authorization that minted it (revoking the
+  agent ends it), and lasts a fixed 1 hour from mint (`AI_APPS_AGENT_SESSION_MAX_MS`, no env override): use does not
+  extend it, and the agent mints a new one when it ends.
 - **Using one.** Only on `GET /v1/ai-apps/me` (`AiAppMemberContextGuard`: live for the app it names, and `Origin`, if
   sent, must be one of that app's prod/dev origins), `POST /v1/ai-apps/track` (attributed only when the session
   matches the origin), and `GET /v1/ai-apps/access-check` via the gate's `X-AI-App-Session` header (same permission
   and per-app access rule as a LabOS token). `AiAppSessionScopeMiddleware` 401s the token on every other route before
   any guard or auth-service call.
+- **Naming the calling app.** `GET /v1/ai-apps/me?appId=<appId>` lets an app's server say which app is asking. An app
+  session minted for a different app then gets `401 Invalid or expired app session`, with or without `Origin`. Without
+  `appId`, `/me` decides from the session and `Origin` alone. Kit 1.18 tells app servers to send it.
 - **Fleet migration.** `GET /v1/ai-apps/admin/auth-gate` lists each app target's gate version; `POST
   admin/auth-gate/refresh` (`dryRun`, `batchSize`, `appUids`, `target`, `maxFailures`) upgrades gates in place via
   the orchestrator (same image and values), verifies each one (`/_pln/gate`, `/_health`, unchanged unauthenticated

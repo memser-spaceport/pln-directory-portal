@@ -27,7 +27,9 @@ describe('WarmIntrosV2ServiceController patch', () => {
       patchEdgeFields,
       patchPathFields,
     } as unknown as WarmIntrosV2Service,
-    { trackEvent } as unknown as AnalyticsService
+    { trackEvent } as unknown as AnalyticsService,
+    { claim: jest.fn(), finish: jest.fn() } as never,
+    {} as never,
   );
 
   beforeEach(() => {

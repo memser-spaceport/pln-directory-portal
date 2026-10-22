@@ -54,11 +54,16 @@ describe('AiAppMemberContextGuard', () => {
 
   it('marks an agent session so member context can expose the flag', async () => {
     const { guard, sessionService } = build();
-    sessionService.authenticateAppRequest.mockResolvedValue({ memberUid: 'm-1', appId: 'foo', isAgent: true });
+    sessionService.authenticateAppRequest.mockResolvedValue({
+      memberUid: 'm-1',
+      appId: 'foo',
+      isAgent: true,
+      agentAccess: 'read',
+    });
     const req: any = { headers: { authorization: `Bearer ${appToken('foo')}` }, cookies: {} };
     await expect(guard.canActivate(context(req))).resolves.toBe(true);
     expect(req.memberUid).toBe('m-1');
-    expect(req.aiAppAgent).toBe(true);
+    expect(req.aiAppAgent).toEqual({ agentAccess: 'read' });
     expect(req.aiAppTestingUser).toBeUndefined();
   });
 
@@ -69,6 +74,38 @@ describe('AiAppMemberContextGuard', () => {
       cookies: {},
     };
     await expect(guard.canActivate(context(req))).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('401s a server call that names another app, before the session is read', async () => {
+    const { guard, sessionService } = build();
+    const req = { headers: { authorization: `Bearer ${appToken('foo')}` }, query: { appId: 'bar' }, cookies: {} };
+    await expect(guard.canActivate(context(req))).rejects.toThrow('Invalid or expired app session');
+    expect(sessionService.authenticateAppRequest).not.toHaveBeenCalled();
+  });
+
+  it('401s a browser call that names another app even from the session app’s origin', async () => {
+    const { guard } = build();
+    const req = {
+      headers: { authorization: `Bearer ${appToken('foo')}`, origin: buildAppUrl('foo', 'prod') },
+      query: { appId: 'bar' },
+      cookies: {},
+    };
+    await expect(guard.canActivate(context(req))).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('accepts a server call that names the session’s own app', async () => {
+    const { guard } = build();
+    const req: any = { headers: { authorization: `Bearer ${appToken('foo')}` }, query: { appId: 'foo' }, cookies: {} };
+    await expect(guard.canActivate(context(req))).resolves.toBe(true);
+    expect(req.memberUid).toBe('m-1');
+  });
+
+  it('ignores appId for a LabOS token', async () => {
+    const { guard } = build();
+    mockedAxios.post.mockResolvedValue({ data: { active: true, email: 'ada@example.com', sub: 's-1' } });
+    const req: any = { headers: { authorization: 'Bearer labos.jwt.token' }, query: { appId: 'bar' }, cookies: {} };
+    await expect(guard.canActivate(context(req))).resolves.toBe(true);
+    expect(req.userEmail).toBe('ada@example.com');
   });
 
   it('401s an expired or revoked app session without asking the auth service', async () => {
