@@ -9,6 +9,7 @@ const CTX: McpActorContext = {
   permissions: new Set<string>(),
   authorizationUid: 'auth-uid',
   clientName: 'test-client',
+  agentAccess: 'write' as const,
 };
 
 function teamRow(uid: string, name: string, island = 'digital-human-rights') {

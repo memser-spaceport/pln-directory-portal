@@ -5,6 +5,7 @@ import { createHash, randomBytes } from 'crypto';
 import * as jwt from 'jsonwebtoken';
 import { PrismaService } from '../shared/prisma.service';
 import {
+  AI_APPS_AGENT_SESSION_MAX_MS,
   AI_APPS_SESSION_CODE_TTL_MS,
   AI_APPS_SESSION_IDLE_MS,
   AI_APPS_SESSION_ISSUER,
@@ -20,6 +21,9 @@ const sha256 = (value: string) => createHash('sha256').update(value).digest('hex
 
 export type AiAppSessionGrant = { token: string; expiresAt: Date };
 
+/** What a member let their agent do at MCP consent (LAB-2902). */
+export type AiAppAgentAccess = 'read' | 'write';
+
 /** The claims a deployed app sees when it decodes its session token. */
 type AiAppSessionClaims = {
   iss: string;
@@ -32,6 +36,8 @@ type AiAppSessionClaims = {
   testing?: true;
   /** Set only for a session an agent minted (LAB-2763). Apps read this claim. */
   isAgent?: true;
+  /** Set only on an agent session: the minting grant's access level (LAB-2902). */
+  agentAccess?: AiAppAgentAccess;
 };
 
 /** A live session. Real member sessions are exactly `{ memberUid }`; testing and agent sessions add the claim. */
@@ -39,6 +45,7 @@ export type AiAppValidatedSession = {
   memberUid: string;
   testing?: true;
   isAgent?: true;
+  agentAccess?: AiAppAgentAccess;
   sessionUid?: string;
   createdAt?: Date;
   lastUsedAt?: Date;
@@ -128,12 +135,18 @@ export class AiAppsSessionService {
   }
 
   /**
-   * Opens a session for a member an agent is acting as (LAB-2763). Same lifetime as a browser session.
-   * `mcpAuthorizationUid` is stored for LAB-2764 and is not put in the token.
+   * Opens a session for a member an agent is acting as (LAB-2763). It lasts 1 hour from mint and does not slide
+   * (LAB-2911). `mcpAuthorizationUid` is stored for LAB-2764 and is not put in the token; `agentAccess` is stored
+   * and put in the token (LAB-2902).
    */
-  async openAgentSession(memberUid: string, appId: string, mcpAuthorizationUid: string): Promise<AiAppSessionGrant> {
+  async openAgentSession(
+    memberUid: string,
+    appId: string,
+    mcpAuthorizationUid: string,
+    agentAccess: AiAppAgentAccess
+  ): Promise<AiAppSessionGrant> {
     this.assertEnabled();
-    return this.openSession(memberUid, appId, { mcpAuthorizationUid });
+    return this.openSession(memberUid, appId, { mcpAuthorizationUid, agentAccess });
   }
 
   /**
@@ -175,11 +188,12 @@ export class AiAppsSessionService {
   private async openSession(
     memberUid: string,
     appId: string,
-    agent?: { mcpAuthorizationUid: string }
+    agent?: { mcpAuthorizationUid: string; agentAccess: AiAppAgentAccess }
   ): Promise<AiAppSessionGrant> {
     const member = await this.prisma.member.findUnique({ where: { uid: memberUid }, select: { email: true } });
     const now = Date.now();
-    const expiresAt = new Date(now + AI_APPS_SESSION_MAX_MS);
+    const expiresAt = new Date(now + (agent ? AI_APPS_AGENT_SESSION_MAX_MS : AI_APPS_SESSION_MAX_MS));
+    const idleExpiresAt = agent ? expiresAt : new Date(Math.min(now + AI_APPS_SESSION_IDLE_MS, expiresAt.getTime()));
     const jti = randomBytes(16).toString('hex');
     const claims: Omit<AiAppSessionClaims, 'exp'> = {
       iss: AI_APPS_SESSION_ISSUER,
@@ -187,7 +201,7 @@ export class AiAppsSessionService {
       uid: memberUid,
       email: member?.email ?? null,
       jti,
-      ...(agent ? { isAgent: true as const } : {}),
+      ...(agent ? { isAgent: true as const, agentAccess: agent.agentAccess } : {}),
     };
     const token = jwt.sign({ ...claims, exp: Math.floor(expiresAt.getTime() / 1000) }, AI_APPS_SESSION_SECRET, {
       algorithm: 'HS256',
@@ -198,10 +212,11 @@ export class AiAppsSessionService {
         appId,
         memberUid,
         tokenHash: sha256(token),
-        idleExpiresAt: new Date(Math.min(now + AI_APPS_SESSION_IDLE_MS, expiresAt.getTime())),
+        idleExpiresAt,
         expiresAt,
         isAgent: !!agent,
         mcpAuthorizationUid: agent?.mcpAuthorizationUid,
+        agentAccess: agent?.agentAccess,
       },
     });
     return { token, expiresAt };
@@ -210,6 +225,7 @@ export class AiAppsSessionService {
   /**
    * The member of a live session for this app, or null. Checks the signature, the stored record (revocation, idle
    * and absolute expiry) and the binding to `appId`; slides the idle expiry, writing at most every few minutes.
+   * Agent sessions never slide.
    */
   async validate(appId: string, token: string, options?: { touch?: boolean }): Promise<AiAppValidatedSession | null> {
     if (!this.enabled || !token) return null;
@@ -234,7 +250,7 @@ export class AiAppsSessionService {
     ) {
       return null;
     }
-    if (options?.touch !== false && now - row.lastUsedAt.getTime() >= AI_APPS_SESSION_TOUCH_MS) {
+    if (!row.isAgent && options?.touch !== false && now - row.lastUsedAt.getTime() >= AI_APPS_SESSION_TOUCH_MS) {
       await this.prisma.aiAppSession.update({
         where: { uid: row.uid },
         data: {
@@ -253,7 +269,7 @@ export class AiAppsSessionService {
       };
     }
     if (row.isAgent) {
-      return { memberUid: row.memberUid, isAgent: true };
+      return { memberUid: row.memberUid, isAgent: true, agentAccess: row.agentAccess === 'read' ? 'read' : 'write' };
     }
     return { memberUid: row.memberUid };
   }

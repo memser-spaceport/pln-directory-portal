@@ -17,6 +17,7 @@ function ctxFor(memberUid: string, email: string | null = 'member@example.com'):
     permissions: new Set<string>(),
     authorizationUid: 'auth-uid',
     clientName: 'test-client',
+    agentAccess: 'write' as const,
   };
 }
 

@@ -77,4 +77,28 @@ export class DataEnrichmentClientService {
 
     return body as AffinityMemberEnrichmentClientResult;
   }
+
+  async triggerWarmIntroInvestorRefresh(investorProfileUid: string, runUid: string): Promise<void> {
+    const url = `${this.baseUrl()}/api/v1/warm-intros-v2/investors/${encodeURIComponent(investorProfileUid)}/regenerate`;
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    };
+    const apiKey = process.env.DATA_ENRICHMENT_API_KEY?.trim();
+    if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ runUid }),
+    });
+    const text = await res.text();
+    if (res.status === 409) {
+      throw new ConflictException('Investor refresh is already running');
+    }
+    if (res.status !== 202 && !res.ok) {
+      this.logger.error(`Warm intro investor refresh failed: ${res.status} ${text.slice(0, 300)}`);
+      throw new InternalServerErrorException('Failed to start investor refresh');
+    }
+  }
 }

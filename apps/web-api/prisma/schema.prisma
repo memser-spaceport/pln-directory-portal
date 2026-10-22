@@ -3958,6 +3958,8 @@ model AiAppSession {
   /// McpAuthorization.uid that minted an agent session. Null for a browser session.
   /// revokeAuthorization ends these rows (LAB-2764).
   mcpAuthorizationUid  String?
+  /// "read" or "write": the minting grant's access level (LAB-2902). Null for a browser session.
+  agentAccess          String?
 
   @@index([memberUid, revokedAt])
   @@index([expiresAt])
@@ -4608,11 +4610,26 @@ model McpAuthorization {
   accessTokenHash  String?       @unique
   refreshTokenHash String?       @unique
   accessExpiresAt  DateTime?
+  /// False = read-only grant: write tools are hidden (LAB-2902). Grants approved before that keep true.
+  canWrite         Boolean       @default(true)
   member           Member        @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
   authCodes        McpAuthCode[]
+  usedRefreshTokens McpUsedRefreshToken[]
 
   @@unique([memberUid, clientId])
   @@index([memberUid, revokedAt])
+}
+
+/// Hash of a refresh token this grant already rotated (LAB-2895). Presenting one again revokes the grant.
+/// Cleared on a new consent; rows older than the refresh-token lifetime are pruned daily.
+model McpUsedRefreshToken {
+  tokenHash        String           @id
+  authorizationUid String
+  usedAt           DateTime         @default(now())
+  authorization    McpAuthorization @relation(fields: [authorizationUid], references: [uid], onDelete: Cascade)
+
+  @@index([authorizationUid])
+  @@index([usedAt])
 }
 
 /// Short-lived authorization codes (PKCE S256).
@@ -4750,4 +4767,30 @@ model JobMatchEmailSend {
   @@unique([runUid, roleUid, recipientUid])
   @@index([recipientUid])
   @@index([roleUid, recipientUid])
+}
+
+enum WarmIntrosV2RunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+/// One Warm Intros v2 refresh. A fresh RUNNING lock blocks a second start.
+/// A lock older than the job deadline can be taken over.
+/// The migration also adds a partial unique index so only one RUNNING row exists.
+/// Keep that index. Prisma schema cannot declare it.
+model WarmIntrosV2Run {
+  uid                String                @id @default(cuid())
+  status             WarmIntrosV2RunStatus @default(RUNNING)
+  /// Null for the weekly cohort run. Set for a one-investor refresh.
+  investorProfileUid String?
+  lockedUntil        DateTime?
+  error              String?
+  startedAt          DateTime              @default(now())
+  finishedAt         DateTime?
+
+  @@index([status, lockedUntil])
+  @@index([startedAt])
+  @@index([investorProfileUid])
 }

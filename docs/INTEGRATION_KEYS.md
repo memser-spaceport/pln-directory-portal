@@ -94,6 +94,32 @@ GET /v1/integrations/me
 
 200: `{ uid, keyPrefix, name, teamUid, teamName, scopes }`. Requires no scope. Use it to confirm a configured key is valid and bound to the expected team.
 
+### Member proofs: which member an agent acts for
+
+A PL app outside LabOS can check which member an AI agent is acting for, without building its own sign-in. The agent is connected to LabOS through MCP and holds an MCP access token. The app's key needs `members:sign-in`.
+
+1. The app tells the agent its key `uid` (from `GET /v1/integrations/me`). The uid is not a secret.
+2. The agent asks LabOS for a proof:
+
+   ```
+   POST /v1/mcp/member-proofs
+   Authorization: Bearer <MCP access token>
+   { "audience": "<integration key uid>" }
+   ```
+
+   201: `{ proof, expiresAt }`. 401: missing, expired or revoked MCP token. 403: the member lacks `mcp.connect`. 404 `Unknown audience`: no live key with that uid holds `members:sign-in`.
+3. The agent hands `proof` to the app, and the app's server redeems it:
+
+   ```
+   POST /v1/integrations/member-proofs/redeem
+   Authorization: Bearer <integration key>
+   { "proof": "mcp_mp_…" }
+   ```
+
+   200: `{ memberUid, name, email, image, permissions, agent: { clientName, access } }`. `access` is `read` when the member gave their agent read-only access at MCP consent, `write` when they allowed changes. 400 `Invalid or expired member proof`: the proof is unknown, already redeemed, older than 5 minutes, issued for another key, or its agent was revoked or lost `mcp.connect` since.
+
+A proof is single-use and bound to one key: a different key gets the 400 and the proof stays redeemable by its own key until it expires. The proof lives only in the cache, as a sha256 hash, for 5 minutes. The redeem route is bound to the key, not to a team, so it does not call `assertKeyOwnsTeam`. Code: `apps/web-api/src/mcp/mcp-member-proof.service.ts`, `mcp-member-proofs.controller.ts`.
+
 ## Adding an integration route
 
 ```ts

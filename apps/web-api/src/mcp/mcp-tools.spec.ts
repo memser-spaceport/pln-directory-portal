@@ -19,6 +19,10 @@ import {
 } from './mcp-tools';
 import { MasterProfileService } from '../master-profile/master-profile.service';
 import { WarmIntrosV2Service } from '../warm-intros-v2/warm-intros-v2.service';
+import { aiAppFeedbackTools } from './mcp-ai-app-feedback-tools';
+import { directoryTools } from './mcp-directory-tools';
+import { portfolioTools } from './mcp-portfolio-tools';
+import { MCP_WRITE_TOOLS } from './mcp.constants';
 
 describe('mcp-redirect', () => {
   it('treats localhost, 127.0.0.1, and ::1 as loopback', () => {
@@ -98,8 +102,9 @@ describe('toolsForPermissions', () => {
       permissions: new Set(),
       authorizationUid: 'auth-1',
       clientName: 'Claude Code',
+      agentAccess: 'write' as const,
     });
-    expect(result).toEqual({ memberUid: 'm1', name: 'Ada', email: 'ada@example.com' });
+    expect(result).toEqual({ memberUid: 'm1', name: 'Ada', email: 'ada@example.com', agentAccess: 'write' });
   });
 
   it('omits Warm Intro tools without investor_db.view', () => {
@@ -125,6 +130,47 @@ describe('toolsForPermissions', () => {
   });
 });
 
+describe('read-only grants', () => {
+  const stub = {} as any;
+  const fullCatalog = [
+    WHOAMI_TOOL,
+    ...warmIntroTools(stub, stub),
+    ...directoryTools(stub, stub, stub, stub, stub),
+    ...aiAppFeedbackTools(stub),
+    ...portfolioTools(stub),
+  ];
+  const everything = new Set(['directory.admin.full', 'investor_db.edit', 'forum.read', 'ai_apps.read']);
+
+  it('lists every tool that changes data in MCP_WRITE_TOOLS', () => {
+    const writesByName = fullCatalog.map((t) => t.name).filter((name) => /^(update|submit)_/.test(name));
+    expect(writesByName.length).toBeGreaterThan(0);
+    for (const name of writesByName) {
+      expect(MCP_WRITE_TOOLS.has(name)).toBe(true);
+    }
+  });
+
+  it('drops every write tool on a read-only grant and keeps the read tools', () => {
+    const write = toolsForPermissions(everything, fullCatalog, true).map((t) => t.name);
+    const read = toolsForPermissions(everything, fullCatalog, false).map((t) => t.name);
+    expect(read.filter((name) => MCP_WRITE_TOOLS.has(name))).toEqual([]);
+    expect(read).toEqual(write.filter((name) => !MCP_WRITE_TOOLS.has(name)));
+    expect(write).toEqual(expect.arrayContaining(['update_ai_app_feedback_status', 'update_master_profile']));
+  });
+
+  it('reports the grant level from whoami', async () => {
+    const result = await WHOAMI_TOOL.execute({
+      memberUid: 'm1',
+      name: 'Ada',
+      email: null,
+      permissions: new Set(),
+      authorizationUid: 'auth-1',
+      clientName: 'Claude Code',
+      agentAccess: 'read',
+    });
+    expect(result).toMatchObject({ agentAccess: 'read' });
+  });
+});
+
 describe('field lock tools', () => {
   const actor = {
     memberUid: 'm1',
@@ -133,6 +179,7 @@ describe('field lock tools', () => {
     permissions: new Set(['investor_db.edit']),
     authorizationUid: 'auth-1',
     clientName: 'Claude Code',
+    agentAccess: 'write' as const,
   };
 
   it('locks master profile fields for the signed-in member', async () => {
@@ -343,6 +390,7 @@ const mcpActor = {
   permissions: new Set(['investor_db.view']),
   authorizationUid: 'auth-1',
   clientName: 'Claude Code',
+  agentAccess: 'write' as const,
 };
 
 describe('submitWarmPathFeedback', () => {

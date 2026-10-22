@@ -47,6 +47,7 @@ function ctx(memberUid: string): McpActorContext {
     permissions: new Set(),
     authorizationUid: 'auth-1',
     clientName: 'Claude',
+    agentAccess: 'write' as const,
   };
 }
 
