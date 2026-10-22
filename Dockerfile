@@ -10,7 +10,7 @@
 # cached between source-only commits. The runtime image must never contain
 # devDependencies, the sources or build tooling.
 
-ARG NODE_VERSION=20.19
+ARG NODE_VERSION=22.23.4
 
 # ============================
 # Stage 1: builder
