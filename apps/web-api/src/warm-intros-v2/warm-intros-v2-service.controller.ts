@@ -8,12 +8,17 @@ import {
   trackServiceManualFieldsPatch,
 } from '../manual-field-lock/manual-field-lock.analytics';
 import { PatchManualFieldsDto, serviceActor } from '../manual-field-lock/manual-field-lock.service';
+import { PrismaService } from '../shared/prisma.service';
 import {
   IngestConnectionEdgesDto,
   IngestWarmIntrosV2Response,
   IngestWarmPathsV2Dto,
   ListConnectionEdgesQueryDto,
 } from './dto/ingest-warm-intros-v2.dto';
+import { loadAffinityFoundersExport } from './export-affinity-founders.query';
+import { loadDirectoryLinkedinExport } from './export-directory-linkedin.query';
+import { loadInvestorPortfolioOverlaps } from './export-portfolio-overlaps.query';
+import { WarmIntrosV2RunService } from './warm-intros-v2-run.service';
 import { WarmIntrosV2Service } from './warm-intros-v2.service';
 
 /**
@@ -28,7 +33,9 @@ export class WarmIntrosV2ServiceController {
 
   constructor(
     private readonly warmIntrosV2Service: WarmIntrosV2Service,
-    private readonly analytics: AnalyticsService
+    private readonly analytics: AnalyticsService,
+    private readonly runs: WarmIntrosV2RunService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Patch('warm-intros-v2/edges/:uid')
@@ -73,5 +80,33 @@ export class WarmIntrosV2ServiceController {
       `Received warm-intros-v2 path ingest: paths=${dto?.paths?.length ?? 0} runId=${dto?.runId ?? 'none'}`
     );
     return this.warmIntrosV2Service.ingestPaths(dto);
+  }
+
+  @Get('warm-intros-v2/exports/portfolio-overlaps')
+  exportPortfolioOverlaps() {
+    return loadInvestorPortfolioOverlaps(this.prisma);
+  }
+
+  @Get('warm-intros-v2/exports/affinity-founders')
+  exportAffinityFounders() {
+    return loadAffinityFoundersExport(this.prisma);
+  }
+
+  @Get('warm-intros-v2/exports/directory-linkedin')
+  exportDirectoryLinkedin() {
+    return loadDirectoryLinkedinExport(this.prisma);
+  }
+
+  @Post('warm-intros-v2/runs')
+  claimRun() {
+    return this.runs.claim();
+  }
+
+  @Post('warm-intros-v2/runs/:uid/finish')
+  finishRun(
+    @Param('uid') uid: string,
+    @Body() body: { status?: 'COMPLETED' | 'FAILED'; error?: string | null },
+  ) {
+    return this.runs.finish(uid, body?.status as 'COMPLETED' | 'FAILED', body?.error);
   }
 }
