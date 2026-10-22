@@ -37,6 +37,21 @@ Each route SHALL require the internal service secret. The founder export SHALL i
 
 #### Scenario: The team reads the last run
 
-- **GIVEN** a completed run
+- **GIVEN** a completed weekly run
 - **WHEN** a viewer requests the latest run
 - **THEN** the response status is COMPLETED and `finishedAt` is set
+
+### Requirement: Regenerate one investor
+
+`POST /v1/warm-intros-v2/investors/:investorProfileUid/regenerate` SHALL require Investor DB edit permission. An unknown profile SHALL return 404 and SHALL NOT start a run. A profile with no Affinity person id SHALL return 400 and SHALL NOT start a run. An active run for that investor SHALL return 200 `{ status: "already_running" }`. Otherwise the system SHALL return 202 `{ status: "started", uid }` and SHALL ask data-enrichment to refresh that investor only.
+
+`GET /v1/warm-intros-v2/investors/:investorProfileUid/regenerate` SHALL require Investor DB view permission and SHALL return that investor's newest run.
+
+A weekly run SHALL NOT be blocked by an investor run, and an investor run SHALL NOT be blocked by a weekly run.
+
+#### Scenario: A second request for the same investor
+
+- **GIVEN** a RUNNING refresh for an investor whose lock is still in the future
+- **WHEN** an editor requests regeneration for that investor
+- **THEN** the response status is `already_running`
+

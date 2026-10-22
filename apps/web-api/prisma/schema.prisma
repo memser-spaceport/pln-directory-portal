@@ -4759,13 +4759,16 @@ enum WarmIntrosV2RunStatus {
 /// The migration also adds a partial unique index so only one RUNNING row exists.
 /// Keep that index. Prisma schema cannot declare it.
 model WarmIntrosV2Run {
-  uid         String                 @id @default(cuid())
-  status      WarmIntrosV2RunStatus  @default(RUNNING)
-  lockedUntil DateTime?
-  error       String?
-  startedAt   DateTime               @default(now())
-  finishedAt  DateTime?
+  uid                String                @id @default(cuid())
+  status             WarmIntrosV2RunStatus @default(RUNNING)
+  /// Null for the weekly cohort run. Set for a one-investor refresh.
+  investorProfileUid String?
+  lockedUntil        DateTime?
+  error              String?
+  startedAt          DateTime              @default(now())
+  finishedAt         DateTime?
 
   @@index([status, lockedUntil])
   @@index([startedAt])
+  @@index([investorProfileUid])
 }

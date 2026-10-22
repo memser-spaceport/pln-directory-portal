@@ -2,11 +2,13 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { WarmIntrosV2RunStatus } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 
-const LOCK_MS = 12 * 60 * 60 * 1000;
+const WEEKLY_LOCK_MS = 12 * 60 * 60 * 1000;
+const INVESTOR_LOCK_MS = 30 * 60 * 1000;
 
 export type WarmIntrosV2RunView = {
   uid: string;
   status: WarmIntrosV2RunStatus;
+  investorProfileUid: string | null;
   startedAt: Date;
   finishedAt: Date | null;
   error: string | null;
@@ -25,16 +27,32 @@ export class WarmIntrosV2RunService {
   constructor(private readonly prisma: PrismaService) {}
 
   async claim(now: Date = new Date()): Promise<ClaimWarmIntrosV2RunResult> {
+    return this.claimScoped({ investorProfileUid: null, lockMs: WEEKLY_LOCK_MS, now });
+  }
+
+  async claimInvestor(investorProfileUid: string, now: Date = new Date()): Promise<ClaimWarmIntrosV2RunResult> {
+    const uid = investorProfileUid.trim();
+    if (!uid) throw new BadRequestException('investorProfileUid is required');
+    return this.claimScoped({ investorProfileUid: uid, lockMs: INVESTOR_LOCK_MS, now });
+  }
+
+  private async claimScoped(opts: {
+    investorProfileUid: string | null;
+    lockMs: number;
+    now: Date;
+  }): Promise<ClaimWarmIntrosV2RunResult> {
+    const scope = { investorProfileUid: opts.investorProfileUid };
     const active = await this.prisma.warmIntrosV2Run.findFirst({
-      where: { status: 'RUNNING', lockedUntil: { gt: now } },
+      where: { ...scope, status: 'RUNNING', lockedUntil: { gt: opts.now } },
       orderBy: { startedAt: 'desc' },
     });
     if (active) return { action: 'skipped', uid: active.uid };
 
     const stale = await this.prisma.warmIntrosV2Run.findFirst({
       where: {
+        ...scope,
         status: 'RUNNING',
-        OR: [{ lockedUntil: null }, { lockedUntil: { lte: now } }],
+        OR: [{ lockedUntil: null }, { lockedUntil: { lte: opts.now } }],
       },
       orderBy: { startedAt: 'desc' },
     });
@@ -42,10 +60,11 @@ export class WarmIntrosV2RunService {
       const taken = await this.prisma.warmIntrosV2Run.updateMany({
         where: {
           uid: stale.uid,
+          ...scope,
           status: 'RUNNING',
-          OR: [{ lockedUntil: null }, { lockedUntil: { lte: now } }],
+          OR: [{ lockedUntil: null }, { lockedUntil: { lte: opts.now } }],
         },
-        data: { lockedUntil: new Date(now.getTime() + LOCK_MS), error: null },
+        data: { lockedUntil: new Date(opts.now.getTime() + opts.lockMs), error: null },
       });
       if (taken.count === 1) return { action: 'run', uid: stale.uid };
       return { action: 'skipped', uid: stale.uid };
@@ -55,14 +74,15 @@ export class WarmIntrosV2RunService {
       const created = await this.prisma.warmIntrosV2Run.create({
         data: {
           status: 'RUNNING',
-          lockedUntil: new Date(now.getTime() + LOCK_MS),
+          investorProfileUid: opts.investorProfileUid,
+          lockedUntil: new Date(opts.now.getTime() + opts.lockMs),
         },
       });
       return { action: 'run', uid: created.uid };
     } catch (error) {
       if (!isUniqueConflict(error)) throw error;
       const holder = await this.prisma.warmIntrosV2Run.findFirst({
-        where: { status: 'RUNNING' },
+        where: { ...scope, status: 'RUNNING' },
         orderBy: { startedAt: 'desc' },
       });
       if (!holder) throw error;
@@ -90,7 +110,16 @@ export class WarmIntrosV2RunService {
 
   async latest(): Promise<{ run: WarmIntrosV2RunView | null }> {
     const row = await this.prisma.warmIntrosV2Run.findFirst({
-      where: { status: { not: 'SKIPPED' } },
+      where: { investorProfileUid: null, status: { not: 'SKIPPED' } },
+      orderBy: { startedAt: 'desc' },
+    });
+    return { run: row ? toView(row) : null };
+  }
+
+  async latestForInvestor(investorProfileUid: string): Promise<{ run: WarmIntrosV2RunView | null }> {
+    const uid = investorProfileUid.trim();
+    const row = await this.prisma.warmIntrosV2Run.findFirst({
+      where: { investorProfileUid: uid, status: { not: 'SKIPPED' } },
       orderBy: { startedAt: 'desc' },
     });
     return { run: row ? toView(row) : null };
@@ -100,6 +129,7 @@ export class WarmIntrosV2RunService {
 function toView(row: {
   uid: string;
   status: WarmIntrosV2RunStatus;
+  investorProfileUid: string | null;
   startedAt: Date;
   finishedAt: Date | null;
   error: string | null;
@@ -107,6 +137,7 @@ function toView(row: {
   return {
     uid: row.uid,
     status: row.status,
+    investorProfileUid: row.investorProfileUid,
     startedAt: row.startedAt,
     finishedAt: row.finishedAt,
     error: row.error,

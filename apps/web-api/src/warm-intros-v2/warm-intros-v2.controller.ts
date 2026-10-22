@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Put, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
@@ -21,6 +21,9 @@ import {
   UpsertWarmPathFeedbackDto,
 } from './dto/warm-path-feedback.dto';
 import { UpsertWarmPathNoteDto } from './dto/warm-path-note.dto';
+
+import { Response } from 'express';
+import { WarmIntrosV2RegenerateService } from './warm-intros-v2-regenerate.service';
 import { WarmIntrosV2RunService } from './warm-intros-v2-run.service';
 import { WarmIntrosV2Service } from './warm-intros-v2.service';
 
@@ -63,7 +66,27 @@ export class WarmIntrosV2Controller {
     private readonly rbacService: RbacService,
     private readonly accessControlV2Service: AccessControlV2Service,
     private readonly runs: WarmIntrosV2RunService,
+    private readonly regenerateRuns: WarmIntrosV2RegenerateService
   ) {}
+
+  @NoCache()
+  @Get('investors/:investorProfileUid/regenerate')
+  @RequirePermissions(VIEW_PERMS)
+  investorRefreshStatus(@Param('investorProfileUid') investorProfileUid: string) {
+    return this.regenerateRuns.latest(investorProfileUid);
+  }
+
+  @NoCache()
+  @Post('investors/:investorProfileUid/regenerate')
+  @RequirePermissions(EDIT_PERMS)
+  async regenerateInvestor(
+    @Param('investorProfileUid') investorProfileUid: string,
+    @Res({ passthrough: true }) res: Response
+  ) {
+    const result = await this.regenerateRuns.regenerate(investorProfileUid);
+    res.status(result.status === 'started' ? 202 : 200);
+    return result;
+  }
 
   @NoCache()
   @Get('runs/latest')
