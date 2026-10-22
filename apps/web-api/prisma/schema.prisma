@@ -4763,3 +4763,29 @@ model JobMatchEmailSend {
   @@index([recipientUid])
   @@index([roleUid, recipientUid])
 }
+
+enum WarmIntrosV2RunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+/// One Warm Intros v2 refresh. A fresh RUNNING lock blocks a second start.
+/// A lock older than the job deadline can be taken over.
+/// The migration also adds a partial unique index so only one RUNNING row exists.
+/// Keep that index. Prisma schema cannot declare it.
+model WarmIntrosV2Run {
+  uid                String                @id @default(cuid())
+  status             WarmIntrosV2RunStatus @default(RUNNING)
+  /// Null for the weekly cohort run. Set for a one-investor refresh.
+  investorProfileUid String?
+  lockedUntil        DateTime?
+  error              String?
+  startedAt          DateTime              @default(now())
+  finishedAt         DateTime?
+
+  @@index([status, lockedUntil])
+  @@index([startedAt])
+  @@index([investorProfileUid])
+}
