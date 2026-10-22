@@ -3953,6 +3953,8 @@ model AiAppSession {
   /// McpAuthorization.uid that minted an agent session. Null for a browser session.
   /// revokeAuthorization ends these rows (LAB-2764).
   mcpAuthorizationUid  String?
+  /// "read" or "write": the minting grant's access level (LAB-2902). Null for a browser session.
+  agentAccess          String?
 
   @@index([memberUid, revokedAt])
   @@index([expiresAt])
@@ -4603,11 +4605,26 @@ model McpAuthorization {
   accessTokenHash  String?       @unique
   refreshTokenHash String?       @unique
   accessExpiresAt  DateTime?
+  /// False = read-only grant: write tools are hidden (LAB-2902). Grants approved before that keep true.
+  canWrite         Boolean       @default(true)
   member           Member        @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
   authCodes        McpAuthCode[]
+  usedRefreshTokens McpUsedRefreshToken[]
 
   @@unique([memberUid, clientId])
   @@index([memberUid, revokedAt])
+}
+
+/// Hash of a refresh token this grant already rotated (LAB-2895). Presenting one again revokes the grant.
+/// Cleared on a new consent; rows older than the refresh-token lifetime are pruned daily.
+model McpUsedRefreshToken {
+  tokenHash        String           @id
+  authorizationUid String
+  usedAt           DateTime         @default(now())
+  authorization    McpAuthorization @relation(fields: [authorizationUid], references: [uid], onDelete: Cascade)
+
+  @@index([authorizationUid])
+  @@index([usedAt])
 }
 
 /// Short-lived authorization codes (PKCE S256).
