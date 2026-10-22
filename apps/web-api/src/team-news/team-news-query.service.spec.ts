@@ -211,6 +211,22 @@ describe('TeamNewsQueryService — viewCount', () => {
     expect(teamNewsItemFindMany).toHaveBeenCalledTimes(1);
   });
 
+  it('maps imageUrl from the row onto the DTO', async () => {
+    teamNewsItemFindMany.mockResolvedValue([makeRow({ imageUrl: 'https://cdn.example.com/og.jpg' })]);
+
+    const result = await service.listTeamNewsByTeam('team-1', { page: 1, limit: 50 });
+
+    expect(result.items[0].imageUrl).toBe('https://cdn.example.com/og.jpg');
+  });
+
+  it('returns imageUrl null when the row has no image', async () => {
+    teamNewsItemFindMany.mockResolvedValue([makeRow({ imageUrl: null })]);
+
+    const result = await service.listTeamNewsByTeam('team-1', { page: 1, limit: 50 });
+
+    expect(result.items[0].imageUrl).toBeNull();
+  });
+
   it('defaults viewCount to 0 for an item with no impressions yet', async () => {
     const result = await service.listTeamNewsByTeam('team-1', { page: 1, limit: 50 });
 
@@ -589,6 +605,8 @@ describe('TeamNewsQueryService.getDigestNewsPicks', () => {
   let service: TeamNewsQueryService;
 
   const teamNewsItemFindMany = jest.fn();
+  const teamNewsItemFindFirst = jest.fn();
+  const memberFindMany = jest.fn();
   const teamNewsForumLinkFindMany = jest.fn();
   const teamNewsUpvoteGroupBy = jest.fn();
   const teamNewsUpvoteFindMany = jest.fn();
@@ -626,13 +644,16 @@ describe('TeamNewsQueryService.getDigestNewsPicks', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     teamNewsItemFindMany.mockResolvedValue([]);
+    teamNewsItemFindFirst.mockResolvedValue(null);
+    memberFindMany.mockResolvedValue([]);
     teamNewsForumLinkFindMany.mockResolvedValue([]);
     teamNewsUpvoteGroupBy.mockResolvedValue([]);
     teamNewsUpvoteFindMany.mockResolvedValue([]);
     getForYouTeamUidsForMembers.mockResolvedValue(new Map());
     service = new TeamNewsQueryService(
       {
-        teamNewsItem: { findMany: teamNewsItemFindMany },
+        teamNewsItem: { findMany: teamNewsItemFindMany, findFirst: teamNewsItemFindFirst },
+        member: { findMany: memberFindMany },
         teamNewsForumLink: { findMany: teamNewsForumLinkFindMany },
         teamNewsUpvote: { groupBy: teamNewsUpvoteGroupBy, findMany: teamNewsUpvoteFindMany },
       } as unknown as PrismaService,
@@ -691,6 +712,33 @@ describe('TeamNewsQueryService.getDigestNewsPicks', () => {
 
     expect(result.picks['member-1'].map((i) => i.uid)).toEqual(['newer-a', 'b', 'c']);
     expect(result.windowCount).toBe(5);
+  });
+
+  it('carries imageUrl on every picked item (a string or null)', async () => {
+    teamNewsItemFindMany.mockResolvedValue([
+      makeRow({
+        uid: 'with-image',
+        teamUid: 'team-a',
+        imageUrl: 'https://cdn.example.com/og.jpg',
+        team: { uid: 'team-a', name: 'A', logo: null, teamFocusAreas: [] },
+      }),
+      makeRow({
+        uid: 'no-image',
+        teamUid: 'team-b',
+        imageUrl: null,
+        team: { uid: 'team-b', name: 'B', logo: null, teamFocusAreas: [] },
+      }),
+    ]);
+    getForYouTeamUidsForMembers.mockResolvedValue(new Map([['member-1', ['team-a', 'team-b']]]));
+
+    const result = await service.getDigestNewsPicks({
+      memberUids: ['member-1'],
+      sinceCreatedAt: since,
+      untilCreatedAt: until,
+    });
+
+    const byUid = Object.fromEntries(result.picks['member-1'].map((i) => [i.uid, i.imageUrl]));
+    expect(byUid).toEqual({ 'with-image': 'https://cdn.example.com/og.jpg', 'no-image': null });
   });
 
   it('does not pad a 1-item For You list with global items', async () => {
@@ -755,6 +803,142 @@ describe('TeamNewsQueryService.getDigestNewsPicks', () => {
     });
 
     expect(result.picks['member-1'].map((i) => i.uid)).toEqual(['n1', 'n2', 'n3']);
+  });
+
+  it('returns the Top Stories lead as topStory, mapped like the picks', async () => {
+    teamNewsItemFindFirst.mockResolvedValue(
+      makeRow({ uid: 'lead', editorialRank: 1, imageUrl: 'https://cdn.example.com/lead.jpg' })
+    );
+
+    const result = await service.getDigestNewsPicks({
+      memberUids: ['member-1'],
+      sinceCreatedAt: since,
+      untilCreatedAt: until,
+    });
+
+    expect(result.topStory).toEqual(
+      expect.objectContaining({
+        uid: 'lead',
+        editorialRank: 1,
+        imageUrl: 'https://cdn.example.com/lead.jpg',
+        teamName: 'Acme Labs',
+      })
+    );
+  });
+
+  it('asks for editorialRank 1 within the last 14 days, without excluded teams', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-10-21T12:00:00.000Z'));
+    try {
+      await service.getDigestNewsPicks({ memberUids: ['member-1'], sinceCreatedAt: since, untilCreatedAt: until });
+    } finally {
+      jest.useRealTimers();
+    }
+
+    const { where } = teamNewsItemFindFirst.mock.calls[0][0];
+    expect(where.editorialRank).toBe(1);
+    expect(where.eventDate).toEqual({ gte: new Date('2026-10-07T12:00:00.000Z') });
+    expect(where.NOT).toBeDefined();
+  });
+
+  it('returns topStory null when there is no lead, and leaves picks unchanged', async () => {
+    teamNewsItemFindMany.mockResolvedValue([makeRow({ uid: 'n1' })]);
+
+    const result = await service.getDigestNewsPicks({
+      memberUids: ['member-1'],
+      sinceCreatedAt: since,
+      untilCreatedAt: until,
+    });
+
+    expect(result.topStory).toBeNull();
+    expect(result.picks['member-1'].map((i) => i.uid)).toEqual(['n1']);
+    expect(result.windowCount).toBe(1);
+  });
+
+  describe('news categories (LAB-2940)', () => {
+    const window = () => [
+      makeRow({
+        uid: 'fund-a',
+        teamUid: 'team-a',
+        eventType: 'FUNDING',
+        eventDate: new Date('2026-08-20T20:00:00.000Z'),
+        team: { uid: 'team-a', name: 'A', logo: null, teamFocusAreas: [] },
+      }),
+      makeRow({
+        uid: 'launch-b',
+        teamUid: 'team-b',
+        eventType: 'LAUNCH',
+        eventDate: new Date('2026-08-20T19:00:00.000Z'),
+        team: { uid: 'team-b', name: 'B', logo: null, teamFocusAreas: [] },
+      }),
+      makeRow({
+        uid: 'fund-c',
+        teamUid: 'team-c',
+        eventType: 'FUNDING',
+        eventDate: new Date('2026-08-20T18:00:00.000Z'),
+        team: { uid: 'team-c', name: 'C', logo: null, teamFocusAreas: [] },
+      }),
+      makeRow({
+        uid: 'other-d',
+        teamUid: 'team-d',
+        eventType: 'OTHER',
+        eventDate: new Date('2026-08-20T17:00:00.000Z'),
+        team: { uid: 'team-d', name: 'D', logo: null, teamFocusAreas: [] },
+      }),
+    ];
+
+    it("keeps only the member's categories in their For You picks", async () => {
+      teamNewsItemFindMany.mockResolvedValue(window());
+      getForYouTeamUidsForMembers.mockResolvedValue(new Map([['member-1', ['team-a', 'team-b', 'team-c']]]));
+      memberFindMany.mockResolvedValue([{ uid: 'member-1', preferences: { newsCategories: ['FUNDING'] } }]);
+
+      const result = await service.getDigestNewsPicks({
+        memberUids: ['member-1'],
+        sinceCreatedAt: since,
+        untilCreatedAt: until,
+      });
+
+      expect(result.picks['member-1'].map((i) => i.uid)).toEqual(['fund-a', 'fund-c']);
+    });
+
+    it('narrows the newest-items fallback too', async () => {
+      teamNewsItemFindMany.mockResolvedValue(window());
+      getForYouTeamUidsForMembers.mockResolvedValue(new Map([['member-1', []]]));
+      memberFindMany.mockResolvedValue([{ uid: 'member-1', preferences: { newsCategories: ['LAUNCH', 'OTHER'] } }]);
+
+      const result = await service.getDigestNewsPicks({
+        memberUids: ['member-1'],
+        sinceCreatedAt: since,
+        untilCreatedAt: until,
+      });
+
+      expect(result.picks['member-1'].map((i) => i.uid)).toEqual(['launch-b', 'other-d']);
+    });
+
+    it('leaves members without stored categories, and the top story, as before', async () => {
+      teamNewsItemFindMany.mockResolvedValue(window());
+      teamNewsItemFindFirst.mockResolvedValue(makeRow({ uid: 'lead', eventType: 'LAUNCH', editorialRank: 1 }));
+      getForYouTeamUidsForMembers.mockResolvedValue(
+        new Map([
+          ['member-1', []],
+          ['member-2', []],
+        ])
+      );
+      memberFindMany.mockResolvedValue([
+        { uid: 'member-1', preferences: null },
+        { uid: 'member-2', preferences: { newsCategories: ['FUNDING'] } },
+      ]);
+
+      const result = await service.getDigestNewsPicks({
+        memberUids: ['member-1', 'member-2'],
+        sinceCreatedAt: since,
+        untilCreatedAt: until,
+      });
+
+      expect(result.picks['member-1'].map((i) => i.uid)).toEqual(['fund-a', 'launch-b', 'fund-c']);
+      expect(result.picks['member-2'].map((i) => i.uid)).toEqual(['fund-a', 'fund-c']);
+      expect(result.topStory?.uid).toBe('lead');
+      expect(result.windowCount).toBe(4);
+    });
   });
 
   it('queries the watermark createdAt window without a 50-item cap', async () => {

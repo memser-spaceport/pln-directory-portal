@@ -26,6 +26,7 @@ import {
   TEAM_NEWS_BODY_MAX_PLAIN_CHARS,
 } from './team-news-body-html.util';
 import { TeamNewsPostSummaryService } from './team-news-post-summary.service';
+import { TeamNewsImageService } from './team-news-image.service';
 
 type ExistingNewsRow = {
   id: number;
@@ -102,7 +103,8 @@ export class TeamNewsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly pushNotifications: PushNotificationsService,
-    private readonly postSummary: TeamNewsPostSummaryService
+    private readonly postSummary: TeamNewsPostSummaryService,
+    private readonly imageService: TeamNewsImageService
   ) {}
 
   async ingestTeamNews(dto: IngestTeamNewsDto): Promise<IngestTeamNewsResponse> {
@@ -132,6 +134,8 @@ export class TeamNewsService {
     // Only items that were genuinely inserted (not re-ingested updates) should
     // trigger a notification, so we track creations per team here.
     const createdByTeam = new Map<string, CreatedTeamNews>();
+    // Uids of newly inserted rows; merged rows keep their image.
+    const createdUids: string[] = [];
 
     for (const item of dto.items) {
       try {
@@ -148,6 +152,7 @@ export class TeamNewsService {
         const created = await this.upsertNewsItem(item, parsed.eventDate);
         if (created) {
           result.created++;
+          if (created.uid) createdUids.push(created.uid);
           this.trackCreatedItem(createdByTeam, item, parsed.eventDate);
         } else {
           result.updated++;
@@ -162,6 +167,9 @@ export class TeamNewsService {
       }
     }
 
+    // Not awaited: image fetches must not delay the ingest response. Started
+    // first, so that a failure below does not leave the new rows unchecked.
+    this.fillImagesInBackground(createdUids);
     await this.recomputeRecentNewsCounts(teamsTouched);
     await this.notifyRun(dto, createdByTeam);
 
@@ -173,6 +181,14 @@ export class TeamNewsService {
     );
 
     return result;
+  }
+
+  private fillImagesInBackground(uids: string[]): void {
+    if (uids.length === 0) return;
+    this.imageService.fillImages(uids).catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Team-news image fill failed: ${message}`);
+    });
   }
 
   private trackCreatedItem(createdByTeam: Map<string, CreatedTeamNews>, item: TeamNewsIngestItem, eventDate: Date) {
@@ -430,9 +446,10 @@ export class TeamNewsService {
   }
 
   /**
-   * Returns true if a new row was inserted, false if an existing row was updated.
+   * Returns the inserted row (its uid) if a new row was inserted, null if an
+   * existing row was updated.
    */
-  private async upsertNewsItem(item: TeamNewsIngestItem, eventDate: Date): Promise<boolean> {
+  private async upsertNewsItem(item: TeamNewsIngestItem, eventDate: Date): Promise<{ uid: string } | null> {
     const incomingUrls = uniqueSourceUrls(item.sourceUrl, item.sourceUrls);
     const primarySourceUrl = incomingUrls[0] ?? item.sourceUrl;
     const normalizedIncomingUrls = new Set(incomingUrls.map((url) => normalizeSourceUrl(url)).filter(Boolean));
@@ -476,7 +493,7 @@ export class TeamNewsService {
 
     if (exactExisting) {
       await this.mergeIntoExisting(exactExisting, item, incomingUrls, data.rawPayload);
-      return false;
+      return null;
     }
 
     /*
@@ -492,7 +509,7 @@ export class TeamNewsService {
         );
       }
       await this.mergeIntoExisting(globalExisting, item, incomingUrls, data.rawPayload);
-      return false;
+      return null;
     }
 
     /*
@@ -545,11 +562,10 @@ export class TeamNewsService {
 
     if (semanticExisting) {
       await this.mergeIntoExisting(semanticExisting, item, incomingUrls, data.rawPayload);
-      return false;
+      return null;
     }
 
-    await this.prisma.teamNewsItem.create({ data });
-    return true;
+    return this.prisma.teamNewsItem.create({ data, select: { uid: true } });
   }
 
   private async recomputeRecentNewsCounts(teamUids: Set<string>) {
@@ -650,6 +666,7 @@ export class TeamNewsService {
       select: { uid: true },
     });
 
+    this.fillImagesInBackground([created.uid]);
     await this.recomputeRecentNewsCounts(new Set([teamUid]));
 
     return { uid: created.uid };
