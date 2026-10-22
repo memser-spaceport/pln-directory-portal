@@ -4746,8 +4746,6 @@ model JobMatchEmailSend {
   @@index([recipientUid])
   @@index([roleUid, recipientUid])
 }
-<<<<<<< Updated upstream
-=======
 
 enum WarmIntrosV2RunStatus {
   RUNNING
@@ -4774,4 +4772,3 @@ model WarmIntrosV2Run {
   @@index([startedAt])
   @@index([investorProfileUid])
 }
->>>>>>> Stashed changes

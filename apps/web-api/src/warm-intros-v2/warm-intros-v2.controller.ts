@@ -21,12 +21,10 @@ import {
   UpsertWarmPathFeedbackDto,
 } from './dto/warm-path-feedback.dto';
 import { UpsertWarmPathNoteDto } from './dto/warm-path-note.dto';
-<<<<<<< Updated upstream
-=======
+
 import { Response } from 'express';
 import { WarmIntrosV2RegenerateService } from './warm-intros-v2-regenerate.service';
 import { WarmIntrosV2RunService } from './warm-intros-v2-run.service';
->>>>>>> Stashed changes
 import { WarmIntrosV2Service } from './warm-intros-v2.service';
 
 const VIEW_PERMS = {
@@ -66,15 +64,9 @@ export class WarmIntrosV2Controller {
   constructor(
     private readonly warmIntrosV2Service: WarmIntrosV2Service,
     private readonly rbacService: RbacService,
-<<<<<<< Updated upstream
-    private readonly accessControlV2Service: AccessControlV2Service
-  ) {}
-
-  @NoCache()
-=======
     private readonly accessControlV2Service: AccessControlV2Service,
     private readonly runs: WarmIntrosV2RunService,
-    private readonly regenerateRuns: WarmIntrosV2RegenerateService,
+    private readonly regenerateRuns: WarmIntrosV2RegenerateService
   ) {}
 
   @NoCache()
@@ -89,7 +81,7 @@ export class WarmIntrosV2Controller {
   @RequirePermissions(EDIT_PERMS)
   async regenerateInvestor(
     @Param('investorProfileUid') investorProfileUid: string,
-    @Res({ passthrough: true }) res: Response,
+    @Res({ passthrough: true }) res: Response
   ) {
     const result = await this.regenerateRuns.regenerate(investorProfileUid);
     res.status(result.status === 'started' ? 202 : 200);
@@ -104,7 +96,6 @@ export class WarmIntrosV2Controller {
   }
 
   @NoCache()
->>>>>>> Stashed changes
   @Get('paths')
   @RequirePermissions(VIEW_PERMS)
   async listPaths(@Query() query: ListWarmPathsV2QueryDto) {
