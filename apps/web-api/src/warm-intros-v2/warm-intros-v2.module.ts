@@ -3,14 +3,24 @@ import { SharedModule } from '../shared/shared.module';
 import { RbacModule } from '../rbac/rbac.module';
 import { AccessControlV2Module } from '../access-control-v2/access-control-v2.module';
 import { ManualFieldLockModule } from '../manual-field-lock/manual-field-lock.module';
+import { DataEnrichmentClientModule } from '../data-enrichment-client/data-enrichment-client.module';
 import { WarmIntrosV2Service } from './warm-intros-v2.service';
+<<<<<<< Updated upstream
+=======
+import { WarmIntrosV2RunService } from './warm-intros-v2-run.service';
+import { WarmIntrosV2RegenerateService } from './warm-intros-v2-regenerate.service';
+>>>>>>> Stashed changes
 import { WarmIntrosV2ServiceController } from './warm-intros-v2-service.controller';
 import { WarmIntrosV2Controller } from './warm-intros-v2.controller';
 
 @Module({
-  imports: [SharedModule, RbacModule, AccessControlV2Module, ManualFieldLockModule],
+  imports: [SharedModule, RbacModule, AccessControlV2Module, ManualFieldLockModule, DataEnrichmentClientModule],
   controllers: [WarmIntrosV2ServiceController, WarmIntrosV2Controller],
+<<<<<<< Updated upstream
   providers: [WarmIntrosV2Service],
+=======
+  providers: [WarmIntrosV2Service, WarmIntrosV2RunService, WarmIntrosV2RegenerateService],
+>>>>>>> Stashed changes
   exports: [WarmIntrosV2Service],
 })
 export class WarmIntrosV2Module {}
