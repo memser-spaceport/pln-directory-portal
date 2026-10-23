@@ -14,6 +14,7 @@ import { TeamNewsSuggestionsService } from './team-news-suggestions.service';
 import { TeamNewsTrendingSeedService } from './team-news-trending-seed.service';
 import { TeamNewsImpressionsService } from './team-news-impressions.service';
 import { TeamNewsPostSummaryService } from './team-news-post-summary.service';
+import { TeamNewsImageService } from './team-news-image.service';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { TeamNewsPostSummaryService } from './team-news-post-summary.service';
     TeamNewsTrendingSeedService,
     TeamNewsImpressionsService,
     TeamNewsPostSummaryService,
+    TeamNewsImageService,
   ],
   exports: [TeamNewsService, TeamNewsQueryService, TeamNewsEnrichmentService, TeamNewsSuggestionsService],
 })

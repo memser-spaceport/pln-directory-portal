@@ -159,6 +159,7 @@ export class TeamNewsEnrichmentService {
           editorialRank: item.editorialRank ?? null,
           viewCount: item.viewCount,
           isTeamPosted: item.postedByMemberUid != null,
+          imageUrl: item.imageUrl ?? null,
         };
       }),
     };

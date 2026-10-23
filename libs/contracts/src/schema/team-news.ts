@@ -86,6 +86,9 @@ export const TeamNewsItemSchema = z.object({
   viewCount: z.number().int().min(0),
   // True when posted from the team profile by a member or directory admin.
   isTeamPosted: z.boolean(),
+  // Absolute https og:image / twitter:image of the source page, captured when
+  // the item is created. Null when the page has none or was not checked yet.
+  imageUrl: z.string().nullable(),
 });
 
 export const CreateTeamNewsPostRequestSchema = z.object({
@@ -415,6 +418,9 @@ export const TeamNewsDigestPicksResponseSchema = z.object({
   until: z.string(),
   windowCount: z.number().int().min(0),
   picks: z.record(z.string(), z.array(TeamNewsItemSchema)),
+  // Lead of the home feed's Top Stories band (editorialRank 1, last 14 days),
+  // shown as the digest's "Top story" card. Null when there is none.
+  topStory: TeamNewsItemSchema.nullable(),
 });
 
 // GET /v1/team-news/latest — ingestion time of the newest news item the public

@@ -12,7 +12,7 @@ import { PrismaService } from '../shared/prisma.service';
 import { AiProviderService } from '../shared/ai-provider.service';
 import { JobOpeningsQueryService } from '../job-openings/job-openings-query.service';
 import { TEAM_NEWS_EXCLUDED_TEAM_NAMES } from '../team-news/team-news-public-list.config';
-import { fetchOgImageUrl } from './og-image';
+import { fetchOgImageUrl } from '../utils/og-image';
 
 const PROVIDER_ENV_VAR = 'NETWORK_OVERVIEW_AI_PROVIDER';
 const NEWS_CANDIDATE_LIMIT = 40;

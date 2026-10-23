@@ -21,9 +21,23 @@ import { buildTeamNewsEventDateWhere } from './team-news-event-date.where';
 import { TEAM_NEWS_EXCLUDED_TEAM_NAMES } from './team-news-public-list.config';
 import { TeamNewsSuggestionsService } from './team-news-suggestions.service';
 import { selectForYouNewsItems } from './select-for-you-news-items';
+import { narrowsNews, readNewsCategories } from './utils/news-categories';
 
 const EMPTY_DISCUSSION: TeamNewsDiscussion = { count: 0, latestTopicUrl: null };
 const POPULAR_WINDOW_DAYS = 14;
+
+// The team fields toDto reads, shared by the digest queries.
+const TEAM_NEWS_TEAM_INCLUDE = Prisma.validator<Prisma.TeamNewsItemInclude>()({
+  team: {
+    select: {
+      uid: true,
+      name: true,
+      logo: { select: { url: true } },
+      teamFocusAreas: { include: { focusArea: true, ancestorArea: true } },
+    },
+  },
+});
+
 const POPULAR_MIN_UPVOTES = 2;
 
 /**
@@ -493,7 +507,7 @@ export class TeamNewsQueryService {
     const since = opts.sinceCreatedAt ?? new Date(until.getTime() - 24 * 60 * 60 * 1000);
     const limit = opts.limit ?? 3;
 
-    const { items } = await this.loadWatermarkWindow(since, until);
+    const [{ items }, topStory] = await Promise.all([this.loadWatermarkWindow(since, until), this.loadTopStory()]);
     const fallback = items.slice(0, limit);
     const uniqueMemberUids = [...new Set(opts.memberUids)];
 
@@ -502,10 +516,19 @@ export class TeamNewsQueryService {
         ? await this.suggestionsService.getForYouTeamUidsForMembers(uniqueMemberUids)
         : new Map<string, string[]>();
 
+    // LAB-2940: members who switched categories off get only the rest, in their
+    // For You picks and in the newest-items fallback alike.
+    const categoriesByMember = await this.loadNarrowingNewsCategories(uniqueMemberUids);
+
     const picks: Record<string, TeamNewsItemDto[]> = {};
     for (const memberUid of uniqueMemberUids) {
-      const forYouItems = selectForYouNewsItems(items, new Set(forYouByMember.get(memberUid) ?? [])).slice(0, limit);
-      picks[memberUid] = forYouItems.length > 0 ? forYouItems : fallback;
+      const categories = categoriesByMember.get(memberUid);
+      const memberItems = categories ? items.filter((item) => categories.has(item.eventType)) : items;
+      const forYouItems = selectForYouNewsItems(memberItems, new Set(forYouByMember.get(memberUid) ?? [])).slice(
+        0,
+        limit
+      );
+      picks[memberUid] = forYouItems.length > 0 ? forYouItems : categories ? memberItems.slice(0, limit) : fallback;
     }
 
     return {
@@ -514,7 +537,45 @@ export class TeamNewsQueryService {
       until: until.toISOString(),
       windowCount: items.length,
       picks,
+      topStory,
     };
+  }
+
+  /**
+   * News categories (LAB-2940) of the members who narrowed them. Members on
+   * every category are left out, so their picks stay exactly as before.
+   */
+  private async loadNarrowingNewsCategories(memberUids: string[]): Promise<Map<string, Set<string>>> {
+    if (memberUids.length === 0) return new Map();
+    const rows = await this.prisma.member.findMany({
+      where: { uid: { in: memberUids } },
+      select: { uid: true, preferences: true },
+    });
+    const result = new Map<string, Set<string>>();
+    for (const row of rows) {
+      const categories = readNewsCategories(row.preferences);
+      if (narrowsNews(categories)) result.set(row.uid, new Set(categories));
+    }
+    return result;
+  }
+
+  /**
+   * The lead of the home feed's Top Stories band: the item the trending seed
+   * ranked 1, within the band's 14-day window. Global, not per member: the
+   * digest shows it as its "Top story" card.
+   */
+  private async loadTopStory(): Promise<TeamNewsItemDto | null> {
+    const excluded = this.excludedTeamsWhere();
+    const since = new Date(Date.now() - POPULAR_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+    const row = await this.prisma.teamNewsItem.findFirst({
+      where: { editorialRank: 1, eventDate: { gte: since }, ...(excluded ?? {}) },
+      orderBy: [{ eventDate: 'desc' }, { createdAt: 'desc' }],
+      include: TEAM_NEWS_TEAM_INCLUDE,
+    });
+    if (!row) return null;
+
+    const [discussions, upvotes] = await Promise.all([this.loadDiscussions([row.uid]), this.loadUpvotes([row.uid])]);
+    return this.toDto(row, discussions.get(row.uid), new Set(), upvotes);
   }
 
   private async loadWatermarkWindow(since: Date, until: Date, limit?: number): Promise<{ items: TeamNewsItemDto[] }> {
@@ -528,16 +589,7 @@ export class TeamNewsQueryService {
       where,
       orderBy: [{ eventDate: 'desc' }, { createdAt: 'desc' }],
       ...(limit !== undefined ? { take: limit } : {}),
-      include: {
-        team: {
-          select: {
-            uid: true,
-            name: true,
-            logo: { select: { url: true } },
-            teamFocusAreas: { include: { focusArea: true, ancestorArea: true } },
-          },
-        },
-      },
+      include: TEAM_NEWS_TEAM_INCLUDE,
     });
 
     const itemUids = rows.map((r) => r.uid);
@@ -718,6 +770,7 @@ export class TeamNewsQueryService {
       editorialRank: number | null;
       viewCount: number;
       postedByMemberUid: string | null;
+      imageUrl: string | null;
       createdAt: Date;
       team: {
         uid: string;
@@ -779,6 +832,7 @@ export class TeamNewsQueryService {
       editorialRank: row.editorialRank ?? null,
       viewCount: row.viewCount,
       isTeamPosted: row.postedByMemberUid != null,
+      imageUrl: row.imageUrl ?? null,
     };
   }
 

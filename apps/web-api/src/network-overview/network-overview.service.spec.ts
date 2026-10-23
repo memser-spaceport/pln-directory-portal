@@ -2,7 +2,7 @@ jest.mock('ai', () => ({
   generateObject: jest.fn(),
 }));
 
-jest.mock('./og-image', () => ({
+jest.mock('../utils/og-image', () => ({
   fetchOgImageUrl: jest.fn(),
 }));
 
@@ -13,7 +13,7 @@ import type { PrismaService } from '../shared/prisma.service';
 import type { AiProviderService } from '../shared/ai-provider.service';
 import type { JobOpeningsQueryService } from '../job-openings/job-openings-query.service';
 import { NetworkOverviewService } from './network-overview.service';
-import { fetchOgImageUrl } from './og-image';
+import { fetchOgImageUrl } from '../utils/og-image';
 
 const generateObjectMock = generateObject as jest.MockedFunction<typeof generateObject>;
 const fetchOgImageUrlMock = fetchOgImageUrl as jest.MockedFunction<typeof fetchOgImageUrl>;
