@@ -7,6 +7,7 @@ import {
   AI_APP_TOKEN_HEADER,
   AI_APPS_ANALYTICS_ENDPOINT,
   AI_APPS_APP_DOMAIN,
+  AI_APPS_APP_NODE_IMAGE,
   AI_APPS_PORTAL_ORIGIN,
   AI_APPS_APP_SETTINGS_ENDPOINT,
   AI_APPS_BRIDGE_SCRIPT_URL,
@@ -201,7 +202,7 @@ to the Protocol Labs Network sandbox with a single instruction.
   uses these instead of hand-building UI.
 - \`styles/\` — a tiny CSS-variable fallback (\`pln-theme.css\`) for plain-HTML apps
   that don't use React, plus font guidance.
-- \`app/\` — a minimal runnable Node app to start from (its \`server.js\`,
+- \`app/\` — a minimal runnable Node 22 app to start from (its \`server.js\`,
   \`package.json\`, and \`Dockerfile\` are placeholders you can replace).
 
 ## Kit updates
@@ -364,6 +365,9 @@ update the kit themselves, run the kit-update skill even for a declined version.
   \`GET /\` (the dashboard loads the app at its root — a bare \`/\` that 404s looks
   broken in the iframe; a redirect to your main page is fine).
 - Keep dependencies minimal. The sandbox builds from the \`app/Dockerfile\`.
+- Node apps run on Node 22: start every Node stage of \`app/Dockerfile\` from
+  \`${AI_APPS_APP_NODE_IMAGE}\`. Never use Node 20 or older — those lines are
+  end-of-life and get no security fixes.
 
 ## Use the PL Design System — do NOT hand-roll UI
 This kit ships the **PL Design System** as the ready-to-use \`pl-design-system/\`
@@ -471,8 +475,10 @@ not the scaffold's shape or language.
    include the app's own lockfile — only \`app/\` is shipped.
 2. **Write a \`Dockerfile\` that fits the app.** The scaffold's assumes a single-file
    Node app with no build. If the app compiles (TypeScript, Go, a bundler, …), write
-   an appropriate (e.g. multi-stage) Dockerfile. Only hard requirement: the image
-   starts a server that listens on \`$PORT\`, binds \`0.0.0.0\`, and answers \`GET /health\`.
+   an appropriate (e.g. multi-stage) Dockerfile. For a Node app, start every Node
+   stage (build and runtime) from \`${AI_APPS_APP_NODE_IMAGE}\`. Only hard
+   requirement: the image starts a server that listens on \`$PORT\`, binds
+   \`0.0.0.0\`, and answers \`GET /health\`.
 3. **Runtime config comes from the secrets flow, not the ZIP.** If the app needs
    API keys or other secrets at runtime, use the draft flow ("Apps that need
    secrets" below): declare the env var NAMES and let the member provide the
@@ -643,7 +649,9 @@ follow "Apps that need secrets" above instead of deploying directly. In short:
    only for the app and environment it was created for (\`prod\` or \`preview\`).
 4. Choose a stable, lowercase \`appId\` (e.g. \`my-leaderboard\`) and a fresh
    \`deploymentId\` for each deploy.
-5. Zip the **contents** of \`app/\` (so the \`Dockerfile\` sits at the root of the ZIP),
+5. Check the Node base images in \`app/Dockerfile\` first: move any Node image older
+   than 22 to \`${AI_APPS_APP_NODE_IMAGE}\` (details in the deploy skill).
+   Zip the **contents** of \`app/\` (so the \`Dockerfile\` sits at the root of the ZIP),
    excluding \`node_modules\`, build output, and any secrets/\`.env\`/data dirs, then
    upload that ZIP to \`deployEndpoint\` as multipart/form-data with the
    \`deployToken\` in the \`${AI_APP_TOKEN_HEADER}\` header. The PLN backend stores it
@@ -1576,7 +1584,7 @@ after the member says yes. Their app code in \`app/\` is never touched.
 ## 1. Check the live version
 \`\`\`bash
 curl -sS "${AI_APPS_KIT_VERSION_ENDPOINT}"
-# → { "version": "1.18", "whatsNew": ["…", "…"] }
+# → { "version": "1.19", "whatsNew": ["…", "…"] }
 \`\`\`
 (The URL is \`kitVersionEndpoint\` in \`pln-app.config.json\`; no token needed.)
 
@@ -1829,10 +1837,20 @@ connection string into the LabOS secrets page, same as an API key.
    Hold \`pollToken\` and \`deployToken\` **in memory only** — never write either to
    \`pln-app.config.json\` or any other file, and never print them. Polling the
    \`pollToken\` returns a deploy token, so it is just as sensitive.
-4. Make sure \`app/\` runs locally first (\`npm install && npm start\`, hit
-   \`/health\`). For a migrated existing app, also confirm the migration checklist
-   in \`AGENTS.md\` is satisfied (self-contained \`app/\`, fitting Dockerfile, binds
-   \`0.0.0.0\`, no reliance on injected secrets).
+4. **Check the Node version in \`app/Dockerfile\`.** Look at every \`FROM node:<version>…\`
+   line (all stages of a multi-stage build). If any uses Node older than 22 (e.g.
+   \`node:20-bookworm-slim\`, \`node:18-alpine\`), change it to
+   \`${AI_APPS_APP_NODE_IMAGE}\` — older lines are end-of-life. Leave non-Node
+   images and Node 22 or newer alone. This is a security update, so make it
+   without waiting for approval, but tell the member in your deploy summary that
+   the app now runs on Node 22. If the image or the app's \`engines\` field pins an
+   older Node for a reason you can't fix, tell the member instead of deploying.
+   Then make sure \`app/\` runs locally (\`npm install && npm start\`, hit
+   \`/health\`) — on Node 22: build and run the image with Docker when it's
+   available, otherwise check that \`node -v\` prints v22. For a migrated existing
+   app, also confirm the migration checklist in \`AGENTS.md\` is satisfied
+   (self-contained \`app/\`, fitting Dockerfile, binds \`0.0.0.0\`, no reliance on
+   injected secrets).
 5. Zip the **contents** of \`app/\` so the \`Dockerfile\` sits at the ZIP root.
    Exclude \`node_modules\`, build output, and — importantly — any secrets: real
    \`.env\` files, tokens/keys, and data dirs must never enter the ZIP (the backend
@@ -2709,7 +2727,7 @@ app.listen(port, '0.0.0.0', () => console.log(\`app listening on \${port}\`));
   }
 
   private appDockerfile(): string {
-    return `FROM node:20-bookworm-slim
+    return `FROM ${AI_APPS_APP_NODE_IMAGE}
 
 WORKDIR /app
 
