@@ -117,6 +117,24 @@ describe('OfficeHoursService link check', () => {
     });
   });
 
+  it('offers every checked address to the connection, so Node can fall back between them', async () => {
+    const checked = [
+      { address: '2606:4700:4700::1111', family: 6 },
+      { address: '93.184.216.34', family: 4 },
+    ];
+    lookupMock.mockResolvedValue(checked);
+    await service.checkLink('https://calendly.com/someone');
+    const all = jest.fn();
+    getMock.mock.calls[0][1].httpsAgent.options.lookup('calendly.com', { all: true }, all);
+    expect(all).toHaveBeenCalledWith(null, checked);
+  });
+
+  it('returns BROKEN when the host name resolves to a NAT64 form of an internal address', async () => {
+    lookupMock.mockResolvedValue([{ address: '64:ff9b::a9fe:a9fe', family: 6 }]);
+    expect(await service.checkLink('https://calendly.com/someone')).toBe('BROKEN');
+    expect(getMock).not.toHaveBeenCalled();
+  });
+
   describe('links rejected before any request', () => {
     it.each([
       'http://calendly.com/someone',

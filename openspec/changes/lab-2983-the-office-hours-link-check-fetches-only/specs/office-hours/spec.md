@@ -22,7 +22,7 @@ The link check SHALL return `NOT_FOUND` for an empty link, `OK` when the link an
 
 ### Requirement: Only public https links are fetched
 
-The link check SHALL send a request only to an https URL on the default port whose host is a name (not an IP literal, not `localhost`) that resolves only to public addresses. The request SHALL connect to the checked address. A link that fails SHALL be `BROKEN` and SHALL get no request. Loopback, private, link-local, CGNAT, unique-local, IPv4-mapped, documentation, benchmarking, multicast and unspecified addresses are not public.
+The link check SHALL send a request only to an https URL on the default port whose host is a name (not an IP literal, not `localhost`) that resolves only to public addresses. The request SHALL connect to the checked address. A link that fails SHALL be `BROKEN` and SHALL get no request. Loopback, private, link-local, CGNAT, unique-local, documentation, benchmarking, multicast and unspecified addresses, and IPv6 forms that carry an IPv4 address, are not public.
 
 #### Scenario: A link to an internal address
 

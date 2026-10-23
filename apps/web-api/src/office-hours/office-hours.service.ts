@@ -30,15 +30,15 @@ import { MemberInteractionAdjustmentsService } from '../member-interaction-adjus
 const OH_LINK_MAX_REDIRECTS = 5;
 const OH_LINK_TIMEOUT_MS = 8000;
 
-// Connect to the address that passed the check, whatever DNS answers later;
-// the host name still goes into SNI and the certificate check.
-function pinnedHttpsAgent({ address, family }: LookupAddress): Agent {
+// Connect only to the addresses that passed the check, whatever DNS answers
+// later; the host name still goes into SNI and the certificate check.
+function pinnedHttpsAgent(addresses: LookupAddress[]): Agent {
   return new Agent({
     lookup: (_hostname, options, callback) => {
       if ((options as { all?: boolean })?.all) {
-        (callback as unknown as (err: null, addresses: LookupAddress[]) => void)(null, [{ address, family }]);
+        (callback as unknown as (err: null, addresses: LookupAddress[]) => void)(null, addresses);
       } else {
-        callback(null, address, family);
+        callback(null, addresses[0].address, addresses[0].family);
       }
     },
   });
@@ -195,7 +195,7 @@ export class OfficeHoursService {
           timeout: OH_LINK_TIMEOUT_MS,
           validateStatus: () => true,
           proxy: false,
-          httpsAgent: pinnedHttpsAgent(addresses[0]),
+          httpsAgent: pinnedHttpsAgent(addresses),
         });
         const status = response.status;
         const location = response.headers?.location;

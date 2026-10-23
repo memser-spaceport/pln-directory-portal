@@ -130,16 +130,26 @@ describe('isNonPublicAddress', () => {
     '198.51.100.7',
     '203.0.113.9',
     'fec0::1',
+    '::7f00:1',
+    '::127.0.0.1',
+    '64:ff9b::a9fe:a9fe',
+    '2002:7f00:1::1',
+    '2001:0:4136:e378::1',
+    '2001:db8::1',
   ])('treats %s as non-public', (ip) => {
     expect(isNonPublicAddress(ip)).toBe(true);
   });
 
-  it.each(['93.184.216.34', '8.8.8.8', '2606:4700:4700::1111', '::ffff:5db8:d822', '198.20.0.1'])(
-    'treats %s as public',
-    (ip) => {
-      expect(isNonPublicAddress(ip)).toBe(false);
-    }
-  );
+  it.each([
+    '93.184.216.34',
+    '8.8.8.8',
+    '2606:4700:4700::1111',
+    '::ffff:5db8:d822',
+    '198.20.0.1',
+    '2001:4860:4860::8888',
+  ])('treats %s as public', (ip) => {
+    expect(isNonPublicAddress(ip)).toBe(false);
+  });
 });
 
 describe('fetchOgImageUrl', () => {

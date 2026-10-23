@@ -101,7 +101,8 @@ function pageHost(url: URL): string {
 
 /**
  * True for loopback, private, link-local, CGNAT, benchmarking, documentation,
- * multicast, reserved and unspecified addresses.
+ * multicast, reserved and unspecified addresses, and for IPv6 forms that carry
+ * an IPv4 address (mapped, compatible, NAT64, 6to4, Teredo).
  */
 export function isNonPublicAddress(address: string): boolean {
   const ip = address.toLowerCase();
@@ -134,7 +135,19 @@ export function isNonPublicAddress(address: string): boolean {
     );
   }
   if (isIP(ip) === 6) {
-    return ip === '::' || ip === '::1' || /^f[cd]/.test(ip) || /^fe[89a-f]/.test(ip) || ip.startsWith('ff');
+    return (
+      ip === '::' ||
+      ip === '::1' ||
+      // IPv4-compatible (::a.b.c.d), NAT64 (64:ff9b::/96), 6to4 (2002::/16), Teredo and documentation (2001:db8::/32)
+      /^::[0-9a-f.:]+$/.test(ip) ||
+      ip.startsWith('64:ff9b:') ||
+      ip.startsWith('2002:') ||
+      /^2001:0{0,4}:/.test(ip) ||
+      ip.startsWith('2001:db8:') ||
+      /^f[cd]/.test(ip) ||
+      /^fe[89a-f]/.test(ip) ||
+      ip.startsWith('ff')
+    );
   }
   return true;
 }
