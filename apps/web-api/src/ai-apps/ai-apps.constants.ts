@@ -11,7 +11,10 @@
  */
 
 /** Starter kit version shown in the README, ZIP filename, and LabOS UI. Bump when the kit contents or flow change. */
-export const AI_APPS_STARTER_KIT_VERSION = '1.18';
+export const AI_APPS_STARTER_KIT_VERSION = '1.19';
+
+/** Base image for Node apps built from the kit: the scaffold `app/Dockerfile` and the agent instructions. */
+export const AI_APPS_APP_NODE_IMAGE = 'node:22.23.4-bookworm-slim';
 
 /**
  * Member-readable notes for the CURRENT kit version, served by the open
@@ -19,7 +22,7 @@ export const AI_APPS_STARTER_KIT_VERSION = '1.18';
  * before offering it. Replace (don't append) when bumping the version.
  */
 export const AI_APPS_STARTER_KIT_WHATS_NEW: string[] = [
-  'When your app checks the signed-in member from its own server, it now names itself, so LabOS refuses a session meant for another app.',
+  'Apps now build on Node 22 (Node 20 is end-of-life). On your next deploy, your agent moves your app to Node 22 and checks that it still runs.',
 ];
 
 /** Max members on one private app's whitelist (the owner and directory admins never count). */
