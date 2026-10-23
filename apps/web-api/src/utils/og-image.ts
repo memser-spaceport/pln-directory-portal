@@ -1,4 +1,4 @@
-import { promises as dns } from 'dns';
+import { LookupAddress, promises as dns } from 'dns';
 import { isIP } from 'net';
 
 /**
@@ -99,15 +99,25 @@ function pageHost(url: URL): string {
     .replace(/\.$/, '');
 }
 
-/** True for loopback, private, link-local, CGNAT, multicast and unspecified addresses. */
+/**
+ * True for loopback, private, link-local, CGNAT, benchmarking, documentation,
+ * multicast, reserved and unspecified addresses.
+ */
 export function isNonPublicAddress(address: string): boolean {
   const ip = address.toLowerCase();
-  const mappedV4 = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(ip);
+  const mappedV4 = /^(?:::|(?:0{1,4}:){5})ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(ip);
   if (mappedV4) {
     return isNonPublicAddress(mappedV4[1]);
   }
+  // IPv4-mapped IPv6 in hex form, e.g. ::ffff:7f00:1 is 127.0.0.1.
+  const mappedV4Hex = /^(?:::|(?:0{1,4}:){5})ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(ip);
+  if (mappedV4Hex) {
+    const high = parseInt(mappedV4Hex[1], 16);
+    const low = parseInt(mappedV4Hex[2], 16);
+    return isNonPublicAddress([high >> 8, high & 0xff, low >> 8, low & 0xff].join('.'));
+  }
   if (isIP(ip) === 4) {
-    const [a, b] = ip.split('.').map(Number);
+    const [a, b, c] = ip.split('.').map(Number);
     return (
       a === 0 ||
       a === 10 ||
@@ -115,24 +125,36 @@ export function isNonPublicAddress(address: string): boolean {
       (a === 100 && b >= 64 && b <= 127) ||
       (a === 169 && b === 254) ||
       (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 0 && (c === 0 || c === 2)) ||
       (a === 192 && b === 168) ||
+      (a === 198 && (b === 18 || b === 19)) ||
+      (a === 198 && b === 51 && c === 100) ||
+      (a === 203 && b === 0 && c === 113) ||
       a >= 224
     );
   }
   if (isIP(ip) === 6) {
-    return ip === '::' || ip === '::1' || /^f[cd]/.test(ip) || /^fe[89ab]/.test(ip) || ip.startsWith('ff');
+    return ip === '::' || ip === '::1' || /^f[cd]/.test(ip) || /^fe[89a-f]/.test(ip) || ip.startsWith('ff');
   }
   return true;
 }
 
-// A public host name can still resolve to an internal address.
-async function resolvesToPublicAddresses(pageUrl: string): Promise<boolean> {
+/**
+ * Resolve the URL's host and return its addresses, or null when it does not
+ * resolve or any address is non-public: a public host name can still resolve
+ * to an internal address.
+ */
+export async function resolvePublicAddresses(pageUrl: string): Promise<LookupAddress[] | null> {
   try {
     const addresses = await dns.lookup(pageHost(new URL(pageUrl)), { all: true });
-    return addresses.length > 0 && addresses.every((entry) => !isNonPublicAddress(entry.address));
+    return addresses.length > 0 && addresses.every((entry) => !isNonPublicAddress(entry.address)) ? addresses : null;
   } catch {
-    return false;
+    return null;
   }
+}
+
+async function resolvesToPublicAddresses(pageUrl: string): Promise<boolean> {
+  return (await resolvePublicAddresses(pageUrl)) !== null;
 }
 
 // Read at most OG_MAX_HTML_CHARS of the body: the meta tags are in the head.

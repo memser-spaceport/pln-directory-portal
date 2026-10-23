@@ -20,9 +20,29 @@ import {
   OFFICE_HOURS_ACTIONS,
 } from '../utils/constants';
 import axios from 'axios';
+import { LookupAddress } from 'dns';
+import { Agent } from 'https';
+import { isAllowedOgPageUrl, resolvePublicAddresses } from '../utils/og-image';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { MembersService } from '../members/members.service';
 import { MemberInteractionAdjustmentsService } from '../member-interaction-adjustments/member-interaction-adjustments.service';
+
+const OH_LINK_MAX_REDIRECTS = 5;
+const OH_LINK_TIMEOUT_MS = 8000;
+
+// Connect to the address that passed the check, whatever DNS answers later;
+// the host name still goes into SNI and the certificate check.
+function pinnedHttpsAgent({ address, family }: LookupAddress): Agent {
+  return new Agent({
+    lookup: (_hostname, options, callback) => {
+      if ((options as { all?: boolean })?.all) {
+        (callback as unknown as (err: null, addresses: LookupAddress[]) => void)(null, [{ address, family }]);
+      } else {
+        callback(null, address, family);
+      }
+    },
+  });
+}
 
 @Injectable()
 export class OfficeHoursService {
@@ -38,7 +58,7 @@ export class OfficeHoursService {
     private readonly notificationClient: NotificationServiceClient,
     @Inject(forwardRef(() => MembersService))
     private readonly membersService: MembersService,
-    private readonly adjustmentsService: MemberInteractionAdjustmentsService,
+    private readonly adjustmentsService: MemberInteractionAdjustmentsService
   ) {}
 
   async createInteraction(interaction: Prisma.MemberInteractionUncheckedCreateInput, loggedInMember) {
@@ -152,15 +172,40 @@ export class OfficeHoursService {
     }
   }
 
+  /**
+   * Office-hours links are member-supplied, so only public https URLs are
+   * fetched: each hop passes isAllowedOgPageUrl (https, default port, no
+   * IP-literal or localhost host) and must resolve only to public addresses,
+   * and the request is pinned to the checked address so DNS cannot change it.
+   * Redirects are followed by hand so that every hop gets the same check.
+   */
   async checkLink(link: string): Promise<'OK' | 'BROKEN' | 'NOT_FOUND'> {
     if (!link) return 'NOT_FOUND';
 
-    const normalizedLink = this.normalizeUrl(link);
+    let currentUrl = this.normalizeUrl(link);
 
     try {
-      const response = await axios.get(normalizedLink, { maxRedirects: 5, timeout: 8000, validateStatus: () => true });
-      const status = response.status;
-      return status >= 200 && status < 400 ? 'OK' : 'BROKEN';
+      for (let hop = 0; hop <= OH_LINK_MAX_REDIRECTS; hop++) {
+        if (!isAllowedOgPageUrl(currentUrl)) return 'BROKEN';
+        const addresses = await resolvePublicAddresses(currentUrl);
+        if (!addresses) return 'BROKEN';
+
+        const response = await axios.get(currentUrl, {
+          maxRedirects: 0,
+          timeout: OH_LINK_TIMEOUT_MS,
+          validateStatus: () => true,
+          proxy: false,
+          httpsAgent: pinnedHttpsAgent(addresses[0]),
+        });
+        const status = response.status;
+        const location = response.headers?.location;
+        if (status >= 300 && status < 400 && location) {
+          currentUrl = new URL(location, currentUrl).href;
+          continue;
+        }
+        return status >= 200 && status < 400 ? 'OK' : 'BROKEN';
+      }
+      return 'BROKEN';
     } catch (e) {
       return 'BROKEN';
     }
@@ -430,8 +475,8 @@ export class OfficeHoursService {
 
     let normalizedLink = link.trim();
 
-    // Add protocol if missing
-    if (!normalizedLink.match(/^https?:\/\//i)) {
+    // Add protocol if missing; a link with another scheme keeps it and fails the https check
+    if (!normalizedLink.match(/^[a-z][a-z0-9+.-]*:\/\//i)) {
       normalizedLink = `https://${normalizedLink}`;
     }
 
