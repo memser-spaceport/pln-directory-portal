@@ -110,7 +110,7 @@
     "crypto-browserify": "^3.11.0",
     "csv-parse": "^6.1.0",
     "cuid": "^2.1.8",
-    "handlebars": "^4.7.8",
+    "handlebars": "^4.7.10",
     "helmet": "^6.0.0",
     "i18n-iso-countries": "^7.14.0",
     "iconv-lite": "0.4.24",
