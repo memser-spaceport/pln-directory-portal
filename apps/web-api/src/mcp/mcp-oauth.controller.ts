@@ -1,7 +1,9 @@
-import { Body, Controller, Get, Header, Post, Query, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, Header, Param, Post, Query, Req, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 import { NoCache } from '../decorators/no-cache.decorator';
+import { MCP_CLIENT_REGISTER_LIMIT, MCP_CLIENT_REGISTER_TTL_SECONDS } from './mcp.constants';
 import { McpOAuthService } from './mcp-oauth.service';
 
 @ApiTags('MCP OAuth')
@@ -32,11 +34,20 @@ export class McpOAuthController {
 
   @NoCache()
   @Post('register')
+  @Throttle(MCP_CLIENT_REGISTER_LIMIT, MCP_CLIENT_REGISTER_TTL_SECONDS)
   async register(@Body() body: Record<string, unknown>) {
     return this.oauth.registerClient({
       client_name: typeof body.client_name === 'string' ? body.client_name : undefined,
       redirect_uris: Array.isArray(body.redirect_uris) ? body.redirect_uris.map(String) : undefined,
     });
+  }
+
+  @NoCache()
+  @Get('oauth/clients/:clientId')
+  @Header('Cache-Control', 'no-store')
+  clientInfo(@Param('clientId') clientId: string, @Query('redirect_uri') redirectUri?: string | string[]) {
+    const uri = Array.isArray(redirectUri) ? redirectUri[0] : redirectUri;
+    return this.oauth.getClientInfo(clientId, uri);
   }
 
   @NoCache()

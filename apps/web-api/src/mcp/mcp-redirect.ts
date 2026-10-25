@@ -38,6 +38,15 @@ export function isAllowedRedirectUri(uri: string): boolean {
   return Boolean(parsed.hostname || parsed.pathname);
 }
 
+/** Host of an http(s) redirect. Private-use schemes such as cursor:// return null. */
+export function httpRedirectHost(uri: string): string | null {
+  const parsed = parseRedirectUri(uri);
+  if (!parsed || (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')) {
+    return null;
+  }
+  return parsed.hostname || null;
+}
+
 export function isRegisteredRedirectUri(uri: string, registered: string[]): boolean {
   if (!isAllowedRedirectUri(uri)) {
     return false;

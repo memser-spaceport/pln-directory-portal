@@ -2,8 +2,23 @@ jest.mock('../analytics/service/analytics.service', () => ({
   AnalyticsService: jest.fn(),
 }));
 
-import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import 'reflect-metadata';
+import {
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  NotFoundException,
+  RequestMethod,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
+import { McpOAuthController } from './mcp-oauth.controller';
 import { McpOAuthService } from './mcp-oauth.service';
+import {
+  MCP_CLIENT_REGISTER_LIMIT,
+  MCP_CLIENT_REGISTER_TOTAL_CAP,
+  MCP_CLIENT_REGISTER_TTL_SECONDS,
+} from './mcp.constants';
 import { hashSecret, pkceS256Challenge } from './mcp.crypto';
 
 const MEMBER = { uid: 'member-1', name: 'Ada', email: 'ada@example.com' };
@@ -23,6 +38,7 @@ function buildService(
     mcpOAuthClient: {
       create: jest.fn().mockImplementation(async ({ data }) => data),
       findUnique: jest.fn().mockResolvedValue(CLIENT),
+      count: jest.fn().mockResolvedValue(0),
     },
     mcpAuthorization: {
       upsert: jest.fn().mockResolvedValue({ uid: 'auth-1', memberUid: MEMBER.uid, clientId: CLIENT.clientId }),
@@ -100,6 +116,106 @@ describe('McpOAuthService', () => {
     await expect(
       service.registerClient({ client_name: 'Evil', redirect_uris: ['http://evil.example/callback'] })
     ).rejects.toThrow('redirect_uris');
+  });
+
+  it('rejects registration when the client table is at the cap', async () => {
+    const { service, prisma } = buildService();
+    prisma.mcpOAuthClient.count.mockResolvedValue(MCP_CLIENT_REGISTER_TOTAL_CAP);
+    await expect(
+      service.registerClient({ client_name: 'One more', redirect_uris: ['http://127.0.0.1:9/cb'] })
+    ).rejects.toBeInstanceOf(HttpException);
+    await expect(
+      service.registerClient({ client_name: 'One more', redirect_uris: ['http://127.0.0.1:9/cb'] })
+    ).rejects.toMatchObject({ status: HttpStatus.TOO_MANY_REQUESTS });
+    expect(prisma.mcpOAuthClient.create).not.toHaveBeenCalled();
+  });
+
+  it('registers when the client table is under the cap', async () => {
+    const { service, prisma } = buildService();
+    prisma.mcpOAuthClient.count.mockResolvedValue(MCP_CLIENT_REGISTER_TOTAL_CAP - 1);
+    await expect(
+      service.registerClient({ client_name: 'Ok', redirect_uris: ['http://127.0.0.1:9/cb'] })
+    ).resolves.toMatchObject({ client_name: 'Ok' });
+    expect(prisma.mcpOAuthClient.create).toHaveBeenCalled();
+  });
+
+  it('limits registration to 5 per hour per IP', () => {
+    const handler = McpOAuthController.prototype.register;
+    expect(Reflect.getMetadata('THROTTLER:LIMIT', handler)).toBe(MCP_CLIENT_REGISTER_LIMIT);
+    expect(Reflect.getMetadata('THROTTLER:TTL', handler)).toBe(MCP_CLIENT_REGISTER_TTL_SECONDS);
+  });
+
+  it('exposes the registered client name and redirect host', async () => {
+    const { service } = buildService();
+    const handler = McpOAuthController.prototype.clientInfo;
+    expect(Reflect.getMetadata(PATH_METADATA, handler)).toBe('oauth/clients/:clientId');
+    expect(Reflect.getMetadata(METHOD_METADATA, handler)).toBe(RequestMethod.GET);
+
+    await expect(service.getClientInfo(CLIENT.clientId, CLIENT.redirectUris[0])).resolves.toEqual({
+      client_id: CLIENT.clientId,
+      client_name: 'Claude Code',
+      redirect_host: '127.0.0.1',
+      redirect_uri_registered: true,
+    });
+  });
+
+  it('returns the https host when that redirect is registered', async () => {
+    const { service, prisma } = buildService();
+    const redirect = 'https://www.cursor.com/agents/mcp/oauth/callback';
+    prisma.mcpOAuthClient.findUnique.mockResolvedValue({ ...CLIENT, redirectUris: [redirect] });
+    await expect(service.getClientInfo(CLIENT.clientId, redirect)).resolves.toMatchObject({
+      redirect_host: 'www.cursor.com',
+      redirect_uri_registered: true,
+    });
+  });
+
+  it('returns no host for a registered private-use redirect', async () => {
+    const { service, prisma } = buildService();
+    const redirect = 'cursor://anysphere.cursor-mcp/oauth/callback';
+    prisma.mcpOAuthClient.findUnique.mockResolvedValue({ ...CLIENT, redirectUris: [redirect] });
+    await expect(service.getClientInfo(CLIENT.clientId, redirect)).resolves.toEqual({
+      client_id: CLIENT.clientId,
+      client_name: 'Claude Code',
+      redirect_host: null,
+      redirect_uri_registered: true,
+    });
+  });
+
+  it('returns no host when the redirect is not registered', async () => {
+    const { service } = buildService();
+    await expect(service.getClientInfo(CLIENT.clientId, 'https://evil.example/cb')).resolves.toEqual({
+      client_id: CLIENT.clientId,
+      client_name: 'Claude Code',
+      redirect_host: null,
+      redirect_uri_registered: false,
+    });
+    await expect(service.getClientInfo(CLIENT.clientId, 'javascript:alert(1)')).resolves.toMatchObject({
+      redirect_host: null,
+      redirect_uri_registered: false,
+    });
+  });
+
+  it('returns 404 for an unknown client and 400 when redirect_uri is missing', async () => {
+    const { service, prisma } = buildService();
+    prisma.mcpOAuthClient.findUnique.mockResolvedValue(null);
+    await expect(service.getClientInfo('missing', 'https://example.com/cb')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.getClientInfo(CLIENT.clientId, '  ')).rejects.toThrow('redirect_uri');
+  });
+
+  it('omits client_name from the consent redirect', async () => {
+    const { service } = buildService();
+    const location = await service.buildConsentRedirect({
+      client_id: CLIENT.clientId,
+      redirect_uri: CLIENT.redirectUris[0],
+      code_challenge: 'abc',
+      state: 'xyz',
+    });
+    const url = new URL(location);
+    expect(`${url.origin}${url.pathname}`).toBe('https://labos.example.com/mcp/authorize');
+    expect(url.searchParams.get('client_id')).toBe(CLIENT.clientId);
+    expect(url.searchParams.get('client_name')).toBeNull();
+    expect(url.searchParams.get('redirect_uri')).toBe(CLIENT.redirectUris[0]);
+    expect(url.searchParams.get('state')).toBe('xyz');
   });
 
   it('refuses approve without mcp.connect', async () => {
