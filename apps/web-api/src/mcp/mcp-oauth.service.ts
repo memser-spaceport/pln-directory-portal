@@ -1,4 +1,13 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../shared/prisma.service';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
@@ -8,6 +17,7 @@ import { ANALYTICS_EVENTS } from '../utils/constants';
 import {
   MCP_ACCESS_TOKEN_TTL_SEC,
   MCP_AUTH_CODE_TTL_MS,
+  MCP_CLIENT_REGISTER_TOTAL_CAP,
   MCP_CONNECT_PERMISSION,
   MCP_REFRESH_TOKEN_TTL_MS,
   MCP_SCOPE,
@@ -17,7 +27,8 @@ import {
   mcpResourceUrl,
 } from './mcp.constants';
 import { generateSecret, hashSecret, verifyPkceS256 } from './mcp.crypto';
-import { isAllowedRedirectUri, isRegisteredRedirectUri } from './mcp-redirect';
+import { httpRedirectHost, isAllowedRedirectUri, isRegisteredRedirectUri } from './mcp-redirect';
+import { McpOAuthClientInfoDto } from './dto/mcp-oauth-client-info.dto';
 
 export type McpTokenActor = {
   authorizationUid: string;
@@ -135,6 +146,11 @@ export class McpOAuthService {
       throw new BadRequestException('redirect_uris must be loopback, https, or a private-use URI scheme');
     }
 
+    const clientCount = await this.prisma.mcpOAuthClient.count();
+    if (clientCount >= MCP_CLIENT_REGISTER_TOTAL_CAP) {
+      throw new HttpException('Client registration limit reached', HttpStatus.TOO_MANY_REQUESTS);
+    }
+
     const clientId = generateSecret(MCP_TOKEN_PREFIX.client);
     const clientName = (body.client_name || 'MCP client').trim().slice(0, 120);
 
@@ -180,11 +196,34 @@ export class McpOAuthService {
     params.set('redirect_uri', redirectUri);
     params.set('code_challenge', challenge);
     params.set('code_challenge_method', 'S256');
-    params.set('client_name', client.clientName);
     if (query.state) params.set('state', query.state);
     if (query.resource) params.set('resource', query.resource);
     if (query.scope) params.set('scope', query.scope);
     return `${mcpConsentUrl()}?${params.toString()}`;
+  }
+
+  async getClientInfo(clientId: string, redirectUri: string | undefined): Promise<McpOAuthClientInfoDto> {
+    const id = clientId?.trim();
+    const uri = redirectUri?.trim();
+    if (!id) {
+      throw new BadRequestException('client_id is required');
+    }
+    if (!uri) {
+      throw new BadRequestException('redirect_uri is required');
+    }
+
+    const client = await this.prisma.mcpOAuthClient.findUnique({ where: { clientId: id } });
+    if (!client) {
+      throw new NotFoundException('Unknown client_id');
+    }
+
+    const registered = isRegisteredRedirectUri(uri, client.redirectUris);
+    return {
+      client_id: client.clientId,
+      client_name: client.clientName,
+      redirect_host: registered ? httpRedirectHost(uri) : null,
+      redirect_uri_registered: registered,
+    };
   }
 
   async approve(memberUid: string, input: ApproveInput): Promise<{ redirectUrl: string }> {
