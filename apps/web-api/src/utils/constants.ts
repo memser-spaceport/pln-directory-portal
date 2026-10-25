@@ -7,63 +7,88 @@ export enum APP_ENV {
   UAT = 'uat',
 }
 
-export const ALLOWED_CORS_ORIGINS = {
+const HTTP_LOCALHOST_ORIGIN = /^http:\/\/localhost(?::\d+)?$/;
+const HTTPS_SPACEPORT_VERCEL_ORIGIN = /^https:\/\/(?:[a-z0-9-]+\.)*[a-z0-9-]+-protocol-labs-spaceport\.vercel\.app$/;
+const HTTPS_FEATURE_PLNETWORK_ORIGIN = /^https:\/\/(?:[a-z0-9-]+\.)*[a-z0-9-]+-[a-z0-9-]+\.plnetwork\.io$/;
+
+function httpsOrigin(host: string): string {
+  return `https://${host}`;
+}
+
+function httpsDomain(domain: string): RegExp {
+  const escaped = domain.replace(/\./g, '\\.');
+  return new RegExp(`^https://(?:[a-z0-9-]+\\.)*${escaped}$`);
+}
+
+function httpsSubdomains(domain: string): RegExp {
+  const escaped = domain.replace(/\./g, '\\.');
+  return new RegExp(`^https://(?:[a-z0-9-]+\\.)+${escaped}$`);
+}
+
+export const ALLOWED_CORS_ORIGINS: Record<APP_ENV, Array<string | RegExp>> = {
   [APP_ENV.DEV]: [
-    /localhost/,
-    /app.forestadmin.com/,
-    /.-protocol-labs-spaceport.vercel.app/,
-    /protocol-labs-network-lk82taf1j-protocol-labs-spaceport.vercel.app/,
-    /protocol-labs-network-web-admin.vercel.app/,
-    /dev.plnetwork.io/,
-    /dev-admin.plnetwork.io/,
-    /uat.plnetwork.io/,
-    /uat-auth-admin.plnetwork.io/,
-    /uat-auth-app.plnetwork.io/,
-    /uat-analytics.plnetwork.io/,
-    /uat-admin.plnetwork.io/,
-    /staging.plnetwork.io/,
-    /dev-auth-admin.plnetwork.io/,
-    /dev-auth-app.plnetwork.io/,
-    /dev-analytics.plnetwork.io/,
-    /staging-admin.plnetwork.io/,
-    /protocol-ai-git-fix-home-page-polaris-01.vercel.app/,
-    'https://os.pl.xyz',
-    /\.os\.pl\.xyz$/,
+    HTTP_LOCALHOST_ORIGIN,
+    httpsOrigin('app.forestadmin.com'),
+    HTTPS_SPACEPORT_VERCEL_ORIGIN,
+    httpsOrigin('protocol-labs-network-lk82taf1j-protocol-labs-spaceport.vercel.app'),
+    httpsOrigin('protocol-labs-network-web-admin.vercel.app'),
+    httpsDomain('dev.plnetwork.io'),
+    httpsOrigin('dev-admin.plnetwork.io'),
+    httpsOrigin('uat.plnetwork.io'),
+    httpsOrigin('uat-auth-admin.plnetwork.io'),
+    httpsOrigin('uat-auth-app.plnetwork.io'),
+    httpsOrigin('uat-analytics.plnetwork.io'),
+    httpsOrigin('uat-admin.plnetwork.io'),
+    httpsOrigin('staging.plnetwork.io'),
+    httpsOrigin('dev-auth-admin.plnetwork.io'),
+    httpsOrigin('dev-auth-app.plnetwork.io'),
+    httpsOrigin('dev-analytics.plnetwork.io'),
+    httpsOrigin('staging-admin.plnetwork.io'),
+    httpsOrigin('protocol-ai-git-fix-home-page-polaris-01.vercel.app'),
+    httpsOrigin('os.pl.xyz'),
+    httpsSubdomains('os.pl.xyz'),
     // Feature/preview frontend deployments.
     // Required because feature frontends run on random Vercel preview hosts
     // while APIs run on feature backends such as directory-fe-pr-123.plnetwork.io.
-    /\.vercel\.app$/,
+    httpsSubdomains('vercel.app'),
     // Feature environments
-    /-[a-z0-9-]+\.plnetwork\.io$/,
+    HTTPS_FEATURE_PLNETWORK_ORIGIN,
   ],
   [APP_ENV.STAGING]: [
-    /.-protocol-labs-spaceport.vercel.app/,
-    /app.forestadmin.com/,
-    /staging.plnetwork.io/,
-    /dev-auth-admin.plnetwork.io/,
-    /dev-auth-app.plnetwork.io/,
-    /dev-analytics.plnetwork.io/,
-    /staging-admin.plnetwork.io/,
+    HTTPS_SPACEPORT_VERCEL_ORIGIN,
+    httpsOrigin('app.forestadmin.com'),
+    httpsOrigin('staging.plnetwork.io'),
+    httpsOrigin('dev-auth-admin.plnetwork.io'),
+    httpsOrigin('dev-auth-app.plnetwork.io'),
+    httpsOrigin('dev-analytics.plnetwork.io'),
+    httpsOrigin('staging-admin.plnetwork.io'),
   ],
   [APP_ENV.UAT]: [
-    /app.forestadmin.com/,
-    /uat.plnetwork.io/,
-    /uat-auth-admin.plnetwork.io/,
-    /uat-auth-app.plnetwork.io/,
-    /uat-analytics.plnetwork.io/,
-    /dev-analytics.plnetwork.io/,
-    /uat-admin.plnetwork.io/,
+    httpsOrigin('app.forestadmin.com'),
+    httpsOrigin('uat.plnetwork.io'),
+    httpsOrigin('uat-auth-admin.plnetwork.io'),
+    httpsOrigin('uat-auth-app.plnetwork.io'),
+    httpsOrigin('uat-analytics.plnetwork.io'),
+    httpsOrigin('dev-analytics.plnetwork.io'),
+    httpsOrigin('uat-admin.plnetwork.io'),
   ],
   [APP_ENV.PRODUCTION]: [
-    'https://www.plnetwork.io',
-    /app.forestadmin.com/,
-    /admin.plnetwork.io/,
-    /plnetwork.io/,
-    /protocol.ai/,
-    'https://os.pl.xyz',
-    /\.os\.pl\.xyz$/,
+    httpsOrigin('www.plnetwork.io'),
+    httpsOrigin('app.forestadmin.com'),
+    httpsOrigin('admin.plnetwork.io'),
+    httpsDomain('plnetwork.io'),
+    httpsDomain('protocol.ai'),
+    httpsOrigin('os.pl.xyz'),
+    httpsSubdomains('os.pl.xyz'),
   ],
 };
+
+export function buildCorsOptions(environment: string | undefined = process.env.ENVIRONMENT) {
+  return {
+    origin: ALLOWED_CORS_ORIGINS[(environment || APP_ENV.DEV) as APP_ENV],
+    credentials: true as const,
+  };
+}
 
 export const IS_DEV_ENVIRONMENT = process.env.ENVIRONMENT == APP_ENV.DEV;
 
