@@ -7,7 +7,16 @@ export const MCP_SCOPE = 'labos';
 
 export const MCP_AUTH_CODE_TTL_MS = 10 * 60 * 1000;
 export const MCP_ACCESS_TOKEN_TTL_SEC = 60 * 60;
+/** Absolute refresh-grant lifetime from consent. Also how long a rotated refresh hash is kept for reuse detection. */
 export const MCP_REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+/** Idle refresh-grant lifetime from the last use, or from consent when the grant has not been used. */
+export const MCP_REFRESH_TOKEN_IDLE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Registrations one IP may make per hour. The throttler store is in-memory, so this limit is per pod. */
+export const MCP_CLIENT_REGISTER_LIMIT = 5;
+export const MCP_CLIENT_REGISTER_TTL_SECONDS = 60 * 60;
+/** Most OAuth clients the table may hold. Registration returns 429 at this count. */
+export const MCP_CLIENT_REGISTER_TOTAL_CAP = 1000;
 
 export const MCP_TOKEN_PREFIX = {
   access: 'mcp_at',

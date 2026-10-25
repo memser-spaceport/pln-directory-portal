@@ -1,4 +1,13 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../shared/prisma.service';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
@@ -8,7 +17,9 @@ import { ANALYTICS_EVENTS } from '../utils/constants';
 import {
   MCP_ACCESS_TOKEN_TTL_SEC,
   MCP_AUTH_CODE_TTL_MS,
+  MCP_CLIENT_REGISTER_TOTAL_CAP,
   MCP_CONNECT_PERMISSION,
+  MCP_REFRESH_TOKEN_IDLE_TTL_MS,
   MCP_REFRESH_TOKEN_TTL_MS,
   MCP_SCOPE,
   MCP_TOKEN_PREFIX,
@@ -17,7 +28,8 @@ import {
   mcpResourceUrl,
 } from './mcp.constants';
 import { generateSecret, hashSecret, verifyPkceS256 } from './mcp.crypto';
-import { isAllowedRedirectUri, isRegisteredRedirectUri } from './mcp-redirect';
+import { httpRedirectHost, isAllowedRedirectUri, isRegisteredRedirectUri } from './mcp-redirect';
+import { McpOAuthClientInfoDto } from './dto/mcp-oauth-client-info.dto';
 
 export type McpTokenActor = {
   authorizationUid: string;
@@ -135,6 +147,11 @@ export class McpOAuthService {
       throw new BadRequestException('redirect_uris must be loopback, https, or a private-use URI scheme');
     }
 
+    const clientCount = await this.prisma.mcpOAuthClient.count();
+    if (clientCount >= MCP_CLIENT_REGISTER_TOTAL_CAP) {
+      throw new HttpException('Client registration limit reached', HttpStatus.TOO_MANY_REQUESTS);
+    }
+
     const clientId = generateSecret(MCP_TOKEN_PREFIX.client);
     const clientName = (body.client_name || 'MCP client').trim().slice(0, 120);
 
@@ -180,11 +197,34 @@ export class McpOAuthService {
     params.set('redirect_uri', redirectUri);
     params.set('code_challenge', challenge);
     params.set('code_challenge_method', 'S256');
-    params.set('client_name', client.clientName);
     if (query.state) params.set('state', query.state);
     if (query.resource) params.set('resource', query.resource);
     if (query.scope) params.set('scope', query.scope);
     return `${mcpConsentUrl()}?${params.toString()}`;
+  }
+
+  async getClientInfo(clientId: string, redirectUri: string | undefined): Promise<McpOAuthClientInfoDto> {
+    const id = clientId?.trim();
+    const uri = redirectUri?.trim();
+    if (!id) {
+      throw new BadRequestException('client_id is required');
+    }
+    if (!uri) {
+      throw new BadRequestException('redirect_uri is required');
+    }
+
+    const client = await this.prisma.mcpOAuthClient.findUnique({ where: { clientId: id } });
+    if (!client) {
+      throw new NotFoundException('Unknown client_id');
+    }
+
+    const registered = isRegisteredRedirectUri(uri, client.redirectUris);
+    return {
+      client_id: client.clientId,
+      client_name: client.clientName,
+      redirect_host: registered ? httpRedirectHost(uri) : null,
+      redirect_uri_registered: registered,
+    };
   }
 
   async approve(memberUid: string, input: ApproveInput): Promise<{ redirectUrl: string }> {
@@ -228,6 +268,8 @@ export class McpOAuthService {
         clientName: client.clientName,
         connectedAt: new Date(),
         revokedAt: null,
+        // A new consent starts a new lifetime. A previous last use would idle-expire the new grant.
+        lastUsedAt: null,
         canWrite,
       },
     });
@@ -385,6 +427,10 @@ export class McpOAuthService {
       await this.revokeOnReuse(presentedHash);
       throw new UnauthorizedException('Invalid refresh_token');
     }
+    if (this.refreshGrantExpired(authorization)) {
+      await this.revokeAuthorization(authorization.uid);
+      throw new UnauthorizedException('Invalid refresh_token');
+    }
     const { allowed } = await this.accessControl.hasPermission(authorization.memberUid, MCP_CONNECT_PERMISSION);
     if (!allowed) {
       throw new ForbiddenException(`Missing permission: ${MCP_CONNECT_PERMISSION}`);
@@ -418,7 +464,8 @@ export class McpOAuthService {
     return this.prisma.$transaction(async (tx) => {
       const rotated = await tx.mcpAuthorization.updateMany({
         where: { uid: authorizationUid, refreshTokenHash: presentedHash, revokedAt: null },
-        data: tokens.hashes,
+        // A refresh counts as use, so a client that only refreshes stays inside the idle limit.
+        data: { ...tokens.hashes, lastUsedAt: new Date() },
       });
       if (rotated.count !== 1) {
         return null;
@@ -426,6 +473,16 @@ export class McpOAuthService {
       await tx.mcpUsedRefreshToken.create({ data: { tokenHash: presentedHash, authorizationUid } });
       return tokens.response;
     });
+  }
+
+  /** True when the grant is past 30 days from consent, or past 7 days from its last use. */
+  private refreshGrantExpired(authorization: { connectedAt: Date; lastUsedAt: Date | null }): boolean {
+    const now = Date.now();
+    const lastUsed = authorization.lastUsedAt ?? authorization.connectedAt;
+    return (
+      now - authorization.connectedAt.getTime() >= MCP_REFRESH_TOKEN_TTL_MS ||
+      now - lastUsed.getTime() >= MCP_REFRESH_TOKEN_IDLE_TTL_MS
+    );
   }
 
   /**

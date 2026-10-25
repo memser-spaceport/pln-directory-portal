@@ -5,7 +5,7 @@ import helmet from 'helmet';
 import { CsrfFilter, nestCsrf } from 'ncsrf';
 import { NotFoundExceptionFilter } from './filters/not-found-exception.filter';
 import { CSRFGuard } from './guards/csfr.guard';
-import { ALLOWED_CORS_ORIGINS, APP_ENV } from './utils/constants';
+import { buildCorsOptions } from './utils/constants';
 
 export function mainConfig(app: INestApplication) {
   // API Versioning
@@ -27,10 +27,7 @@ export function mainConfig(app: INestApplication) {
   // Apply automatic CSRF protection:
   // app.useGlobalGuards(new CSRFGuard());
   // Enable CORS for the web-app
-  app.enableCors({
-    origin: ALLOWED_CORS_ORIGINS[process.env.ENVIRONMENT || APP_ENV.DEV],
-    credentials: true,
-  });
+  app.enableCors(buildCorsOptions());
   /* Default JSON parser. Raised from the body-parser default 100kb so the investor-outreach
    * ingest endpoint can accept batches with the script's per-row `evidence` objects (a single
    * batch of 25 enriched investors is ~150kb; 5mb leaves comfortable headroom for future growth). */
