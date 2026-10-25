@@ -15,9 +15,12 @@ import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { McpOAuthController } from './mcp-oauth.controller';
 import { McpOAuthService } from './mcp-oauth.service';
 import {
+  MCP_ACCESS_TOKEN_TTL_SEC,
   MCP_CLIENT_REGISTER_LIMIT,
   MCP_CLIENT_REGISTER_TOTAL_CAP,
   MCP_CLIENT_REGISTER_TTL_SECONDS,
+  MCP_REFRESH_TOKEN_IDLE_TTL_MS,
+  MCP_REFRESH_TOKEN_TTL_MS,
 } from './mcp.constants';
 import { hashSecret, pkceS256Challenge } from './mcp.crypto';
 
@@ -46,6 +49,7 @@ function buildService(
       findFirst: jest.fn(),
       findMany: jest.fn(),
       update: jest.fn().mockResolvedValue({ memberUid: MEMBER.uid }),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     mcpAuthCode: {
       create: jest.fn().mockResolvedValue({}),
@@ -378,6 +382,116 @@ describe('McpOAuthService', () => {
 
     await expect(service.revokeAuthorizationForMember(MEMBER.uid, 'auth-1')).resolves.toEqual({ ok: true });
     expect(prisma.mcpAuthorization.update).toHaveBeenCalled();
+  });
+
+  it('refreshes a grant that is inside the absolute and idle limits', async () => {
+    const { service, prisma } = buildService();
+    prisma.mcpAuthorization.findUnique.mockResolvedValue({
+      uid: 'auth-1',
+      memberUid: MEMBER.uid,
+      revokedAt: null,
+      connectedAt: new Date(Date.now() - MCP_REFRESH_TOKEN_TTL_MS + 60_000),
+      lastUsedAt: new Date(Date.now() - MCP_REFRESH_TOKEN_IDLE_TTL_MS + 60_000),
+      refreshTokenHash: hashSecret('mcp_rt_live'),
+    });
+
+    const tokens = await service.exchangeToken({ grant_type: 'refresh_token', refresh_token: 'mcp_rt_live' });
+
+    expect(tokens.expires_in).toBe(MCP_ACCESS_TOKEN_TTL_SEC);
+    expect(tokens.refresh_token).toMatch(/^mcp_rt_/);
+    expect(prisma.mcpAuthorization.update).not.toHaveBeenCalled();
+    expect(prisma.mcpAuthorization.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ lastUsedAt: expect.any(Date) }),
+      })
+    );
+  });
+
+  it.each([
+    [
+      'the absolute limit',
+      {
+        connectedAt: new Date(Date.now() - MCP_REFRESH_TOKEN_TTL_MS - 1_000),
+        lastUsedAt: new Date(),
+      },
+    ],
+    [
+      'the idle limit',
+      {
+        connectedAt: new Date(),
+        lastUsedAt: new Date(Date.now() - MCP_REFRESH_TOKEN_IDLE_TTL_MS - 1_000),
+      },
+    ],
+  ])('rejects a refresh token past %s, revokes the grant, and issues no tokens', async (_limit, dates) => {
+    const { service, prisma, appSessions } = buildService();
+    prisma.mcpAuthorization.findUnique.mockResolvedValue({
+      uid: 'auth-1',
+      memberUid: MEMBER.uid,
+      revokedAt: null,
+      refreshTokenHash: hashSecret('mcp_rt_old'),
+      ...dates,
+    });
+
+    const error = await service.exchangeToken({ grant_type: 'refresh_token', refresh_token: 'mcp_rt_old' }).then(
+      () => null,
+      (caught: unknown) => caught
+    );
+
+    expect(error).toBeInstanceOf(UnauthorizedException);
+    expect((error as Error).message).toBe('Invalid refresh_token');
+    expect(prisma.mcpAuthorization.updateMany).not.toHaveBeenCalled();
+    expect(prisma.mcpAuthorization.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { uid: 'auth-1' },
+        data: expect.objectContaining({
+          revokedAt: expect.any(Date),
+          refreshTokenHash: null,
+          accessTokenHash: null,
+        }),
+      })
+    );
+    expect(appSessions.revokeAgentSessionsForAuthorization).toHaveBeenCalledWith('auth-1', prisma);
+  });
+
+  it('accepts a new consent after an expired refresh is rejected', async () => {
+    const { service, prisma } = buildService();
+    prisma.mcpAuthorization.findUnique.mockResolvedValueOnce({
+      uid: 'auth-1',
+      memberUid: MEMBER.uid,
+      revokedAt: null,
+      connectedAt: new Date(Date.now() - MCP_REFRESH_TOKEN_TTL_MS - 1_000),
+      lastUsedAt: new Date(Date.now() - MCP_REFRESH_TOKEN_IDLE_TTL_MS - 1_000),
+      refreshTokenHash: hashSecret('mcp_rt_old'),
+    });
+
+    await expect(service.exchangeToken({ grant_type: 'refresh_token', refresh_token: 'mcp_rt_old' })).rejects.toThrow(
+      'Invalid refresh_token'
+    );
+
+    await service.approve(MEMBER.uid, {
+      clientId: CLIENT.clientId,
+      redirectUri: CLIENT.redirectUris[0],
+      codeChallenge: 'abc',
+      codeChallengeMethod: 'S256',
+    });
+    expect(prisma.mcpAuthorization.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({ revokedAt: null, lastUsedAt: null, connectedAt: expect.any(Date) }),
+      })
+    );
+
+    prisma.mcpAuthorization.findUnique.mockResolvedValueOnce({
+      uid: 'auth-1',
+      memberUid: MEMBER.uid,
+      revokedAt: null,
+      connectedAt: new Date(),
+      lastUsedAt: null,
+      refreshTokenHash: hashSecret('mcp_rt_new'),
+    });
+
+    await expect(
+      service.exchangeToken({ grant_type: 'refresh_token', refresh_token: 'mcp_rt_new' })
+    ).resolves.toMatchObject({ token_type: 'Bearer', expires_in: MCP_ACCESS_TOKEN_TTL_SEC });
   });
 
   it('refuses an access token whose authorization is already revoked', async () => {
