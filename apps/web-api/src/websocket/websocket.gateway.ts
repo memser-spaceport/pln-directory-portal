@@ -13,7 +13,7 @@ import { Server, Socket } from 'socket.io';
 import axios from 'axios';
 import { PrismaService } from '../shared/prisma.service';
 import { AuthenticatedSocketData, getRoomName, WebSocketEvent } from './websocket.types';
-import { ALLOWED_CORS_ORIGINS, APP_ENV } from '../utils/constants';
+import { buildCorsOptions } from '../utils/constants';
 
 // Extended socket type with authentication data
 interface AuthenticatedSocket extends Socket {
@@ -21,10 +21,7 @@ interface AuthenticatedSocket extends Socket {
 }
 
 @WebSocketGateway({
-  cors: {
-    origin: ALLOWED_CORS_ORIGINS[process.env.ENVIRONMENT || APP_ENV.DEV],
-    credentials: true,
-  },
+  cors: buildCorsOptions(),
   namespace: '/notifications',
   transports: ['websocket', 'polling'],
 })
