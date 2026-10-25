@@ -4,7 +4,7 @@ jest.mock('../analytics/service/analytics.service', () => ({
 
 import { UnauthorizedException } from '@nestjs/common';
 import { McpOAuthService } from './mcp-oauth.service';
-import { MCP_REFRESH_TOKEN_TTL_MS } from './mcp.constants';
+import { MCP_ACCESS_TOKEN_TTL_SEC, MCP_REFRESH_TOKEN_IDLE_TTL_MS, MCP_REFRESH_TOKEN_TTL_MS } from './mcp.constants';
 import { pkceS256Challenge } from './mcp.crypto';
 
 const MEMBER = { uid: 'member-1', name: 'Ada', email: 'ada@example.com' };
@@ -119,6 +119,7 @@ const refresh = (service: McpOAuthService, token: string) =>
   service.exchangeToken({ grant_type: 'refresh_token', refresh_token: token }) as Promise<{
     access_token: string;
     refresh_token: string;
+    expires_in: number;
   }>;
 
 describe('McpOAuthService refresh-token rotation and reuse', () => {
@@ -202,6 +203,76 @@ describe('McpOAuthService refresh-token rotation and reuse', () => {
     await connect(service);
     await expect(refresh(service, 'mcp_rt_unknown')).rejects.toBeInstanceOf(UnauthorizedException);
     expect(appSessions.revokeAgentSessionsForAuthorization).not.toHaveBeenCalled();
+  });
+
+  it('refreshes a grant that is inside the absolute and idle limits', async () => {
+    const { service, authorizations } = build();
+    const first = await connect(service);
+    authorizations[0].connectedAt = new Date(Date.now() - MCP_REFRESH_TOKEN_TTL_MS + 60_000);
+    authorizations[0].lastUsedAt = new Date(Date.now() - MCP_REFRESH_TOKEN_IDLE_TTL_MS + 60_000);
+
+    const second = await refresh(service, first.refresh_token);
+
+    expect(second.expires_in).toBe(MCP_ACCESS_TOKEN_TTL_SEC);
+    expect(second.refresh_token).not.toBe(first.refresh_token);
+    expect(authorizations[0].revokedAt).toBeNull();
+    expect(authorizations[0].lastUsedAt.getTime()).toBeGreaterThan(Date.now() - 5_000);
+    await expect(refresh(service, second.refresh_token)).resolves.toHaveProperty('access_token');
+  });
+
+  it('rejects a refresh token older than 30 days from consent and revokes the grant', async () => {
+    const { service, authorizations, appSessions, analytics } = build();
+    const first = await connect(service);
+    authorizations[0].connectedAt = new Date(Date.now() - MCP_REFRESH_TOKEN_TTL_MS - 1_000);
+    authorizations[0].lastUsedAt = new Date();
+
+    await expect(refresh(service, first.refresh_token)).rejects.toThrow('Invalid refresh_token');
+
+    expect(authorizations[0].revokedAt).toBeInstanceOf(Date);
+    expect(authorizations[0].refreshTokenHash).toBeNull();
+    expect(authorizations[0].accessTokenHash).toBeNull();
+    expect(appSessions.revokeAgentSessionsForAuthorization).toHaveBeenCalledWith('auth-1', expect.anything());
+    expect(analytics.trackEvent).not.toHaveBeenCalledWith(expect.objectContaining({ name: 'mcp-refresh-token-reuse' }));
+    await expect(service.authenticateAccessToken(first.access_token)).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(refresh(service, first.refresh_token)).rejects.toThrow('Invalid refresh_token');
+  });
+
+  it('rejects a refresh token idle for longer than 7 days and revokes the grant', async () => {
+    const { service, authorizations } = build();
+    const first = await connect(service);
+    authorizations[0].connectedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+    authorizations[0].lastUsedAt = new Date(Date.now() - MCP_REFRESH_TOKEN_IDLE_TTL_MS - 1_000);
+
+    await expect(refresh(service, first.refresh_token)).rejects.toThrow('Invalid refresh_token');
+
+    expect(authorizations[0].revokedAt).toBeInstanceOf(Date);
+    expect(authorizations[0].refreshTokenHash).toBeNull();
+    await expect(refresh(service, first.refresh_token)).rejects.toThrow('Invalid refresh_token');
+  });
+
+  it('counts a grant with no last use as idle from consent', async () => {
+    const { service, authorizations } = build();
+    const first = await connect(service);
+    authorizations[0].connectedAt = new Date(Date.now() - MCP_REFRESH_TOKEN_IDLE_TTL_MS - 1_000);
+    authorizations[0].lastUsedAt = null;
+
+    await expect(refresh(service, first.refresh_token)).rejects.toThrow('Invalid refresh_token');
+    expect(authorizations[0].revokedAt).toBeInstanceOf(Date);
+  });
+
+  it('accepts a new consent after an expired refresh and keeps that grant', async () => {
+    const { service, authorizations, appSessions } = build();
+    const first = await connect(service);
+    authorizations[0].connectedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+    authorizations[0].lastUsedAt = new Date(Date.now() - MCP_REFRESH_TOKEN_IDLE_TTL_MS - 1_000);
+    await expect(refresh(service, first.refresh_token)).rejects.toThrow('Invalid refresh_token');
+
+    const next = await connect(service);
+
+    await expect(refresh(service, next.refresh_token)).resolves.toHaveProperty('access_token');
+    await expect(refresh(service, first.refresh_token)).rejects.toThrow('Invalid refresh_token');
+    expect(authorizations[0].revokedAt).toBeNull();
+    expect(appSessions.revokeAgentSessionsForAuthorization).toHaveBeenCalledTimes(1);
   });
 
   it('prunes only remembered hashes older than the refresh-token lifetime', async () => {

@@ -19,6 +19,7 @@ import {
   MCP_AUTH_CODE_TTL_MS,
   MCP_CLIENT_REGISTER_TOTAL_CAP,
   MCP_CONNECT_PERMISSION,
+  MCP_REFRESH_TOKEN_IDLE_TTL_MS,
   MCP_REFRESH_TOKEN_TTL_MS,
   MCP_SCOPE,
   MCP_TOKEN_PREFIX,
@@ -267,6 +268,8 @@ export class McpOAuthService {
         clientName: client.clientName,
         connectedAt: new Date(),
         revokedAt: null,
+        // A new consent starts a new lifetime. A previous last use would idle-expire the new grant.
+        lastUsedAt: null,
         canWrite,
       },
     });
@@ -424,6 +427,10 @@ export class McpOAuthService {
       await this.revokeOnReuse(presentedHash);
       throw new UnauthorizedException('Invalid refresh_token');
     }
+    if (this.refreshGrantExpired(authorization)) {
+      await this.revokeAuthorization(authorization.uid);
+      throw new UnauthorizedException('Invalid refresh_token');
+    }
     const { allowed } = await this.accessControl.hasPermission(authorization.memberUid, MCP_CONNECT_PERMISSION);
     if (!allowed) {
       throw new ForbiddenException(`Missing permission: ${MCP_CONNECT_PERMISSION}`);
@@ -457,7 +464,8 @@ export class McpOAuthService {
     return this.prisma.$transaction(async (tx) => {
       const rotated = await tx.mcpAuthorization.updateMany({
         where: { uid: authorizationUid, refreshTokenHash: presentedHash, revokedAt: null },
-        data: tokens.hashes,
+        // A refresh counts as use, so a client that only refreshes stays inside the idle limit.
+        data: { ...tokens.hashes, lastUsedAt: new Date() },
       });
       if (rotated.count !== 1) {
         return null;
@@ -465,6 +473,16 @@ export class McpOAuthService {
       await tx.mcpUsedRefreshToken.create({ data: { tokenHash: presentedHash, authorizationUid } });
       return tokens.response;
     });
+  }
+
+  /** True when the grant is past 30 days from consent, or past 7 days from its last use. */
+  private refreshGrantExpired(authorization: { connectedAt: Date; lastUsedAt: Date | null }): boolean {
+    const now = Date.now();
+    const lastUsed = authorization.lastUsedAt ?? authorization.connectedAt;
+    return (
+      now - authorization.connectedAt.getTime() >= MCP_REFRESH_TOKEN_TTL_MS ||
+      now - lastUsed.getTime() >= MCP_REFRESH_TOKEN_IDLE_TTL_MS
+    );
   }
 
   /**
