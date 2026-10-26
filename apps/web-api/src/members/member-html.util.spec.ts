@@ -21,7 +21,7 @@ describe('sanitizeMemberHtml', () => {
 
   it('removes javascript: URLs, also with mixed case or an encoded tab', () => {
     const out = sanitizeMemberHtml(
-      '<a href="javascript:alert(1)">a</a><a href="JaVaScRiPt:alert(1)">b</a><a href="java&#x09;script:alert(1)">c</a>',
+      '<a href="javascript:alert(1)">a</a><a href="JaVaScRiPt:alert(1)">b</a><a href="java&#x09;script:alert(1)">c</a>'
     );
     expect(out).toBe('<a>a</a><a>b</a><a>c</a>');
   });
@@ -29,8 +29,8 @@ describe('sanitizeMemberHtml', () => {
   it('removes style, iframe and object content and unsafe inline styles', () => {
     expect(
       sanitizeMemberHtml(
-        '<style>p{}</style><iframe src="https://x"></iframe><object data="x"></object><p style="background:url(javascript:alert(1))">x</p>',
-      ),
+        '<style>p{}</style><iframe src="https://x"></iframe><object data="x"></object><p style="background:url(javascript:alert(1))">x</p>'
+      )
     ).toBe('<p>x</p>');
   });
 
