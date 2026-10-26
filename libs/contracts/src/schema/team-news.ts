@@ -248,6 +248,10 @@ export const TeamNewsGroupedResponseSchema = z.object({
   allTabExtraItems: z.array(TeamNewsItemSchema).default([]),
   /** Memberships ∪ follows ∪ Teams-to-follow matches; empty for anonymous. */
   forYouTeamUids: z.array(z.string()).default([]),
+  // LAB-2999: For You by news tags. The member's tags (focus-area slugs, parents
+  // expanded to children) and the teams they belong to or follow; [] signed out.
+  forYouTags: z.array(z.string()).default([]),
+  forYouOwnTeamUids: z.array(z.string()).default([]),
 });
 
 export const TeamNewsFacetItemSchema = z.object({

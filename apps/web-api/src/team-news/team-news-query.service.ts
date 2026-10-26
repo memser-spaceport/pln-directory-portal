@@ -21,9 +21,10 @@ import type {
 import { buildTeamNewsEventDateWhere } from './team-news-event-date.where';
 import { TEAM_NEWS_EXCLUDED_TEAM_NAMES } from './team-news-public-list.config';
 import { TeamNewsSuggestionsService } from './team-news-suggestions.service';
-import { selectForYouNewsItems } from './select-for-you-news-items';
+import { selectForYouNewsItems, selectNewsItemsByTagsAndTeams } from './select-for-you-news-items';
 import { narrowsNews, readNewsCategories } from './utils/news-categories';
 import { groupUsedNewsTags, NewsTagVocabularyService } from './news-tag-vocabulary.service';
+import { isNewsTagPicksEnabled } from './utils/news-tags';
 
 const EMPTY_DISCUSSION: TeamNewsDiscussion = { count: 0, latestTopicUrl: null };
 const POPULAR_WINDOW_DAYS = 14;
@@ -423,6 +424,8 @@ export class TeamNewsQueryService {
       viewerMemberUid && this.suggestionsService
         ? this.suggestionsService.getForYouTeamUids(viewerMemberUid)
         : Promise.resolve([] as string[]);
+    // LAB-2999: what For You matches on once news tags are on (the frontend flag decides).
+    const forYouTagsPromise = this.loadForYouTagFields(viewerMemberUid);
 
     const where = this.buildWhere(query);
     const rows = await this.prisma.teamNewsItem.findMany({
@@ -441,7 +444,7 @@ export class TeamNewsQueryService {
     });
 
     const itemUids = rows.map((r) => r.uid);
-    const [focusAreas, discussions, upvotes, forYouTeamUids] = await Promise.all([
+    const [focusAreas, discussions, upvotes, forYouTeamUids, { forYouTags, forYouOwnTeamUids }] = await Promise.all([
       this.prisma.focusArea.findMany({
         where: { parentUid: null },
         select: { uid: true, title: true },
@@ -449,6 +452,7 @@ export class TeamNewsQueryService {
       this.loadDiscussions(itemUids),
       this.loadUpvotes(itemUids, viewerMemberUid),
       forYouPromise,
+      forYouTagsPromise,
     ]);
     const focusByTitle = new Map(focusAreas.map((fa) => [fa.title, fa]));
 
@@ -498,6 +502,25 @@ export class TeamNewsQueryService {
       }),
       allTabExtraItems,
       forYouTeamUids,
+      forYouTags,
+      forYouOwnTeamUids,
+    };
+  }
+
+  /** The viewer's effective news tags and own or followed teams; both empty signed out (LAB-2999). */
+  private async loadForYouTagFields(
+    viewerMemberUid?: string
+  ): Promise<{ forYouTags: string[]; forYouOwnTeamUids: string[] }> {
+    if (!viewerMemberUid || !this.suggestionsService || !this.tagVocabulary) {
+      return { forYouTags: [], forYouOwnTeamUids: [] };
+    }
+    const [tagsByMember, ownByMember] = await Promise.all([
+      this.tagVocabulary.getEffectiveTagsForMembers([viewerMemberUid]),
+      this.suggestionsService.getOwnTeamUidsForMembers([viewerMemberUid]),
+    ]);
+    return {
+      forYouTags: [...(tagsByMember.get(viewerMemberUid) ?? [])],
+      forYouOwnTeamUids: [...(ownByMember.get(viewerMemberUid) ?? [])],
     };
   }
 
@@ -553,6 +576,17 @@ export class TeamNewsQueryService {
     const fallback = items.slice(0, limit);
     const uniqueMemberUids = [...new Set(opts.memberUids)];
 
+    if (isNewsTagPicksEnabled() && this.suggestionsService && this.tagVocabulary) {
+      return {
+        generatedAt: new Date().toISOString(),
+        since: since.toISOString(),
+        until: until.toISOString(),
+        windowCount: items.length,
+        picks: await this.pickDigestNewsByTags(items, uniqueMemberUids, limit),
+        topStory,
+      };
+    }
+
     const forYouByMember =
       uniqueMemberUids.length > 0 && this.suggestionsService
         ? await this.suggestionsService.getForYouTeamUidsForMembers(uniqueMemberUids)
@@ -581,6 +615,35 @@ export class TeamNewsQueryService {
       picks,
       topStory,
     };
+  }
+
+  /**
+   * Digest picks by news tags (LAB-2999, behind NEWS_TAG_PICKS_ENABLED): per
+   * member, stories from their own or followed teams plus stories sharing any
+   * of their tags, newest first, one per team. A member with no match gets the
+   * newest network stories. Categories no longer narrow anything here.
+   */
+  private async pickDigestNewsByTags(
+    items: TeamNewsItemDto[],
+    memberUids: string[],
+    limit: number
+  ): Promise<Record<string, TeamNewsItemDto[]>> {
+    const fallback = items.slice(0, limit);
+    const picks: Record<string, TeamNewsItemDto[]> = {};
+    if (memberUids.length === 0) return picks;
+    const [tagsByMember, ownByMember] = await Promise.all([
+      (this.tagVocabulary as NewsTagVocabularyService).getEffectiveTagsForMembers(memberUids),
+      (this.suggestionsService as TeamNewsSuggestionsService).getOwnTeamUidsForMembers(memberUids),
+    ]);
+    for (const memberUid of memberUids) {
+      const matched = selectNewsItemsByTagsAndTeams(
+        items,
+        ownByMember.get(memberUid) ?? new Set(),
+        tagsByMember.get(memberUid) ?? new Set()
+      ).slice(0, limit);
+      picks[memberUid] = matched.length > 0 ? matched : fallback;
+    }
+    return picks;
   }
 
   /**

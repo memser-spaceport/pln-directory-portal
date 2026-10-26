@@ -49,3 +49,11 @@ export async function resolveNewsTags(
   if (stored) return { newsTags: stored };
   return { newsTags: await seed(), newsTagsSeeded: true };
 }
+
+/**
+ * Whether the digest picks news by the member's tags (LAB-2999). Read on every
+ * call, so flipping the env var needs no code change; anything but "true" is off.
+ */
+export function isNewsTagPicksEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return (env.NEWS_TAG_PICKS_ENABLED ?? '').trim().toLowerCase() === 'true';
+}

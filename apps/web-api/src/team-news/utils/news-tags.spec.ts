@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { buildNewsTagVocabulary } from '../news-tag-vocabulary.service';
-import { parseNewsTags, readStoredNewsTags, resolveNewsTags } from './news-tags';
+import { isNewsTagPicksEnabled, parseNewsTags, readStoredNewsTags, resolveNewsTags } from './news-tags';
 
 /** LAB-2998: a member's news tags, stored as focus-area slugs in `Member.preferences.newsTags`. */
 const vocabulary = buildNewsTagVocabulary([
@@ -60,5 +60,19 @@ describe('resolveNewsTags', () => {
 
   it('marks an empty seed as seeded too (a member on no team)', async () => {
     await expect(resolveNewsTags(null, async () => [])).resolves.toEqual({ newsTags: [], newsTagsSeeded: true });
+  });
+});
+
+describe('isNewsTagPicksEnabled (LAB-2999)', () => {
+  it.each([
+    ['true', true],
+    ['TRUE', true],
+    [' true ', true],
+    ['false', false],
+    ['1', false],
+    ['', false],
+    [undefined, false],
+  ])('reads %p as %p', (value, expected) => {
+    expect(isNewsTagPicksEnabled({ NEWS_TAG_PICKS_ENABLED: value } as NodeJS.ProcessEnv)).toBe(expected);
   });
 });

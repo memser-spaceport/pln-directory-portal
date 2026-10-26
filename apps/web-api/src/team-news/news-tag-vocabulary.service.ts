@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
 import { slugify } from '../utils/helper/helper';
+import { readStoredNewsTags } from './utils/news-tags';
 
 /**
  * News tags are focus-area slugs (LAB-2969): the enrichment producer tags news
@@ -88,6 +89,28 @@ export function groupUsedNewsTags(usedTags: Iterable<string>, vocabulary: NewsTa
 }
 
 /**
+ * The tags themselves plus every focus area under them, so a member who chose
+ * Digital Human Rights also matches news tagged Data Ownership. Slugs that are
+ * not in the vocabulary are dropped.
+ */
+export function expandNewsTags(tags: Iterable<string>, vocabulary: NewsTagVocabulary): Set<string> {
+  const childrenOf = new Map<string, string[]>();
+  for (const tag of vocabulary.values()) {
+    if (!tag.parentSlug) continue;
+    childrenOf.set(tag.parentSlug, [...(childrenOf.get(tag.parentSlug) ?? []), tag.slug]);
+  }
+  const result = new Set<string>();
+  const queue = [...tags].filter((slug) => vocabulary.has(slug));
+  while (queue.length > 0) {
+    const slug = queue.shift() as string;
+    if (result.has(slug)) continue;
+    result.add(slug);
+    queue.push(...(childrenOf.get(slug) ?? []));
+  }
+  return result;
+}
+
+/**
  * The focus-area vocabulary, cached in memory, plus the starting tags of a
  * member who never chose any. Depends only on Prisma, so both the members and
  * the team-news modules can provide it without importing each other.
@@ -124,18 +147,57 @@ export class NewsTagVocabularyService {
    * as vocabulary slugs. Reads only; nothing is stored.
    */
   async seedTagsForMember(memberUid: string): Promise<string[]> {
-    const [vocabulary, rows] = await Promise.all([
+    return (await this.seedTagsForMembers([memberUid])).get(memberUid) ?? [];
+  }
+
+  /** seedTagsForMember for many members in one query, for the digest (LAB-2999). */
+  async seedTagsForMembers(memberUids: string[]): Promise<Map<string, string[]>> {
+    const uniqueMemberUids = [...new Set(memberUids)];
+    const result = new Map<string, string[]>(uniqueMemberUids.map((uid) => [uid, []]));
+    if (uniqueMemberUids.length === 0) return result;
+    const [vocabulary, roles] = await Promise.all([
       this.getVocabulary(),
-      this.prisma.teamFocusArea.findMany({
-        where: { team: { teamMemberRoles: { some: { memberUid } } } },
-        select: { focusArea: { select: { title: true } } },
+      this.prisma.teamMemberRole.findMany({
+        where: { memberUid: { in: uniqueMemberUids } },
+        select: {
+          memberUid: true,
+          team: { select: { teamFocusAreas: { select: { focusArea: { select: { title: true } } } } } },
+        },
       }),
     ]);
-    const slugs: string[] = [];
-    for (const row of rows) {
-      const slug = slugify(row.focusArea.title);
-      if (vocabulary.has(slug) && !slugs.includes(slug)) slugs.push(slug);
+    for (const role of roles) {
+      const slugs = result.get(role.memberUid);
+      if (!slugs) continue;
+      for (const tfa of role.team.teamFocusAreas) {
+        const slug = slugify(tfa.focusArea.title);
+        if (vocabulary.has(slug) && !slugs.includes(slug)) slugs.push(slug);
+      }
     }
-    return slugs;
+    return result;
+  }
+
+  /**
+   * The tags For You and the digest match news on, per member (LAB-2999): the
+   * saved list, or the starting tags when they never saved one, with each
+   * parent focus area expanded to its children. Every member gets an entry.
+   */
+  async getEffectiveTagsForMembers(memberUids: string[]): Promise<Map<string, Set<string>>> {
+    const uniqueMemberUids = [...new Set(memberUids)];
+    const result = new Map<string, Set<string>>();
+    if (uniqueMemberUids.length === 0) return result;
+    const [vocabulary, members] = await Promise.all([
+      this.getVocabulary(),
+      this.prisma.member.findMany({
+        where: { uid: { in: uniqueMemberUids } },
+        select: { uid: true, preferences: true },
+      }),
+    ]);
+    const stored = new Map(members.map((m) => [m.uid, readStoredNewsTags(m.preferences)]));
+    const unsaved = uniqueMemberUids.filter((uid) => !stored.get(uid));
+    const seeds = unsaved.length > 0 ? await this.seedTagsForMembers(unsaved) : new Map<string, string[]>();
+    for (const uid of uniqueMemberUids) {
+      result.set(uid, expandNewsTags(stored.get(uid) ?? seeds.get(uid) ?? [], vocabulary));
+    }
+    return result;
   }
 }
