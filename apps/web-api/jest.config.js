@@ -19,5 +19,4 @@ module.exports = {
   moduleNameMapper: {
     '^nodemailer/lib/mail-composer$': require.resolve('nodemailer/lib/mail-composer'),
   },
-  transformIgnorePatterns: ['node_modules/(?!(web3.storage|ipfs-car|@web3-storage|carbites)/)'],
 };
