@@ -15,7 +15,9 @@ module.exports = {
   moduleFileExtensions: ['ts', 'js', 'html'],
   coverageDirectory: '../../coverage/apps/api',
   setupFilesAfterEnv: ['./mocks.ts'],
-  transformIgnorePatterns: [
-    'node_modules/(?!(web3.storage|ipfs-car|@web3-storage|carbites)/)',
-  ],
+  // nodemailer exposes lib/* only through package.json "exports", which Jest 27 does not read.
+  moduleNameMapper: {
+    '^nodemailer/lib/mail-composer$': require.resolve('nodemailer/lib/mail-composer'),
+  },
+  transformIgnorePatterns: ['node_modules/(?!(web3.storage|ipfs-car|@web3-storage|carbites)/)'],
 };
