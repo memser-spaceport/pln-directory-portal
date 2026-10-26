@@ -12,6 +12,10 @@ export const MEMBER_HTML_FIELDS: Partial<Record<Prisma.ModelName, readonly strin
   MemberExperience: ['description'],
 };
 
+// The link schemes the profile editor (Quill) allows, plus inline images.
+const ALLOWED_SCHEMES = ['http', 'https', 'mailto', 'tel', 'sms'];
+const ALLOWED_SCHEMES_BY_TAG = { img: ['http', 'https', 'data'] };
+
 const COLOR = [/^#[0-9a-f]{3,8}$/i, /^rgba?\([\d\s,.%]+\)$/i, /^[a-z]+$/i];
 
 // The formatting the profile editor (Quill) writes: headers, inline marks,
@@ -64,8 +68,8 @@ const MEMBER_HTML_SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
       'text-align': [/^(left|right|center|justify)$/],
     },
   },
-  allowedSchemes: ['http', 'https', 'mailto'],
-  allowedSchemesByTag: { img: ['http', 'https', 'data'] },
+  allowedSchemes: ALLOWED_SCHEMES,
+  allowedSchemesByTag: ALLOWED_SCHEMES_BY_TAG,
   allowProtocolRelative: false,
   transformTags: {
     a: (tagName, attribs) => ({
@@ -76,18 +80,29 @@ const MEMBER_HTML_SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
 };
 
 // Same parser, nothing removed: the reference to tell an unsafe value from a
-// value that only differs in entity or attribute encoding.
+// value that only differs in entity or attribute encoding. `srcset` is kept
+// under another name, because sanitize-html filters its URLs on its own.
 const PASS_THROUGH_OPTIONS: sanitizeHtml.IOptions = {
   allowedTags: false,
   allowedAttributes: false,
   allowVulnerableTags: true,
   allowedSchemesAppliedToAttributes: [],
+  transformTags: {
+    '*': (tagName, attribs) => ({
+      tagName,
+      attribs: Object.fromEntries(
+        Object.entries(attribs).map(([name, value]) => [name.toLowerCase() === 'srcset' ? 'data-srcset' : name, value])
+      ),
+    }),
+  },
 };
 
-// Removes only what can run code: script-like elements, event handlers,
-// unsafe inline styles and non-allowed URL schemes. Unknown but harmless
-// tags, classes and styles stay, so the clean-up script does not count or
-// rewrite a value only because it has formatting the editor does not write.
+// Removes only what can run code or load from elsewhere: script-like
+// elements, event handlers, unsafe inline styles, `srcset`, and URLs with a
+// non-allowed scheme or protocol-relative URLs (`//host`), the same URL rules
+// as the sanitizer. Unknown but harmless tags, classes and styles stay, so the
+// clean-up script does not count or rewrite a value only because it has
+// formatting the editor does not write.
 const SCRIPTABLE_TAGS = [
   'script',
   'style',
@@ -118,12 +133,17 @@ const SCRIPTABLE_ONLY_OPTIONS: sanitizeHtml.IOptions = {
       tagName,
       attribs: Object.fromEntries(
         Object.entries(attribs).filter(
-          ([name, value]) => !/^on/i.test(name) && !(name.toLowerCase() === 'style' && UNSAFE_STYLE.test(String(value)))
+          ([name, value]) =>
+            !/^on/i.test(name) &&
+            name.toLowerCase() !== 'srcset' &&
+            !(name.toLowerCase() === 'style' && UNSAFE_STYLE.test(String(value)))
         )
       ),
     }),
   },
-  allowedSchemes: ['http', 'https', 'mailto', 'data'],
+  allowedSchemes: ALLOWED_SCHEMES,
+  allowedSchemesByTag: ALLOWED_SCHEMES_BY_TAG,
+  allowProtocolRelative: false,
   allowedSchemesAppliedToAttributes: ['href', 'src', 'cite', 'action', 'formaction', 'xlink:href'],
 };
 
@@ -134,7 +154,8 @@ export function sanitizeMemberHtml<T extends string | null | undefined>(value: T
 
 /**
  * True when the value has content that can run code (script-like elements,
- * event handlers, javascript: URLs). Harmless formatting the sanitizer would
+ * event handlers, srcset, URLs with a scheme other than the allowed ones or
+ * protocol-relative URLs). Harmless formatting the sanitizer would
  * drop, or a different entity encoding, does not count.
  */
 export function hasUnsafeMemberHtml(value: string | null | undefined): boolean {

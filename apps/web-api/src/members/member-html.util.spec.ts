@@ -79,6 +79,26 @@ describe('hasUnsafeMemberHtml', () => {
     expect(hasUnsafeMemberHtml('<iframe src="https://x"></iframe>')).toBe(true);
   });
 
+  it('is true for the URLs the sanitizer removes: data: links, protocol-relative URLs and srcset', () => {
+    expect(hasUnsafeMemberHtml('<a href="data:text/html,<script>alert(1)</script>">x</a>')).toBe(true);
+    expect(hasUnsafeMemberHtml('<a href="//evil.example">x</a>')).toBe(true);
+    expect(hasUnsafeMemberHtml('<img src="//evil.example/a.png">')).toBe(true);
+    expect(hasUnsafeMemberHtml('<img srcset="javascript:alert(1)">')).toBe(true);
+  });
+
+  it('agrees with the sanitizer on every URL it keeps', () => {
+    for (const html of [
+      '<a href="https://x.io">a</a>',
+      '<a href="mailto:a@x.io">a</a>',
+      '<a href="tel:+100">a</a>',
+      '<a href="/members/abc">a</a>',
+      '<img src="data:image/png;base64,AAAA" />',
+    ]) {
+      expect(hasUnsafeMemberHtml(html)).toBe(false);
+      expect(sanitizeMemberHtml(html)).toBe(html);
+    }
+  });
+
   it('is false for harmless formatting the editor does not write', () => {
     expect(
       hasUnsafeMemberHtml('<span style="font-size:11pt" class="MsoNormal">a</span><table><tr><td>x</td></tr></table>')

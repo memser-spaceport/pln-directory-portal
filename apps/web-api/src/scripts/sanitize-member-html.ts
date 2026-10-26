@@ -10,7 +10,8 @@
  * before anyone runs --apply. Only rows with content that can run code are
  * written (with the same sanitizer as new writes); a value with only harmless
  * formatting or a different entity encoding is left as it is. Logs uids and
- * lengths, never the field content. Safe to rerun.
+ * lengths, never the field content. A row edited after it was read is left
+ * as it is (its new value was sanitized on write). Safe to rerun.
  *
  * Writes through a plain PrismaClient, so no DB CUD events are emitted for
  * the cleaned rows.
@@ -39,7 +40,8 @@ async function cleanMembers(apply: boolean): Promise<number> {
       found++;
       const bio = sanitizeMemberHtml(row.bio) as string;
       console.log(`  Member ${row.uid} bio: ${row.bio?.length} -> ${bio.length} chars`);
-      if (apply) await prisma.member.update({ where: { uid: row.uid }, data: { bio } });
+      // Writes only if the bio did not change since it was read
+      if (apply) await prisma.member.updateMany({ where: { uid: row.uid, bio: row.bio }, data: { bio } });
     }
   }
   return found;
@@ -65,7 +67,12 @@ async function cleanExperiences(apply: boolean): Promise<number> {
       console.log(
         `  MemberExperience ${row.uid} (member ${row.memberUid}) description: ${row.description?.length} -> ${description.length} chars`
       );
-      if (apply) await prisma.memberExperience.update({ where: { uid: row.uid }, data: { description } });
+      if (apply) {
+        await prisma.memberExperience.updateMany({
+          where: { uid: row.uid, description: row.description },
+          data: { description },
+        });
+      }
     }
   }
   return found;
