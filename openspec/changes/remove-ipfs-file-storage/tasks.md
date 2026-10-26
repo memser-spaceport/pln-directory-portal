@@ -22,6 +22,6 @@
 ## 4. Verify and release
 
 - [x] 4.1 Run `yarn build:api` and ESLint on the touched files. Verify that the build passes and that no touched file has more lint errors than on `develop`.
-- [ ] 4.2 Update draft PR #3595 (title, body) to the removal approach. Verify that the PR description lists the kept items (DB enum, packages) and the Cloudflare cleanup.
+- [x] 4.2 Update draft PR #3595 (title, body) to the removal approach. Verify that the PR description lists the kept items (DB enum, packages) and the Cloudflare cleanup.
 - [ ] 4.3 After Vova approves, link the approval in the PR and mark it ready for review. Verify that the PR is no longer a draft.
 - [ ] 4.4 After merge, have someone with Cloudflare access delete the `web3-file-retrieval` worker. Verify that the worker no longer appears in the Cloudflare dashboard.
