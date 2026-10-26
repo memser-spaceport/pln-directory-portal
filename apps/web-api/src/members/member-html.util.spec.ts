@@ -50,6 +50,12 @@ describe('sanitizeMemberHtml', () => {
     expect(out).toContain('Bio is AI generated');
   });
 
+  it('adds rel="noopener noreferrer" to links that open a new tab and drops protocol-relative URLs', () => {
+    expect(sanitizeMemberHtml('<a href="https://x.io" target="_blank">a</a><a href="//evil.example">b</a>')).toBe(
+      '<a href="https://x.io" target="_blank" rel="noopener noreferrer">a</a><a>b</a>'
+    );
+  });
+
   it('drops classes that are not editor classes', () => {
     expect(sanitizeMemberHtml('<p class="ql-align-right evil">x</p>')).toBe('<p class="ql-align-right">x</p>');
   });
@@ -65,6 +71,18 @@ describe('hasUnsafeMemberHtml', () => {
     expect(hasUnsafeMemberHtml('<p>a</p><script>x</script>')).toBe(true);
     expect(hasUnsafeMemberHtml('<a href="javascript:x()">a</a>')).toBe(true);
     expect(hasUnsafeMemberHtml('<p onclick="x()">a</p>')).toBe(true);
+  });
+
+  it('is true for unsafe inline styles and script-like elements', () => {
+    expect(hasUnsafeMemberHtml('<p style="background:url(javascript:alert(1))">x</p>')).toBe(true);
+    expect(hasUnsafeMemberHtml('<svg><a href="x">y</a></svg>')).toBe(true);
+    expect(hasUnsafeMemberHtml('<iframe src="https://x"></iframe>')).toBe(true);
+  });
+
+  it('is false for harmless formatting the editor does not write', () => {
+    expect(
+      hasUnsafeMemberHtml('<span style="font-size:11pt" class="MsoNormal">a</span><table><tr><td>x</td></tr></table>')
+    ).toBe(false);
   });
 
   it('is false for safe values, also when only entities or spaces differ', () => {

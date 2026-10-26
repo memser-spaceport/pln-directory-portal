@@ -66,6 +66,13 @@ const MEMBER_HTML_SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
   },
   allowedSchemes: ['http', 'https', 'mailto'],
   allowedSchemesByTag: { img: ['http', 'https', 'data'] },
+  allowProtocolRelative: false,
+  transformTags: {
+    a: (tagName, attribs) => ({
+      tagName,
+      attribs: attribs.target ? { ...attribs, rel: 'noopener noreferrer' } : attribs,
+    }),
+  },
 };
 
 // Same parser, nothing removed: the reference to tell an unsafe value from a
@@ -77,15 +84,62 @@ const PASS_THROUGH_OPTIONS: sanitizeHtml.IOptions = {
   allowedSchemesAppliedToAttributes: [],
 };
 
+// Removes only what can run code: script-like elements, event handlers,
+// unsafe inline styles and non-allowed URL schemes. Unknown but harmless
+// tags, classes and styles stay, so the clean-up script does not count or
+// rewrite a value only because it has formatting the editor does not write.
+const SCRIPTABLE_TAGS = [
+  'script',
+  'style',
+  'iframe',
+  'frame',
+  'frameset',
+  'object',
+  'embed',
+  'applet',
+  'base',
+  'link',
+  'meta',
+  'form',
+  'svg',
+  'math',
+  'template',
+  'noscript',
+];
+const UNSAFE_STYLE = /javascript:|expression\s*\(|url\s*\(/i;
+
+const SCRIPTABLE_ONLY_OPTIONS: sanitizeHtml.IOptions = {
+  allowedTags: false,
+  allowedAttributes: false,
+  allowVulnerableTags: true,
+  exclusiveFilter: (frame) => SCRIPTABLE_TAGS.includes(frame.tag),
+  transformTags: {
+    '*': (tagName, attribs) => ({
+      tagName,
+      attribs: Object.fromEntries(
+        Object.entries(attribs).filter(
+          ([name, value]) => !/^on/i.test(name) && !(name.toLowerCase() === 'style' && UNSAFE_STYLE.test(String(value)))
+        )
+      ),
+    }),
+  },
+  allowedSchemes: ['http', 'https', 'mailto', 'data'],
+  allowedSchemesAppliedToAttributes: ['href', 'src', 'cite', 'action', 'formaction', 'xlink:href'],
+};
+
 export function sanitizeMemberHtml<T extends string | null | undefined>(value: T): T {
   if (typeof value !== 'string') return value;
   return sanitizeHtml(value, MEMBER_HTML_SANITIZE_OPTIONS) as T;
 }
 
-/** True when sanitizing removes content, not only re-encodes it. */
+/**
+ * True when the value has content that can run code (script-like elements,
+ * event handlers, javascript: URLs). Harmless formatting the sanitizer would
+ * drop, or a different entity encoding, does not count.
+ */
 export function hasUnsafeMemberHtml(value: string | null | undefined): boolean {
   if (!value) return false;
-  return sanitizeHtml(value, MEMBER_HTML_SANITIZE_OPTIONS) !== sanitizeHtml(value, PASS_THROUGH_OPTIONS);
+  return sanitizeHtml(value, SCRIPTABLE_ONLY_OPTIONS) !== sanitizeHtml(value, PASS_THROUGH_OPTIONS);
 }
 
 function sanitizeData(data: unknown, fields: readonly string[]): void {

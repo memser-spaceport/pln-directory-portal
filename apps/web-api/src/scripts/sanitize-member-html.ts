@@ -7,9 +7,13 @@
  *   yarn api:sanitize-member-html --apply    # writes; run only after a human approved the dry-run
  *
  * Changes stored data, so a human reviews the dry-run output and approves
- * before anyone runs --apply. Only rows with unsafe content are written:
- * a value that differs only in entity encoding is left as it is. Logs uids
- * and lengths, never the field content. Safe to rerun.
+ * before anyone runs --apply. Only rows with content that can run code are
+ * written (with the same sanitizer as new writes); a value with only harmless
+ * formatting or a different entity encoding is left as it is. Logs uids and
+ * lengths, never the field content. Safe to rerun.
+ *
+ * Writes through a plain PrismaClient, so no DB CUD events are emitted for
+ * the cleaned rows.
  */
 import { PrismaClient } from '@prisma/client';
 import { hasUnsafeMemberHtml, sanitizeMemberHtml } from '../members/member-html.util';

@@ -5,7 +5,7 @@ Member rich-text fields that the frontend renders as HTML (`Member.bio` and `Mem
 
 ## Requirements
 ### Requirement: Sanitize member HTML on write
-Every create, update, upsert, createMany and updateMany of `Member.bio` or `MemberExperience.description` through `PrismaService` SHALL pass the value through `sanitizeMemberHtml` (`apps/web-api/src/members/member-html.util.ts`) before it is stored. The sanitizer SHALL remove script and style elements with their content, event-handler attributes, and `javascript:` (and any other non-allowed scheme) URLs, and SHALL keep the formatting the profile editor writes: paragraphs, headers, bold, italic, underline, strike, colors, lists, alignment and indent classes (`ql-*`), code blocks, links, member mentions and hosted images.
+Every create, update, upsert, createMany and updateMany of `Member.bio` or `MemberExperience.description` through `PrismaService` SHALL pass the value through `sanitizeMemberHtml` (`apps/web-api/src/members/member-html.util.ts`) before it is stored. The sanitizer SHALL remove script and style elements with their content, event-handler attributes, and `javascript:` (and any other non-allowed scheme or protocol-relative) URLs, SHALL add `rel="noopener noreferrer"` to links with a `target`, and SHALL keep the formatting the profile editor writes: paragraphs, headers, bold, italic, underline, strike, colors, lists, alignment and indent classes (`ql-*`), code blocks, links, member mentions and hosted images.
 
 #### Scenario: A member saves a bio with a script tag
 - **GIVEN** a bio `<p>Hello <script>alert(1)</script>world</p>`
@@ -18,7 +18,7 @@ Every create, update, upsert, createMany and updateMany of `Member.bio` or `Memb
 - **THEN** the stored bio has no event-handler attribute and keeps its links, images and the AI disclaimer
 
 ### Requirement: One-time clean-up of stored values
-`yarn api:sanitize-member-html` SHALL list the members and experiences whose stored HTML has unsafe content (uids and lengths only) and change nothing. With `--apply`, which a human runs only after approving the dry-run, it SHALL write the sanitized value for those rows only; values that differ only in entity encoding SHALL stay as they are.
+`yarn api:sanitize-member-html` SHALL list the members and experiences whose stored HTML has unsafe content (uids and lengths only) and change nothing. With `--apply`, which a human runs only after approving the dry-run, it SHALL write the sanitized value for those rows only. Unsafe content means script-like elements, event-handler attributes, unsafe inline styles or non-allowed URL schemes; values with only harmless formatting or a different entity encoding SHALL stay as they are.
 
 #### Scenario: Dry-run
 - **GIVEN** one stored bio with a script tag
