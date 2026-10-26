@@ -260,6 +260,19 @@ export const TeamNewsFiltersResponseSchema = z.object({
   focus: z.array(TeamNewsFacetItemSchema),
 });
 
+/** A news tag a member can choose: a focus area, by its slug (LAB-2998). */
+export const TeamNewsTagSchema = z.object({
+  slug: z.string(),
+  title: z.string(),
+});
+
+/** A top-level focus area with the second-level ones news used under it. */
+export const TeamNewsTagGroupSchema = TeamNewsTagSchema.extend({
+  children: z.array(TeamNewsTagSchema),
+});
+
+export const TeamNewsTagsResponseSchema = z.array(TeamNewsTagGroupSchema);
+
 // Service ingest. The producer (e.g. pln-data-enrichment) is responsible for
 // noise filtering, classification, and source-URL liveness checks before
 // posting here. The directory just persists what it's told, idempotently.
@@ -445,6 +458,7 @@ export type TeamNewsItemDto = z.infer<typeof TeamNewsItemSchema>;
 export type TeamNewsListResponse = z.infer<typeof TeamNewsListResponseSchema>;
 export type TeamNewsGroupedResponse = z.infer<typeof TeamNewsGroupedResponseSchema>;
 export type TeamNewsFiltersResponse = z.infer<typeof TeamNewsFiltersResponseSchema>;
+export type TeamNewsTagsResponse = z.infer<typeof TeamNewsTagsResponseSchema>;
 export type TeamNewsIngestItem = z.infer<typeof TeamNewsIngestItemSchema>;
 export type IngestTeamNewsDto = z.infer<typeof IngestTeamNewsDtoSchema>;
 export type IngestTeamNewsResponse = z.infer<typeof IngestTeamNewsResponseSchema>;

@@ -16,12 +16,14 @@ import type {
   TeamNewsPopularResponse,
   TeamNewsRecentResponse,
   TeamNewsDigestPicksResponse,
+  TeamNewsTagsResponse,
 } from 'libs/contracts/src/schema/team-news';
 import { buildTeamNewsEventDateWhere } from './team-news-event-date.where';
 import { TEAM_NEWS_EXCLUDED_TEAM_NAMES } from './team-news-public-list.config';
 import { TeamNewsSuggestionsService } from './team-news-suggestions.service';
 import { selectForYouNewsItems } from './select-for-you-news-items';
 import { narrowsNews, readNewsCategories } from './utils/news-categories';
+import { groupUsedNewsTags, NewsTagVocabularyService } from './news-tag-vocabulary.service';
 
 const EMPTY_DISCUSSION: TeamNewsDiscussion = { count: 0, latestTopicUrl: null };
 const POPULAR_WINDOW_DAYS = 14;
@@ -57,6 +59,9 @@ type UpvoteStamp = {
   viewerUpvoted: Set<string>;
 };
 
+const NEWS_TAGS_WINDOW_DAYS = 90;
+const NEWS_TAGS_CACHE_MS = 10 * 60 * 1000;
+
 const TOP_LEVEL_FOCUS_AREAS = [
   'Digital Human Rights',
   'Economies & Governance',
@@ -67,10 +72,47 @@ const TOP_LEVEL_FOCUS_AREAS = [
 
 @Injectable()
 export class TeamNewsQueryService {
+  /** The tag list changes only as news is ingested; ten minutes is fresh enough (LAB-2998). */
+  private newsTagsCache: { at: number; value: Promise<TeamNewsTagsResponse> } | null = null;
+
   constructor(
     private readonly prisma: PrismaService,
-    @Optional() private readonly suggestionsService?: TeamNewsSuggestionsService
+    @Optional() private readonly suggestionsService?: TeamNewsSuggestionsService,
+    @Optional() private readonly tagVocabulary?: NewsTagVocabularyService
   ) {}
+
+  /**
+   * News tags members can choose (LAB-2998): the focus areas that tagged news
+   * created in the last 90 days, from teams the public feed shows, grouped under
+   * their top-level focus area.
+   */
+  listNewsTags(now: Date = new Date()): Promise<TeamNewsTagsResponse> {
+    if (this.newsTagsCache && now.getTime() - this.newsTagsCache.at < NEWS_TAGS_CACHE_MS) {
+      return this.newsTagsCache.value;
+    }
+    const value = this.loadNewsTags(now);
+    this.newsTagsCache = { at: now.getTime(), value };
+    value.catch(() => {
+      if (this.newsTagsCache?.value === value) this.newsTagsCache = null;
+    });
+    return value;
+  }
+
+  private async loadNewsTags(now: Date): Promise<TeamNewsTagsResponse> {
+    if (!this.tagVocabulary) {
+      throw new Error('NewsTagVocabularyService is not provided to TeamNewsQueryService');
+    }
+    const since = new Date(now.getTime() - NEWS_TAGS_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+    const excluded = this.excludedTeamsWhere();
+    const [vocabulary, rows] = await Promise.all([
+      this.tagVocabulary.getVocabulary(),
+      this.prisma.teamNewsItem.findMany({
+        where: { AND: [{ createdAt: { gte: since } }, ...(excluded ? [excluded] : [])] },
+        select: { tags: true },
+      }),
+    ]);
+    return groupUsedNewsTags(new Set(rows.flatMap((r) => r.tags)), vocabulary);
+  }
 
   /**
    * The excluded-team rule, in one place.
