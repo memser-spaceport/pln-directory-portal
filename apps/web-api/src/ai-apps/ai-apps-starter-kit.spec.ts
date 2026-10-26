@@ -2,7 +2,13 @@ import AdmZip from 'adm-zip';
 import { createHash } from 'crypto';
 
 import { AiAppsStarterKitService, KIT_MANIFEST_PATH } from './ai-apps-starter-kit.service';
-import { AI_APPS_BRIDGE_SCRIPT_URL, AI_APPS_PORTAL_ORIGIN, AI_APPS_STARTER_KIT_VERSION } from './ai-apps.constants';
+import {
+  AI_APPS_APP_NODE_IMAGE,
+  AI_APPS_BRIDGE_SCRIPT_URL,
+  AI_APPS_PORTAL_ORIGIN,
+  AI_APPS_STARTER_KIT_VERSION,
+  AI_APPS_STARTER_KIT_WHATS_NEW,
+} from './ai-apps.constants';
 
 describe('AiAppsStarterKitService buildZip', () => {
   let entries: Map<string, string>;
@@ -143,7 +149,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('kit 1.15: deploys answer 202 and the agent polls statusEndpoint for the real outcome', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.18');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.19');
     const config = JSON.parse(entries.get('pln-app.config.json') as string);
     expect(config.statusEndpoint).toContain('/v1/ai-apps/{appUid}/deployments/{deploymentId}');
     expect(config.notes).toContain('poll statusEndpoint');
@@ -180,7 +186,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('kit 1.14: member context comes from same-origin /_pln/me, with the Bearer fallback for older gates', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.18');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.19');
     const skill = entries.get('.claude/skills/pln-member-context/SKILL.md') as string;
     expect(skill).toContain("fetch('/_pln/me', { credentials: 'same-origin' })");
     expect(skill).toContain('memberContextEndpoint + "?appId=<appId>"');
@@ -277,9 +283,9 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('kit 1.15: writes the feedback endpoint templates and teaches the feedback flow', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.18');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.19');
     const config = JSON.parse(entries.get('pln-app.config.json') as string);
-    expect(config.kitVersion).toBe('1.18');
+    expect(config.kitVersion).toBe('1.19');
     expect(config.feedbackEndpoint).toContain('/v1/ai-apps/{appUid}/agent/feedback');
     expect(config.feedbackStatusEndpoint).toContain('/v1/ai-apps/{appUid}/agent/feedback/{feedbackUid}');
 
@@ -298,7 +304,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('kit 1.16: teaches written feedback, replies and the closing note, and never public comments', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.18');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.19');
     const skill = entries.get('.claude/skills/app-feedback/SKILL.md') as string;
     expect(skill).toContain('`kind: "FEEDBACK"`');
     expect(skill).toContain('"kind": "FEEDBACK"');
@@ -520,7 +526,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('defaults apps to all PL Infra members and asks about private access before the first deploy (kit 1.13+)', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.18');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.19');
     const readme = entries.get('README.md') as string;
     expect(readme).toContain('New apps are open to **all PL Infra members**');
     expect(readme).toContain('**Manage access**');
@@ -540,7 +546,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('kit 1.16: ships a short Preview testing-users skill, listed in the kit README only', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.18');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.19');
     const skill = entries.get('.claude/skills/preview-testing-users/SKILL.md') as string;
     expect(skill).toContain('name: preview-testing-users');
     expect(skill).toContain('Preview only');
@@ -561,7 +567,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   });
 
   it('documents public endpoints and that the app must secure them (kit 1.13+)', () => {
-    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.18');
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.19');
     const deploySkill = entries.get('.claude/skills/deploy-to-labs/SKILL.md') as string;
     expect(deploySkill).toContain('## Public endpoints (paths without LabOS sign-in)');
     expect(deploySkill).toContain(
@@ -740,5 +746,65 @@ describe('AiAppsStarterKitService kit 1.17: resume an interrupted connect', () =
   it('still sends the kit-update skill through the deploy skill connect step', () => {
     const skill = entries.get('.claude/skills/kit-update/SKILL.md') as string;
     expect(skill).toContain('step 3 of the **deploy-to-labs** skill');
+  });
+});
+
+describe('AiAppsStarterKitService kit 1.19: apps build on Node 22', () => {
+  let entries: Map<string, string>;
+
+  beforeAll(() => {
+    const zip = new AdmZip(new AiAppsStarterKitService().buildZip());
+    entries = new Map(
+      zip
+        .getEntries()
+        .filter((e) => !e.isDirectory)
+        .map((e) => [e.entryName, e.getData().toString('utf8')])
+    );
+  });
+
+  it('scaffolds app/Dockerfile on node:22.23.4-bookworm-slim', () => {
+    expect(AI_APPS_APP_NODE_IMAGE).toBe('node:22.23.4-bookworm-slim');
+    expect(entries.get('app/Dockerfile')).toMatch(/^FROM node:22\.23\.4-bookworm-slim\n/);
+  });
+
+  it('never builds on a Node line older than 22 anywhere in the kit', () => {
+    const olderNode: string[] = [];
+    for (const [path, text] of entries) {
+      for (const [line, major] of text.matchAll(/^\s*FROM\s+node:(\d+)\S*/gim)) {
+        if (Number(major) < 22) olderNode.push(`${path}: ${line.trim()}`);
+      }
+    }
+    expect(olderNode).toEqual([]);
+  });
+
+  it('names the Node 22 image in the build rules and the migration Dockerfile step', () => {
+    for (const path of ['CLAUDE.md', 'AGENTS.md']) {
+      const text = entries.get(path) as string;
+      expect(text).toContain(
+        `Node apps run on Node 22: start every Node stage of \`app/Dockerfile\` from\n  \`${AI_APPS_APP_NODE_IMAGE}\``
+      );
+      expect(text).toContain('Never use Node 20 or older');
+      expect(text).toContain(
+        `For a Node app, start every Node\n   stage (build and runtime) from \`${AI_APPS_APP_NODE_IMAGE}\``
+      );
+      expect(text).toContain(`move any Node image older\n   than 22 to \`${AI_APPS_APP_NODE_IMAGE}\``);
+    }
+    expect(entries.get('README.md')).toContain('a minimal runnable Node 22 app');
+  });
+
+  it('moves older Node images to Node 22 before every deploy and tells the member', () => {
+    const skill = entries.get('.claude/skills/deploy-to-labs/SKILL.md') as string;
+    expect(skill).toContain('**Check the Node version in `app/Dockerfile`.**');
+    expect(skill).toContain('If any uses Node older than 22');
+    expect(skill).toContain(`change it to\n   \`${AI_APPS_APP_NODE_IMAGE}\``);
+    expect(skill).toContain('Leave non-Node\n   images and Node 22 or newer alone.');
+    expect(skill).toContain('without waiting for approval, but tell the member in your deploy summary');
+  });
+
+  it('kit 1.19 tells agents to move existing apps to Node 22 on their next deploy', () => {
+    expect(AI_APPS_STARTER_KIT_VERSION).toBe('1.19');
+    expect(AI_APPS_STARTER_KIT_WHATS_NEW).toEqual([
+      expect.stringContaining('On your next deploy, your agent moves your app to Node 22'),
+    ]);
   });
 });

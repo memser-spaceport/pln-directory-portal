@@ -1063,11 +1063,15 @@ pln-app.config.json                            connect/deploy/draft/metadata/log
 pl-design-system/                              curated PL Design System (files, not a nested zip)
 styles/pln-theme.css                           minimal CSS-variable fallback (plain-HTML apps)
 styles/FONTS.md                                Inter font guidance
-app/                                           minimal runnable Node/Express scaffold
+app/                                           minimal runnable Node/Express scaffold (Dockerfile FROM node:22.23.4-bookworm-slim ≥1.19)
 .pln-kit/manifest.json                         SHA-256 of every kit-managed file (kits ≥1.17)
 ```
 
 The kit deliberately exposes **no internal PLN APIs** — only the connect, deploy, draft, metadata, logs, member-context and kit version/update endpoints — and **no token**.
+
+### App Node runtime (kits ≥1.19)
+
+`AI_APPS_APP_NODE_IMAGE` (`node:22.23.4-bookworm-slim`, the same Node release the API image runs) is the single source for the app Node image. The scaffold `app/Dockerfile` starts from it, and `CLAUDE.md`/`AGENTS.md` (build rules and the migration Dockerfile step) tell agents to use it for every Node stage and never Node 20 or older. Kit updates never ship `app/`, so existing apps move at deploy time instead: step 4 of the deploy skill has the agent switch any `FROM node:<N>` with N < 22 to that image, check that the app still runs on Node 22, and tell the member in the deploy summary. It doesn't wait for approval. Non-Node images and Node ≥ 22 are left alone. Deployed apps keep their image until they are redeployed.
 
 ### Kit updates (kits ≥1.17)
 
