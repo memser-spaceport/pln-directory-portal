@@ -7,10 +7,7 @@ import { sanitizeMemberHtmlWriteArgs } from '../members/member-html.util';
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit {
   private static warned = false;
-  constructor(
-    private ingestionService: HuskyDataIngestionService,
-    private readonly logger: LogService,
-  ) {
+  constructor(private ingestionService: HuskyDataIngestionService, private readonly logger: LogService) {
     super();
   }
   async onModuleInit() {
@@ -34,11 +31,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
         }
       } catch (error) {
         // swallow to not block db operation
-        this.logger.error(
-          'Error occurred in emitting CUD events to Queue',
-          (error as any)?.stack,
-          PrismaService.name,
-        );
+        this.logger.error('Error occurred in emitting CUD events to Queue', (error as any)?.stack, PrismaService.name);
       }
 
       return result;
@@ -195,7 +188,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
    */
   private async emitCUDEvents(params, result) {
     const models = process.env.TRACKED_DB_ENTITIES
-      ? process.env.TRACKED_DB_ENTITIES.split(',').map(model => model.trim())
+      ? process.env.TRACKED_DB_ENTITIES.split(',').map((model) => model.trim())
       : ['Member', 'Team', 'PLEvent', 'Project'];
     const actions = ['create', 'update', 'delete'];
     const { action, model } = params;
@@ -211,11 +204,11 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
       entity: model,
       action,
       data: {
-        uid
+        uid,
       },
       options: {
-        timestamp: new Date().toISOString()
-      }
+        timestamp: new Date().toISOString(),
+      },
     });
   }
 }
