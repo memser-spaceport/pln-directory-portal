@@ -222,7 +222,6 @@ export const SHARE_IDEA_SUBJECT = 'A new idea received';
 export const SUPPORT_SUBJECT = 'A new support request received';
 export const ASK_CREATED_SUBJECT = 'A new ask created';
 export const ASK_CLOSED_SUBJECT = 'An ask closed';
-export const IPFS = 'ipfs';
 export const S3 = 's3';
 
 export const DEFAULT_MEMBER_ROLES = {

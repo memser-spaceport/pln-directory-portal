@@ -2,68 +2,47 @@
 
 ## Context
 
-See proposal.md for the reasons behind this change. The current state of the code:
+See proposal.md for the reasons behind this change. The current state:
 
-- `FileEncryptionService.getEncryptedFile` (`apps/web-api/src/utils/file-encryption/file-encryption.service.ts`) is the only encryption code in the API. It imports `crypto-browserify`, keys the cipher with `sha256(FILE_ENCRYPTION_SALT)[0:32]`, reads the cipher name from `FILE_ENCRYPTION_ALGORITHM`, and writes `iv(16) || ciphertext`.
-- It runs only when `FILE_STORAGE=ipfs`, from `FileUploadService.storeImageFiles` and `storeOneAndGetSecureUrl`. The S3 branch uploads plaintext and never calls it. `SharedModule`, `ImagesModule`, `UploadsModule`, `CommandModule` and the Forest Admin agent construct the service, so the constructor must stay side-effect free.
-- The API never decrypts. The Cloudflare worker `apps/web-api/cloudflare/workers/web3-file-retrieval/web3-file-retrieval.js` decrypts. It is bundled with webpack and pasted into the Cloudflare dashboard by hand, and it hard-codes `aes-256-ctr` with the same `sha256(salt)` key.
-- Data (read-only check, 2026-10-26): prod `Image` has 0 worker/IPFS URLs among ~59k rows (S3 buckets, `images.lumacdn.com`, `images.unsplash.com`, 17 empty). Prod `Upload` has 823 rows, all `S3`. Dev is the same. Nothing encrypted is referenced today.
+- `FileUploadService` (`apps/web-api/src/utils/file-upload/file-upload.service.ts`) branches on `FILE_STORAGE === 'ipfs'` in `storeImageFiles` and `storeOneAndGetSecureUrl`. The IPFS branch encrypts with `FileEncryptionService` and uploads through web3.storage. The S3 branch uploads plaintext through `AwsService`.
+- `ImagesController.uploadImage` turns a CID into a worker URL (`getDecryptedFileUrl`) when IPFS is on. `UploadsService` maps `storage === 'ipfs'` to the `IPFS` enum and stores a `cid`.
+- The Cloudflare worker in `apps/web-api/cloudflare/workers/web3-file-retrieval/` decrypts IPFS files. It is bundled by hand and pasted into the Cloudflare dashboard. Nothing in CI builds or deploys it.
+- Data (read-only check, 2026-10-26): prod `Image` has 0 IPFS/worker URLs among 59,058 rows, and prod `Upload` has 823 rows, all `S3`. Dev is the same.
 
 ## Goals / Non-Goals
 
 **Goals:**
-- No `crypto-browserify` at API runtime. Node's built-in `crypto` only.
-- A real derived key for new files.
-- Files encrypted before the change still decrypt through the worker, with the legacy code path left byte-for-byte as it is.
-- No behavior change on the live S3 path.
+- No IPFS, web3.storage or file-encryption code left in the API or the repo.
+- S3 behavior byte-for-byte unchanged.
 
 **Non-Goals:**
-- Re-encrypting or migrating stored files. None are referenced, and IPFS content is immutable (a new ciphertext means a new CID).
-- Authenticated encryption (GCM). IPFS addressing already makes stored bytes tamper-evident: a changed file has a different CID. GCM would add a tag format for no practical gain.
-- Removing the IPFS / web3.storage upload path, or modernising the worker's legacy dependencies (`browserify-aes`, `create-hash`).
-- Key rotation tooling.
+- Removing the `IPFS` DB enum value or the `Image.cid` column.
+- Removing the `web3.storage` / `crypto-browserify` packages from `package.json`.
+- Updating the old Airtable or Forest Admin docs beyond replacing the storage provider name.
 
 ## Decisions
 
-### D1. Node `crypto` in the API
-Import `createCipheriv`, `randomBytes` and `hkdfSync` from `crypto`. This is what the ticket asks for, and it drops the polyfill and its vulnerable transitive packages from the API's runtime import graph.
+### D1. Delete the IPFS path instead of fixing its crypto
+The path is unused and probably broken upstream. Fixing it (an earlier plan in this change: HKDF key, format marker, worker changes) adds code and a manual worker deploy for no user. Deleting it removes the weak key, the polyfill import and the public-storage surface at once.
 
-### D2. HKDF-SHA256 over scrypt or PBKDF2
-`key = HKDF-SHA256(ikm = FILE_ENCRYPTION_PASSWORD, salt = FILE_ENCRYPTION_SALT, info = "pln-file-encryption-v2", L = 32)`.
-- `FILE_ENCRYPTION_PASSWORD` is a server-side secret that ops generate as random bytes (≥ 32 bytes, base64/hex). It is not a human password, so a slow password KDF adds nothing, and HKDF is the right tool.
-- HKDF is native in Node (`hkdfSync`) and in Workers Web Crypto (`crypto.subtle.deriveBits`). The worker needs no new bundle dependency and spends no measurable CPU. scrypt is not in Web Crypto and would cost CPU per isolate on the worker.
-- Alternative considered: a raw 32-byte key in a new env var. Simpler, but the ticket asks for a derived key, and it would leave the existing `FILE_ENCRYPTION_PASSWORD` meaningless.
+### D2. Unwrap the S3 branches, don't rewrite them
+In `FileUploadService`, the existing S3 code becomes the only path with the same statements, so S3 behavior can't drift. `storeOneAndGetSecureUrl` keeps returning `storage: 's3'` so its result shape stays the same.
 
-### D3. Keep AES-256-CTR, hard-coded
-The worker already uses `aes-256-ctr`, and Web Crypto `AES-CTR` with `length: 128` matches Node's full-block counter increment. Hard-coding the cipher removes the API/worker mismatch that `FILE_ENCRYPTION_ALGORITHM` allowed.
+### D3. Keep the DB enum and columns
+`UploadStorage.IPFS` and `cid` stay in the Prisma schema. `UploadsService` always writes `S3` and a null `cid`, which is what every row already has. A destructive enum migration would add risk for no gain.
 
-### D4. 8-byte version marker `PLNENC02`
-New layout: `"PLNENC02" || iv(16) || ciphertext`. Legacy layout: `iv(16) || ciphertext`. Without a marker the worker cannot tell which key to use, because CTR decryption never fails. The chance that a legacy file's random IV starts with these 8 bytes is 2⁻⁶⁴, and no legacy files are in use anyway.
-
-### D5. Worker: add a branch, leave the legacy path alone
-In `handleRequest`, after fetching: if the buffer starts with the marker, derive the key once per isolate (module-level cached promise) with `crypto.subtle` HKDF and decrypt with `crypto.subtle` AES-CTR. Otherwise run the existing `createDecipheriv('aes-256-ctr', getScryptKey(), iv)` code unchanged. The new binding is `FILE_ENCRYPTION_PASSWORD` (a Cloudflare secret), read the same way as `FILE_ENCRYPTION_SALT`.
-
-### D6. Fail closed, lazily
-The API checks for the password and salt inside `getEncryptedFile`, not in the constructor. That way the many modules that construct the service, and the S3 path, keep booting without the new secret, and an IPFS upload without secrets throws instead of writing weak or plain bytes.
-
-### D7. Keep `crypto-browserify` installed, unimported
-Its only importer was this service and its spec. `yarn remove crypto-browserify` re-resolves unrelated `yarn.lock` entries (commitlint, typescript, semver, ts-node), so the package stays in `package.json`. With no import, it is off the API's runtime path. Dropping it belongs to a separate lockfile cleanup.
+### D4. Keep the packages
+`yarn remove` re-resolves about 240 unrelated `yarn.lock` lines (commitlint, typescript, semver, ts-node), so `web3.storage` and `crypto-browserify` stay in `package.json`. With no imports, neither is loaded at runtime. The `web3.storage` entry in Jest's `transformIgnorePatterns` stays for the same reason; it is inert.
 
 ## Risks / Trade-offs
 
-- [Worker not redeployed before IPFS is turned on] → New files would come back as garbage. Mitigation: IPFS is off everywhere today. The worker redeploy and the `FILE_ENCRYPTION_PASSWORD` binding are a release step in tasks.md, required before anyone sets `FILE_STORAGE=ipfs`, and the worker `.md` documents both.
-- [Jest's node environment lacks `globalThis.crypto.subtle` for the worker spec] → On Node 22 it is available. If the configured Jest env hides it, assign `require('crypto').webcrypto` to `global.crypto` in the spec's `beforeAll`, the same way the spec already injects `FILE_ENCRYPTION_SALT`.
-- [Weak ops-chosen password] → `.env.example` and the worker `.md` say to generate it with `openssl rand -base64 32`.
+- [An environment still sets `FILE_STORAGE=ipfs`] → It would now upload to S3 instead of IPFS. The data check shows no environment does, and S3 is the intended store.
+- [The deployed worker keeps running with the old salt in its settings] → Delete it in Cloudflare after merge (tasks.md). It only proxies IPFS reads, so deleting it affects no live URL.
+- [Hidden consumers of `FileEncryptionService` or `getDecryptedFileUrl`] → `yarn build:api` type-checks every import, and a repo-wide grep finds no other references.
 
 ## Migration Plan
 
-**Existing files (needs Vova's approval on LAB-2992):**
-1. No re-encryption. The read-only queries from 2026-10-26 (prod and dev `Image` URL hosts, `Upload.storage`) found 0 encrypted files referenced by the app.
-2. Legacy decrypt stays in the worker, unchanged (D5). Any unreferenced legacy object on IPFS still decrypts through the worker if requested.
-3. Re-run the same count query on prod just before merge. If it is non-zero, stop and revisit; nothing in this plan changes for those rows, but the reviewer should know.
-
-**Deploy:**
-1. Merge the API change. No env change is needed while `FILE_STORAGE` is S3.
-2. Only before anyone enables `FILE_STORAGE=ipfs`: set `FILE_ENCRYPTION_PASSWORD` in the API env (SSM) and as a worker secret, bundle the worker (`yarn webpack --config …/web3-file-retrieval.webpack.js`) and redeploy it.
-
-**Rollback:** revert the PR. Files written in the new format exist only if IPFS was enabled in between. The new worker still reads them, so roll the worker back last.
+- **Existing files:** none on IPFS, so no migration.
+- **Deploy:** merge into `develop`. No env change is needed. Optional cleanup: drop the unused env vars from SSM.
+- **After merge:** delete the `web3-file-retrieval` worker in Cloudflare.
+- **Rollback:** revert the PR.

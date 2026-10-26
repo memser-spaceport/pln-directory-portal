@@ -24,7 +24,6 @@
 - `apps/web-api/src/scripts`: one-off `ts-node` scripts run through the `api:*` scripts in `package.json` (imports, seeds, backfills, exports)
 - `apps/web-api/src/cli.ts`: `nest-commander` CLI entry (commands in `src/commands`; built by the `web-api:build-cli` target)
 - `apps/web-api/docs`: API docs (data model, deployment guide, testing guidelines)
-- `apps/web-api/cloudflare/workers`: Cloudflare Worker code (`web3-file-retrieval`)
 - `apps/back-office`: Next.js admin app
 - `apps/back-office/pages`: Next.js Pages Router routes (UI routes + `pages/api/*` endpoints)
 - `apps/back-office/components`: shared UI components

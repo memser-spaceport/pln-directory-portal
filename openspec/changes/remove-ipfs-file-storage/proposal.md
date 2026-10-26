@@ -2,30 +2,29 @@
 
 ## Why
 
-LAB-2992 is wave 2 (High) of the LAB-2977 security spike. The IPFS upload path encrypts files with `crypto-browserify`, a browser polyfill that pulls in packages with known CVEs (`pbkdf2`, `sha.js`, `cipher-base`). The key is just `sha256(FILE_ENCRYPTION_SALT)`, so the salt is in effect the key. `FILE_ENCRYPTION_PASSWORD` is configured but never read, and nothing derives a key with a key-derivation function.
+LAB-2992 (wave 2 of the LAB-2977 security spike) flagged the file encryption: it used `crypto-browserify`, a browser polyfill with known-CVE dependencies, and its key was just `sha256(FILE_ENCRYPTION_SALT)`. That encryption exists only for the IPFS / web3.storage upload path from 2022. Since S3 support was added (Jan 2024), every upload goes to S3. The IPFS path is switched off everywhere, a read-only check on 2026-10-26 found 0 IPFS files in prod and dev, and the `api.web3.storage` upload API it calls is no longer available. Removing the dead path closes the finding with less risk than repairing it.
 
 ## What Changes
 
-- The API encrypts files with Node's built-in `crypto` instead of `crypto-browserify`.
-- New files are encrypted with a key derived by HKDF-SHA256 from `FILE_ENCRYPTION_PASSWORD` (input key material) and `FILE_ENCRYPTION_SALT` (salt). The cipher is fixed to AES-256-CTR, the same cipher the worker uses today. It no longer comes from `FILE_ENCRYPTION_ALGORITHM`.
-- New ciphertext starts with a fixed 8-byte version marker, so the reader can tell new files from legacy ones.
-- If a secret is missing, encryption fails with an error. It never falls back to the legacy key.
-- The Cloudflare file-retrieval worker decrypts both formats. Marked files use the derived key. Unmarked (legacy) files keep the existing `sha256(salt)` path, unchanged.
-- Nothing in the API imports `crypto-browserify` anymore. The package stays in `package.json`, because removing it re-resolves unrelated `yarn.lock` entries; dropping it is a separate lockfile cleanup.
-- No re-encryption or data migration. A read-only check on 2026-10-26 found 0 IPFS/worker-hosted files in prod and in dev. Every `Image` and `Upload` row is on S3 or an external CDN, and the S3 path never encrypts.
+- **BREAKING (config only):** `FILE_STORAGE=ipfs` no longer has any effect. Uploads always go to S3, which is already the case in every environment.
+- `FileEncryptionService` is deleted, along with its registrations in the shared, images, uploads and command modules and in the Forest Admin agent.
+- `FileUploadService` loses the web3.storage client, the encryption step and `getDecryptedFileUrl`. Its S3 code is unchanged.
+- The images controller and the uploads service drop their IPFS branches. Upload rows are always written as `S3`.
+- The Cloudflare `web3-file-retrieval` worker code (decrypt proxy) is deleted.
+- `FILE_STORAGE`, `FILE_ENCRYPTION_*`, `WORKER_IMAGE_URL` and `WEB3_STORAGE_API_TOKEN` are removed from `.env.example`. AGENTS.md and the docs under `docs/` no longer mention Web3Storage or the worker.
+- No data migration: there are no IPFS files.
 
 ## Capabilities
 
 ### New Capabilities
-- `file-encryption`: how the API encrypts files before storing them on public storage (IPFS), and how the file-retrieval worker decrypts both current and legacy files.
+- `file-storage`: where the API stores uploaded images and files.
 
 ### Modified Capabilities
 <!-- none -->
 
 ## Impact
 
-- Code: `apps/web-api/src/utils/file-encryption/file-encryption.service.ts` and its spec; `apps/web-api/cloudflare/workers/web3-file-retrieval/web3-file-retrieval.js`, its spec and its `.md`; `.env.example`.
-- Dependencies: none added or removed. `crypto-browserify` stays installed but unimported. The worker keeps its own direct deps (`browserify-aes`, `create-hash`, `buffer`).
-- Config: new IPFS uploads need `FILE_ENCRYPTION_PASSWORD`, a random secret, in the API env and as a worker binding. `FILE_ENCRYPTION_ALGORITHM` and `FILE_ENCRYPTION_KEY_LENGTH` are no longer read.
-- Runtime: no behavior change for the live S3 upload path, which `FileEncryptionService` never touches. The IPFS path is not in use in any environment today.
-- Process: this is a restricted area (secrets/keys), so a human builds it. Vova approves the migration plan in `design.md` on LAB-2992 before merge.
+- Code: `apps/web-api/src/utils/file-upload/`, `apps/web-api/src/utils/file-encryption/` (deleted), `apps/web-api/src/images/`, `apps/web-api/src/uploads/`, `shared.module.ts`, `command.module.ts`, `utils/forest-admin/agent.ts`, `utils/constants.ts`, `apps/web-api/cloudflare/` (deleted).
+- Not changed: the `IPFS` value of the `UploadStorage` DB enum (removing it needs a migration and gains nothing), the `Image.cid` column (S3 images use it too), and the `web3.storage` / `crypto-browserify` packages in `package.json` (no longer imported; removing them re-resolves unrelated `yarn.lock` entries, so that is a separate cleanup).
+- Infra: after merge, someone with Cloudflare access deletes the deployed `web3-file-retrieval` worker, whose settings hold the old salt.
+- Process: the approach differs from the ticket's acceptance criteria, so Vova approves the switch on LAB-2992 before merge.
