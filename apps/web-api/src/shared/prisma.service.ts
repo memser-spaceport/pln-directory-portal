@@ -2,6 +2,7 @@ import { INestApplication, Injectable, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { HuskyDataIngestionService } from './husky-data-ingestion.service';
 import { LogService } from './log.service';
+import { sanitizeMemberHtmlWriteArgs } from '../members/member-html.util';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit {
@@ -16,6 +17,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
     await this.$connect();
     // Setting up Prisma Middleware for handling Team updates
     this.$use(async (params, next) => {
+      // Member HTML fields (bio, experience description) are sanitized on every write
+      sanitizeMemberHtmlWriteArgs(params);
       const result = await next(params);
       if (params.model === 'Team' && params.action === 'update') {
         await this.createTeamFocusAreaVersionHistory(params);

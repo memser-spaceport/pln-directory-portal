@@ -30,6 +30,7 @@
     "api:backfill-team-news-images": "ts-node --transpile-only apps/web-api/src/scripts/backfill-team-news-images.ts",
     "api:backfill-ai-app-views": "ts-node --transpile-only apps/web-api/src/scripts/backfill-ai-app-views.ts",
     "api:backfill-ai-app-feedback-pins": "ts-node --transpile-only apps/web-api/src/scripts/backfill-ai-app-feedback-pins.ts",
+    "api:sanitize-member-html": "ts-node --transpile-only apps/web-api/src/scripts/sanitize-member-html.ts",
     "api:merge-master-profiles": "ts-node --transpile-only apps/web-api/src/scripts/merge-master-profiles.ts",
     "api:export-investor-portfolio-overlaps": "ts-node --transpile-only apps/web-api/src/scripts/export-investor-portfolio-overlaps.ts",
     "api:export-affinity-founders": "ts-node --transpile-only apps/web-api/src/scripts/export-affinity-founders.ts",
