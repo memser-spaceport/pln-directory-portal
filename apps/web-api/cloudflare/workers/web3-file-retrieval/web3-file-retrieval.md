@@ -33,3 +33,21 @@ yarn webpack --progress --config apps/web-api/cloudflare/workers/web3-file-retri
 
 # Output goes into the global dist folder.
 ```
+
+### Encryption formats
+
+The worker decrypts two layouts, both AES-256-CTR:
+
+| Layout | Bytes | Key |
+|---|---|---|
+| Current (written by the API) | `PLNENC02` (8) · IV (16) · ciphertext | HKDF-SHA256 of `FILE_ENCRYPTION_PASSWORD`, salt `FILE_ENCRYPTION_SALT`, info `pln-file-encryption-v2` |
+| Legacy (no marker) | IV (16) · ciphertext | `sha256(FILE_ENCRYPTION_SALT)` |
+
+### Secrets
+
+Set both as encrypted variables on the worker in the Cloudflare Dashboard, with the same values as the API env:
+
+- `FILE_ENCRYPTION_PASSWORD`: random secret (`openssl rand -base64 32`)
+- `FILE_ENCRYPTION_SALT`
+
+Redeploy the bundled worker with both secrets before setting `FILE_STORAGE=ipfs` on the API. Otherwise files the API encrypts come back from the worker as `502`.
