@@ -156,17 +156,11 @@ Heroku is a platform as a service (PaaS) that enables developers to build, run, 
 
 Cloud-based platform for hosting, deploying, and scaling web applications, including Next.js web apps, that provides a seamless and fast development experience, with features such as automatic deployments, preview URLs, custom domains, CDN caching, edge network optimization, and serverless functions, as well as integration with Git workflows and popular development tools, improving developer productivity and user experience.
 
-## 🎯 Serverless Functions
-
-**[Cloudflare](https://www.cloudflare.com/)**
-
-Cloudflare is a web infrastructure and website security company, providing content delivery network services, DDoS mitigation, Internet security, and distributed domain name server services.
-
 ## 📁 File Storage
 
-**[web3.Storage](https://web3.storage/)**
+**[AWS S3](https://aws.amazon.com/s3/)**
 
-At the core of web3.storage is a storage service to safely secure and make your data available - giving developers the power of decentralized storage and content addressing via simple client libraries or an HTTP API.
+Object storage for uploaded images and files.
 
 **[Google Cloud Platform](https://cloud.google.com/)**
 

@@ -1,12 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { File, Web3Storage } from 'web3.storage';
-
 // Explicitly import multer to temporarily fix this issue:
 // https://github.com/DefinitelyTyped/DefinitelyTyped/issues/47780
 import 'multer';
-import { FileEncryptionService } from '../file-encryption/file-encryption.service';
 import { AwsService } from '../aws/aws.service';
-import { IPFS } from '../constants';
 import * as path from 'path';
 import { createHash } from 'crypto';
 
@@ -20,65 +16,28 @@ function fileExt(name: string) {
 
 @Injectable()
 export class FileUploadService {
-  constructor(private fileEcryptionService: FileEncryptionService, private awsService:AwsService) {}
-
-  private makeStorageClient() {
-    console.log("Inside makeStorageClient");
-    return new Web3Storage({
-      token: process.env.WEB3_STORAGE_API_TOKEN || '',
-      endpoint: new URL('https://api.web3.storage'),
-    });
-  }
-
-  private makeFileObjects(files: Array<Express.Multer.File>) {
-    return files.map((file) => new File([new Uint8Array(file.buffer)], `${file.originalname}`));
-  }
-
-  private encryptFiles(files: Array<Express.Multer.File>) {
-    return files.map((file) => this.fileEcryptionService.getEncryptedFile(file));
-  }
+  constructor(private awsService:AwsService) {}
 
   async storeImageFiles(uploadedFiles: Array<Express.Multer.File>) {
-    if (process.env.FILE_STORAGE === IPFS) {
-      const client = this.makeStorageClient();
-      const encryptedFiles = this.encryptFiles(uploadedFiles);
-      const fileObjects = this.makeFileObjects(encryptedFiles);
-      const cid = await client.put(fileObjects);
-      return cid;
-    } else {
-      let response;
-      for (const file of uploadedFiles) {
-        if (!response) {
-          response = await this.awsService.uploadFileToS3(file, process.env.AWS_S3_IMAGE_BUCKET_NAME , file.originalname);
-        } else {
-          await this.awsService.uploadFileToS3(file, process.env.AWS_S3_IMAGE_BUCKET_NAME , file.originalname);
-        }
+    let response;
+    for (const file of uploadedFiles) {
+      if (!response) {
+        response = await this.awsService.uploadFileToS3(file, process.env.AWS_S3_IMAGE_BUCKET_NAME , file.originalname);
+      } else {
+        await this.awsService.uploadFileToS3(file, process.env.AWS_S3_IMAGE_BUCKET_NAME , file.originalname);
       }
-      return response.Location;
     }
+    return response.Location;
   }
 
-  async getDecryptedFileUrl(cid: string, filename: string) {
-    return `${process.env.WORKER_IMAGE_URL}/${cid}/${filename}`;
-  }
-
-  // New: single-file store that returns a secure URL (worker URL for IPFS or presigned GET for S3).
+  // Single-file store that returns a secure URL (presigned GET by default).
   async storeOneAndGetSecureUrl(
     file: Express.Multer.File,
     opts?: { prefix?: string; signed?: boolean; ttlSec?: number },
-  ): Promise<{ url: string; storage: 'ipfs' | 's3'; keyOrPath: string; bucket?: string }> {
+  ): Promise<{ url: string; storage: 's3'; keyOrPath: string; bucket?: string }> {
     const prefix = opts?.prefix ?? 'uploads';
     const signed = opts?.signed ?? true;
     const ttlSec = Math.max(30, Number(opts?.ttlSec ?? 3600)); // default 1h for this helper
-
-    if (process.env.FILE_STORAGE === IPFS) {
-      const client = this.makeStorageClient();
-      const enc = this.encryptFiles([file]);
-      const fileObjs = this.makeFileObjects(enc);
-      const cid = await client.put(fileObjs);
-      const url = await this.getDecryptedFileUrl(cid, file.originalname);
-      return { url, storage: 'ipfs', keyOrPath: `${cid}/${file.originalname}` };
-    }
 
     // Resolve ONE bucket consistently for S3 uploads
     const bucket =

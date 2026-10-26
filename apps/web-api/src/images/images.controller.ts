@@ -15,7 +15,6 @@ import { apiImages } from '../../../../libs/contracts/src/lib/contract-images';
 import { FileUploadService } from '../utils/file-upload/file-upload.service';
 import { hashFileName } from '../utils/hashing';
 import { ImagesService } from './images.service';
-import { IPFS } from '../../src/utils/constants';
 
 const server = initNestServer(apiImages);
 type RouteShape = typeof server.routeShapes;
@@ -110,7 +109,7 @@ export class ImagesController {
       encoding: '7bit',
     };
 
-    // Store the original file in web3.storage or s3 based on env config
+    // Store the original file in S3
     const resp = await this.fileUploadService.storeImageFiles([expressOriginalFile]);
 
     // Create the image record with basic metadata
@@ -120,10 +119,7 @@ export class ImagesController {
         filename: file.originalname,
         size: buffer.length,
         height: 0, // No processing, so set to 0
-        url: process.env.FILE_STORAGE === 'ipfs' ? await this.fileUploadService.getDecryptedFileUrl(
-          resp,
-          file.originalname
-        ): resp,
+        url: resp,
         width: 0, // No processing, so set to 0
         version: 'ORIGINAL',
         type: mimetype.split('/')[1], // Extract format from mimetype

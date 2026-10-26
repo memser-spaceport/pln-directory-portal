@@ -46,6 +46,28 @@ describe('AwsService.sendHtmlEmail', () => {
     expect(raw).toContain('<p>Hi</p>');
   });
 
+  it('keeps the raw MIME layout of the message', async () => {
+    process.env.IS_EMAIL_ENABLED = 'true';
+    await new AwsService().sendHtmlEmail({
+      from: 'Directory <directory@example.com>',
+      to: ['candidate@example.com', 'Ünïcode Name <second@example.com>'],
+      cc: ['cc@example.com'],
+      subject: 'Héllo – a subject long enough to be folded across more than one header line by the composer',
+      html: `<p>Hi ✓</p><p>${'a'.repeat(120)}</p>`,
+      text: 'Hi ✓',
+      replyTo: 'lead@example.com',
+    });
+    const raw: string = sendRawEmail.mock.calls[0][0].RawMessage.Data;
+    const boundaries = [...raw.matchAll(/boundary="([^"]+)"/g)].map((m) => m[1]);
+    let normalized = raw
+      .replace(/^Message-ID: .*$/m, 'Message-ID: <MESSAGE-ID>')
+      .replace(/^Date: .*$/m, 'Date: <DATE>');
+    boundaries.forEach((b, i) => {
+      normalized = normalized.split(b).join(`<BOUNDARY-${i}>`);
+    });
+    expect(normalized).toMatchSnapshot();
+  });
+
   it('rejects when SES fails', async () => {
     process.env.IS_EMAIL_ENABLED = 'true';
     sendRawEmail.mockReturnValue({ promise: () => Promise.reject(new Error('ses down')) });

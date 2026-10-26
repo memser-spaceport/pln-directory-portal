@@ -27,7 +27,7 @@ flowchart TB
     end
 
     subgraph FS["File Storage"]
-        W3S["Web3Storage"]
+        S3["AWS S3"]
     end
 
     subgraph ER["#nbsp;#nbsp;Error Reporting#nbsp;#nbsp;"]
@@ -38,22 +38,17 @@ flowchart TB
         f1["Fathom"]
     end
 
-    subgraph CDN
-        CW["Cloudflare Workers"]
-    end
-
     subgraph GCP["Google Cloud Platform"]
         GCPAPI["Google Places API"]
         GCPBucket["Google Cloud Storage Bucket"]
     end
 
     HC(("HTTP Client"))
-    CW -- retrieves files --> W3S
     CI/CD --> HSWA
     CI/CD --> HSAPI
     HSWA <-- request/response --> HSAPI
-    HSAPI -- storing encrypted files --> W3S
-    CDN -- serving decrypted files --> HSWA
+    HSAPI -- storing files --> S3
+    S3 -- serving files --> HSWA
     HSWA --> A1
     HSWA --> ER
     HSWA -- auth requests --> AS
