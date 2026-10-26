@@ -15,6 +15,7 @@ import { LocationTransferService } from '../location-transfer/location-transfer.
 import { generateUid } from './generated-uid';
 import { resetCacheAfterCreateOrUpdateOrDelete } from './reset-cache-after-cud';
 import { LogService } from '../../shared/log.service';
+import { MEMBER_HTML_FIELDS, sanitizeMemberHtml } from '../../members/member-html.util';
 
 const prismaService = new PrismaService(new HuskyDataIngestionService(new AwsService()), new LogService());
 
@@ -91,6 +92,25 @@ async function configureCUDSyncs(collection, slug) {
   });
 }
 
+// The admin panel writes through its own SQL connection, not PrismaService,
+// so it sanitizes the member HTML fields itself.
+function configureMemberHtmlSanitizing(collection, model: 'Member' | 'MemberExperience') {
+  const fields = MEMBER_HTML_FIELDS[model] ?? [];
+  const sanitize = (record) => {
+    for (const field of fields) {
+      if (typeof record?.[field] === 'string') record[field] = sanitizeMemberHtml(record[field]);
+    }
+  };
+
+  collection.addHook('Before', 'Create', async (context) => {
+    context.data.forEach(sanitize);
+  });
+
+  collection.addHook('Before', 'Update', async (context) => {
+    sanitize(context.patch);
+  });
+}
+
 async function triggerSync(slug) {
   if (process.env.ENVIRONMENT !== APP_ENV.PRODUCTION) {
     return;
@@ -147,6 +167,11 @@ export function createForestAdminAgent() {
     });
 
     configureCUDSyncs(collection, 'member-to-pln-airtable');
+    configureMemberHtmlSanitizing(collection, 'Member');
+  });
+
+  agent.customizeCollection('MemberExperience', (collection) => {
+    configureMemberHtmlSanitizing(collection, 'MemberExperience');
   });
 
   agent.customizeCollection('Team', (collection) => {
