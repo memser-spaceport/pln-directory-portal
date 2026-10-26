@@ -1,4 +1,9 @@
-import { buildNewsTagVocabulary, groupUsedNewsTags, NewsTagVocabularyService } from './news-tag-vocabulary.service';
+import {
+  buildNewsTagVocabulary,
+  expandNewsTags,
+  groupUsedNewsTags,
+  NewsTagVocabularyService,
+} from './news-tag-vocabulary.service';
 
 /**
  * LAB-2998: news tags are focus-area slugs, so the vocabulary is the focus-area
@@ -48,11 +53,31 @@ describe('buildNewsTagVocabulary', () => {
 });
 
 describe('NewsTagVocabularyService', () => {
-  function buildPrisma(teamAreaTitles: string[] = []) {
+  /** Team focus-area titles per member, and stored preferences per member. */
+  function buildPrisma(
+    teamAreasByMember: Record<string, string[]> = {},
+    preferencesByMember: Record<string, unknown> = {}
+  ) {
     return {
       focusArea: { findMany: jest.fn(async () => areas) },
-      teamFocusArea: {
-        findMany: jest.fn(async () => teamAreaTitles.map((title) => ({ focusArea: { title } }))),
+      teamMemberRole: {
+        findMany: jest.fn(async (args: any) =>
+          (args.where.memberUid.in as string[]).flatMap((memberUid) =>
+            teamAreasByMember[memberUid] === undefined
+              ? []
+              : [
+                  {
+                    memberUid,
+                    team: { teamFocusAreas: teamAreasByMember[memberUid].map((title) => ({ focusArea: { title } })) },
+                  },
+                ]
+          )
+        ),
+      },
+      member: {
+        findMany: jest.fn(async (args: any) =>
+          (args.where.uid.in as string[]).map((uid) => ({ uid, preferences: preferencesByMember[uid] ?? null }))
+        ),
       },
     };
   }
@@ -78,19 +103,61 @@ describe('NewsTagVocabularyService', () => {
   });
 
   it("seeds a member's tags from their teams' focus areas, deduplicated", async () => {
-    const prisma = buildPrisma(['AI', 'Data Ownership', 'AI']);
-    const service = new NewsTagVocabularyService(prisma as any);
+    const service = new NewsTagVocabularyService(buildPrisma({ m1: ['AI', 'Data Ownership', 'AI'] }) as any);
 
     await expect(service.seedTagsForMember('m1')).resolves.toEqual(['ai', 'data-ownership']);
-    expect(prisma.teamFocusArea.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { team: { teamMemberRoles: { some: { memberUid: 'm1' } } } } })
-    );
   });
 
   it('seeds nothing for a member on no team', async () => {
-    const service = new NewsTagVocabularyService(buildPrisma([]) as any);
+    const service = new NewsTagVocabularyService(buildPrisma() as any);
 
     await expect(service.seedTagsForMember('m1')).resolves.toEqual([]);
+  });
+
+  it('seeds many members with one query', async () => {
+    const prisma = buildPrisma({ m1: ['AI'], m2: ['Climate / ReFi'] });
+    const service = new NewsTagVocabularyService(prisma as any);
+
+    const seeds = await service.seedTagsForMembers(['m1', 'm2', 'm3']);
+
+    expect(Object.fromEntries(seeds)).toEqual({ m1: ['ai'], m2: ['climate-refi'], m3: [] });
+    expect(prisma.teamMemberRole.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  describe('getEffectiveTagsForMembers', () => {
+    it('uses saved tags, expanding a parent to its children', async () => {
+      const service = new NewsTagVocabularyService(
+        buildPrisma({}, { m1: { newsTags: ['digital-human-rights'] } }) as any
+      );
+
+      const tags = await service.getEffectiveTagsForMembers(['m1']);
+
+      expect([...(tags.get('m1') ?? [])].sort()).toEqual(['data-ownership', 'digital-human-rights']);
+    });
+
+    it('seeds a member who never saved, and keeps a saved empty list empty', async () => {
+      const prisma = buildPrisma({ m1: ['AI'], m2: ['AI'] }, { m2: { newsTags: [] } });
+      const service = new NewsTagVocabularyService(prisma as any);
+
+      const tags = await service.getEffectiveTagsForMembers(['m1', 'm2']);
+
+      expect([...(tags.get('m1') ?? [])]).toEqual(['ai']);
+      expect([...(tags.get('m2') ?? [])]).toEqual([]);
+      // Only the member who never saved is seeded.
+      expect((prisma.teamMemberRole.findMany.mock.calls[0] as any)[0].where.memberUid.in).toEqual(['m1']);
+    });
+  });
+});
+
+describe('expandNewsTags', () => {
+  const vocabulary = buildNewsTagVocabulary(areas);
+
+  it('adds every focus area under a chosen parent', () => {
+    expect([...expandNewsTags(['ai-robotics'], vocabulary)].sort()).toEqual(['ai', 'ai-robotics']);
+  });
+
+  it('leaves a child as itself and drops slugs outside the vocabulary', () => {
+    expect([...expandNewsTags(['ai', 'launch'], vocabulary)]).toEqual(['ai']);
   });
 });
 

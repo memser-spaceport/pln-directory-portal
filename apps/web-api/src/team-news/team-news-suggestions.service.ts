@@ -93,6 +93,32 @@ export class TeamNewsSuggestionsService {
   }
 
   /**
+   * The teams each member belongs to or follows, without the Teams-to-follow
+   * expansion: what For You and the digest keep next to tag matches when news
+   * tags are on (LAB-2999). Every member gets an entry, empty when they have none.
+   */
+  async getOwnTeamUidsForMembers(memberUids: string[]): Promise<Map<string, Set<string>>> {
+    const uniqueMemberUids = [...new Set(memberUids)];
+    const result = new Map<string, Set<string>>(uniqueMemberUids.map((uid) => [uid, new Set<string>()]));
+    if (uniqueMemberUids.length === 0) return result;
+
+    const [roles, followsByMember] = await Promise.all([
+      this.prisma.teamMemberRole.findMany({
+        where: { memberUid: { in: uniqueMemberUids } },
+        select: { memberUid: true, teamUid: true },
+      }),
+      this.followsService.getFollowedTeamUidsByMembers(uniqueMemberUids),
+    ]);
+    for (const uid of uniqueMemberUids) {
+      for (const teamUid of followsByMember.get(uid) ?? []) result.get(uid)?.add(teamUid);
+    }
+    for (const role of roles) {
+      result.get(role.memberUid)?.add(role.teamUid);
+    }
+    return result;
+  }
+
+  /**
    * Same union as getForYouTeamUids, batched so a digest job does not N+1.
    * Members with no memberships and no follows map to [].
    */
@@ -106,21 +132,7 @@ export class TeamNewsSuggestionsService {
       return result;
     }
 
-    const [roles, followsByMember] = await Promise.all([
-      this.prisma.teamMemberRole.findMany({
-        where: { memberUid: { in: uniqueMemberUids } },
-        select: { memberUid: true, teamUid: true },
-      }),
-      this.followsService.getFollowedTeamUidsByMembers(uniqueMemberUids),
-    ]);
-
-    const seedByMember = new Map<string, Set<string>>();
-    for (const uid of uniqueMemberUids) {
-      seedByMember.set(uid, new Set(followsByMember.get(uid) ?? []));
-    }
-    for (const role of roles) {
-      seedByMember.get(role.memberUid)?.add(role.teamUid);
-    }
+    const seedByMember = await this.getOwnTeamUidsForMembers(uniqueMemberUids);
 
     const membersWithSeeds = uniqueMemberUids.filter((uid) => (seedByMember.get(uid)?.size ?? 0) > 0);
     if (membersWithSeeds.length === 0) {

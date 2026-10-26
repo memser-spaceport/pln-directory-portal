@@ -23,3 +23,17 @@ export function selectForYouNewsItems<T extends { teamUid: string; eventDate: st
   }
   return selected;
 }
+
+/**
+ * For You by news tags (LAB-2999): stories from the member's own or followed
+ * teams, plus stories sharing any of their tags, then the latest story per team.
+ * `tags` holds focus-area slugs only, so a legacy verb tag (`launch`) never matches.
+ */
+export function selectNewsItemsByTagsAndTeams<
+  T extends { teamUid: string; eventDate: string; createdAt: string; tags?: string[] | null }
+>(items: T[], ownTeamUids: ReadonlySet<string>, tags: ReadonlySet<string>): T[] {
+  const matched = items.filter(
+    (item) => ownTeamUids.has(item.teamUid) || (item.tags ?? []).some((tag) => tags.has(tag.trim().toLowerCase()))
+  );
+  return selectForYouNewsItems(matched, new Set(matched.map((item) => item.teamUid)));
+}
