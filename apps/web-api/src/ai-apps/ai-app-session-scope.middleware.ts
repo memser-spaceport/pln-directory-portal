@@ -26,8 +26,9 @@ const route = (req: Request) => `${req.method} ${req.originalUrl.split('?')[0]}`
  * middleware in app.module (`/v1/ai-apps/me`, `/v1/ai-apps/track`, `/v1/ai-apps/access-check`). Anywhere else they
  * get a 401 before any guard or auth-service call, and the attempt is logged with the app it came from.
  *
- * Soak telemetry: a LabOS token sent from a deployed app's origin to one of those other routes is logged
- * (`ai_app_origin_labos_token`) but not blocked. It shows which apps would break once they only hold app sessions.
+ * A LabOS member token (Bearer or `authToken` cookie) sent from a deployed app's origin to one of those other
+ * routes is refused with 401 and logged (`ai_app_origin_labos_token`). A request from the LabOS origin is unchanged.
+ * App session tokens stay valid on the three routes this middleware does not cover.
  */
 @Injectable()
 export class AiAppSessionScopeMiddleware implements NestMiddleware {
@@ -51,6 +52,8 @@ export class AiAppSessionScopeMiddleware implements NestMiddleware {
     const appId = appIdFromOrigin(req.headers.origin);
     if (appId && extractTokenFromRequest(req)) {
       this.logger.warn(JSON.stringify({ event: 'ai_app_origin_labos_token', appId, route: route(req) }));
+      res.status(401).send({ statusCode: 401, message: 'LabOS member tokens are not accepted from an AI app origin' });
+      return;
     }
     next();
   }

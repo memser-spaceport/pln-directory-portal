@@ -6,11 +6,11 @@ import { buildAppUrl } from './ai-apps.constants';
 const appToken = jwt.sign({ iss: 'pln-ai-apps-session', aud: 'foo', uid: 'm-1' }, 'k');
 const labosToken = jwt.sign({ iss: 'https://auth.os.pl.xyz', sub: 's-1' }, 'k');
 
-function run(authorization?: string, url = '/v1/members/m-2', origin?: string) {
+function run(authorization?: string, url = '/v1/members/m-2', origin?: string, cookies: Record<string, string> = {}) {
   const res: any = { status: jest.fn().mockReturnThis(), send: jest.fn().mockReturnThis() };
   const next = jest.fn();
   const headers: any = { ...(authorization ? { authorization } : {}), ...(origin ? { origin } : {}) };
-  const req: any = { method: 'PUT', originalUrl: `${url}?x=1`, headers, cookies: {} };
+  const req: any = { method: 'PUT', originalUrl: `${url}?x=1`, headers, cookies };
   new AiAppSessionScopeMiddleware().use(req, res, next);
   return { res, next };
 }
@@ -41,12 +41,19 @@ describe('AiAppSessionScopeMiddleware', () => {
     expect(res.status).not.toHaveBeenCalled();
   });
 
-  it('logs (but does not block) a LabOS token sent from a deployed app origin', () => {
+  it.each<[string, string | undefined, Record<string, string>]>([
+    ['Bearer', `Bearer ${labosToken}`, {}],
+    ['authToken cookie', undefined, { authToken: `"${labosToken}"` }],
+  ])('401s a LabOS member token sent as %s from a deployed app origin', (_label, authorization, cookies) => {
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
-    const { res, next } = run(`Bearer ${labosToken}`, '/v1/members/m-2', buildAppUrl('network-pulse', 'prod'));
+    const { res, next } = run(authorization, '/v1/members/m-2', buildAppUrl('network-pulse', 'prod'), cookies);
 
-    expect(next).toHaveBeenCalled();
-    expect(res.status).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.send).toHaveBeenCalledWith({
+      statusCode: 401,
+      message: 'LabOS member tokens are not accepted from an AI app origin',
+    });
+    expect(next).not.toHaveBeenCalled();
     expect(JSON.parse(warn.mock.calls[0][0] as string)).toEqual({
       event: 'ai_app_origin_labos_token',
       appId: 'network-pulse',
@@ -54,10 +61,22 @@ describe('AiAppSessionScopeMiddleware', () => {
     });
   });
 
-  it('does not log LabOS itself or other platform hosts under the app domain', () => {
+  it('does not block an app origin that sends no token', () => {
+    const { res, next } = run(undefined, '/v1/members/m-2', buildAppUrl('network-pulse', 'prod'));
+    expect(next).toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it('does not log or block LabOS itself or other platform hosts under the app domain', () => {
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
-    run(`Bearer ${labosToken}`, '/v1/members/m-2', buildAppUrl('directoryv2', 'prod'));
-    run(`Bearer ${labosToken}`, '/v1/members/m-2', 'https://example.com');
+    for (const origin of [buildAppUrl('directoryv2', 'prod'), 'https://example.com']) {
+      const bearer = run(`Bearer ${labosToken}`, '/v1/members/m-2', origin);
+      const cookie = run(undefined, '/v1/members/m-2', origin, { authToken: `"${labosToken}"` });
+      expect(bearer.next).toHaveBeenCalled();
+      expect(bearer.res.status).not.toHaveBeenCalled();
+      expect(cookie.next).toHaveBeenCalled();
+      expect(cookie.res.status).not.toHaveBeenCalled();
+    }
     expect(warn).not.toHaveBeenCalled();
   });
 
