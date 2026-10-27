@@ -173,7 +173,7 @@ export function EditModal({ team, authToken, onClose }: Props) {
       try {
         const formData = new FormData();
         formData.append('file', selectedLogoFile);
-        const response = await api.post('/v1/images', formData, {
+        const response = await api.post('/v1/admin/images', formData, {
           headers: { 'content-type': 'multipart/form-data' },
         });
         uploadedLogoUid = response.data.image.uid;

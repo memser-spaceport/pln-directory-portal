@@ -1,12 +1,14 @@
 import { Module } from '@nestjs/common';
-import { FileEncryptionService } from '../utils/file-encryption/file-encryption.service';
 import { FileUploadService } from '../utils/file-upload/file-upload.service';
+import { AwsService } from '../utils/aws/aws.service';
+import { JwtService } from '../utils/jwt/jwt.service';
+import { AdminImagesController } from './admin-images.controller';
 import { ImagesController } from './images.controller';
 import { ImagesService } from './images.service';
-import { AwsService } from '../utils/aws/aws.service';
+import { ServiceImagesController } from './service-images.controller';
 
 @Module({
-  controllers: [ImagesController],
-  providers: [ImagesService, FileUploadService, FileEncryptionService, AwsService],
+  controllers: [ImagesController, AdminImagesController, ServiceImagesController],
+  providers: [ImagesService, FileUploadService, AwsService, JwtService],
 })
 export class ImagesModule {}

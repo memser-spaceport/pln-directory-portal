@@ -5,7 +5,7 @@ The PLN Directory data was initially being stored & managed on Airtable which me
 After an extensive research, we've selected [Forest Admin](https://www.forestadmin.com/) as it covers all the existing needs that were previously provided by Airtable as well as:
 
 - [Direct integration with NestJS](https://www.forestadmin.com/integrations/nestjs);
-- Upload customization that allowed us to easily make use of our storage provider (Web3Storage);
+- Upload customization that allowed us to easily make use of our storage provider (AWS S3);
 - An easy-to-use interface that can be customizable either via code or its layout editor;
 
 ---
@@ -62,7 +62,7 @@ To ensure that the `uid` is always correctly populated on Forest Admin, we're ma
 
 For more details on the actual implementation, please check: [generated-uid.ts](../apps/web-api/src/utils/forest-admin/generated-uid.ts#L7)
 
-#### 🏞 Uploading images to Web3Storage
+#### 🏞 Uploading images to S3
 
 In order to support image uploads through Forest Admin we resorted to a custom [action](https://docs.forestadmin.com/developer-guide-agents-nodejs/agent-customization/actions) that will call the upload method on the images controller.
 

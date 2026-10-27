@@ -1,43 +1,24 @@
-import {
-  Controller,
-  HttpException,
-  HttpStatus,
-  UploadedFile,
-  UseInterceptors,
-} from '@nestjs/common';
+import { Controller, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBody, ApiConsumes, ApiParam } from '@nestjs/swagger';
-import { Prisma } from '@prisma/client';
+import { Throttle } from '@nestjs/throttler';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
-import * as fs from 'fs';
-import * as path from 'path';
 import { apiImages } from '../../../../libs/contracts/src/lib/contract-images';
-import { FileUploadService } from '../utils/file-upload/file-upload.service';
-import { hashFileName } from '../utils/hashing';
+import { ANONYMOUS_IMAGE_UPLOAD_LIMIT, ANONYMOUS_IMAGE_UPLOAD_TTL_SECONDS } from './images.constants';
 import { ImagesService } from './images.service';
-import { IPFS } from '../../src/utils/constants';
 
 const server = initNestServer(apiImages);
 type RouteShape = typeof server.routeShapes;
 
 /**
- * Despite the name, this controller IS used in production:
- * - apps/back-office uploads member/deal images here via a bare `fetch`
- *   (utils/services/member.ts saveRegistrationImage) and via the token-attaching
- *   `api` instance (components/teams/data-quality/EditModal.tsx) — neither sends
- *   a member token the member-auth introspection guards accept.
- * - An external events-service proxies public IRL event-logo uploads here.
- * Do not add a member-auth guard (UserTokenValidation/UserTokenCheckGuard/etc.)
- * without first giving those callers a credential they can actually send — the
- * `Image` model itself holds no member PII (url/filename/dimensions only), so
- * there's no anonymous-data-leak reason to gate it.
+ * POST /v1/images stays open. Sign-up and onboarding upload before a member
+ * account exists, and the directory uploads profile, team and rich-text images
+ * here with no member token. The per-IP limit is the control on this route.
+ * Back-office uses POST /v1/admin/images. The events service uses POST /v1/service/images.
  */
 @Controller()
 export class ImagesController {
-  constructor(
-    private readonly imagesService: ImagesService,
-    private readonly fileUploadService: FileUploadService
-  ) {}
+  constructor(private readonly imagesService: ImagesService) {}
 
   @Api(server.route.getImages)
   findAll() {
@@ -63,73 +44,9 @@ export class ImagesController {
       },
     },
   })
+  @Throttle(ANONYMOUS_IMAGE_UPLOAD_LIMIT, ANONYMOUS_IMAGE_UPLOAD_TTL_SECONDS)
   @UseInterceptors(FileInterceptor('file'))
-  async uploadImage(
-    @UploadedFile() file: Express.Multer.File,
-    { needsToHashFilename } = { needsToHashFilename: true }
-  ) {
-    const { mimetype, buffer } = file;
-
-    if (
-      mimetype !== 'image/jpeg' &&
-      mimetype !== 'image/png' &&
-      mimetype !== 'image/webp' &&
-      mimetype !== 'image/gif'
-    ) {
-      throw new HttpException('Invalid file type', HttpStatus.BAD_REQUEST);
-    }
-
-    // Hash filename if needed
-    file.originalname = needsToHashFilename
-      ? `${hashFileName(
-          `${path.parse(file.originalname).name}-${Date.now()}`
-        )}${path.parse(file.originalname).ext}`
-      : file.originalname;
-
-    const dir = './img-tmp';
-    // Check if directory exists and create it if it doesn't
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir);
-    }
-
-    // Store the original file without processing
-    const originalFilePath = path.join(dir, file.originalname);
-    fs.writeFileSync(originalFilePath, buffer);
-
-    // Create a file object for the original image
-    const expressOriginalFile: Express.Multer.File = {
-      path: originalFilePath,
-      size: buffer.length,
-      filename: file.originalname,
-      buffer: buffer,
-      destination: '',
-      fieldname: 'file',
-      mimetype: mimetype,
-      originalname: file.originalname,
-      stream: fs.createReadStream(originalFilePath),
-      encoding: '7bit',
-    };
-
-    // Store the original file in web3.storage or s3 based on env config
-    const resp = await this.fileUploadService.storeImageFiles([expressOriginalFile]);
-
-    // Create the image record with basic metadata
-    const createdImages = await this.imagesService.bulkCreate(
-      {
-        cid: resp,
-        filename: file.originalname,
-        size: buffer.length,
-        height: 0, // No processing, so set to 0
-        url: process.env.FILE_STORAGE === 'ipfs' ? await this.fileUploadService.getDecryptedFileUrl(
-          resp,
-          file.originalname
-        ): resp,
-        width: 0, // No processing, so set to 0
-        version: 'ORIGINAL',
-        type: mimetype.split('/')[1], // Extract format from mimetype
-      },
-      undefined // No thumbnails
-    );
-    return createdImages;
+  uploadImage(@UploadedFile() file: Express.Multer.File, { needsToHashFilename } = { needsToHashFilename: true }) {
+    return this.imagesService.upload(file, { needsToHashFilename });
   }
 }

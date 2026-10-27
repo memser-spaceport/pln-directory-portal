@@ -4,6 +4,7 @@ import * as jwt from 'jsonwebtoken';
 import { request } from 'http';
 import { AddressInfo } from 'net';
 import { AiAppSessionScopeMiddleware } from './ai-app-session-scope.middleware';
+import { buildAppUrl } from './ai-apps.constants';
 
 /** Same controller prefix and routes as AiAppsController, plus a route the token must not reach. */
 @Controller('v1/ai-apps')
@@ -46,6 +47,7 @@ class ScopeTestModule implements NestModule {
 
 describe('AiAppSessionScopeMiddleware routing (as registered in app.module)', () => {
   const token = jwt.sign({ iss: 'pln-ai-apps-session', aud: 'foo', uid: 'm-1' }, 'k');
+  const labosToken = jwt.sign({ iss: 'https://auth.os.pl.xyz', sub: 's-1' }, 'k');
   let app: any;
   let base: string;
 
@@ -56,16 +58,14 @@ describe('AiAppSessionScopeMiddleware routing (as registered in app.module)', ()
   });
   afterAll(async () => app?.close());
 
-  const call = (method: string, path: string) =>
+  const call = (method: string, path: string, authorization = `Bearer ${token}`, origin?: string) =>
     new Promise<number>((resolve, reject) => {
-      const req = request(
-        `${base}${path}`,
-        { method, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' } },
-        (res) => {
-          res.resume();
-          resolve(res.statusCode ?? 0);
-        }
-      );
+      const headers: Record<string, string> = { authorization, 'content-type': 'application/json' };
+      if (origin) headers.origin = origin;
+      const req = request(`${base}${path}`, { method, headers }, (res) => {
+        res.resume();
+        resolve(res.statusCode ?? 0);
+      });
       req.on('error', reject);
       req.end(method === 'POST' ? '{}' : undefined);
     });
@@ -84,5 +84,19 @@ describe('AiAppSessionScopeMiddleware routing (as registered in app.module)', ()
     ['POST', '/v1/ai-apps/me'],
   ])('401s an app session token on %s %s', async (method, path) => {
     expect(await call(method, path)).toBe(401);
+  });
+
+  it('lets an app session token reach the member routes from an app origin', async () => {
+    const origin = buildAppUrl('network-pulse', 'prod');
+    expect(await call('GET', '/v1/ai-apps/me', `Bearer ${token}`, origin)).not.toBe(401);
+    expect(await call('POST', '/v1/ai-apps/track', `Bearer ${token}`, origin)).not.toBe(401);
+    expect(await call('GET', '/v1/ai-apps/access-check?appId=foo&method=GET', `Bearer ${token}`, origin)).not.toBe(401);
+  });
+
+  it('401s a LabOS token from an app origin and leaves a LabOS-origin request unchanged', async () => {
+    const labos = `Bearer ${labosToken}`;
+    expect(await call('GET', '/v1/members/m-2', labos, buildAppUrl('network-pulse', 'prod'))).toBe(401);
+    expect(await call('GET', '/v1/ai-apps/me', labos, buildAppUrl('network-pulse', 'prod'))).not.toBe(401);
+    expect(await call('GET', '/v1/members/m-2', labos, buildAppUrl('directoryv2', 'prod'))).not.toBe(401);
   });
 });

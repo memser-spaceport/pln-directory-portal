@@ -646,23 +646,12 @@ feedback, adapt behavior). `GET /v1/ai-apps/me` returns the signed-in member's
 
 The payload deliberately carries **no contact info** — no `email` and no `officeHours` link. Apps get an identity to personalize with, never a channel to reach the member.
 
-How it works — no app-side login and no new token flow:
+A deployed AI app does not use the LabOS member `authToken`. The app signs the member in through its own auth gate and calls `/me` with the app session that gate issues (see "App-scoped sessions").
 
-- LabOS writes the login cookies (`authToken` etc.) with `domain=COOKIE_DOMAIN`,
-  a shared parent domain (on Dev: `.dev.plnetwork.io`), so a deployed app at
-  `<appId>.<AI_APPS_APP_DOMAIN>` receives the cookie on its **own** origin. The
-  kit's snippet reads it from `document.cookie` (URL-decode + strip the JSON
-  quotes) and sends it to `/me` as `Authorization: Bearer`.
-- ⚠️ `credentials: 'include'` alone is NOT reliable: the cookie domain covers the
-  app hosts but not necessarily the API host (on Dev the API lives at
-  `dev-directory.plnetwork.io`, a **sibling** of `dev.plnetwork.io`, so the
-  browser never attaches the cookie → guaranteed 401 with only PostHog cookies
-  in the request). Bearer-from-cookie only requires the cookie to reach the app
-  host, which is exactly what `COOKIE_DOMAIN` guarantees.
-- Unlike the other dashboard endpoints, `/me` uses `UserAccessTokenValidateGuard`,
-  which accepts the token from the `Authorization: Bearer` header **or** the
-  `authToken` cookie (`extractTokenFromRequest`), then introspects it against the
-  auth service. `RbacGuard` enforces `ai_apps.read`.
+- With `AI_APPS_SHARE_AUTH_TOKEN=false` on LabOS, `authToken` is host-only on the LabOS origin, the same as `refreshToken` and `userInfo`. LabOS does not set it on `COOKIE_DOMAIN`. A deployed app then has no `authToken` in `document.cookie`, and the cookie is not on that app's request `Cookie` header. Sign-in, refresh and sign-out on LabOS keep working: they read and write the host-only cookies.
+- The switch stays **on** in production until the ATS has its own sign-in ([LAB-2900](https://linear.app/protocollabs/issue/LAB-2900)). A person turns it off in dev after the soak counts below are checked, then in production. This change does not set the value. Unset means the switch stays on.
+- `/me` uses `UserAccessTokenValidateGuard`, which accepts an app session or a LabOS token from the `Authorization: Bearer` header **or** the `authToken` cookie (`extractTokenFromRequest`), then introspects a LabOS token against the auth service. `RbacGuard` enforces `ai_apps.read`. A LabOS token on this route is for LabOS itself, and for an app outside AI Apps that still receives the shared cookie while the switch is on (`docs/LABOS_AUTH.md`). It is not how an AI app signs in.
+- A request from an AI app origin that carries a LabOS member token (Bearer or `authToken` cookie) gets `401` on every other route. `AiAppSessionScopeMiddleware` logs `ai_app_origin_labos_token` and does not call the handler. App session tokens stay valid on `GET /v1/ai-apps/me`, `POST /v1/ai-apps/track` and `GET /v1/ai-apps/access-check`. A request from the LabOS origin is unchanged.
 - Access outcomes: guest/signed-out → `401` (no token); signed-in member without
   AI Apps access → `403`; otherwise the curated profile above. The kit instructs
   apps to treat any non-200 as "not signed in" and keep working un-personalized.
@@ -678,20 +667,21 @@ How it works — no app-side login and no new token flow:
 
 ## App-scoped sessions (LAB-2695)
 
-Deployed apps are moving off the visitor's LabOS token onto a **session bound to one app**, so a token taken from
-one app works nowhere else. The pieces:
+A deployed app signs the member in with a **session bound to one app**. A token taken from one app works nowhere else. The LabOS member token is not that session. The pieces:
 
 - **Session token.** An HS256 JWT signed with `AI_APPS_SESSION_SECRET` (`iss: pln-ai-apps-session`, `aud: <appId>`,
-  `uid`, `email`, `jti`, `exp`). It carries the same `email` claim apps read from the LabOS token today, because one
+  `uid`, `email`, `jti`, `exp`). It carries the same `email` claim a LabOS token carries, because one
   prod app (`pl-capital-command-center`) decodes it for an email allowlist. Only its sha256 is stored
   (`AiAppSession`); every use checks the signature and the stored row (idle timeout `AI_APPS_SESSION_IDLE_HOURS`,
   default 24; absolute `AI_APPS_SESSION_MAX_DAYS`, default 30; revocation). Without a secret, sessions are disabled
   and the auth gate keeps its previous behavior.
-- **Getting one.** `POST /v1/ai-apps/sessions/exchange-token` `{ appId, target }` (member JWT; the gate's silent path
-  while LabOS still shares its token), or the sign-in round trip: `POST sessions/code` (LabOS server, member JWT)
+- **Getting one.** The sign-in round trip is the path: `POST sessions/code` (LabOS server, member JWT)
   returns a 60 s single-use code bound to `appId` + `target` and the target's callback origin, then the gate calls
-  `POST sessions/redeem` `{ code, appId, target }`. `POST sessions/revoke` (member JWT) ends all of a member's app
-  sessions; LabOS calls it on sign-out.
+  `POST sessions/redeem` `{ code, appId, target }`. `POST /v1/ai-apps/sessions/exchange-token` `{ appId, target }`
+  (member JWT) is the gate's silent path only while the app host still receives `authToken`
+  (`AI_APPS_SHARE_AUTH_TOKEN` is not `false`). With the switch off the app host has no LabOS token to exchange, so
+  the gate uses the code round trip.
+  `POST sessions/revoke` (member JWT) ends all of a member's app sessions; LabOS calls it on sign-out.
 - **Agent sessions.** An agent connected through LabOS MCP mints one with `POST /v1/mcp/app-sessions` `{ appId }`
   (Bearer MCP access token). It carries `isAgent: true` and `agentAccess` (`read` or `write`: the grant's level chosen
   at MCP consent; `/me` returns both), stores the MCP authorization that minted it (revoking the
@@ -700,8 +690,10 @@ one app works nowhere else. The pieces:
 - **Using one.** Only on `GET /v1/ai-apps/me` (`AiAppMemberContextGuard`: live for the app it names, and `Origin`, if
   sent, must be one of that app's prod/dev origins), `POST /v1/ai-apps/track` (attributed only when the session
   matches the origin), and `GET /v1/ai-apps/access-check` via the gate's `X-AI-App-Session` header (same permission
-  and per-app access rule as a LabOS token). `AiAppSessionScopeMiddleware` 401s the token on every other route before
-  any guard or auth-service call.
+  and per-app access rule as a LabOS token). `AiAppSessionScopeMiddleware` 401s an app session token on every other
+  route before any guard or auth-service call. The same middleware 401s a LabOS member token (Bearer or `authToken`
+  cookie) when the request `Origin` is a deployed app, and logs `ai_app_origin_labos_token`. A LabOS-origin request
+  with a LabOS token is not affected.
 - **Naming the calling app.** `GET /v1/ai-apps/me?appId=<appId>` lets an app's server say which app is asking. An app
   session minted for a different app then gets `401 Invalid or expired app session`, with or without `Origin`. Without
   `appId`, `/me` decides from the session and `Origin` alone. Kit 1.18 tells app servers to send it.
@@ -712,13 +704,16 @@ one app works nowhere else. The pieces:
   only. Gate state lives in `AiAppAuthGate` and the gate-ready flags are set with a plain SQL update, so owners see
   no status, event, notification or "Last updated" change. Deploys record the `authGateVersion` the orchestrator
   reports.
-- **Kit 1.14.** `pln-member-context` calls same-origin `/_pln/me` and falls back to `memberContextEndpoint` + the
-  `authToken` cookie on a 404 (older gates). Analytics keeps the cookie + Bearer call, which works with both gates.
+- **Kit 1.14.** `pln-member-context` calls same-origin `/_pln/me`. An older gate's 404 used to fall back to
+  `memberContextEndpoint` plus a shared `authToken` cookie. That cookie is not the sign-in path. With the share
+  switch off the app host does not have it, so the fallback does not sign the member in. Analytics sends the app
+  session as Bearer.
 
 ### Soak telemetry
 
-Before LabOS stops sharing `authToken` with app hosts, these must stay at zero (CloudWatch Logs Insights on the
-web-api log group):
+A person checks these counts before setting `AI_APPS_SHARE_AUTH_TOKEN=false` (CloudWatch Logs Insights on the
+web-api log group). This repository does not set that value. Production stays on until the ATS has its own sign-in
+(LAB-2900). Dev is turned off first:
 
 ```
 fields @timestamp, @message
@@ -728,9 +723,10 @@ fields @timestamp, @message
 | sort n desc
 ```
 
-`ai_app_origin_labos_token` = an app's page called a Directory route other than `/me`/`/track` with the visitor's
-LabOS token (it would break once apps only hold app sessions). `ai_app_session_disallowed_route` = an app session
-token was sent to such a route (already rejected).
+`ai_app_origin_labos_token` = an app origin sent a LabOS member token (Bearer or `authToken` cookie) to a Directory
+route other than `/me`, `/track` and `/access-check`. The API answers 401. A non-zero count means an app page still
+sends that token and the call fails. `ai_app_session_disallowed_route` = an app session token was sent to such a
+route (also 401).
 
 ## Product analytics for deployed apps
 
@@ -755,9 +751,10 @@ via a second PostHog project).
   attribute" lexicon the PO asked for, done as PostHog properties rather than
   a long `ai-apps-<app-name>-…` event-name prefix, so apps stay filterable by
   app without bloating names.
-- **Identity**: a `Bearer` token (from the same cookie the member-context flow
-  reads) resolves to a `memberUid` via `AUTH_API_URL`'s introspect endpoint;
-  otherwise the app-generated `anon:<uuid>` (validated against
+- **Identity**: an app session resolves to its member when it is live for the
+  app the `Origin` names. A LabOS Bearer or `authToken` cookie is introspected
+  at `AUTH_API_URL`. An AI app sends its app session. It does not read a shared
+  `authToken`. Otherwise the app-generated `anon:<uuid>` (validated against
   `AI_APP_ANON_ID_REGEX`) is the distinct ID. A missing/invalid/expired token
   or an introspection failure silently falls back to anonymous — this path
   must never throw or block the app.

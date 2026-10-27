@@ -1,0 +1,31 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`AwsService.sendHtmlEmail keeps the raw MIME layout of the message 1`] = `
+"From: Directory <directory@example.com>
+To: candidate@example.com, =?UTF-8?Q?=C3=9Cn=C3=AFcode_Name?=
+ <second@example.com>
+Cc: cc@example.com
+Reply-To: lead@example.com
+Subject: =?UTF-8?Q?H=C3=A9llo_=E2=80=93_a_subject_long_enou?=
+ =?UTF-8?Q?gh_to_be_folded_across_more_than_one_hea?=
+ =?UTF-8?Q?der_line_by_the_composer?=
+Message-ID: <MESSAGE-ID>
+Date: <DATE>
+MIME-Version: 1.0
+Content-Type: multipart/alternative;
+ boundary=\\"<BOUNDARY-0>\\"
+
+--<BOUNDARY-0>
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+Hi =E2=9C=93
+--<BOUNDARY-0>
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+<p>Hi =E2=9C=93</p><p>aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa=
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</p>
+--<BOUNDARY-0>--
+"
+`;

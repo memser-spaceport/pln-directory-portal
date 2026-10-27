@@ -4,11 +4,31 @@ How to identify the signed-in LabOS member from an app that is **not** deployed
 through AI Apps. No starter kit, deploy token, iframe, or auth sidecar is
 involved.
 
-This works only when the app is served on the **same parent domain as AI Apps**
-(`os.pl.xyz`). LabOS writes the session cookie with `Domain=.os.pl.xyz` in
-production and `Domain=.dev.os.pl.xyz` on dev, so a host such as
-`<appId>.os.pl.xyz` or `ats.dev.os.pl.xyz` receives `authToken`. A host
-outside that parent never sees the cookie.
+A deployed AI app does not use this cookie. The app signs the member in through
+its own gate and calls the API with an app session. See `docs/AI_APPS.md`.
+
+This page is for an app outside AI Apps, such as the PL ATS. That app receives
+`authToken` only while LabOS still shares it. The switch is
+`AI_APPS_SHARE_AUTH_TOKEN` on the LabOS frontend. Unset means the switch stays
+on. Production stays on until the ATS has its own sign-in
+([LAB-2900](https://linear.app/protocollabs/issue/LAB-2900)). A person turns it
+off in dev after the soak counts in `docs/AI_APPS.md` are checked, then in
+production. This repository does not set the value. When the switch is
+`false`, `authToken` is host-only on the LabOS origin. It is not set on
+`COOKIE_DOMAIN`. This app then does not see it in `document.cookie` or on its
+request `Cookie` header. Sign-in, refresh and sign-out on LabOS still work.
+
+The API refuses a LabOS member token (Bearer or `authToken` cookie) when the
+request `Origin` is a deployed AI app, on every route except
+`GET /v1/ai-apps/me`, `POST /v1/ai-apps/track` and
+`GET /v1/ai-apps/access-check`. A request from the LabOS origin is unchanged.
+This app calls only `/me`.
+
+While the switch is on, this works only when the app is served on the **same
+parent domain as LabOS** (`os.pl.xyz`). LabOS writes `authToken` with
+`Domain=.os.pl.xyz` in production and `Domain=.dev.os.pl.xyz` on dev, so a host
+such as `ats.dev.os.pl.xyz` receives it. A host outside that parent never sees
+the cookie. An AI app host is not a reader of this cookie.
 
 ## What you integrate
 
@@ -36,6 +56,9 @@ There is no auth sidecar in front of this app. Unsigned traffic reaches you.
 Check `/me` yourself before treating a visitor as signed in.
 
 ## Reading the cookie
+
+These steps apply only while the switch is on, and only to an app outside AI
+Apps. A deployed AI app does not read this cookie.
 
 `authToken` is not `HttpOnly`. Browser code on the app's own origin can read
 it. The value is URL-encoded and JSON-quoted (`%22eyJhbGci...%22`).
@@ -85,9 +108,10 @@ The same cookie arrives on every request to the app. Read it from the
 it as `Authorization: Bearer`. Keep the token in memory for that request.
 Do not write it to logs, localStorage, a database, or any other service.
 
-`authToken` is the only LabOS cookie on the shared domain. `refreshToken` and
-`userInfo` are host-only on LabOS and never reach the app. Identity comes from
-`/me`.
+While the switch is on, `authToken` is the only LabOS session cookie on the
+shared domain. `refreshToken` and `userInfo` are host-only on LabOS and never
+reach the app. With the switch off, `authToken` is host-only too. Identity
+comes from `/me`, not from the raw cookie.
 
 ## Response
 
@@ -123,10 +147,12 @@ Dev portal is `https://directoryv2.dev.os.pl.xyz`. `backlink` must be an
 on dev). Any other host is dropped, and the member will not come back to the
 app.
 
-After they sign in, LabOS sets `authToken` on the shared domain and redirects
-to `backlink`. Reload `/me`. Do not build a login form, session store, or
+After they sign in, LabOS redirects to `backlink`. While the switch is on,
+LabOS also sets `authToken` on the shared domain, and this app can read it.
+With the switch off, the cookie stays on the LabOS host and this app does not
+receive it. Reload `/me`. Do not build a login form, session store, or
 token-refresh client in the app. An expired access token is a 401 — send them
-through this link again. LabOS refreshes the cookie as part of its own login.
+through this link again. LabOS refreshes its own cookie as part of its login.
 
 Localhost has no LabOS cookie. Treat that the same as 401.
 

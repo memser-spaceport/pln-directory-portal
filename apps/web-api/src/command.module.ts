@@ -12,7 +12,6 @@ import { TeamMemberRolesService } from './team-member-roles/team-member-roles.se
 import { TeamsService } from './teams/teams.service';
 import { TechnologiesService } from './technologies/technologies.service';
 import { AirtableService } from './utils/airtable/airtable.service';
-import { FileEncryptionService } from './utils/file-encryption/file-encryption.service';
 import { FileMigrationService } from './utils/file-migration/file-migration.service';
 import { FileUploadService } from './utils/file-upload/file-upload.service';
 import { LocationTransferService } from './utils/location-transfer/location-transfer.service';
@@ -34,7 +33,6 @@ import { ParticipantsRequestService } from './participants-request/participants-
     MigrateAirtableDataCommand,
     FileMigrationService,
     FileUploadService,
-    FileEncryptionService,
     ImagesService,
     ImagesController,
     ParticipantsRequestService,
