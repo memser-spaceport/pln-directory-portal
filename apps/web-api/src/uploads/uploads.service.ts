@@ -2,7 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
 import { FileUploadService } from '../utils/file-upload/file-upload.service';
 import { AwsService } from '../utils/aws/aws.service';
-import { UploadKind, UploadScopeType, UploadStatus, UploadStorage } from '@prisma/client';
+import { UploadKind, UploadScopeType, UploadStatus } from '@prisma/client';
 import * as crypto from 'crypto';
 import cuid from 'cuid';
 
@@ -111,42 +111,34 @@ export class UploadsService {
     const checksum = checksumSha256(file.buffer);
 
     // Store file; since bucket is public, no signing is required.
-    const {
-      storage,
-      keyOrPath,
-      bucket: usedBucket,
-    } = await this.files.storeOneAndGetSecureUrl(file, {
+    const { keyOrPath, bucket: usedBucket } = await this.files.storeOneAndGetSecureUrl(file, {
       prefix: `uploads/${(params.scopeType || 'NONE').toLowerCase()}/${
         params.scopeUid ?? 'none'
       }/${kind.toLowerCase()}`,
       signed: true,
     });
 
-    // Map storage string to enum
-    const storageEnum: UploadStorage = storage === 'ipfs' ? 'IPFS' : 'S3';
-
     // Pre-generate uid so we can build the app URL before DB write
     const uid = cuid();
 
     // Non-expiring app URL
     const publicUrl =
-      storageEnum === 'S3' && usedBucket && keyOrPath ? this.buildPublicUrl(usedBucket, keyOrPath) : this.buildAppUrl(uid);
+      usedBucket && keyOrPath ? this.buildPublicUrl(usedBucket, keyOrPath) : this.buildAppUrl(uid);
 
-    const streamUrl =
-      storageEnum === 'S3' ? this.buildStreamUrl(kind, keyOrPath) : null;
+    const streamUrl = this.buildStreamUrl(kind, keyOrPath);
 
     const created = await this.prisma.upload.create({
       data: {
         uid,
-        storage: storageEnum,
+        storage: 'S3',
         kind,
         status: 'READY',
         scopeType: params.scopeType ?? 'NONE',
         scopeUid: params.scopeUid ?? null,
         uploaderUid: params.uploaderUid ?? null,
-        bucket: storageEnum === 'S3' ? usedBucket ?? null : null,
-        key: storageEnum === 'S3' ? keyOrPath ?? null : null,
-        cid: storageEnum === 'IPFS' ? keyOrPath ?? null : null,
+        bucket: usedBucket ?? null,
+        key: keyOrPath ?? null,
+        cid: null,
         url: publicUrl,
         streamUrl,
         filename: file.originalname,

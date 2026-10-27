@@ -13,8 +13,6 @@ import { FileUploadService } from '../utils/file-upload/file-upload.service';
 import { createImage } from './__mocks__/images.mocks';
 import { ImagesModule } from './images.module';
 
-jest.mock('web3.storage');
-
 describe('Images', () => {
   let app: INestApplication;
   let cacheManager: Cache;

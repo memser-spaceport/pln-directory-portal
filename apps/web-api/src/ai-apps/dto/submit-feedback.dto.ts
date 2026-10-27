@@ -60,7 +60,7 @@ export const FeedbackPinInputSchema = z
     viewportW: z.number().int().min(1).max(20000),
     viewportH: z.number().int().min(1).max(20000),
     note: maybeEmpty(2000),
-    // A hosted image (S3 or the IPFS worker, depending on the environment), so
+    // A hosted image (S3), so
     // only the scheme is checked: https, never an inline data: URI.
     /** The click within the element, as a fraction of its box; optional for older clients. */
     ox: z.number().min(0).max(1).nullable().optional(),

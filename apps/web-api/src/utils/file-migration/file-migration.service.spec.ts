@@ -6,7 +6,6 @@ import path from 'path';
 import { ImagesController } from '../../images/images.controller';
 import { ImagesService } from '../../images/images.service';
 import { PrismaService } from '../../shared/prisma.service';
-import { FileEncryptionService } from '../file-encryption/file-encryption.service';
 import { FileUploadService } from '../file-upload/file-upload.service';
 import { hashFileName } from '../hashing';
 import { FileMigrationService } from './file-migration.service';
@@ -34,10 +33,6 @@ describe('FileMigrationService', () => {
         {
           provide: FileUploadService,
           useValue: createMock<FileUploadService>(),
-        },
-        {
-          provide: FileEncryptionService,
-          useValue: createMock<FileEncryptionService>(),
         },
         { provide: ImagesController, useValue: createMock<ImagesController>() },
         { provide: ImagesService, useValue: createMock<ImagesService>() },

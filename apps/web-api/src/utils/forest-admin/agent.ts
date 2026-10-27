@@ -7,7 +7,6 @@ import { ImagesController } from '../../images/images.controller';
 import { ImagesService } from '../../images/images.service';
 import { PrismaService } from '../../shared/prisma.service';
 import { APP_ENV } from '../constants';
-import { FileEncryptionService } from '../file-encryption/file-encryption.service';
 import { FileUploadService } from '../file-upload/file-upload.service';
 import { AwsService } from '../aws/aws.service';
 import { HuskyDataIngestionService } from '../../shared/husky-data-ingestion.service';
@@ -15,6 +14,7 @@ import { LocationTransferService } from '../location-transfer/location-transfer.
 import { generateUid } from './generated-uid';
 import { resetCacheAfterCreateOrUpdateOrDelete } from './reset-cache-after-cud';
 import { LogService } from '../../shared/log.service';
+import { MEMBER_HTML_FIELDS, sanitizeMemberHtml } from '../../members/member-html.util';
 
 const prismaService = new PrismaService(new HuskyDataIngestionService(new AwsService()), new LogService());
 
@@ -36,7 +36,7 @@ async function executeImageUpload(context) {
   const prismaService = new PrismaService(new HuskyDataIngestionService(new AwsService()), new LogService());
   const uploadController = new ImagesController(
     new ImagesService(prismaService),
-    new FileUploadService(new FileEncryptionService(), new AwsService())
+    new FileUploadService(new AwsService())
   );
   const { image } = await uploadController.uploadImage(builtFile);
   prismaService.$disconnect();
@@ -88,6 +88,25 @@ async function configureCUDSyncs(collection, slug) {
 
   collection.addHook('After', 'Delete', async () => {
     await triggerSync(slug);
+  });
+}
+
+// The admin panel writes through its own SQL connection, not PrismaService,
+// so it sanitizes the member HTML fields itself.
+function configureMemberHtmlSanitizing(collection, model: 'Member' | 'MemberExperience') {
+  const fields = MEMBER_HTML_FIELDS[model] ?? [];
+  const sanitize = (record) => {
+    for (const field of fields) {
+      if (typeof record?.[field] === 'string') record[field] = sanitizeMemberHtml(record[field]);
+    }
+  };
+
+  collection.addHook('Before', 'Create', async (context) => {
+    context.data.forEach(sanitize);
+  });
+
+  collection.addHook('Before', 'Update', async (context) => {
+    sanitize(context.patch);
   });
 }
 
@@ -147,6 +166,11 @@ export function createForestAdminAgent() {
     });
 
     configureCUDSyncs(collection, 'member-to-pln-airtable');
+    configureMemberHtmlSanitizing(collection, 'Member');
+  });
+
+  agent.customizeCollection('MemberExperience', (collection) => {
+    configureMemberHtmlSanitizing(collection, 'MemberExperience');
   });
 
   agent.customizeCollection('Team', (collection) => {

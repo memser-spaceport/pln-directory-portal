@@ -20,7 +20,7 @@ The PLN Directory data needed to be migrated from Airtable into our own relation
 
 - [Convert the existing location](./LOCATION_MAPPING.md) fields on Airtable (city, country, state/province, region) into existing Google Places API results before inserting them on our database;
 
-- Applying file encryption to the images being migrated from Airtable into Web3Storage;
+- Uploading the images migrated from Airtable to S3;
 
 ### How? Building a CLI command
 
@@ -34,7 +34,7 @@ The command is mainly responsible for:
 
 For the purpose of converting the locations coming from Airtable into matching Google Places API results we made use of a service called [`LocationTransferService`](../apps/web-api/src/utils/location-transfer/location-transfer.service.ts) responsible for finding and retrieving a Google Places API result from an Airtable member.
 
-As for the images being migrated, we've made use of another service called [`FileMigrationService`](../apps/web-api/src/utils/file-migration/file-migration.service.ts) that's responsible for downloading images and calling the existing [`uploadImage`](../apps/web-api/src/images/images.controller.ts#L61) method that takes care of compressing files, generating thumbnails and finally encrypting those images before uploading them to Web3Storage and inserting them on the database.
+As for the images being migrated, we've made use of another service called [`FileMigrationService`](../apps/web-api/src/utils/file-migration/file-migration.service.ts) that's responsible for downloading images and calling the existing [`uploadImage`](../apps/web-api/src/images/images.controller.ts#L61) method that takes care of compressing files, generating thumbnails and finally uploading those images to S3 and inserting them on the database.
 
 ### Running the command
 
