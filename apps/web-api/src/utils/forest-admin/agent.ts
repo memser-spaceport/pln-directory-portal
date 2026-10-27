@@ -35,8 +35,7 @@ async function executeImageUpload(context) {
   };
   const prismaService = new PrismaService(new HuskyDataIngestionService(new AwsService()), new LogService());
   const uploadController = new ImagesController(
-    new ImagesService(prismaService),
-    new FileUploadService(new AwsService())
+    new ImagesService(prismaService, new FileUploadService(new AwsService()))
   );
   const { image } = await uploadController.uploadImage(builtFile);
   prismaService.$disconnect();
