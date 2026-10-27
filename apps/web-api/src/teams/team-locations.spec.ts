@@ -118,4 +118,12 @@ describe('team locations in a team update request', () => {
   it('rejects a blank location', () => {
     expect(ParticipantRequestTeamSchema.safeParse(request(['Varna', '  '])).success).toBe(false);
   });
+
+  it('accepts a location of up to 100 characters, not counting surrounding spaces', () => {
+    expect(ParticipantRequestTeamSchema.safeParse(request([` ${'a'.repeat(100)} `])).success).toBe(true);
+  });
+
+  it('rejects a location longer than 100 characters', () => {
+    expect(ParticipantRequestTeamSchema.safeParse(request(['a'.repeat(101)])).success).toBe(false);
+  });
 });
