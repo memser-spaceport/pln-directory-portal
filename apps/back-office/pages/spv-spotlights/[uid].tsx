@@ -341,7 +341,9 @@ const SpvSpotlightDetailPage = () => {
       files.map(async (file): Promise<MediaItem> => {
         const body = new FormData();
         body.append('file', file);
-        const response = await api.post('/v1/images', body, { headers: { 'content-type': 'multipart/form-data' } });
+        const response = await api.post('/v1/admin/images', body, {
+          headers: { 'content-type': 'multipart/form-data' },
+        });
         const image = response.data.image ?? response.data;
         return { imageUid: image.uid, alt: file.name, fit: 'cover', url: image.url };
       })
