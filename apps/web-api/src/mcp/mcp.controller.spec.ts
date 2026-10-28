@@ -30,13 +30,16 @@ jest.mock('@modelcontextprotocol/sdk/server/streamableHttp.js', () => ({
 
 import { McpController } from './mcp.controller';
 import { McpScopesService } from './mcp-scopes.service';
+import { McpAccessRequestsService } from './mcp-access-requests.service';
 import { MCP_NEEDS_WRITE_NOTE } from './mcp-tool-plan';
 
 /**
  * Drives the real MCP SDK over HTTP (stateless Streamable HTTP), so `tools/list` and `tools/call` are what an agent
  * sees. Permissions give RBAC access to everything; only scope levels vary.
  */
-function build(opts: { scopeLevels?: Record<string, string>; settings?: unknown[] | Error } = {}) {
+function build(
+  opts: { scopeLevels?: Record<string, string>; settings?: unknown[] | Error; requestsFail?: boolean } = {}
+) {
   const actor = {
     authorizationUid: 'auth-1',
     memberUid: 'member-1',
@@ -66,7 +69,21 @@ function build(opts: { scopeLevels?: Record<string, string>; settings?: unknown[
       }),
     },
   };
-  const scopes = new McpScopesService(prisma as any, analytics as any);
+  const requests: Array<{ uid: string; scope: string; level: string; resolvedAt: null }> = [];
+  const requestPrisma = {
+    mcpAccessRequest: {
+      findFirst: jest.fn(async ({ where }) => requests.find((r) => r.scope === where.scope) ?? null),
+      create: jest.fn(async ({ data }) => {
+        if (opts.requestsFail) throw new Error('db down');
+        const row = { uid: `req-${requests.length + 1}`, resolvedAt: null, ...data };
+        requests.push(row);
+        return row;
+      }),
+      update: jest.fn(async () => ({})),
+    },
+  };
+  const accessRequests = new McpAccessRequestsService(requestPrisma as any);
+  const scopes = new McpScopesService(prisma as any, analytics as any, accessRequests);
   const stub = {} as any;
   const controller = new McpController(
     oauth as any,
@@ -81,7 +98,8 @@ function build(opts: { scopeLevels?: Record<string, string>; settings?: unknown[
     aiApps as any,
     stub,
     analytics as any,
-    scopes
+    scopes,
+    accessRequests
   );
   /** One MCP request: returns what `tools/list` would show and a way to call a tool by name. */
   const handle = async (body: unknown = { jsonrpc: '2.0', id: 1, method: 'tools/list' }) => {
@@ -89,7 +107,7 @@ function build(opts: { scopeLevels?: Record<string, string>; settings?: unknown[
     await controller.handle({ headers: { authorization: 'Bearer mcp_at_live' }, body } as any, {} as any);
     return new Map(registered);
   };
-  return { handle, aiApps, analytics };
+  return { handle, aiApps, analytics, requests };
 }
 
 type Harness = ReturnType<typeof build>;
@@ -134,8 +152,9 @@ describe('McpController scope enforcement', () => {
     const result: any = await call(h, 'update_ai_app_feedback_status', { feedbackUid: 'fb-1', status: 'VIEWED' });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toBe(
-      'This needs write access to AI Apps for this connection. Ask the member to allow it in LabOS: https://labos.example/settings/mcp'
+      'This needs write access to AI Apps for this connection. Ask the member to allow it in LabOS: https://labos.example/settings/mcp?request=req-1'
     );
+    expect(h.requests).toMatchObject([{ scope: 'ai_apps', level: 'write', toolName: 'update_ai_app_feedback_status' }]);
     expect(aiApps.updateFeedbackStatusForMcp).not.toHaveBeenCalled();
     expect(analytics.trackEvent).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -171,7 +190,12 @@ describe('McpController scope enforcement', () => {
     const result: any = await call(h, 'search_members', { query: 'ada' });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('needs read access to Search');
-    expect(result.content[0].text).toContain('https://labos.example/settings/mcp');
+    expect(result.content[0].text).toContain('https://labos.example/settings/mcp?request=req-1');
+
+    // The agent retries: same request, same link.
+    const again: any = await call(h, 'search_teams', { query: 'ada' });
+    expect(again.content[0].text).toContain('?request=req-1');
+    expect(h.requests).toHaveLength(1);
   });
 
   it('hides an admin-off scope from every connection and refuses it without a link', async () => {
@@ -186,6 +210,7 @@ describe('McpController scope enforcement', () => {
     expect(analytics.trackEvent).toHaveBeenCalledWith(
       expect.objectContaining({ properties: expect.objectContaining({ reason: 'admin_off' }) })
     );
+    expect(h.requests).toEqual([]);
   });
 
   it('hides write tools when admins cap the scope at read, even for a write connection', async () => {
@@ -203,6 +228,13 @@ describe('McpController scope enforcement', () => {
     const result: any = await call(h, 'search_members', { query: 'ada' });
     expect(result).toMatchObject({ isError: true });
     expect(result.content[0].text).toContain("couldn't check this connection's permissions");
+  });
+
+  it('still refuses, with the plain Settings link, when the request cannot be stored', async () => {
+    const h = build({ requestsFail: true });
+    const result: any = await call(h, 'update_ai_app_feedback_status', { feedbackUid: 'fb-1', status: 'VIEWED' });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/LabOS: https:\/\/labos\.example\/settings\/mcp$/);
   });
 
   it('registers nothing for a tool outside the registry, so the SDK answers "not found"', async () => {

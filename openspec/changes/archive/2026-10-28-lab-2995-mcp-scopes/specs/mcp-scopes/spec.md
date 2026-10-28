@@ -1,3 +1,7 @@
+## Purpose
+
+MCP agents reach LabOS only through a reviewed allowlist. Every tool belongs to one scope; each MCP connection sets each scope to none, read or write; admins cap each scope for everyone. Refused calls tell the agent why and link the member to the exact setting.
+
 ## ADDED Requirements
 
 ### Requirement: Every MCP tool belongs to one scope

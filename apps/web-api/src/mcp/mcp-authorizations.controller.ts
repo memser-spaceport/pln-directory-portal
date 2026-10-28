@@ -22,6 +22,7 @@ import { RbacService } from '../rbac/rbac.service';
 import { ApproveMcpOAuthDto } from './dto/approve-mcp-oauth.dto';
 import { McpOAuthService } from './mcp-oauth.service';
 import { McpScopesService } from './mcp-scopes.service';
+import { McpAccessRequestsService } from './mcp-access-requests.service';
 
 const CONNECT = { anyOf: [RBAC_PERMISSION_CODES.MCP_CONNECT] };
 
@@ -33,7 +34,8 @@ export class McpAuthorizationsController {
   constructor(
     private readonly oauth: McpOAuthService,
     private readonly rbacService: RbacService,
-    private readonly scopes: McpScopesService
+    private readonly scopes: McpScopesService,
+    private readonly accessRequests: McpAccessRequestsService
   ) {}
 
   @NoCache()
@@ -57,6 +59,14 @@ export class McpAuthorizationsController {
   async updateScopes(@Param('uid') uid: string, @Body() body: unknown, @Req() req: any) {
     const memberUid = await this.resolveMemberUid(req);
     return this.scopes.updateConnectionLevels(memberUid, uid, body);
+  }
+
+  /** A refused agent call the member can allow (LAB-3014). Owner only: anyone else gets 404. */
+  @NoCache()
+  @Get('access-requests/:uid')
+  async accessRequest(@Param('uid') uid: string, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.accessRequests.getForMember(memberUid, uid);
   }
 
   @NoCache()

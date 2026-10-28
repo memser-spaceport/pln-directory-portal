@@ -74,7 +74,7 @@ function buildService(
     revokeAgentSessionsForAuthorization: jest.fn().mockResolvedValue(0),
   };
   const analytics = { trackEvent: jest.fn().mockResolvedValue(undefined) };
-  const scopes = new McpScopesService(prisma as any, analytics as any);
+  const scopes = new McpScopesService(prisma as any, analytics as any, {} as any);
   const service = new McpOAuthService(
     prisma as any,
     accessControl as any,

@@ -55,7 +55,7 @@ function build(settings: Array<{ scope: string; maxLevel: string }> = []) {
     $transaction: jest.fn(async (ops: Array<Promise<unknown>>) => Promise.all(ops)),
   };
   const analytics = { trackEvent: jest.fn().mockResolvedValue(undefined) };
-  const service = new McpScopesService(prisma as any, analytics as any);
+  const service = new McpScopesService(prisma as any, analytics as any, {} as any);
   const add = (r: Record<string, unknown>) =>
     rows.set(r.uid as string, { memberUid: 'member-1', revokedAt: null, ...r });
   return { service, prisma, analytics, rows, add };

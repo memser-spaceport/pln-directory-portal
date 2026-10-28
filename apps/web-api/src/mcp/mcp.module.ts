@@ -22,6 +22,7 @@ import { McpOAuthController } from './mcp-oauth.controller';
 import { McpOAuthService } from './mcp-oauth.service';
 import { McpController } from './mcp.controller';
 import { McpScopesService } from './mcp-scopes.service';
+import { McpAccessRequestsService } from './mcp-access-requests.service';
 import { JwtService } from '../utils/jwt/jwt.service';
 
 @Module({
@@ -49,6 +50,13 @@ import { JwtService } from '../utils/jwt/jwt.service';
     McpMemberProofsIntegrationController,
     McpController,
   ],
-  providers: [McpOAuthService, McpAppSessionService, McpMemberProofService, McpScopesService, JwtService],
+  providers: [
+    McpOAuthService,
+    McpAppSessionService,
+    McpMemberProofService,
+    McpScopesService,
+    McpAccessRequestsService,
+    JwtService,
+  ],
 })
 export class McpModule {}

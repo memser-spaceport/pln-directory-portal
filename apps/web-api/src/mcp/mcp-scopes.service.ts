@@ -14,6 +14,7 @@ import { PrismaService } from '../shared/prisma.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
 import { ANALYTICS_EVENTS } from '../utils/constants';
 import { connectionStatus } from './mcp-grant-expiry';
+import { McpAccessRequestsService } from './mcp-access-requests.service';
 import { levelAtLeast, MCP_SCOPES, minLevel, registryMaxLevel, scopesWithTools } from './mcp-scopes.registry';
 
 export type McpStoredLevels = Partial<Record<McpScopeKey, McpLevel>>;
@@ -74,7 +75,11 @@ export function initialScopeLevels(caps: McpAdminCaps): McpStoredLevels {
 
 @Injectable()
 export class McpScopesService {
-  constructor(private readonly prisma: PrismaService, private readonly analytics: AnalyticsService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly analytics: AnalyticsService,
+    private readonly accessRequests: McpAccessRequestsService
+  ) {}
 
   /** Throws when the settings can't be read; MCP callers fail closed on that. */
   async adminCaps(): Promise<McpAdminCaps> {
@@ -166,6 +171,11 @@ export class McpScopesService {
       select: CONNECTION_SELECT,
     });
 
+    const item = this.toConnection(updated, caps);
+    const requestResolved = parsed.data.requestUid
+      ? await this.accessRequests.resolveIfMet(parsed.data.requestUid, item)
+      : false;
+
     if (changes.length > 0) {
       void this.analytics.trackEvent({
         name: ANALYTICS_EVENTS.MCP.SCOPE_LEVELS_UPDATED,
@@ -175,12 +185,12 @@ export class McpScopesService {
           authorizationUid: uid,
           clientName: row.clientName,
           changes,
-          // Access requests are resolved by LAB-3014.
           viaRequest: Boolean(parsed.data.requestUid),
+          requestResolved,
         },
       });
     }
-    return this.toConnection(updated, caps);
+    return item;
   }
 
   async adminScopes(): Promise<McpAdminScopesResponse> {
