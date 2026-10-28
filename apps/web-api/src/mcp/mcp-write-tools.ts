@@ -126,6 +126,9 @@ export function profileTools(members: MembersService, hooks: MembersHooksService
         'Send only the fields to change; an empty string clears a text field. skills replaces the whole list and ' +
         'takes existing LabOS skill titles. Name, email, teams, roles and photo stay in LabOS.',
       visibility: 'always',
+      // Without it the SDK drops `email` and friends silently, and the rest of the call saves as if they were never
+      // sent; with it the call is refused and names them.
+      keepUnknownArgs: true,
       inputSchema: {
         bio: z.string().optional(),
         moreDetails: z.string().optional(),

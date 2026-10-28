@@ -4,7 +4,8 @@ jest.mock('../members/members.service', () => ({ MembersService: jest.fn() }));
 jest.mock('../members/members.hooks.service', () => ({ MembersHooksService: jest.fn() }));
 
 import { BadRequestException } from '@nestjs/common';
-import { McpActorContext, McpToolDef } from './mcp-tools';
+import { z } from 'zod';
+import { McpActorContext, McpToolDef, toolInputSchema } from './mcp-tools';
 import { newsWriteTools, profileTools } from './mcp-write-tools';
 import { McpWriteLimitService, MCP_WRITE_LIMIT_PER_HOUR } from './mcp-write-limit.service';
 
@@ -149,6 +150,20 @@ describe('profile tools', () => {
     await expect(tool(tools, 'update_my_profile').execute(CTX, args)).rejects.toBeInstanceOf(BadRequestException);
     expect(members.updateMemberByUid).not.toHaveBeenCalled();
     expect(hooks.postUpdateActions).not.toHaveBeenCalled();
+  });
+
+  // The SDK validates arguments with the tool's schema before `execute` and keeps only what the schema returns. A raw
+  // shape strips unknown keys, so `email` never reached the allowlist check and `{ bio, email }` saved the bio.
+  it('still refuses a blocked field after the SDK has parsed the arguments', async () => {
+    const { tools, members } = build();
+    const update = tool(tools, 'update_my_profile');
+    const sdkParse = (args: Record<string, unknown>) => (toolInputSchema(update) as z.ZodTypeAny).parse(args);
+
+    expect(z.object(update.inputSchema!).parse({ bio: 'ok', email: 'evil@example.com' })).toEqual({ bio: 'ok' });
+    const parsed = sdkParse({ bio: 'ok', email: 'evil@example.com' });
+    expect(parsed).toEqual({ bio: 'ok', email: 'evil@example.com' });
+    await expect(update.execute(CTX, parsed)).rejects.toThrow("These fields can't be changed by an agent: email");
+    expect(members.updateMemberByUid).not.toHaveBeenCalled();
   });
 });
 

@@ -276,6 +276,13 @@ describe('McpController scope enforcement', () => {
     expect(result.content[0].text).toMatch(/LabOS: https:\/\/labos\.example\/settings\/mcp$/);
   });
 
+  it('gives update_my_profile a schema that keeps unknown arguments, and other tools their raw shape (LAB-3020)', async () => {
+    const tools = await build({ scopeLevels: { profile: 'write' } }).handle();
+    const schema = tools.get('update_my_profile')?.inputSchema as { parse: (v: unknown) => unknown };
+    expect(schema.parse({ bio: 'ok', email: 'evil@example.com' })).toEqual({ bio: 'ok', email: 'evil@example.com' });
+    expect(tools.get('search_teams')?.inputSchema).not.toHaveProperty('parse');
+  });
+
   it('registers nothing for a tool outside the registry, so the SDK answers "not found"', async () => {
     const h = build();
     expect(await call(h, 'delete_everything')).toEqual({ notFound: true });
