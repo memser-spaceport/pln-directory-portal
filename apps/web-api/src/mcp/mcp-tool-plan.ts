@@ -1,13 +1,15 @@
 import { McpScopeKey } from 'libs/contracts/src/schema/mcp-scopes';
 import { McpToolDef } from './mcp-tools';
 import { levelAtLeast, MCP_UNSCOPED_TOOLS, scopeLabel, toolScope } from './mcp-scopes.registry';
+import { MCP_WRITE_LIMIT_PER_HOUR } from './mcp-write-limit.service';
 import { McpAdminCaps, McpStoredLevels, resolveScope } from './mcp-scopes.service';
 
 /**
  * Why a call is refused (LAB-2995). `needs_write` and `scope_none` are member-fixable in Settings; `admin_off` is not;
- * `unavailable` means the scope settings could not be read, so everything scoped fails closed.
+ * `unavailable` means the scope settings could not be read, so everything scoped fails closed. `rate_limited` is a write
+ * tool over its per-member hourly allowance (LAB-3020).
  */
-export type McpRefusalReason = 'needs_write' | 'scope_none' | 'admin_off' | 'unavailable';
+export type McpRefusalReason = 'needs_write' | 'scope_none' | 'admin_off' | 'unavailable' | 'rate_limited';
 
 export type McpPlannedTool =
   /** Listed and runs. */
@@ -15,7 +17,12 @@ export type McpPlannedTool =
   /** Listed with a needs-write note; a call is refused. The member could raise the scope to write. */
   | { tool: McpToolDef; mode: 'listed_refused'; scope: McpScopeKey; reason: 'needs_write' }
   /** Not listed. A call by name is still answered with the refusal. */
-  | { tool: McpToolDef; mode: 'hidden'; scope: McpScopeKey; reason: Exclude<McpRefusalReason, 'needs_write'> };
+  | {
+      tool: McpToolDef;
+      mode: 'hidden';
+      scope: McpScopeKey;
+      reason: Exclude<McpRefusalReason, 'needs_write' | 'rate_limited'>;
+    };
 
 export const MCP_NEEDS_WRITE_NOTE = '[Needs write access: the member can allow it in LabOS]';
 
@@ -54,7 +61,8 @@ export function refusalText(
   reason: McpRefusalReason,
   scope: McpScopeKey,
   toolLevel: 'read' | 'write',
-  settingsUrl: string
+  settingsUrl: string,
+  toolName?: string
 ) {
   const label = scopeLabel(scope);
   switch (reason) {
@@ -65,6 +73,10 @@ export function refusalText(
       return toolLevel === 'write'
         ? `Changes in ${label} are turned off by LabOS admins.`
         : `${label} is turned off by LabOS admins.`;
+    case 'rate_limited':
+      return `LabOS limits agents to ${MCP_WRITE_LIMIT_PER_HOUR} ${
+        toolName ?? 'write'
+      } calls an hour. Try again later.`;
     case 'unavailable':
       return "LabOS couldn't check this connection's permissions. Try again later.";
   }

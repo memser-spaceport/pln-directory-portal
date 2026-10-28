@@ -32,13 +32,18 @@ import { directoryTools } from './mcp-directory-tools';
 import { McpOAuthService } from './mcp-oauth.service';
 import { portfolioTools } from './mcp-portfolio-tools';
 import { newsTools } from './mcp-news-tools';
+import { newsWriteTools, profileTools } from './mcp-write-tools';
+import { McpWriteLimitService } from './mcp-write-limit.service';
+import { TeamNewsService } from '../team-news/team-news.service';
+import { MembersHooksService } from '../members/members.hooks.service';
+import { PrismaService } from '../shared/prisma.service';
 import { TeamNewsQueryService } from '../team-news/team-news-query.service';
 import { TeamNewsSuggestionsService } from '../team-news/team-news-suggestions.service';
 import { McpToolDef, toolsForPermissions, WHOAMI_TOOL, warmIntroTools } from './mcp-tools';
 import { McpAdminCaps, McpScopesService, resolveScope } from './mcp-scopes.service';
 import { McpAccessRequestsService } from './mcp-access-requests.service';
 import { calledToolNames, MCP_NEEDS_WRITE_NOTE, McpRefusalReason, planTools, refusalText } from './mcp-tool-plan';
-import { toolScope } from './mcp-scopes.registry';
+import { isWriteTool, toolScope } from './mcp-scopes.registry';
 import { mcpSettingsUrl } from './mcp.constants';
 
 @ApiTags('MCP')
@@ -61,7 +66,11 @@ export class McpController {
     private readonly scopes: McpScopesService,
     private readonly accessRequests: McpAccessRequestsService,
     private readonly newsQuery: TeamNewsQueryService,
-    private readonly newsSuggestions: TeamNewsSuggestionsService
+    private readonly newsSuggestions: TeamNewsSuggestionsService,
+    private readonly teamNews: TeamNewsService,
+    private readonly memberHooks: MembersHooksService,
+    private readonly prisma: PrismaService,
+    private readonly writeLimit: McpWriteLimitService
   ) {}
 
   private readonly logger = new Logger(McpController.name);
@@ -103,6 +112,8 @@ export class McpController {
         ...aiAppFeedbackTools(this.aiApps),
         ...portfolioTools(this.portfolio),
         ...newsTools(this.newsQuery, this.newsSuggestions),
+        ...newsWriteTools(this.teamNews, this.newsQuery, this.members),
+        ...profileTools(this.members, this.memberHooks, this.prisma),
       ]),
       actor.scopeLevels,
       caps
@@ -175,7 +186,9 @@ export class McpController {
       }
       return {
         isError: true,
-        content: [{ type: 'text' as const, text: refusalText(reason, entry.scope, entry.level, settingsUrl) }],
+        content: [
+          { type: 'text' as const, text: refusalText(reason, entry.scope, entry.level, settingsUrl, tool.name) },
+        ],
       };
     };
 
@@ -195,6 +208,10 @@ export class McpController {
       }
       register(tool, tool.description, async (args) => {
         const toolArgs = args ?? {};
+        // Per-member hourly allowance for agent writes (LAB-3020).
+        if (isWriteTool(tool.name) && !(await this.writeLimit.tryConsume(actor.memberUid, tool.name))) {
+          return refuse(tool, 'rate_limited')();
+        }
         try {
           const result = await tool.execute(ctx, toolArgs);
           trackMcpToolInvocation(this.analytics, actor, {

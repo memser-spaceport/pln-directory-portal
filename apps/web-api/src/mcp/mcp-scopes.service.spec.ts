@@ -18,6 +18,7 @@ const NO_CAPS: McpAdminCaps = {
   directory: 'write',
   events: 'write',
   investors: 'write',
+  profile: 'write',
   ai_apps: 'write',
 };
 
@@ -131,6 +132,7 @@ describe('McpScopesService', () => {
       'directory',
       'events',
       'investors',
+      'profile',
       'ai_apps',
     ]);
     expect(items[0].scopes.find((s) => s.key === 'forum')).toEqual({
@@ -232,7 +234,7 @@ describe('McpScopesService', () => {
       registryMax: 'read',
       adminMax: 'none',
     });
-    expect(res.scopes.find((s) => s.key === 'news')).toMatchObject({ registryMax: 'read', adminMax: 'write' });
+    expect(res.scopes.find((s) => s.key === 'news')).toMatchObject({ registryMax: 'write', adminMax: 'write' });
     expect(analytics.trackEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         name: 'mcp-admin-scope-updated',

@@ -24,6 +24,7 @@ import { McpOAuthService } from './mcp-oauth.service';
 import { McpController } from './mcp.controller';
 import { McpScopesService } from './mcp-scopes.service';
 import { McpAccessRequestsService } from './mcp-access-requests.service';
+import { McpWriteLimitService } from './mcp-write-limit.service';
 import { JwtService } from '../utils/jwt/jwt.service';
 
 @Module({
@@ -58,6 +59,7 @@ import { JwtService } from '../utils/jwt/jwt.service';
     McpMemberProofService,
     McpScopesService,
     McpAccessRequestsService,
+    McpWriteLimitService,
     JwtService,
   ],
 })

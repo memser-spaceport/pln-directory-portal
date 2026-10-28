@@ -10,6 +10,8 @@ jest.mock('../search/search.service', () => ({ SearchService: jest.fn() }));
 jest.mock('../ai-apps/ai-apps.service', () => ({ AiAppsService: jest.fn() }));
 jest.mock('../spv-spotlights/pl-network-portfolio.service', () => ({ PlNetworkPortfolioService: jest.fn() }));
 jest.mock('./mcp-oauth.service', () => ({ McpOAuthService: jest.fn() }));
+jest.mock('../members/members.hooks.service', () => ({ MembersHooksService: jest.fn() }));
+jest.mock('../team-news/team-news.service', () => ({ TeamNewsService: jest.fn() }));
 jest.mock('../team-news/team-news-query.service', () => ({ TeamNewsQueryService: jest.fn() }));
 jest.mock('../team-news/team-news-suggestions.service', () => ({ TeamNewsSuggestionsService: jest.fn() }));
 // The SDK's ESM build can't load under Jest 27, so a fake server records what the controller registers: the SDK lists
@@ -40,7 +42,12 @@ import { MCP_NEEDS_WRITE_NOTE } from './mcp-tool-plan';
  * sees. Permissions give RBAC access to everything; only scope levels vary.
  */
 function build(
-  opts: { scopeLevels?: Record<string, string>; settings?: unknown[] | Error; requestsFail?: boolean } = {}
+  opts: {
+    scopeLevels?: Record<string, string>;
+    settings?: unknown[] | Error;
+    requestsFail?: boolean;
+    writeLimited?: boolean;
+  } = {}
 ) {
   const actor = {
     authorizationUid: 'auth-1',
@@ -85,6 +92,7 @@ function build(
     },
   };
   const accessRequests = new McpAccessRequestsService(requestPrisma as any);
+  const writeLimit = { tryConsume: jest.fn().mockResolvedValue(!opts.writeLimited) };
   const scopes = new McpScopesService(prisma as any, analytics as any, accessRequests);
   const stub = {} as any;
   const controller = new McpController(
@@ -103,7 +111,11 @@ function build(
     scopes,
     accessRequests,
     stub,
-    stub
+    stub,
+    stub,
+    stub,
+    stub,
+    writeLimit as any
   );
   /** One MCP request: returns what `tools/list` would show and a way to call a tool by name. */
   const handle = async (body: unknown = { jsonrpc: '2.0', id: 1, method: 'tools/list' }) => {
@@ -241,6 +253,20 @@ describe('McpController scope enforcement', () => {
     const result: any = await call(h, 'search_members', { query: 'ada' });
     expect(result).toMatchObject({ isError: true });
     expect(result.content[0].text).toContain("couldn't check this connection's permissions");
+  });
+
+  it('refuses a write over the hourly allowance without running it', async () => {
+    const h = build({ scopeLevels: { ai_apps: 'write' }, writeLimited: true });
+    const result: any = await call(h, 'update_ai_app_feedback_status', { feedbackUid: 'fb-1', status: 'VIEWED' });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toBe(
+      'LabOS limits agents to 10 update_ai_app_feedback_status calls an hour. Try again later.'
+    );
+    expect(h.aiApps.updateFeedbackStatusForMcp).not.toHaveBeenCalled();
+    expect(h.analytics.trackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ properties: expect.objectContaining({ reason: 'rate_limited' }) })
+    );
+    expect(h.requests).toEqual([]);
   });
 
   it('still refuses, with the plain Settings link, when the request cannot be stored', async () => {
