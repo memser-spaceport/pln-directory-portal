@@ -23,6 +23,7 @@ import { aiAppFeedbackTools } from './mcp-ai-app-feedback-tools';
 import { directoryTools } from './mcp-directory-tools';
 import { portfolioTools } from './mcp-portfolio-tools';
 import { newsTools } from './mcp-news-tools';
+import { newsWriteTools, profileTools } from './mcp-write-tools';
 import { isWriteTool, MCP_TOOL_SCOPES, MCP_UNSCOPED_TOOLS, registryMaxLevel } from './mcp-scopes.registry';
 
 describe('mcp-redirect', () => {
@@ -140,6 +141,8 @@ describe('scope registry', () => {
     ...aiAppFeedbackTools(stub),
     ...portfolioTools(stub),
     ...newsTools(stub, stub),
+    ...newsWriteTools(stub, stub, stub),
+    ...profileTools(stub, stub, stub),
   ];
   const everything = new Set(['directory.admin.full', 'investor_db.edit', 'forum.read', 'ai_apps.read']);
 
@@ -156,7 +159,7 @@ describe('scope registry', () => {
   });
 
   it('marks every tool that changes data as a write tool', () => {
-    const writesByName = fullCatalog.map((t) => t.name).filter((name) => /^(update|submit)_/.test(name));
+    const writesByName = fullCatalog.map((t) => t.name).filter((name) => /^(update|submit|post)_/.test(name));
     expect(writesByName.length).toBeGreaterThan(0);
     for (const name of writesByName) {
       expect(isWriteTool(name)).toBe(true);
@@ -170,9 +173,10 @@ describe('scope registry', () => {
   });
 
   it('allows write only on scopes that have write tools', () => {
-    expect(registryMaxLevel('investors')).toBe('write');
-    expect(registryMaxLevel('ai_apps')).toBe('write');
-    for (const scope of ['search', 'forum', 'news', 'directory', 'events'] as const) {
+    for (const scope of ['investors', 'ai_apps', 'news', 'profile'] as const) {
+      expect(registryMaxLevel(scope)).toBe('write');
+    }
+    for (const scope of ['search', 'forum', 'directory', 'events'] as const) {
       expect(registryMaxLevel(scope)).toBe('read');
     }
   });

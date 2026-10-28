@@ -12,6 +12,7 @@ export const MCP_SCOPES: ReadonlyArray<{ key: McpScopeKey; label: string }> = [
   { key: 'directory', label: 'Members, teams and projects' },
   { key: 'events', label: 'Events' },
   { key: 'investors', label: 'Investors and warm intros' },
+  { key: 'profile', label: 'Your profile' },
   { key: 'ai_apps', label: 'AI Apps' },
 ];
 
@@ -28,6 +29,7 @@ export const MCP_TOOL_SCOPES: Readonly<Record<string, McpToolScope>> = {
 
   list_news: { scope: 'news', level: 'read' },
   get_news_item: { scope: 'news', level: 'read' },
+  post_team_news: { scope: 'news', level: 'write' },
 
   get_member: { scope: 'directory', level: 'read' },
   get_team: { scope: 'directory', level: 'read' },
@@ -47,6 +49,9 @@ export const MCP_TOOL_SCOPES: Readonly<Record<string, McpToolScope>> = {
   update_master_profile: { scope: 'investors', level: 'write' },
   update_connection_edge: { scope: 'investors', level: 'write' },
   update_warm_path: { scope: 'investors', level: 'write' },
+
+  get_my_profile: { scope: 'profile', level: 'read' },
+  update_my_profile: { scope: 'profile', level: 'write' },
 
   list_my_ai_apps: { scope: 'ai_apps', level: 'read' },
   list_ai_app_feedback: { scope: 'ai_apps', level: 'read' },

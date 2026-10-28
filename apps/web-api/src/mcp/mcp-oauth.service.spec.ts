@@ -300,6 +300,7 @@ describe('McpOAuthService', () => {
     directory: 'read',
     events: 'read',
     investors: 'read',
+    profile: 'read',
     ai_apps: 'read',
   };
 

@@ -5,7 +5,7 @@ import { z } from 'zod';
  *
  * A leaf module (only `zod`), so specs and the MCP module can import it without the contracts barrel.
  */
-export const MCP_SCOPE_KEYS = ['search', 'forum', 'news', 'directory', 'events', 'investors', 'ai_apps'] as const;
+export const MCP_SCOPE_KEYS = ['search', 'forum', 'news', 'directory', 'events', 'investors', 'profile', 'ai_apps'] as const;
 export const McpScopeKeySchema = z.enum(MCP_SCOPE_KEYS);
 export type McpScopeKey = z.infer<typeof McpScopeKeySchema>;
 

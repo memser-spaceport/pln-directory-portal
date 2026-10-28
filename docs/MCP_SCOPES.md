@@ -13,10 +13,11 @@ has no entry. Adding a tool to MCP means adding it there.
 | --- | --- | --- | --- |
 | `search` | Search | `search_members`, `search_teams`, `search_projects`, `search_events` | none |
 | `forum` | Forum | `search_forum_threads`, `get_forum_thread` | none |
-| `news` | News feed | `list_news` (feed `latest` = Home → Latest, `for_you` = one latest story per For You team, falls back to latest; `teamUid` = one team), `get_news_item` | none |
+| `news` | News feed | `list_news` (feed `latest` = Home → Latest, `for_you` = one latest story per For You team, falls back to latest; `teamUid` = one team), `get_news_item` | `post_team_news` (team members / admins; duplicate link rejected) |
 | `directory` | Members, teams and projects | `get_member`, `get_team`, `get_project`, `list_portfolio_teams` | none |
 | `events` | Events | `get_event` | none |
 | `investors` | Investors and warm intros | master-profile and warm-intro reads | `submit_warm_path_feedback`, `submit_warm_path_note`, `update_master_profile`, `update_connection_edge`, `update_warm_path` |
+| `profile` | Your profile | `get_my_profile` | `update_my_profile` (allowlist: bio, moreDetails, social handles, officeHours, openToWork, jobSearchStatus, skills) |
 | `ai_apps` | AI Apps | `list_my_ai_apps`, `list_ai_app_feedback` | `update_ai_app_feedback_status` |
 
 Member RBAC still applies on top (investor DB tools need `investor_db.view` / `.edit`, forum tools `forum.read`).
@@ -60,3 +61,10 @@ same connection and scope from the last 24 hours (a write refusal raises a read 
 - `PATCH /v1/mcp/authorizations/:uid/scopes` with `requestUid` resolves the request when the save reaches the
   requested level on that same connection. `mcp-scope-levels-updated` carries `viaRequest` and `requestResolved`.
 - The table is also the "Blocked by permissions" record for the activity drawer (LAB-2938).
+
+## Write limit
+
+Every write tool allows 10 calls per member per tool per hour (`McpWriteLimitService`, a fixed-window counter in the
+shared cache). Over the limit the call is refused with "LabOS limits agents to 10 <tool> calls an hour. Try again
+later." and `mcp-tool-refused` reason `rate_limited`; no access request is created. If the cache is unavailable the
+call is allowed.

@@ -133,3 +133,26 @@ The MCP server SHALL offer `list_news` and `get_news_item` in the `news` scope a
 
 - **WHEN** a connection has `news` at `none`
 - **THEN** neither news tool is listed
+
+### Requirement: Agents post team news and edit their own profile
+
+The `news` scope SHALL also offer `post_team_news` at `write`, which posts news for one of the member's teams with the same checks as the team page (team member or directory admin, active team, safe link, no duplicate link for the team). A new `profile` scope ("Your profile") SHALL offer `get_my_profile` at `read` and `update_my_profile` at `write`. `update_my_profile` SHALL accept only bio, moreDetails, the social handles, officeHours, openToWork, jobSearchStatus and skills (existing skill titles), SHALL reject a call that names any other field without changing anything, and SHALL run the normal member post-update actions.
+
+#### Scenario: Blocked profile field
+
+- **WHEN** an agent calls `update_my_profile` with `bio` and `email`
+- **THEN** the call fails and the profile is unchanged
+
+#### Scenario: Posting for another team
+
+- **WHEN** an agent posts news for a team the member does not belong to
+- **THEN** the call fails and nothing is posted
+
+### Requirement: Agent writes are rate limited per member
+
+Each write tool SHALL allow at most 10 calls per member per tool per hour. A call over the limit SHALL be refused with an error that names the limit, SHALL NOT run, SHALL NOT create an access request, and SHALL emit `mcp-tool-refused` with reason `rate_limited`. If the limit store is unavailable the call SHALL be allowed.
+
+#### Scenario: Eleventh post in an hour
+
+- **WHEN** a connection calls `post_team_news` an eleventh time within the hour
+- **THEN** the call is refused with "LabOS limits agents to 10 post_team_news calls an hour. Try again later."
