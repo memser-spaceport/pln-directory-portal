@@ -1,8 +1,13 @@
 import React, { useState } from 'react';
 
+import { trackEvent } from '../../../utils/services/analytics';
 import { validateInvestorEmail, parseInvestorCsvLine, normalizeInvestorCsvHeader } from '../../../utils/investor-csv';
 
+import { useAuth } from '../../../context/auth-context';
+
 import { CsvUploadModal } from '../CsvUploadModal';
+
+const CSV_SELECTION_EVENT = 'spotlight-email-csv-send';
 
 interface SelectableInvestor {
   uid: string;
@@ -11,6 +16,7 @@ interface SelectableInvestor {
 
 interface SelectSpvInvestorsModalProps {
   isOpen: boolean;
+  spotlightUid: string;
   investors: SelectableInvestor[];
   onSelect: (investorUids: string[]) => void;
   onClose: () => void;
@@ -59,7 +65,9 @@ const matchInvestors = (csvContent: string, investors: SelectableInvestor[]): Cs
 const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`;
 
 export const SelectSpvInvestorsModal: React.FC<SelectSpvInvestorsModalProps> = (props) => {
-  const { isOpen, investors, onSelect, onClose } = props;
+  const { isOpen, spotlightUid, investors, onSelect, onClose } = props;
+
+  const { user } = useAuth();
 
   const [match, setMatch] = useState<CsvMatch | null>(null);
   const [error, setError] = useState('');
@@ -87,6 +95,20 @@ export const SelectSpvInvestorsModal: React.FC<SelectSpvInvestorsModalProps> = (
   const handleSubmit = () => {
     if (!match?.matchedUids.length) return;
     onSelect(match.matchedUids);
+
+    if (user) {
+      trackEvent({
+        name: CSV_SELECTION_EVENT,
+        distinctId: user.uid,
+        properties: {
+          spotlightUid,
+          matchedCount: match.matchedUids.length,
+          notOnListCount: match.notOnListEmails.length,
+          invalidCount: match.invalidCount,
+        },
+      }).catch((err) => console.error('[SelectSpvInvestorsModal] Failed to track CSV selection', err));
+    }
+
     handleClose();
   };
 
