@@ -12,6 +12,7 @@ import { RbacModule } from '../rbac/rbac.module';
 import { SharedModule } from '../shared/shared.module';
 import { PlNetworkPortfolioModule } from '../spv-spotlights/pl-network-portfolio.module';
 import { WarmIntrosV2Module } from '../warm-intros-v2/warm-intros-v2.module';
+import { McpAdminScopesController } from './mcp-admin-scopes.controller';
 import { McpAppSessionService } from './mcp-app-session.service';
 import { McpAppSessionsController } from './mcp-app-sessions.controller';
 import { McpAuthorizationsController } from './mcp-authorizations.controller';
@@ -20,6 +21,8 @@ import { McpMemberProofsController, McpMemberProofsIntegrationController } from 
 import { McpOAuthController } from './mcp-oauth.controller';
 import { McpOAuthService } from './mcp-oauth.service';
 import { McpController } from './mcp.controller';
+import { McpScopesService } from './mcp-scopes.service';
+import { JwtService } from '../utils/jwt/jwt.service';
 
 @Module({
   imports: [
@@ -40,11 +43,12 @@ import { McpController } from './mcp.controller';
   controllers: [
     McpOAuthController,
     McpAuthorizationsController,
+    McpAdminScopesController,
     McpAppSessionsController,
     McpMemberProofsController,
     McpMemberProofsIntegrationController,
     McpController,
   ],
-  providers: [McpOAuthService, McpAppSessionService, McpMemberProofService],
+  providers: [McpOAuthService, McpAppSessionService, McpMemberProofService, McpScopesService, JwtService],
 })
 export class McpModule {}

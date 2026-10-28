@@ -1,12 +1,12 @@
 import { AnalyticsService } from '../analytics/service/analytics.service';
 import { ANALYTICS_EVENTS } from '../utils/constants';
-import { MCP_WRITE_TOOLS } from './mcp.constants';
+import { isWriteTool } from './mcp-scopes.registry';
 import type { McpTokenActor } from './mcp-oauth.service';
 
 export type McpToolOperation = 'read' | 'write';
 
 export function mcpToolOperation(toolName: string): McpToolOperation {
-  return MCP_WRITE_TOOLS.has(toolName) ? 'write' : 'read';
+  return isWriteTool(toolName) ? 'write' : 'read';
 }
 
 function stringProp(value: unknown): string | undefined {

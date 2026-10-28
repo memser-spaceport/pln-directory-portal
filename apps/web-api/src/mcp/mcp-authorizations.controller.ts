@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Get,
   Param,
+  Patch,
   Post,
   Req,
   UseGuards,
@@ -20,6 +21,7 @@ import { RBAC_PERMISSION_CODES } from '../rbac/rbac.constants';
 import { RbacService } from '../rbac/rbac.service';
 import { ApproveMcpOAuthDto } from './dto/approve-mcp-oauth.dto';
 import { McpOAuthService } from './mcp-oauth.service';
+import { McpScopesService } from './mcp-scopes.service';
 
 const CONNECT = { anyOf: [RBAC_PERMISSION_CODES.MCP_CONNECT] };
 
@@ -28,7 +30,11 @@ const CONNECT = { anyOf: [RBAC_PERMISSION_CODES.MCP_CONNECT] };
 @UseGuards(UserAccessTokenValidateGuard, RbacGuard)
 @RequirePermissions(CONNECT)
 export class McpAuthorizationsController {
-  constructor(private readonly oauth: McpOAuthService, private readonly rbacService: RbacService) {}
+  constructor(
+    private readonly oauth: McpOAuthService,
+    private readonly rbacService: RbacService,
+    private readonly scopes: McpScopesService
+  ) {}
 
   @NoCache()
   @Post('oauth/approve')
@@ -43,6 +49,14 @@ export class McpAuthorizationsController {
   async list(@Req() req: any) {
     const memberUid = await this.resolveMemberUid(req);
     return this.oauth.listAuthorizations(memberUid);
+  }
+
+  /** Saves a connection's scope levels in one call (LAB-2995). Body: `{ levels: { [scope]: level }, requestUid? }`. */
+  @NoCache()
+  @Patch('authorizations/:uid/scopes')
+  async updateScopes(@Param('uid') uid: string, @Body() body: unknown, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.scopes.updateConnectionLevels(memberUid, uid, body);
   }
 
   @NoCache()

@@ -4,6 +4,7 @@ jest.mock('../analytics/service/analytics.service', () => ({
 
 import { UnauthorizedException } from '@nestjs/common';
 import { McpOAuthService } from './mcp-oauth.service';
+import { McpScopesService } from './mcp-scopes.service';
 import { MCP_ACCESS_TOKEN_TTL_SEC, MCP_REFRESH_TOKEN_IDLE_TTL_MS, MCP_REFRESH_TOKEN_TTL_MS } from './mcp.constants';
 import { pkceS256Challenge } from './mcp.crypto';
 
@@ -33,6 +34,7 @@ function fakePrisma() {
       })),
     },
     member: { findUnique: jest.fn(async () => MEMBER) },
+    mcpScopeSetting: { findMany: jest.fn(async () => []) },
     mcpAuthorization: {
       upsert: jest.fn(async ({ where, create, update }) => {
         const key = where.memberUid_clientId;
@@ -94,7 +96,8 @@ function build() {
   const accessControl = { hasPermission: jest.fn().mockResolvedValue({ allowed: true }) };
   const appSessions = { revokeAgentSessionsForAuthorization: jest.fn().mockResolvedValue(2) };
   const analytics = { trackEvent: jest.fn().mockResolvedValue(undefined) };
-  const service = new McpOAuthService(store.prisma, accessControl as any, appSessions as any, analytics as any);
+  const scopes = new McpScopesService(store.prisma, analytics as any);
+  const service = new McpOAuthService(store.prisma, accessControl as any, appSessions as any, analytics as any, scopes);
   return { ...store, service, appSessions, analytics };
 }
 
