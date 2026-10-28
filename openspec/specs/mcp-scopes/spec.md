@@ -88,7 +88,7 @@ Each member-fixable refusal SHALL create an `McpAccessRequest` (authorization, s
 - **THEN** the request becomes `resolved` and the next forum write call is allowed
 
 ### Requirement: The connection list carries status and scopes
-`GET /v1/mcp/authorizations` SHALL return, for each active connection: `uid`, `clientName`, `connectedAt`, `lastUsedAt`, `status`, and `scopes` in registry order, each `{ key, label, level, maxLevel, lock }`. `level` SHALL be the effective level. `maxLevel` SHALL be the highest level the member may set. `lock` SHALL be `admin` when the admin maximum is lower than the registry maximum, otherwise `null`. Status SHALL be `signin_expired` when a refresh would be refused, otherwise `not_used` when never used, `active` when used within 14 days, else `idle`. Scopes with no tools SHALL be omitted.
+`GET /v1/mcp/authorizations` SHALL return, for each active connection: `uid`, `clientName`, `connectedAt`, `lastUsedAt`, `status`, and `scopes` in registry order, each `{ key, label, level, maxLevel, registryMax, lock }`. `level` SHALL be the effective level. `maxLevel` SHALL be the highest level the member may set. `registryMax` SHALL be what the scope's tools allow before admin caps. `lock` SHALL be `admin` when the admin maximum is lower than the registry maximum, otherwise `null`. Status SHALL be `signin_expired` when a refresh would be refused, otherwise `not_used` when never used, `active` when used within 14 days, else `idle`. Scopes with no tools SHALL be omitted.
 
 #### Scenario: Admin-locked scope in the list
 - **WHEN** admins cap `forum` at `read`

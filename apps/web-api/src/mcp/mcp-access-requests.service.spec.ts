@@ -57,7 +57,16 @@ const connection = (level: 'none' | 'read' | 'write', uid = 'auth-1') => ({
   connectedAt: new Date().toISOString(),
   lastUsedAt: null,
   status: 'active' as const,
-  scopes: [{ key: 'forum' as const, label: 'Forum', level, maxLevel: 'write' as const, lock: null }],
+  scopes: [
+    {
+      key: 'forum' as const,
+      label: 'Forum',
+      level,
+      maxLevel: 'write' as const,
+      registryMax: 'write' as const,
+      lock: null,
+    },
+  ],
 });
 
 describe('McpAccessRequestsService', () => {
