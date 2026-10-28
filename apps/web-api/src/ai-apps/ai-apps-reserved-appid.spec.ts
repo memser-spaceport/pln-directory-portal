@@ -56,10 +56,16 @@ beforeEach(() => {
 });
 
 describe('isReservedAppId', () => {
-  it.each(['api-directory', 'auth', 'forum', 'www', 'deployment-orchestrator-runner', 'dev-directory', 'directoryv2'])(
-    'reserves %s',
-    (appId) => expect(isReservedAppId(appId)).toBe(true)
-  );
+  it.each([
+    'api-directory',
+    'auth',
+    'forum',
+    'www',
+    'deployment-orchestrator-runner',
+    'dev-directory',
+    'directoryv2',
+    'irl',
+  ])('reserves %s', (appId) => expect(isReservedAppId(appId)).toBe(true));
 
   it.each(['my-app', 'auth-demo', 'api-directory-v2-test', 'forum-bot', 'x'])('allows %s', (appId) =>
     expect(isReservedAppId(appId)).toBe(false)
