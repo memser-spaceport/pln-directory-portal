@@ -98,5 +98,6 @@ describe('AiAppSessionScopeMiddleware routing (as registered in app.module)', ()
     expect(await call('GET', '/v1/members/m-2', labos, buildAppUrl('network-pulse', 'prod'))).toBe(401);
     expect(await call('GET', '/v1/ai-apps/me', labos, buildAppUrl('network-pulse', 'prod'))).not.toBe(401);
     expect(await call('GET', '/v1/members/m-2', labos, buildAppUrl('directoryv2', 'prod'))).not.toBe(401);
+    expect(await call('GET', '/v1/members/m-2', labos, buildAppUrl('irl', 'prod'))).not.toBe(401);
   });
 });

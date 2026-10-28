@@ -69,7 +69,7 @@ describe('AiAppSessionScopeMiddleware', () => {
 
   it('does not log or block LabOS itself or other platform hosts under the app domain', () => {
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
-    for (const origin of [buildAppUrl('directoryv2', 'prod'), 'https://example.com']) {
+    for (const origin of [buildAppUrl('directoryv2', 'prod'), buildAppUrl('irl', 'prod'), 'https://example.com']) {
       const bearer = run(`Bearer ${labosToken}`, '/v1/members/m-2', origin);
       const cookie = run(undefined, '/v1/members/m-2', origin, { authToken: `"${labosToken}"` });
       expect(bearer.next).toHaveBeenCalled();
@@ -84,6 +84,7 @@ describe('AiAppSessionScopeMiddleware', () => {
     expect(appIdFromOrigin(buildAppUrl('foo', 'prod'))).toBe('foo');
     expect(appIdFromOrigin(buildAppUrl('foo', 'preview'))).toBe('foo-preview');
     expect(appIdFromOrigin(buildAppUrl('forum', 'prod'))).toBeNull();
+    expect(appIdFromOrigin(buildAppUrl('irl', 'prod'))).toBeNull();
     expect(appIdFromOrigin('not a url')).toBeNull();
   });
 });

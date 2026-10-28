@@ -353,9 +353,10 @@ const AI_APPS_BUILTIN_RESERVED_APP_IDS = [
   'dev-notification-processor',
   'dev-notification-receiver',
   'dev-deployment-orchestrator-runner',
-  // LabOS portal labels.
+  // LabOS portal labels, plus the events submission UI (`https://irl.os.pl.xyz`).
   'directoryv2',
   'os',
+  'irl',
   // Generic infrastructure names.
   'www',
   'api',
