@@ -37,7 +37,7 @@ Member RBAC still applies on top (investor DB tools need `investor_db.view` / `.
 | Situation | `tools/list` | A call |
 | --- | --- | --- |
 | Effective level covers the tool | listed | runs |
-| Write tool, connection at `read`, member may raise to `write` | listed, description starts `[Needs write access: …]` | `isError`: "This needs write access to <Label> for this connection. Ask the member to allow it in LabOS: <WEB_UI_BASE_URL>/settings/mcp" |
+| Write tool, connection at `read`, member may raise to `write` | listed, description starts `[Needs write access: …]` | `isError`: "This needs write access to <Label> for this connection. Ask the member to allow it in LabOS: <WEB_UI_BASE_URL>/settings/mcp?request=<uid>" |
 | Connection set the scope to `none` | hidden | same refusal, "read access" (or "write access" for a write tool) |
 | Admin cap below the tool's level | hidden | `isError`: "<Label> is turned off by LabOS admins." (write tools: "Changes in <Label> are turned off…"), no link |
 | Scope settings can't be read | only `whoami` | `isError`: "LabOS couldn't check this connection's permissions. Try again later." |
@@ -47,4 +47,16 @@ so it never appears in `tools/list`. Every refusal except the last sends PostHog
 `scope`, `reason`: `needs_write`, `scope_none`, `admin_off`). Level saves send `mcp-scope-levels-updated`; admin changes
 `mcp-admin-scope-updated`.
 
-The `?request=<id>` deep link and the `McpAccessRequest` table are LAB-3014.
+## Access requests
+
+Each member-fixable refusal (`needs_write`, `scope_none`) creates an `McpAccessRequest` or reuses the open one for the
+same connection and scope from the last 24 hours (a write refusal raises a read request to write). The refusal links to
+`/settings/mcp?request=<uid>`. If the request can't be stored, the refusal still goes out with the plain link.
+`admin_off` refusals get no request.
+
+- `GET /v1/mcp/access-requests/:uid` (member guards, `mcp.connect`) returns
+  `{ uid, authorizationUid, scope, level, toolName, status, createdAt }` to the connection's member only; anyone else
+  gets 404. `status` is `open`, `resolved`, or `expired` (unresolved for 7 days).
+- `PATCH /v1/mcp/authorizations/:uid/scopes` with `requestUid` resolves the request when the save reaches the
+  requested level on that same connection. `mcp-scope-levels-updated` carries `viaRequest` and `requestResolved`.
+- The table is also the "Blocked by permissions" record for the activity drawer (LAB-2938).

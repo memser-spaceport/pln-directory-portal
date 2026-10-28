@@ -33,6 +33,7 @@ import { McpOAuthService } from './mcp-oauth.service';
 import { portfolioTools } from './mcp-portfolio-tools';
 import { McpToolDef, toolsForPermissions, WHOAMI_TOOL, warmIntroTools } from './mcp-tools';
 import { McpAdminCaps, McpScopesService, resolveScope } from './mcp-scopes.service';
+import { McpAccessRequestsService } from './mcp-access-requests.service';
 import { calledToolNames, MCP_NEEDS_WRITE_NOTE, McpRefusalReason, planTools, refusalText } from './mcp-tool-plan';
 import { toolScope } from './mcp-scopes.registry';
 import { mcpSettingsUrl } from './mcp.constants';
@@ -54,7 +55,8 @@ export class McpController {
     private readonly aiApps: AiAppsService,
     private readonly portfolio: PlNetworkPortfolioService,
     private readonly analytics: AnalyticsService,
-    private readonly scopes: McpScopesService
+    private readonly scopes: McpScopesService,
+    private readonly accessRequests: McpAccessRequestsService
   ) {}
 
   private readonly logger = new Logger(McpController.name);
@@ -150,9 +152,24 @@ export class McpController {
           },
         });
       }
+      let settingsUrl = mcpSettingsUrl();
+      if (reason === 'needs_write' || reason === 'scope_none') {
+        try {
+          const requestUid = await this.accessRequests.createOrReuse(
+            actor.authorizationUid,
+            entry.scope,
+            entry.level,
+            tool.name
+          );
+          settingsUrl = `${settingsUrl}?request=${encodeURIComponent(requestUid)}`;
+        } catch (error) {
+          // The refusal still goes out, with the plain Settings link.
+          this.logger.error(`MCP access request not stored: ${String(error)}`);
+        }
+      }
       return {
         isError: true,
-        content: [{ type: 'text' as const, text: refusalText(reason, entry.scope, entry.level, mcpSettingsUrl()) }],
+        content: [{ type: 'text' as const, text: refusalText(reason, entry.scope, entry.level, settingsUrl) }],
       };
     };
 

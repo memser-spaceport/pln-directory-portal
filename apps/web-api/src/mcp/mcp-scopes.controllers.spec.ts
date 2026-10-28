@@ -23,10 +23,21 @@ describe('MCP scope routes', () => {
     ]);
 
     const scopes = { updateConnectionLevels: jest.fn().mockResolvedValue({ uid: 'auth-1' }) };
-    const controller = new McpAuthorizationsController({} as any, {} as any, scopes as any);
+    const controller = new McpAuthorizationsController({} as any, {} as any, scopes as any, {} as any);
     const body = { levels: { forum: 'none' } };
     await controller.updateScopes('auth-1', body, { memberUid: 'member-1' });
     expect(scopes.updateConnectionLevels).toHaveBeenCalledWith('member-1', 'auth-1', body);
+  });
+
+  it('GET /v1/mcp/access-requests/:uid sits behind the member guards and reads for the caller', async () => {
+    const handler = McpAuthorizationsController.prototype.accessRequest;
+    expect(Reflect.getMetadata(PATH_METADATA, handler)).toBe('access-requests/:uid');
+    expect(Reflect.getMetadata(METHOD_METADATA, handler)).toBe(RequestMethod.GET);
+
+    const requests = { getForMember: jest.fn().mockResolvedValue({ uid: 'req-1' }) };
+    const controller = new McpAuthorizationsController({} as any, {} as any, {} as any, requests as any);
+    await expect(controller.accessRequest('req-1', { memberUid: 'member-1' })).resolves.toEqual({ uid: 'req-1' });
+    expect(requests.getForMember).toHaveBeenCalledWith('member-1', 'req-1');
   });
 
   it('GET and PUT /v1/admin/mcp/scopes require AdminAuthGuard and record the admin', async () => {

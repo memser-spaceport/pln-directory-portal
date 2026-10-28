@@ -30,7 +30,7 @@ function build() {
   const sessions = { openAgentSession: jest.fn().mockResolvedValue(GRANT) };
   const analytics = { trackEvent: jest.fn().mockResolvedValue(undefined) };
   const prisma = { mcpScopeSetting: { findMany: jest.fn().mockResolvedValue([]) } };
-  const scopes = new McpScopesService(prisma as any, analytics as any);
+  const scopes = new McpScopesService(prisma as any, analytics as any, {} as any);
   const service = new McpAppSessionService(oauth as any, access as any, sessions as any, analytics as any, scopes);
   return { service, oauth, access, sessions, analytics, prisma };
 }

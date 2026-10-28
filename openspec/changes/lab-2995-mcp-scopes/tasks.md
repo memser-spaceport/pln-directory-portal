@@ -31,11 +31,11 @@
 
 ## 5. Access requests (BE-2)
 
-- [ ] 5.1 `McpAccessRequestsService`: create or reuse within 24h for the same authorization and scope (raise the level if needed), computed status (`open`/`resolved`/`expired` after 7 days)
-- [ ] 5.2 `refuse()` creates or reuses the request for `needs_write` and `scope_none`, and puts `<WEB_UI_BASE_URL>/settings/mcp?request=<uid>` in the text
-- [ ] 5.3 `GET /v1/mcp/access-requests/:uid`, owner only (404 otherwise)
-- [ ] 5.4 PATCH `…/scopes` with `requestUid` resolves the request when the saved level meets it
-- [ ] 5.5 Tests: loop dedupe, ownership, expiry, resolve on save, no request for `admin_off`
+- [x] 5.1 `McpAccessRequestsService`: create or reuse within 24h for the same authorization and scope (raise the level if needed), computed status (`open`/`resolved`/`expired` after 7 days)
+- [x] 5.2 `refuse()` creates or reuses the request for `needs_write` and `scope_none`, and puts `<WEB_UI_BASE_URL>/settings/mcp?request=<uid>` in the text
+- [x] 5.3 `GET /v1/mcp/access-requests/:uid`, owner only (404 otherwise)
+- [x] 5.4 PATCH `…/scopes` with `requestUid` resolves the request when the saved level meets it
+- [x] 5.5 Tests: loop dedupe, ownership, expiry, resolve on save, no request for `admin_off`
 
 ## 6. Docs and spec
 
