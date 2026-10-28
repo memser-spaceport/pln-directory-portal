@@ -17,10 +17,8 @@ export function Breadcrumb({ items, classname }: BreadcrumbProps) {
       aria-label="breadcrumb"
       className="navbar top-20 z-40 border-t border-t-slate-200 px-16 py-3.5 text-sm leading-6 shadow-[0_1px_4px_0_#e2e8f0]"
     >
-      <Link href="/directory">
-        <a className="on-focus--link">
-          <HomeIcon className="h-4 w-4 fill-slate-600 hover:fill-slate-700" />
-        </a>
+      <Link href="/directory" className="on-focus--link">
+        <HomeIcon className="h-4 w-4 fill-slate-600 hover:fill-slate-700" />
       </Link>
       <span className="mx-4 text-slate-400">/</span>
       {items.map((item, index, items) => {
@@ -38,13 +36,8 @@ export function Breadcrumb({ items, classname }: BreadcrumbProps) {
             {...ariaCurrent}
           >
             {item.href ? (
-              <Link href={item.href} passHref>
-                <a
-                  href="replace"
-                  className="on-focus--link hover:text-slate-700 active:text-slate-900"
-                >
-                  {item.label}
-                </a>
+              <Link href={item.href} className="on-focus--link hover:text-slate-700 active:text-slate-900">
+                {item.label}
               </Link>
             ) : (
               <p className= {classname}>

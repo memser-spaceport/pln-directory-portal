@@ -35,45 +35,40 @@ export function RecommendationsLayout({
         <nav className="navbar top-0 flex h-[8%] min-h-[80px] items-center justify-between pr-[40px] only-of-type:shadow-[0_1px_4px_0_#e2e8f0]">
           <div className="flex h-full items-center space-x-5">
             <div className="m-auto h-full w-[80px] bg-[#1D4ED8]">
-              <Link href={ROUTE_CONSTANTS.PENDING_LIST}>
-                <a className="on-focus relative left-[15px] top-[20px]">
-                  <ProtocolLabsLogo title="Protocol Labs Directory Beta Black Logo" width="45" height="40" />
-                </a>
+              <Link href={ROUTE_CONSTANTS.PENDING_LIST} className="on-focus relative left-[15px] top-[20px]">
+                <ProtocolLabsLogo title="Protocol Labs Directory Beta Black Logo" width="45" height="40" />
               </Link>
             </div>
             <span className="text-base font-semibold">{title}</span>
           </div>
           {!!activeTab && (
             <ul className="flex space-x-4 text-sm text-gray-700">
-              <Link href={ROUTE_CONSTANTS.RECOMMENDATIONS_MEMBERS}>
-                <a
-                  className={`on-focus group flex items-center rounded-lg px-3 py-2.5 text-sm focus:text-slate-900 ${
-                    activeTab === 'members' ? 'text-[#1D4ED8]' : 'text-[#475569]'
-                  }`}
-                >
-                  <UserGroupIcon className="mr-2 h-5 w-5" />
-                  Opted-in
-                </a>
+              <Link
+                href={ROUTE_CONSTANTS.RECOMMENDATIONS_MEMBERS}
+                className={`on-focus group flex items-center rounded-lg px-3 py-2.5 text-sm focus:text-slate-900 ${
+                  activeTab === 'members' ? 'text-[#1D4ED8]' : 'text-[#475569]'
+                }`}
+              >
+                <UserGroupIcon className="mr-2 h-5 w-5" />
+                Opted-in
               </Link>
-              <Link href={ROUTE_CONSTANTS.RECOMMENDATIONS_RUNS}>
-                <a
-                  className={`on-focus group flex items-center rounded-lg px-3 py-2.5 text-sm focus:text-slate-900 ${
-                    activeTab === 'runs' ? 'text-[#1D4ED8]' : 'text-[#475569]'
-                  }`}
-                >
-                  <PlayIcon className="mr-2 h-5 w-5" />
-                  Runs
-                </a>
+              <Link
+                href={ROUTE_CONSTANTS.RECOMMENDATIONS_RUNS}
+                className={`on-focus group flex items-center rounded-lg px-3 py-2.5 text-sm focus:text-slate-900 ${
+                  activeTab === 'runs' ? 'text-[#1D4ED8]' : 'text-[#475569]'
+                }`}
+              >
+                <PlayIcon className="mr-2 h-5 w-5" />
+                Runs
               </Link>
-              <Link href={ROUTE_CONSTANTS.RECOMMENDATIONS_HISTORY}>
-                <a
-                  className={`on-focus group flex items-center rounded-lg px-3 py-2.5 text-sm focus:text-slate-900 ${
-                    activeTab === 'history' ? 'text-[#1D4ED8]' : 'text-[#475569]'
-                  }`}
-                >
-                  <ClockIcon className="mr-2 h-5 w-5" />
-                  History
-                </a>
+              <Link
+                href={ROUTE_CONSTANTS.RECOMMENDATIONS_HISTORY}
+                className={`on-focus group flex items-center rounded-lg px-3 py-2.5 text-sm focus:text-slate-900 ${
+                  activeTab === 'history' ? 'text-[#1D4ED8]' : 'text-[#475569]'
+                }`}
+              >
+                <ClockIcon className="mr-2 h-5 w-5" />
+                History
               </Link>
             </ul>
           )}

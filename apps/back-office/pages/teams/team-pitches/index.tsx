@@ -163,8 +163,8 @@ const TeamPitchesPage = () => {
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm font-medium">
-                      <Link href={`/teams/team-pitches/${pitch.uid}`}>
-                        <a className="text-blue-600 hover:text-blue-900">View Details</a>
+                      <Link href={`/teams/team-pitches/${pitch.uid}`} className="text-blue-600 hover:text-blue-900">
+                        View Details
                       </Link>
                     </td>
                   </tr>

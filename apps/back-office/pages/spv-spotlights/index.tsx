@@ -155,8 +155,8 @@ const SpvSpotlightsPage = () => {
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm font-medium">
-                      <Link href={`/spv-spotlights/${row.uid}`}>
-                        <a className="text-blue-600 hover:text-blue-900">View Details</a>
+                      <Link href={`/spv-spotlights/${row.uid}`} className="text-blue-600 hover:text-blue-900">
+                        View Details
                       </Link>
                     </td>
                   </tr>

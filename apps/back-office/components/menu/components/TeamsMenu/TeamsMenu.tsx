@@ -24,21 +24,17 @@ export const TeamsMenu = () => {
       </button>
 
       <div ref={menuRef} className={clsx(s.menu, { [s.open]: open })}>
-        <Link href="/teams" passHref>
-          <a className={s.menuItem}>
-            <TeamsIcon />
-            <span className={s.menuItemLabel}>Teams</span>
-            <CaretIcon />
-          </a>
+        <Link href="/teams" className={s.menuItem}>
+          <TeamsIcon />
+          <span className={s.menuItemLabel}>Teams</span>
+          <CaretIcon />
         </Link>
 
         {isDirectoryAdmin && (
-          <Link href="/teams/data-quality" passHref>
-            <a className={s.menuItem}>
-              <DataQualityIcon />
-              <span className={s.menuItemLabel}>Data Quality</span>
-              <CaretIcon />
-            </a>
+          <Link href="/teams/data-quality" className={s.menuItem}>
+            <DataQualityIcon />
+            <span className={s.menuItemLabel}>Data Quality</span>
+            <CaretIcon />
           </Link>
         )}
       </div>

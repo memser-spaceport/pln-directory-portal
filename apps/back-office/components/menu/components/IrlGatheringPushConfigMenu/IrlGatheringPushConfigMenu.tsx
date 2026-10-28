@@ -5,11 +5,9 @@ import s from './IrlGatheringPushConfigMenu.module.scss';
 
 export const IrlGatheringPushConfigMenu = () => {
   return (
-    <Link href="/irl-gathering-push-config" passHref>
-      <a className={s.menuItem}>
-        <BellIcon />
-        <span className={s.menuItemLabel}>IRL Push Config</span>
-      </a>
+    <Link href="/irl-gathering-push-config" className={s.menuItem}>
+      <BellIcon />
+      <span className={s.menuItemLabel}>IRL Push Config</span>
     </Link>
   );
 };

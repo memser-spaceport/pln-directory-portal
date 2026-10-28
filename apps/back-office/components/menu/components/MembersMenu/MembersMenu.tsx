@@ -30,51 +30,39 @@ export const MembersMenu = () => {
         </span>
       </button>
       <div ref={menuRef} className={`${s.menu} ${open ? s.open : ''}`}>
-        <Link href="/members-v2" passHref>
-          <a className={s.menuItem}>
-            <span className={s.menuItemLabel}>Members V2</span>
-            <CaretIcon />
-          </a>
+        <Link href="/members-v2" className={s.menuItem}>
+          <span className={s.menuItemLabel}>Members V2</span>
+          <CaretIcon />
         </Link>
-        <Link href="/members?filter=level1" passHref>
-          <a className={s.menuItem}>
-            <Level1Icon />
-            <span className={s.menuItemLabel}>1 level</span>
-            <span className={s.menuItemCount}>{counts?.VERIFIED}</span>
-            <CaretIcon />
-          </a>
+        <Link href="/members?filter=level1" className={s.menuItem}>
+          <Level1Icon />
+          <span className={s.menuItemLabel}>1 level</span>
+          <span className={s.menuItemCount}>{counts?.VERIFIED}</span>
+          <CaretIcon />
         </Link>
-        <Link href="/members?filter=level0" passHref>
-          <div className={s.menuItem}>
-            <Level0Icon />
-            <span className={s.menuItemLabel}>0 Level</span>
-            <span className={s.menuItemCount}>{counts?.PENDING}</span>
-            <CaretIcon />
-          </div>
+        <Link href="/members?filter=level0" className={s.menuItem}>
+          <Level0Icon />
+          <span className={s.menuItemLabel}>0 Level</span>
+          <span className={s.menuItemCount}>{counts?.PENDING}</span>
+          <CaretIcon />
         </Link>
-        <Link href="/members?filter=level2" passHref>
-          <div className={s.menuItem}>
-            <Level2Icon />
-            <span className={s.menuItemLabel}>2-4 Level</span>
-            <span className={s.menuItemCount}>{counts?.APPROVED ?? 0}</span>
-            <CaretIcon />
-          </div>
+        <Link href="/members?filter=level2" className={s.menuItem}>
+          <Level2Icon />
+          <span className={s.menuItemLabel}>2-4 Level</span>
+          <span className={s.menuItemCount}>{counts?.APPROVED ?? 0}</span>
+          <CaretIcon />
         </Link>
-        <Link href="/members?filter=level56" passHref>
-          <div className={s.menuItem}>
-            <Level2Icon />
-            <span className={s.menuItemLabel}>5-6 Level</span>
-            <span className={s.menuItemCount}>{0}</span>
-            <CaretIcon />
-          </div>
+        <Link href="/members?filter=level56" className={s.menuItem}>
+          <Level2Icon />
+          <span className={s.menuItemLabel}>5-6 Level</span>
+          <span className={s.menuItemCount}>{0}</span>
+          <CaretIcon />
         </Link>
-        <Link href="/members?filter=rejected" passHref>
-          <div className={s.menuItem}>
-            <RejectedIcon />
-            <span className={s.menuItemLabel}>Rejected</span>
-            <span className={s.menuItemCount}>{counts?.REJECTED}</span>
-            <CaretIcon />
-          </div>
+        <Link href="/members?filter=rejected" className={s.menuItem}>
+          <RejectedIcon />
+          <span className={s.menuItemLabel}>Rejected</span>
+          <span className={s.menuItemCount}>{counts?.REJECTED}</span>
+          <CaretIcon />
         </Link>
         <AddMember authToken={cookieValue} className={s.addMemberBtn} />
       </div>

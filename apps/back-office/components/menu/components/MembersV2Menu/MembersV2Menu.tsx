@@ -77,23 +77,24 @@ export const MembersV2Menu = () => {
         {TABS.map((tab) => {
           const TabIcon = tab.Icon;
           return (
-            <Link key={tab.id} href={`/members-v2?tab=${tab.id}`} passHref>
-              <a className={s.menuItem} onClick={() => setOpen(false)}>
-                <TabIcon />
-                <span className={s.menuItemLabel}>{tab.label}</span>
-                <span className={s.menuItemCount}>{counts?.[tab.id] ?? 0}</span>
-                <CaretIcon />
-              </a>
+            <Link
+              key={tab.id}
+              href={`/members-v2?tab=${tab.id}`}
+              className={s.menuItem}
+              onClick={() => setOpen(false)}
+            >
+              <TabIcon />
+              <span className={s.menuItemLabel}>{tab.label}</span>
+              <span className={s.menuItemCount}>{counts?.[tab.id] ?? 0}</span>
+              <CaretIcon />
             </Link>
           );
         })}
-        <Link href="/members-v2?tab=POLICIES" passHref>
-          <a className={s.menuItem} onClick={() => setOpen(false)}>
-            <PoliciesIcon />
-            <span className={s.menuItemLabel}>Policies</span>
-            <span className={s.menuItemCount}>{policiesData?.length ?? 0}</span>
-            <CaretIcon />
-          </a>
+        <Link href="/members-v2?tab=POLICIES" className={s.menuItem} onClick={() => setOpen(false)}>
+          <PoliciesIcon />
+          <span className={s.menuItemLabel}>Policies</span>
+          <span className={s.menuItemCount}>{policiesData?.length ?? 0}</span>
+          <CaretIcon />
         </Link>
         <AddMember authToken={cookieValue} className={s.addMemberBtn} showRbacSection />
       </div>

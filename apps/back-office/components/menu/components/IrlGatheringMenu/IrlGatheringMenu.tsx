@@ -27,20 +27,16 @@ export const IrlGatheringMenu = () => {
       </button>
 
       <div ref={menuRef} className={`${s.menu} ${open ? s.open : ''}`}>
-        <Link href="/irl-gathering-push-config" passHref>
-          <a className={s.menuItem}>
-            <BellIcon />
-            <span className={s.menuItemLabel}>Push Config</span>
-            <CaretIcon />
-          </a>
+        <Link href="/irl-gathering-push-config" className={s.menuItem}>
+          <BellIcon />
+          <span className={s.menuItemLabel}>Push Config</span>
+          <CaretIcon />
         </Link>
 
-        <Link href="/irl-gathering-push-send" passHref>
-          <a className={s.menuItem}>
-            <SendIcon />
-            <span className={s.menuItemLabel}>Send Push</span>
-            <CaretIcon />
-          </a>
+        <Link href="/irl-gathering-push-send" className={s.menuItem}>
+          <SendIcon />
+          <span className={s.menuItemLabel}>Send Push</span>
+          <CaretIcon />
         </Link>
       </div>
     </div>

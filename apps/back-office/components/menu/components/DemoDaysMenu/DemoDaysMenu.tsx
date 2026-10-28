@@ -28,38 +28,30 @@ export const DemoDaysMenu = () => {
         </span>
       </button>
       <div ref={menuRef} className={`${s.menu} ${open ? s.open : ''}`}>
-        <Link href="/demo-days" passHref>
-          <a className={s.menuItem}>
-            <DemoDaysIcon />
-            <span className={s.menuItemLabel}>Demo Days</span>
-            <CaretIcon />
-          </a>
+        <Link href="/demo-days" className={s.menuItem}>
+          <DemoDaysIcon />
+          <span className={s.menuItemLabel}>Demo Days</span>
+          <CaretIcon />
         </Link>
 
-        <Link href="/demo-days/subscribers" passHref>
-          <a className={s.menuItem}>
-            <SubscribersIcon />
-            <span className={s.menuItemLabel}>Subscribers</span>
-            <CaretIcon />
-          </a>
+        <Link href="/demo-days/subscribers" className={s.menuItem}>
+          <SubscribersIcon />
+          <span className={s.menuItemLabel}>Subscribers</span>
+          <CaretIcon />
         </Link>
 
         {canViewTeamPitches && (
-          <Link href="/teams/team-pitches" passHref>
-            <a className={s.menuItem}>
-              <PitchIcon />
-              <span className={s.menuItemLabel}>Team Spotlights</span>
-              <CaretIcon />
-            </a>
+          <Link href="/teams/team-pitches" className={s.menuItem}>
+            <PitchIcon />
+            <span className={s.menuItemLabel}>Team Spotlights</span>
+            <CaretIcon />
           </Link>
         )}
         {canViewTeamPitches && (
-          <Link href="/spv-spotlights" passHref>
-            <a className={s.menuItem}>
-              <PitchIcon />
-              <span className={s.menuItemLabel}>SPV Spotlights</span>
-              <CaretIcon />
-            </a>
+          <Link href="/spv-spotlights" className={s.menuItem}>
+            <PitchIcon />
+            <span className={s.menuItemLabel}>SPV Spotlights</span>
+            <CaretIcon />
           </Link>
         )}
       </div>
