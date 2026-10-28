@@ -13,7 +13,7 @@ has no entry. Adding a tool to MCP means adding it there.
 | --- | --- | --- | --- |
 | `search` | Search | `search_members`, `search_teams`, `search_projects`, `search_events` | none |
 | `forum` | Forum | `search_forum_threads`, `get_forum_thread` | none |
-| `news` | News feed | none yet (LAB-3015) | none |
+| `news` | News feed | `list_news` (feed `latest` = Home → Latest, `for_you` = one latest story per For You team, falls back to latest; `teamUid` = one team), `get_news_item` | none |
 | `directory` | Members, teams and projects | `get_member`, `get_team`, `get_project`, `list_portfolio_teams` | none |
 | `events` | Events | `get_event` | none |
 | `investors` | Investors and warm intros | master-profile and warm-intro reads | `submit_warm_path_feedback`, `submit_warm_path_note`, `update_master_profile`, `update_connection_edge`, `update_warm_path` |

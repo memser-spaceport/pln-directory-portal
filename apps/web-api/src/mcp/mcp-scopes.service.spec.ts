@@ -117,7 +117,7 @@ describe('connectionStatus', () => {
 });
 
 describe('McpScopesService', () => {
-  it('lists each connection with status and scopes in registry order, without scopes that have no tools', async () => {
+  it('lists each connection with status and scopes in registry order', async () => {
     const { service, add } = build([{ scope: 'forum', maxLevel: 'none' }]);
     add(row({ uid: 'a', scopeLevels: { ai_apps: 'write' } }));
     add(row({ uid: 'b', lastUsedAt: new Date(Date.now() - 8 * DAY), connectedAt: new Date(Date.now() - 9 * DAY) }));
@@ -127,6 +127,7 @@ describe('McpScopesService', () => {
     expect(items[0].scopes.map((s) => s.key)).toEqual([
       'search',
       'forum',
+      'news',
       'directory',
       'events',
       'investors',
@@ -231,7 +232,7 @@ describe('McpScopesService', () => {
       registryMax: 'read',
       adminMax: 'none',
     });
-    expect(res.scopes.find((s) => s.key === 'news')).toMatchObject({ registryMax: 'none', adminMax: 'write' });
+    expect(res.scopes.find((s) => s.key === 'news')).toMatchObject({ registryMax: 'read', adminMax: 'write' });
     expect(analytics.trackEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         name: 'mcp-admin-scope-updated',

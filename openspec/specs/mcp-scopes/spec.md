@@ -119,3 +119,17 @@ The migration SHALL set `investors` and `ai_apps` to `write` for authorizations 
 #### Scenario: A grant that allowed changes
 - **WHEN** an authorization had `canWrite = true` before the migration
 - **THEN** it can still call `update_ai_app_feedback_status` and `submit_warm_path_note`, and cannot call anything it couldn't call before
+
+### Requirement: Agents read the news feed under the news scope
+
+The MCP server SHALL offer `list_news` and `get_news_item` in the `news` scope at level `read`. `list_news` SHALL return compact rows `{ uid, title, summary, eventType, eventDate, teamUid, teamName, url }`, where `url` opens the story in LabOS, plus `{ feed, page, hasMore }`; it SHALL NOT return upvote or viewer fields. With `feed: latest` (the default) it SHALL return Home → Latest order for the given search, page and limit (at most 25). With `feed: for_you` it SHALL return the latest story for each of the member's For You teams, and SHALL return Latest with `feed: latest` when there are none. With `teamUid` it SHALL return only that team's news. `get_news_item` SHALL return one story with its source link, and an unknown uid SHALL be an error result.
+
+#### Scenario: For You without picks
+
+- **WHEN** a member with no For You teams calls `list_news` with `feed: for_you`
+- **THEN** the result is the Latest feed and says `feed: latest`
+
+#### Scenario: News scope off
+
+- **WHEN** a connection has `news` at `none`
+- **THEN** neither news tool is listed
