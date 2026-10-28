@@ -19,7 +19,6 @@ import {
   MCP_AUTH_CODE_TTL_MS,
   MCP_CLIENT_REGISTER_TOTAL_CAP,
   MCP_CONNECT_PERMISSION,
-  MCP_REFRESH_TOKEN_IDLE_TTL_MS,
   MCP_REFRESH_TOKEN_TTL_MS,
   MCP_SCOPE,
   MCP_TOKEN_PREFIX,
@@ -30,6 +29,8 @@ import {
 import { generateSecret, hashSecret, verifyPkceS256 } from './mcp.crypto';
 import { httpRedirectHost, isAllowedRedirectUri, isRegisteredRedirectUri } from './mcp-redirect';
 import { McpOAuthClientInfoDto } from './dto/mcp-oauth-client-info.dto';
+import { refreshGrantExpired } from './mcp-grant-expiry';
+import { initialScopeLevels, McpScopesService, McpStoredLevels, parseStoredLevels } from './mcp-scopes.service';
 
 export type McpTokenActor = {
   authorizationUid: string;
@@ -37,8 +38,8 @@ export type McpTokenActor = {
   email: string | null;
   name: string;
   clientName: string;
-  /** False on a read-only grant (LAB-2902). */
-  canWrite: boolean;
+  /** Stored per-scope levels (LAB-2995); resolve against admin caps with `McpScopesService`. */
+  scopeLevels: McpStoredLevels;
 };
 
 type RegisterBody = {
@@ -67,7 +68,9 @@ type ApproveInput = {
   codeChallengeMethod: string;
   state?: string;
   resource?: string;
+  /** Ignored since LAB-2995: every consent starts read only. */
   allowChanges?: boolean;
+  acknowledgedContactDetails?: boolean;
 };
 
 type TokenInput = {
@@ -107,7 +110,8 @@ export class McpOAuthService {
     private readonly prisma: PrismaService,
     private readonly accessControl: AccessControlV2Service,
     private readonly appSessions: AiAppsSessionService,
-    private readonly analytics: AnalyticsService
+    private readonly analytics: AnalyticsService,
+    private readonly scopes: McpScopesService
   ) {}
 
   protectedResourceMetadata() {
@@ -254,23 +258,24 @@ export class McpOAuthService {
       throw new ForbiddenException('Member not found');
     }
 
-    const canWrite = input.allowChanges === true;
+    // Every consent starts read only (LAB-2995): `allowChanges` is ignored, write is turned on later in Settings.
+    // `canWrite: false` keeps a rollback to the pre-scopes code read only too.
+    const now = new Date();
+    const grant = {
+      clientName: client.clientName,
+      connectedAt: now,
+      canWrite: false,
+      scopeLevels: initialScopeLevels(await this.scopes.adminCaps()),
+      contactAckAt: input.acknowledgedContactDetails === true ? now : null,
+    };
     const authorization = await this.prisma.mcpAuthorization.upsert({
       where: { memberUid_clientId: { memberUid, clientId: input.clientId } },
-      create: {
-        memberUid,
-        clientId: input.clientId,
-        clientName: client.clientName,
-        connectedAt: new Date(),
-        canWrite,
-      },
+      create: { memberUid, clientId: input.clientId, ...grant },
       update: {
-        clientName: client.clientName,
-        connectedAt: new Date(),
+        ...grant,
         revokedAt: null,
         // A new consent starts a new lifetime. A previous last use would idle-expire the new grant.
         lastUsedAt: null,
-        canWrite,
       },
     });
 
@@ -324,17 +329,7 @@ export class McpOAuthService {
   }
 
   async listAuthorizations(memberUid: string) {
-    const rows = await this.prisma.mcpAuthorization.findMany({
-      where: { memberUid, revokedAt: null },
-      orderBy: { connectedAt: 'desc' },
-      select: {
-        uid: true,
-        clientName: true,
-        connectedAt: true,
-        lastUsedAt: true,
-      },
-    });
-    return { items: rows };
+    return this.scopes.listConnections(memberUid);
   }
 
   async revokeAuthorizationForMember(memberUid: string, uid: string) {
@@ -376,7 +371,7 @@ export class McpOAuthService {
       email: authorization.member.email,
       name: authorization.member.name,
       clientName: authorization.clientName,
-      canWrite: authorization.canWrite,
+      scopeLevels: parseStoredLevels(authorization.scopeLevels),
     };
   }
 
@@ -427,7 +422,7 @@ export class McpOAuthService {
       await this.revokeOnReuse(presentedHash);
       throw new UnauthorizedException('Invalid refresh_token');
     }
-    if (this.refreshGrantExpired(authorization)) {
+    if (refreshGrantExpired(authorization)) {
       await this.revokeAuthorization(authorization.uid);
       throw new UnauthorizedException('Invalid refresh_token');
     }
@@ -473,16 +468,6 @@ export class McpOAuthService {
       await tx.mcpUsedRefreshToken.create({ data: { tokenHash: presentedHash, authorizationUid } });
       return tokens.response;
     });
-  }
-
-  /** True when the grant is past 30 days from consent, or past 7 days from its last use. */
-  private refreshGrantExpired(authorization: { connectedAt: Date; lastUsedAt: Date | null }): boolean {
-    const now = Date.now();
-    const lastUsed = authorization.lastUsedAt ?? authorization.connectedAt;
-    return (
-      now - authorization.connectedAt.getTime() >= MCP_REFRESH_TOKEN_TTL_MS ||
-      now - lastUsed.getTime() >= MCP_REFRESH_TOKEN_IDLE_TTL_MS
-    );
   }
 
   /**

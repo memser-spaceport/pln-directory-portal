@@ -22,7 +22,7 @@ import { WarmIntrosV2Service } from '../warm-intros-v2/warm-intros-v2.service';
 import { aiAppFeedbackTools } from './mcp-ai-app-feedback-tools';
 import { directoryTools } from './mcp-directory-tools';
 import { portfolioTools } from './mcp-portfolio-tools';
-import { MCP_WRITE_TOOLS } from './mcp.constants';
+import { isWriteTool, MCP_TOOL_SCOPES, MCP_UNSCOPED_TOOLS, registryMaxLevel } from './mcp-scopes.registry';
 
 describe('mcp-redirect', () => {
   it('treats localhost, 127.0.0.1, and ::1 as loopback', () => {
@@ -130,7 +130,7 @@ describe('toolsForPermissions', () => {
   });
 });
 
-describe('read-only grants', () => {
+describe('scope registry', () => {
   const stub = {} as any;
   const fullCatalog = [
     WHOAMI_TOOL,
@@ -141,20 +141,43 @@ describe('read-only grants', () => {
   ];
   const everything = new Set(['directory.admin.full', 'investor_db.edit', 'forum.read', 'ai_apps.read']);
 
-  it('lists every tool that changes data in MCP_WRITE_TOOLS', () => {
+  it('puts every catalog tool except whoami in the scope registry', () => {
+    const missing = fullCatalog
+      .map((t) => t.name)
+      .filter((name) => !MCP_UNSCOPED_TOOLS.has(name) && !MCP_TOOL_SCOPES[name]);
+    expect(missing).toEqual([]);
+  });
+
+  it('registers no tool that is not in the catalog', () => {
+    const names = new Set(fullCatalog.map((t) => t.name));
+    expect(Object.keys(MCP_TOOL_SCOPES).filter((name) => !names.has(name))).toEqual([]);
+  });
+
+  it('marks every tool that changes data as a write tool', () => {
     const writesByName = fullCatalog.map((t) => t.name).filter((name) => /^(update|submit)_/.test(name));
     expect(writesByName.length).toBeGreaterThan(0);
     for (const name of writesByName) {
-      expect(MCP_WRITE_TOOLS.has(name)).toBe(true);
+      expect(isWriteTool(name)).toBe(true);
     }
+    expect(
+      fullCatalog
+        .map((t) => t.name)
+        .filter(isWriteTool)
+        .sort()
+    ).toEqual(writesByName.sort());
   });
 
-  it('drops every write tool on a read-only grant and keeps the read tools', () => {
-    const write = toolsForPermissions(everything, fullCatalog, true).map((t) => t.name);
-    const read = toolsForPermissions(everything, fullCatalog, false).map((t) => t.name);
-    expect(read.filter((name) => MCP_WRITE_TOOLS.has(name))).toEqual([]);
-    expect(read).toEqual(write.filter((name) => !MCP_WRITE_TOOLS.has(name)));
-    expect(write).toEqual(expect.arrayContaining(['update_ai_app_feedback_status', 'update_master_profile']));
+  it('allows write only on scopes that have write tools', () => {
+    expect(registryMaxLevel('investors')).toBe('write');
+    expect(registryMaxLevel('ai_apps')).toBe('write');
+    for (const scope of ['search', 'forum', 'directory', 'events'] as const) {
+      expect(registryMaxLevel(scope)).toBe('read');
+    }
+    expect(registryMaxLevel('news')).toBe('none');
+  });
+
+  it('keeps RBAC visibility independent of scopes', () => {
+    expect(toolsForPermissions(everything, fullCatalog).map((t) => t.name)).toEqual(fullCatalog.map((t) => t.name));
   });
 
   it('reports the grant level from whoami', async () => {

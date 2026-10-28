@@ -2,6 +2,7 @@ import {
   All,
   BadRequestException,
   Controller,
+  Logger,
   NotFoundException,
   Req,
   Res,
@@ -14,6 +15,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { NoCache } from '../decorators/no-cache.decorator';
 import { SkipEmptyStringToNull } from '../decorators/skip-empty-string-to-null.decorator';
 import { AnalyticsService } from '../analytics/service/analytics.service';
+import { ANALYTICS_EVENTS } from '../utils/constants';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
 import { MasterProfileService } from '../master-profile/master-profile.service';
 import { WarmIntrosV2Service } from '../warm-intros-v2/warm-intros-v2.service';
@@ -29,7 +31,11 @@ import { trackMcpToolInvocation } from './mcp-analytics';
 import { directoryTools } from './mcp-directory-tools';
 import { McpOAuthService } from './mcp-oauth.service';
 import { portfolioTools } from './mcp-portfolio-tools';
-import { toolsForPermissions, WHOAMI_TOOL, warmIntroTools } from './mcp-tools';
+import { McpToolDef, toolsForPermissions, WHOAMI_TOOL, warmIntroTools } from './mcp-tools';
+import { McpAdminCaps, McpScopesService, resolveScope } from './mcp-scopes.service';
+import { calledToolNames, MCP_NEEDS_WRITE_NOTE, McpRefusalReason, planTools, refusalText } from './mcp-tool-plan';
+import { toolScope } from './mcp-scopes.registry';
+import { mcpSettingsUrl } from './mcp.constants';
 
 @ApiTags('MCP')
 @Controller('mcp')
@@ -47,8 +53,11 @@ export class McpController {
     private readonly search: SearchService,
     private readonly aiApps: AiAppsService,
     private readonly portfolio: PlNetworkPortfolioService,
-    private readonly analytics: AnalyticsService
+    private readonly analytics: AnalyticsService,
+    private readonly scopes: McpScopesService
   ) {}
+
+  private readonly logger = new Logger(McpController.name);
 
   @NoCache()
   @All()
@@ -72,15 +81,28 @@ export class McpController {
 
     const access = await this.accessControl.getMemberAccess(actor.memberUid);
     const permissions = new Set(access.effectivePermissions ?? []);
-    const tools = toolsForPermissions(permissions, [
-      WHOAMI_TOOL,
-      ...warmIntroTools(this.masterProfiles, this.warmIntros),
-      ...directoryTools(this.members, this.teams, this.projects, this.plEvents, this.search),
-      ...aiAppFeedbackTools(this.aiApps),
-      ...portfolioTools(this.portfolio),
-    ], actor.canWrite);
+    let caps: McpAdminCaps | null = null;
+    try {
+      caps = await this.scopes.adminCaps();
+    } catch (error) {
+      // Fail closed (LAB-2995): without admin caps only `whoami` runs.
+      this.logger.error(`MCP scope settings unavailable: ${String(error)}`);
+    }
+    const plan = planTools(
+      toolsForPermissions(permissions, [
+        WHOAMI_TOOL,
+        ...warmIntroTools(this.masterProfiles, this.warmIntros),
+        ...directoryTools(this.members, this.teams, this.projects, this.plEvents, this.search),
+        ...aiAppFeedbackTools(this.aiApps),
+        ...portfolioTools(this.portfolio),
+      ]),
+      actor.scopeLevels,
+      caps
+    );
+    const calledTools = calledToolNames(req.body);
 
     const server = new McpServer({ name: 'LabOS', version: '1.0.0' });
+    const aiAppsWrite = caps !== null && resolveScope(actor.scopeLevels, caps, 'ai_apps').level === 'write';
     const ctx = {
       memberUid: actor.memberUid,
       name: actor.name,
@@ -88,13 +110,16 @@ export class McpController {
       permissions,
       authorizationUid: actor.authorizationUid,
       clientName: actor.clientName,
-      agentAccess: actor.canWrite ? ('write' as const) : ('read' as const),
+      agentAccess: aiAppsWrite ? ('write' as const) : ('read' as const),
     };
-    for (const tool of tools) {
-      const config: { description: string; inputSchema?: Record<string, unknown> } = {
-        description: tool.description,
-      };
-      if (tool.inputSchema) {
+    const register = (
+      tool: McpToolDef,
+      description: string,
+      cb: (args?: Record<string, unknown>) => unknown,
+      withSchema = true
+    ) => {
+      const config: { description: string; inputSchema?: Record<string, unknown> } = { description };
+      if (withSchema && tool.inputSchema) {
         config.inputSchema = tool.inputSchema;
       }
       // MCP SDK registerTool generics blow up TS2589 when passed a union config.
@@ -104,7 +129,48 @@ export class McpController {
           cfg: typeof config,
           cb: (args?: Record<string, unknown>) => unknown
         ) => void
-      )(tool.name, config, async (args) => {
+      )(tool.name, config, cb);
+    };
+    const refuse = (tool: McpToolDef, reason: McpRefusalReason) => async () => {
+      const entry = toolScope(tool.name);
+      if (!entry) {
+        return { isError: true, content: [{ type: 'text' as const, text: `Tool ${tool.name} not found` }] };
+      }
+      if (reason !== 'unavailable') {
+        void this.analytics.trackEvent({
+          name: ANALYTICS_EVENTS.MCP.TOOL_REFUSED,
+          distinctId: actor.memberUid,
+          properties: {
+            toolName: tool.name,
+            scope: entry.scope,
+            reason,
+            memberUid: actor.memberUid,
+            clientName: actor.clientName,
+            authorizationUid: actor.authorizationUid,
+          },
+        });
+      }
+      return {
+        isError: true,
+        content: [{ type: 'text' as const, text: refusalText(reason, entry.scope, entry.level, mcpSettingsUrl()) }],
+      };
+    };
+
+    for (const entry of plan) {
+      const { tool } = entry;
+      if (entry.mode === 'listed_refused') {
+        register(tool, `${MCP_NEEDS_WRITE_NOTE} ${tool.description}`, refuse(tool, entry.reason));
+        continue;
+      }
+      if (entry.mode === 'hidden') {
+        // Registered only to answer a call that names it, so `tools/list` never shows it. No input schema, so any
+        // arguments reach the refusal instead of a validation error.
+        if (calledTools.has(tool.name)) {
+          register(tool, tool.description, refuse(tool, entry.reason), false);
+        }
+        continue;
+      }
+      register(tool, tool.description, async (args) => {
         const toolArgs = args ?? {};
         try {
           const result = await tool.execute(ctx, toolArgs);
