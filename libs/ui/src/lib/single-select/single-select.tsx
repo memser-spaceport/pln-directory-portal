@@ -103,12 +103,12 @@ export function SingleSelect({
                 options.map((option) => {
                   return (
                     <Listbox.Option as={Fragment} key={option.value} value={option.value} >
-                      {({ active, selected }) => (
+                      {({ focus, selected }) => (
                         <div
                           className={`${selected
                             ? 'border-blue-600 bg-blue-600 text-white'
                             : 'border-white bg-white'
-                            } ${!selected && active
+                            } ${!selected && focus
                               ? 'border-slate-100 bg-slate-200 active:border-blue-600 active:bg-white active:ring-2 active:ring-blue-300'
                               : ''
                             }

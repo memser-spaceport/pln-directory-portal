@@ -1,5 +1,5 @@
 import { Dialog, Transition } from '@headlessui/react';
-import React, { ReactNode, Fragment, LegacyRef, useEffect, useRef } from 'react';
+import React, { ReactNode, Fragment, Ref, useEffect, useRef } from 'react';
 
 type ModalProps = {
   isOpen: boolean;
@@ -11,7 +11,7 @@ type ModalProps = {
   enableHeader?: boolean;
   enableFooter?: boolean;
   modalClassName?: string;
-  modalRef?: LegacyRef<HTMLDivElement>;
+  modalRef?: Ref<HTMLDivElement>;
   blurBackdrop?: boolean;
 };
 

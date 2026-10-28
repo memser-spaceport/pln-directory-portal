@@ -165,7 +165,7 @@
     "@faker-js/faker": "^7.5.0",
     "@fontsource/inter": "^4.5.11",
     "@golevelup/ts-jest": "^0.3.3",
-    "@headlessui/react": "^1.7.3",
+    "@headlessui/react": "^2.2.10",
     "@heroicons/react": "^1.0.6",
     "@hookform/resolvers": "^5.9.2",
     "@nestjs/cli": "^9.0.0",

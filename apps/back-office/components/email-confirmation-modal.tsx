@@ -34,7 +34,7 @@ export function EmailConfirmationModal({
               leaveFrom="opacity-100"
               leaveTo="opacity-0"
             >
-              <Dialog.Overlay className="fixed inset-0 bg-black opacity-30" />
+              <div className="fixed inset-0 bg-black opacity-30" aria-hidden="true" />
             </Transition.Child>
           )}
 
@@ -51,7 +51,7 @@ export function EmailConfirmationModal({
             leaveFrom="opacity-100 scale-100"
             leaveTo="opacity-0 scale-95"
           >
-            <div className="inline-block w-full max-w-2xl transform overflow-hidden rounded-lg bg-white p-6 text-left align-middle shadow-xl transition-all">
+            <Dialog.Panel className="inline-block w-full max-w-2xl transform overflow-hidden rounded-lg bg-white p-6 text-left align-middle shadow-xl transition-all">
               <Dialog.Title as="h3" className="text-lg font-medium leading-6 text-gray-900">
                 Confirm Email Details
               </Dialog.Title>
@@ -105,7 +105,7 @@ export function EmailConfirmationModal({
                   Send Email
                 </button>
               </div>
-            </div>
+            </Dialog.Panel>
           </Transition.Child>
         </div>
       </Dialog>
