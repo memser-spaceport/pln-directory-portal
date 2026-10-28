@@ -69,7 +69,6 @@ export function SingleSelect({
         name={name}
         value={selectedOption?.value}
         onChange={onChangeHandler}
-        placeholder="Enter value"
         className="w-full text-sm"
         disabled={disabled}
       >

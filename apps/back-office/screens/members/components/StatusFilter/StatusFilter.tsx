@@ -112,9 +112,6 @@ export const StatusFilter = ({ onSelect, value }: { onSelect: (v: string) => voi
             outline: 'none',
             zIndex: 3,
           }),
-          indicatorContainer: (base) => ({
-            display: 'none',
-          }),
           indicatorSeparator: (base) => ({
             display: 'none',
           }),
