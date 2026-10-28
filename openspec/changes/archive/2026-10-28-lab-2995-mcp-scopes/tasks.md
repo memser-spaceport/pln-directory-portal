@@ -40,4 +40,4 @@
 ## 6. Docs and spec
 
 - [x] 6.1 Update `docs/AI_APPS.md` (or the MCP section) with scopes, levels, and the refusal format
-- [ ] 6.2 Archive this change in the last subtask PR so `openspec/specs/mcp-scopes/spec.md` lands with the code
+- [x] 6.2 Archive this change in the last subtask PR so `openspec/specs/mcp-scopes/spec.md` lands with the code
