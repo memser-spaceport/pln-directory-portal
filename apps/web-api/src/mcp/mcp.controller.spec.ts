@@ -10,6 +10,8 @@ jest.mock('../search/search.service', () => ({ SearchService: jest.fn() }));
 jest.mock('../ai-apps/ai-apps.service', () => ({ AiAppsService: jest.fn() }));
 jest.mock('../spv-spotlights/pl-network-portfolio.service', () => ({ PlNetworkPortfolioService: jest.fn() }));
 jest.mock('./mcp-oauth.service', () => ({ McpOAuthService: jest.fn() }));
+jest.mock('../team-news/team-news-query.service', () => ({ TeamNewsQueryService: jest.fn() }));
+jest.mock('../team-news/team-news-suggestions.service', () => ({ TeamNewsSuggestionsService: jest.fn() }));
 // The SDK's ESM build can't load under Jest 27, so a fake server records what the controller registers: the SDK lists
 // exactly the registered tools and routes `tools/call` to their callbacks.
 const registered = new Map<string, { description: string; inputSchema?: unknown; cb: (args?: unknown) => unknown }>();
@@ -99,7 +101,9 @@ function build(
     stub,
     analytics as any,
     scopes,
-    accessRequests
+    accessRequests,
+    stub,
+    stub
   );
   /** One MCP request: returns what `tools/list` would show and a way to call a tool by name. */
   const handle = async (body: unknown = { jsonrpc: '2.0', id: 1, method: 'tools/list' }) => {
@@ -136,7 +140,16 @@ describe('McpController scope enforcement', () => {
     const h = build();
     const { aiApps } = h;
     const names = (await listed(h)).map((t) => t.name);
-    expect(names).toEqual(expect.arrayContaining(['whoami', 'search_members', 'get_forum_thread', 'list_my_ai_apps']));
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'whoami',
+        'search_members',
+        'get_forum_thread',
+        'list_my_ai_apps',
+        'list_news',
+        'get_news_item',
+      ])
+    );
 
     const result: any = await call(h, 'list_my_ai_apps');
     expect(result.isError).toBeFalsy();

@@ -26,6 +26,9 @@ export const MCP_TOOL_SCOPES: Readonly<Record<string, McpToolScope>> = {
   search_forum_threads: { scope: 'forum', level: 'read' },
   get_forum_thread: { scope: 'forum', level: 'read' },
 
+  list_news: { scope: 'news', level: 'read' },
+  get_news_item: { scope: 'news', level: 'read' },
+
   get_member: { scope: 'directory', level: 'read' },
   get_team: { scope: 'directory', level: 'read' },
   get_project: { scope: 'directory', level: 'read' },

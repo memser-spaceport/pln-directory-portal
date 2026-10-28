@@ -12,6 +12,7 @@ import { RbacModule } from '../rbac/rbac.module';
 import { SharedModule } from '../shared/shared.module';
 import { PlNetworkPortfolioModule } from '../spv-spotlights/pl-network-portfolio.module';
 import { WarmIntrosV2Module } from '../warm-intros-v2/warm-intros-v2.module';
+import { TeamNewsModule } from '../team-news/team-news.module';
 import { McpAdminScopesController } from './mcp-admin-scopes.controller';
 import { McpAppSessionService } from './mcp-app-session.service';
 import { McpAppSessionsController } from './mcp-app-sessions.controller';
@@ -40,6 +41,7 @@ import { JwtService } from '../utils/jwt/jwt.service';
     AiAppsModule,
     PlNetworkPortfolioModule,
     IntegrationKeysModule,
+    TeamNewsModule,
   ],
   controllers: [
     McpOAuthController,

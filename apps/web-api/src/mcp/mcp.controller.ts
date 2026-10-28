@@ -31,6 +31,9 @@ import { trackMcpToolInvocation } from './mcp-analytics';
 import { directoryTools } from './mcp-directory-tools';
 import { McpOAuthService } from './mcp-oauth.service';
 import { portfolioTools } from './mcp-portfolio-tools';
+import { newsTools } from './mcp-news-tools';
+import { TeamNewsQueryService } from '../team-news/team-news-query.service';
+import { TeamNewsSuggestionsService } from '../team-news/team-news-suggestions.service';
 import { McpToolDef, toolsForPermissions, WHOAMI_TOOL, warmIntroTools } from './mcp-tools';
 import { McpAdminCaps, McpScopesService, resolveScope } from './mcp-scopes.service';
 import { McpAccessRequestsService } from './mcp-access-requests.service';
@@ -56,7 +59,9 @@ export class McpController {
     private readonly portfolio: PlNetworkPortfolioService,
     private readonly analytics: AnalyticsService,
     private readonly scopes: McpScopesService,
-    private readonly accessRequests: McpAccessRequestsService
+    private readonly accessRequests: McpAccessRequestsService,
+    private readonly newsQuery: TeamNewsQueryService,
+    private readonly newsSuggestions: TeamNewsSuggestionsService
   ) {}
 
   private readonly logger = new Logger(McpController.name);
@@ -97,6 +102,7 @@ export class McpController {
         ...directoryTools(this.members, this.teams, this.projects, this.plEvents, this.search),
         ...aiAppFeedbackTools(this.aiApps),
         ...portfolioTools(this.portfolio),
+        ...newsTools(this.newsQuery, this.newsSuggestions),
       ]),
       actor.scopeLevels,
       caps
