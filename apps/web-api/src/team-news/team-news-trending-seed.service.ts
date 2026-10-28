@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { generateObject } from 'ai';
+import { generateText } from 'ai';
 import { z } from 'zod';
 import type { SeedTeamNewsTrendingDto, SeedTeamNewsTrendingResponse } from 'libs/contracts/src/schema/team-news';
 import { PrismaService } from '../shared/prisma.service';
@@ -24,6 +24,19 @@ const LlmRankingSchema = z.object({
   editorialUids: z.array(z.string()).max(EDITORIAL_RANK_LIMIT),
   excludedUids: z.array(z.string()),
 });
+
+/** Accepts a raw JSON object or the same object inside one markdown fence. */
+function parseRankingJson(text: string): z.infer<typeof LlmRankingSchema> {
+  const trimmed = text.trim();
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const body = (fenced?.[1] ?? trimmed).trim();
+  const start = body.indexOf('{');
+  const end = body.lastIndexOf('}');
+  if (start < 0 || end <= start) {
+    throw new Error('ranking response has no JSON object');
+  }
+  return LlmRankingSchema.parse(JSON.parse(body.slice(start, end + 1)));
+}
 
 type CandidateRow = {
   uid: string;
@@ -237,13 +250,12 @@ export class TeamNewsTrendingSeedService {
     const likedTarget = Math.min(likedLimit, Math.max(0, likedPool.length));
 
     try {
-      const { object } = await generateObject({
+      const { text } = await generateText({
         model: this.aiProvider.getResponsesModel(undefined, {
           useSearchGrounding: false,
           providerOverride: 'anthropic',
           modelOverride: STORY_PICK_MODEL,
         }),
-        schema: LlmRankingSchema,
         system: `You curate team news for a Protocol Labs Network home page with two distinct surfaces.
 
 1) editorialUids (${editorialTarget}): the most important / newsworthy items for the "Top stories" band — editorial significance, not popularity. Ordered best-first (rank 1 = lead story). Prefer isNewBatch=true when quality is comparable; otherwise pick the best from the full 14-day window.
@@ -254,19 +266,24 @@ export class TeamNewsTrendingSeedService {
 
 HARD RULE: likedUids and editorialUids must be disjoint — no UID in both lists. Editorial importance ≠ popularity; do not put the same story on both lists.
 HARD RULE: a UID in excludedUids must not appear in editorialUids or likedUids.
-Return only UIDs from the provided catalog.`,
+Return only UIDs from the provided catalog.
+
+Reply with one JSON object and no other text. No markdown. All three keys are required. excludedUids is [] when no story is negative.
+{"editorialUids":[],"likedUids":[],"excludedUids":[]}
+editorialUids has at most ${editorialTarget} strings. likedUids has at most ${likedTarget} strings.`,
         prompt: `Catalog (JSON):\n${JSON.stringify(
           catalog,
           null,
           2
-        )}\n\nReturn editorialUids with up to ${editorialTarget} UIDs, likedUids with up to ${likedTarget} UIDs, and excludedUids for every negative story. editorialUids and likedUids must be disjoint and must not include excludedUids.`,
+        )}\n\nReturn the JSON object. editorialUids has up to ${editorialTarget} UIDs. likedUids has up to ${likedTarget} UIDs. excludedUids lists every negative story. The two pick lists are disjoint and contain no excluded UID.`,
         temperature: 0.4,
       });
 
+      const object = parseRankingJson(text);
       return {
-        likedUids: object.likedUids ?? [],
-        editorialUids: object.editorialUids ?? [],
-        excludedUids: object.excludedUids ?? [],
+        likedUids: object.likedUids,
+        editorialUids: object.editorialUids,
+        excludedUids: object.excludedUids,
         failed: false,
       };
     } catch (error) {

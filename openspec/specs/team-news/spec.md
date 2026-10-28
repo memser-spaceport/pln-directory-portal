@@ -8,12 +8,22 @@ The team-news seed ranks a 14-day window into Top stories and Popular this week.
 
 ### Requirement: Story picking uses Claude Opus 5.5
 
-`POST /v1/service/team-news/seed-trending` SHALL rank stories with Claude Opus 5.5 (`claude-opus-5-5`). The call SHALL use the Anthropic provider. The call SHALL NOT follow `AI_PROVIDER` or `CLAUDE_MODEL`.
+`POST /v1/service/team-news/seed-trending` SHALL rank stories with Claude Opus 5.5 (`claude-opus-5-5`). The call SHALL use the Anthropic provider. The call SHALL NOT follow `AI_PROVIDER` or `CLAUDE_MODEL`. The model SHALL reply with one JSON object whose keys are `editorialUids`, `likedUids`, and `excludedUids`. The system SHALL store ranks only when that object matches the ranking schema. A reply that does not match SHALL leave the current ranks unchanged.
 
 #### Scenario: The ranking call
 
 - **WHEN** seed-trending ranks a window
 - **THEN** the model call uses provider `anthropic` and model `claude-opus-5-5`
+
+#### Scenario: The reply is wrapped in a markdown fence
+
+- **WHEN** the model returns the ranking object inside a json code fence
+- **THEN** the ranks are stored from that object
+
+#### Scenario: The reply is not the ranking object
+
+- **WHEN** the model returns text that is not the ranking object
+- **THEN** the run does not clear `editorialRank`
 
 ### Requirement: Negative stories stay off Top stories and Popular this week
 
