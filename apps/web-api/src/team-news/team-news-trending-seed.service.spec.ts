@@ -1,16 +1,24 @@
 jest.mock('ai', () => ({
-  generateObject: jest.fn(),
+  generateText: jest.fn(),
 }));
 jest.mock('@ai-sdk/openai', () => ({ openai: { responses: jest.fn() } }));
 jest.mock('@ai-sdk/google', () => ({ google: jest.fn() }));
 jest.mock('@ai-sdk/anthropic', () => ({ anthropic: jest.fn(), createAnthropic: jest.fn() }));
 
-import { generateObject } from 'ai';
+import { generateText } from 'ai';
 import { PrismaService } from '../shared/prisma.service';
 import { AiProviderService } from '../shared/ai-provider.service';
 import { PROTOCOL_LABS_TEAM_UID } from './team-news-public-list.config';
 import { TeamNewsTrendingSeedService } from './team-news-trending-seed.service';
 import { TRENDING_SEED_BOT_COUNT } from './team-news-trending-seed.util';
+
+function rankingText(
+  ranking: { likedUids: string[]; editorialUids: string[]; excludedUids?: string[] },
+  fenced = false
+) {
+  const json = JSON.stringify({ excludedUids: [], ...ranking });
+  return { text: fenced ? `Here is the ranking:\n\`\`\`json\n${json}\n\`\`\`` : json };
+}
 
 describe('TeamNewsTrendingSeedService', () => {
   const findMany = jest.fn();
@@ -66,7 +74,7 @@ describe('TeamNewsTrendingSeedService', () => {
       candidateCount: 0,
     });
 
-    expect(generateObject).not.toHaveBeenCalled();
+    expect(generateText).not.toHaveBeenCalled();
     expect(upvoteCreateMany).not.toHaveBeenCalled();
     expect(updateMany).not.toHaveBeenCalled();
   });
@@ -84,18 +92,20 @@ describe('TeamNewsTrendingSeedService', () => {
     ];
     // First call = new batch, second = window.
     findMany.mockResolvedValueOnce(candidates).mockResolvedValueOnce(candidates);
-    (generateObject as jest.Mock).mockResolvedValue({
-      object: {
-        likedUids: ['a', 'b', 'c', 'd', 'x-invalid'],
-        editorialUids: ['e', 'f', 'g'],
-      },
-    });
+    (generateText as jest.Mock).mockResolvedValue(
+      rankingText({ likedUids: ['a', 'b', 'c', 'd', 'x-invalid'], editorialUids: ['e', 'f', 'g'] }, true)
+    );
 
     const result = await service.seedTrending({
       createdAfter: '2026-07-30T00:00:00.000Z',
       limit: 5,
     });
 
+    expect(getResponsesModel).toHaveBeenCalledWith(undefined, {
+      useSearchGrounding: false,
+      providerOverride: 'anthropic',
+      modelOverride: 'claude-opus-5-5',
+    });
     expect(result.candidateCount).toBe(8);
     expect(result.protocolLabsIncluded).toBe(true);
     expect(result.ranked).toHaveLength(5);
@@ -134,12 +144,9 @@ describe('TeamNewsTrendingSeedService', () => {
     ];
     findMany.mockResolvedValueOnce(candidates).mockResolvedValueOnce(candidates);
     findFirst.mockResolvedValue(null);
-    (generateObject as jest.Mock).mockResolvedValue({
-      object: {
-        likedUids: ['a', 'b', 'c', 'd', 'e'],
-        editorialUids: ['a', 'b', 'f'],
-      },
-    });
+    (generateText as jest.Mock).mockResolvedValue(
+      rankingText({ likedUids: ['a', 'b', 'c', 'd', 'e'], editorialUids: ['a', 'b', 'f'] })
+    );
 
     const result = await service.seedTrending({
       createdAfter: '2026-07-30T00:00:00.000Z',
@@ -168,12 +175,7 @@ describe('TeamNewsTrendingSeedService', () => {
     ];
     findMany.mockResolvedValueOnce(newBatch).mockResolvedValueOnce(window);
     findFirst.mockResolvedValue(null);
-    (generateObject as jest.Mock).mockResolvedValue({
-      object: {
-        likedUids: ['new1'],
-        editorialUids: ['new1'],
-      },
-    });
+    (generateText as jest.Mock).mockResolvedValue(rankingText({ likedUids: ['new1'], editorialUids: ['new1'] }));
 
     const result = await service.seedTrending({
       createdAfter: '2026-08-10T08:56:00.000Z',
@@ -190,5 +192,134 @@ describe('TeamNewsTrendingSeedService', () => {
     }
     expect(result.ranked.length).toBeGreaterThanOrEqual(1);
     expect(update).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not pad an excluded newest story into editorial or liked', async () => {
+    const candidates = [
+      candidate('neg', 't0', 'Negative', '2026-08-08T00:00:00.000Z'),
+      candidate('a', 't1', 'Alpha', '2026-08-07T00:00:00.000Z'),
+      candidate('b', 't2', 'Beta', '2026-08-06T00:00:00.000Z'),
+      candidate('c', 't3', 'Gamma', '2026-08-05T00:00:00.000Z'),
+      candidate('d', 't4', 'Delta', '2026-08-04T00:00:00.000Z'),
+      candidate('e', 't5', 'Epsilon', '2026-08-03T00:00:00.000Z'),
+      candidate('f', 't6', 'Zeta', '2026-08-02T00:00:00.000Z'),
+      candidate('g', 't7', 'Eta', '2026-08-01T00:00:00.000Z'),
+    ];
+    findMany.mockResolvedValueOnce(candidates).mockResolvedValueOnce(candidates);
+    findFirst.mockResolvedValue(null);
+    (generateText as jest.Mock).mockResolvedValue(
+      rankingText({ likedUids: ['neg', 'b', 'c', 'd', 'e'], editorialUids: ['neg', 'a'], excludedUids: ['neg'] })
+    );
+
+    const result = await service.seedTrending({
+      createdAfter: '2026-08-10T00:00:00.000Z',
+      limit: 5,
+    });
+
+    expect(result.editorial.map((row) => row.uid)).not.toContain('neg');
+    expect(result.editorial[0].uid).toBe('a');
+    expect(result.ranked.map((row) => row.uid)).not.toContain('neg');
+  });
+
+  it('does not force an excluded Protocol Labs item into liked', async () => {
+    const candidates = [
+      candidate('pl', PROTOCOL_LABS_TEAM_UID, 'Protocol Labs', '2026-08-08T00:00:00.000Z'),
+      candidate('a', 't1', 'Alpha', '2026-08-07T00:00:00.000Z'),
+      candidate('b', 't2', 'Beta', '2026-08-06T00:00:00.000Z'),
+      candidate('c', 't3', 'Gamma', '2026-08-05T00:00:00.000Z'),
+      candidate('d', 't4', 'Delta', '2026-08-04T00:00:00.000Z'),
+      candidate('e', 't5', 'Epsilon', '2026-08-03T00:00:00.000Z'),
+      candidate('f', 't6', 'Zeta', '2026-08-02T00:00:00.000Z'),
+      candidate('g', 't7', 'Eta', '2026-08-01T00:00:00.000Z'),
+    ];
+    findMany.mockResolvedValueOnce(candidates).mockResolvedValueOnce(candidates);
+    (generateText as jest.Mock).mockResolvedValue(
+      rankingText({ likedUids: ['a', 'b', 'c', 'd', 'e'], editorialUids: ['f', 'g', 'a'], excludedUids: ['pl'] })
+    );
+
+    const result = await service.seedTrending({
+      createdAfter: '2026-08-10T00:00:00.000Z',
+      limit: 5,
+    });
+
+    expect(result.ranked.map((row) => row.uid)).not.toContain('pl');
+    expect(result.editorial.map((row) => row.uid)).not.toContain('pl');
+    expect(result.protocolLabsIncluded).toBe(false);
+  });
+
+  it('stores a single suitable editorial pick and does not invent ranks 2 and 3', async () => {
+    const candidates = [
+      candidate('keep', 't1', 'Alpha', '2026-08-07T00:00:00.000Z'),
+      candidate('neg1', 't2', 'Beta', '2026-08-06T00:00:00.000Z'),
+      candidate('neg2', 't3', 'Gamma', '2026-08-05T00:00:00.000Z'),
+      candidate('neg3', 't4', 'Delta', '2026-08-04T00:00:00.000Z'),
+    ];
+    findMany.mockResolvedValueOnce(candidates).mockResolvedValueOnce(candidates);
+    findFirst.mockResolvedValue(null);
+    (generateText as jest.Mock).mockResolvedValue(
+      rankingText({ likedUids: [], editorialUids: ['keep'], excludedUids: ['neg1', 'neg2', 'neg3'] })
+    );
+
+    const result = await service.seedTrending({
+      createdAfter: '2026-08-10T00:00:00.000Z',
+      limit: 5,
+    });
+
+    expect(result.editorial).toEqual([{ uid: 'keep', rank: 1 }]);
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(update).toHaveBeenCalledWith({
+      where: { uid: 'keep' },
+      data: { editorialRank: 1 },
+    });
+  });
+
+  it('keeps existing editorial ranks when the reply is not the ranking JSON', async () => {
+    const candidates = [
+      candidate('a', 't1', 'Alpha', '2026-08-07T00:00:00.000Z'),
+      candidate('b', 't2', 'Beta', '2026-08-06T00:00:00.000Z'),
+    ];
+    findMany.mockResolvedValueOnce(candidates).mockResolvedValueOnce(candidates);
+    findFirst.mockResolvedValue(null);
+    (generateText as jest.Mock).mockResolvedValue({ text: 'I would pick story a.' });
+
+    const result = await service.seedTrending({
+      createdAfter: '2026-08-10T00:00:00.000Z',
+      limit: 5,
+    });
+
+    expect(result).toEqual({
+      ranked: [],
+      editorial: [],
+      protocolLabsIncluded: false,
+      candidateCount: 2,
+    });
+    expect(updateMany).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('keeps existing editorial ranks when the model call throws', async () => {
+    const candidates = [
+      candidate('a', 't1', 'Alpha', '2026-08-07T00:00:00.000Z'),
+      candidate('b', 't2', 'Beta', '2026-08-06T00:00:00.000Z'),
+    ];
+    findMany.mockResolvedValueOnce(candidates).mockResolvedValueOnce(candidates);
+    findFirst.mockResolvedValue(null);
+    (generateText as jest.Mock).mockRejectedValue(new Error('model down'));
+
+    const result = await service.seedTrending({
+      createdAfter: '2026-08-10T00:00:00.000Z',
+      limit: 5,
+    });
+
+    expect(result).toEqual({
+      ranked: [],
+      editorial: [],
+      protocolLabsIncluded: false,
+      candidateCount: 2,
+    });
+    expect(updateMany).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+    expect(upvoteDeleteMany).not.toHaveBeenCalled();
+    expect(upvoteCreateMany).not.toHaveBeenCalled();
   });
 });

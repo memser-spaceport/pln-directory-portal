@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { generateObject } from 'ai';
+import { generateText } from 'ai';
 import { z } from 'zod';
 import type { SeedTeamNewsTrendingDto, SeedTeamNewsTrendingResponse } from 'libs/contracts/src/schema/team-news';
 import { PrismaService } from '../shared/prisma.service';
@@ -17,12 +17,26 @@ import {
 } from './team-news-trending-seed.util';
 
 const POPULAR_WINDOW_DAYS = 14;
-const PROVIDER_ENV_VAR = 'TEAM_NEWS_TRENDING_AI_PROVIDER';
+const STORY_PICK_MODEL = 'claude-opus-5-5';
 
 const LlmRankingSchema = z.object({
   likedUids: z.array(z.string()).max(TRENDING_LIKED_LIMIT),
   editorialUids: z.array(z.string()).max(EDITORIAL_RANK_LIMIT),
+  excludedUids: z.array(z.string()),
 });
+
+/** Accepts a raw JSON object or the same object inside one markdown fence. */
+function parseRankingJson(text: string): z.infer<typeof LlmRankingSchema> {
+  const trimmed = text.trim();
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const body = (fenced?.[1] ?? trimmed).trim();
+  const start = body.indexOf('{');
+  const end = body.lastIndexOf('}');
+  if (start < 0 || end <= start) {
+    throw new Error('ranking response has no JSON object');
+  }
+  return LlmRankingSchema.parse(JSON.parse(body.slice(start, end + 1)));
+}
 
 type CandidateRow = {
   uid: string;
@@ -37,6 +51,8 @@ type CandidateRow = {
 type LlmPickResult = {
   likedUids: string[];
   editorialUids: string[];
+  excludedUids: string[];
+  failed: boolean;
 };
 
 const CANDIDATE_SELECT = {
@@ -97,32 +113,52 @@ export class TeamNewsTrendingSeedService {
           : [...newBatch]
         : editorialPool;
 
-    const { likedUids: llmLiked, editorialUids: llmEditorial } = await this.rankWithLlm(
-      editorialPool,
-      likedPool,
-      newBatchUids,
-      likedLimit,
-      EDITORIAL_RANK_LIMIT
-    );
+    const llm = await this.rankWithLlm(editorialPool, likedPool, newBatchUids, likedLimit, EDITORIAL_RANK_LIMIT);
+    if (llm.failed) {
+      return {
+        ranked: [],
+        editorial: [],
+        protocolLabsIncluded: false,
+        candidateCount: editorialPool.length,
+      };
+    }
 
     const editorialKnown = new Set(editorialPool.map((c) => c.uid));
     const likedKnown = new Set(likedPool.map((c) => c.uid));
+    const excluded = new Set(this.sanitizeUids(llm.excludedUids, editorialKnown, editorialPool.length));
 
     // Pad editorial first (from the window) so a tiny ingest batch cannot starve Top Stories.
-    let editorialUids = this.sanitizeUids(llmEditorial, editorialKnown, EDITORIAL_RANK_LIMIT);
-    editorialUids = this.padFromPool(editorialUids, editorialPool, EDITORIAL_RANK_LIMIT, new Set());
+    // Excluded stories stay out of both lists, including the recency fill.
+    let editorialUids = this.sanitizeUids(llm.editorialUids, editorialKnown, EDITORIAL_RANK_LIMIT).filter(
+      (uid) => !excluded.has(uid)
+    );
+    editorialUids = this.padFromPool(editorialUids, editorialPool, EDITORIAL_RANK_LIMIT, excluded);
 
-    let likedUids = enforceDisjoint(this.sanitizeUids(llmLiked, likedKnown, likedLimit), editorialUids);
-    likedUids = this.padFromPool(likedUids, likedPool, likedLimit, new Set(editorialUids));
+    const likedReserved = new Set<string>([...editorialUids, ...excluded]);
+    let likedUids = enforceDisjoint(
+      this.sanitizeUids(llm.likedUids, likedKnown, likedLimit).filter((uid) => !excluded.has(uid)),
+      editorialUids
+    );
+    likedUids = this.padFromPool(likedUids, likedPool, likedLimit, likedReserved);
 
     const plUid = plCandidate?.uid ?? null;
-    const plForLiked = plUid && !editorialUids.includes(plUid) && likedKnown.has(plUid) ? plUid : null;
+    const plForLiked =
+      plUid && !excluded.has(plUid) && !editorialUids.includes(plUid) && likedKnown.has(plUid) ? plUid : null;
     likedUids = forceIncludeProtocolLabs(likedUids, plForLiked, likedLimit);
     likedUids = enforceDisjoint(likedUids, editorialUids);
-    likedUids = this.padFromPool(likedUids, likedPool, likedLimit, new Set(editorialUids));
+    likedUids = this.padFromPool(likedUids, likedPool, likedLimit, likedReserved);
     // If the new batch was too small after editorial took slots, finish liked from the window.
     if (likedUids.length < likedLimit) {
-      likedUids = this.padFromPool(likedUids, editorialPool, likedLimit, new Set(editorialUids));
+      likedUids = this.padFromPool(likedUids, editorialPool, likedLimit, likedReserved);
+    }
+
+    if (editorialUids.length < EDITORIAL_RANK_LIMIT) {
+      this.logger.warn(
+        `seed-trending: editorial picks ${editorialUids.length}/${EDITORIAL_RANK_LIMIT} after excluding negative stories`
+      );
+    }
+    if (likedUids.length < likedLimit) {
+      this.logger.warn(`seed-trending: liked picks ${likedUids.length}/${likedLimit} after excluding negative stories`);
     }
 
     const botMemberUids = await this.ensureSeedBotMembers();
@@ -214,33 +250,46 @@ export class TeamNewsTrendingSeedService {
     const likedTarget = Math.min(likedLimit, Math.max(0, likedPool.length));
 
     try {
-      const { object } = await generateObject({
-        model: this.aiProvider.getResponsesModel(PROVIDER_ENV_VAR, { useSearchGrounding: false }),
-        schema: LlmRankingSchema,
+      const { text } = await generateText({
+        model: this.aiProvider.getResponsesModel(undefined, {
+          useSearchGrounding: false,
+          providerOverride: 'anthropic',
+          modelOverride: STORY_PICK_MODEL,
+        }),
         system: `You curate team news for a Protocol Labs Network home page with two distinct surfaces.
 
 1) editorialUids (${editorialTarget}): the most important / newsworthy items for the "Top stories" band — editorial significance, not popularity. Ordered best-first (rank 1 = lead story). Prefer isNewBatch=true when quality is comparable; otherwise pick the best from the full 14-day window.
 
-2) likedUids (${likedTarget}): items for "Popular this week" — interesting / engaging stories that deserve synthetic community interest. Prefer diversity of teams and event types. Prefer eligibleForLiked=true / isNewBatch=true. When a Protocol Labs item is present and not already in editorialUids, include it somewhere in likedUids (not necessarily #1).
+2) likedUids (${likedTarget}): items for "Popular this week" — interesting / engaging stories that deserve synthetic community interest. Prefer diversity of teams and event types. Prefer eligibleForLiked=true / isNewBatch=true. When a Protocol Labs item is present, is not in editorialUids, and is not in excludedUids, include it somewhere in likedUids (not necessarily #1).
+
+3) excludedUids: stories with a negative sentiment or a negative connotation about a team in the Protocol Labs network. Top stories amplify useful network updates. Do not put these UIDs in editorialUids or likedUids. Leave them in the catalog. This ranking does not remove them from the news feed.
 
 HARD RULE: likedUids and editorialUids must be disjoint — no UID in both lists. Editorial importance ≠ popularity; do not put the same story on both lists.
-Return only UIDs from the provided catalog.`,
+HARD RULE: a UID in excludedUids must not appear in editorialUids or likedUids.
+Return only UIDs from the provided catalog.
+
+Reply with one JSON object and no other text. No markdown. All three keys are required. excludedUids is [] when no story is negative.
+{"editorialUids":[],"likedUids":[],"excludedUids":[]}
+editorialUids has at most ${editorialTarget} strings. likedUids has at most ${likedTarget} strings.`,
         prompt: `Catalog (JSON):\n${JSON.stringify(
           catalog,
           null,
           2
-        )}\n\nReturn editorialUids with up to ${editorialTarget} UIDs and likedUids with up to ${likedTarget} UIDs. Sets must be disjoint.`,
+        )}\n\nReturn the JSON object. editorialUids has up to ${editorialTarget} UIDs. likedUids has up to ${likedTarget} UIDs. excludedUids lists every negative story. The two pick lists are disjoint and contain no excluded UID.`,
         temperature: 0.4,
       });
 
+      const object = parseRankingJson(text);
       return {
-        likedUids: object.likedUids ?? [],
-        editorialUids: object.editorialUids ?? [],
+        likedUids: object.likedUids,
+        editorialUids: object.editorialUids,
+        excludedUids: object.excludedUids,
+        failed: false,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`seed-trending: LLM ranking failed: ${message}`);
-      return { likedUids: [], editorialUids: [] };
+      return { likedUids: [], editorialUids: [], excludedUids: [], failed: true };
     }
   }
 
