@@ -470,7 +470,6 @@ export class McpOAuthService {
     });
   }
 
-
   /**
    * A refresh token that is not current: if this grant already rotated it, someone holds a copy, so the grant is
    * revoked (OAuth 2.1 refresh-token reuse detection). Unknown tokens and already-revoked grants change nothing.

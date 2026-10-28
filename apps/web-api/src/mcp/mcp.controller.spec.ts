@@ -140,7 +140,11 @@ describe('McpController scope enforcement', () => {
     expect(analytics.trackEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         name: 'mcp-tool-refused',
-        properties: expect.objectContaining({ toolName: 'update_ai_app_feedback_status', scope: 'ai_apps', reason: 'needs_write' }),
+        properties: expect.objectContaining({
+          toolName: 'update_ai_app_feedback_status',
+          scope: 'ai_apps',
+          reason: 'needs_write',
+        }),
       })
     );
   });

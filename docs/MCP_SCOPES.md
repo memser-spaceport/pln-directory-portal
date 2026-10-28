@@ -1,0 +1,50 @@
+# MCP scopes (LAB-2995)
+
+What an agent connected to LabOS over MCP may list and call. The rules are in `openspec/specs/mcp-scopes/spec.md`; this
+page is the working map.
+
+## Registry
+
+`apps/web-api/src/mcp/mcp-scopes.registry.ts` is the reviewed allowlist. Every tool has one scope and one level (`read`
+or `write`). A tool missing from it is never listed or callable (`whoami` aside), and a spec fails when a catalog tool
+has no entry. Adding a tool to MCP means adding it there.
+
+| Scope | Label | Tools | Write tools |
+| --- | --- | --- | --- |
+| `search` | Search | `search_members`, `search_teams`, `search_projects`, `search_events` | none |
+| `forum` | Forum | `search_forum_threads`, `get_forum_thread` | none |
+| `news` | News feed | none yet (LAB-3015) | none |
+| `directory` | Members, teams and projects | `get_member`, `get_team`, `get_project`, `list_portfolio_teams` | none |
+| `events` | Events | `get_event` | none |
+| `investors` | Investors and warm intros | master-profile and warm-intro reads | `submit_warm_path_feedback`, `submit_warm_path_note`, `update_master_profile`, `update_connection_edge`, `update_warm_path` |
+| `ai_apps` | AI Apps | `list_my_ai_apps`, `list_ai_app_feedback` | `update_ai_app_feedback_status` |
+
+Member RBAC still applies on top (investor DB tools need `investor_db.view` / `.edit`, forum tools `forum.read`).
+
+## Levels
+
+- **Per connection.** `McpAuthorization.scopeLevels` holds `{ [scope]: 'none' | 'read' | 'write' }`. A scope with no
+  key is `read`. Consent stores `read` for every scope (or `none` where admins set `none`); `allowChanges` is ignored.
+  Write is turned on later in Settings → MCP connections (`PATCH /v1/mcp/authorizations/:uid/scopes`).
+- **Admin caps.** `McpScopeSetting` holds a maximum per scope for everyone; no row means not capped. Read and set with
+  `GET` / `PUT /v1/admin/mcp/scopes` (`AdminAuthGuard`, body `{ scopes: { [scope]: level } }`). There is no admin UI yet.
+- **Effective level** = the lower of the stored level, the admin cap, and what the scope's tools allow. Read on every
+  MCP request, so a change applies to the next call without reconnecting. Lowering a cap does not rewrite stored levels.
+- **AI-app sessions and member proofs** take `agentAccess` / `access` from the effective `ai_apps` level.
+
+## What the agent sees
+
+| Situation | `tools/list` | A call |
+| --- | --- | --- |
+| Effective level covers the tool | listed | runs |
+| Write tool, connection at `read`, member may raise to `write` | listed, description starts `[Needs write access: …]` | `isError`: "This needs write access to <Label> for this connection. Ask the member to allow it in LabOS: <WEB_UI_BASE_URL>/settings/mcp" |
+| Connection set the scope to `none` | hidden | same refusal, "read access" (or "write access" for a write tool) |
+| Admin cap below the tool's level | hidden | `isError`: "<Label> is turned off by LabOS admins." (write tools: "Changes in <Label> are turned off…"), no link |
+| Scope settings can't be read | only `whoami` | `isError`: "LabOS couldn't check this connection's permissions. Try again later." |
+
+A hidden tool is registered on the per-request server only when the request's JSON-RPC body names it in `tools/call`,
+so it never appears in `tools/list`. Every refusal except the last sends PostHog `mcp-tool-refused` (`toolName`,
+`scope`, `reason`: `needs_write`, `scope_none`, `admin_off`). Level saves send `mcp-scope-levels-updated`; admin changes
+`mcp-admin-scope-updated`.
+
+The `?request=<id>` deep link and the `McpAccessRequest` table are LAB-3014.

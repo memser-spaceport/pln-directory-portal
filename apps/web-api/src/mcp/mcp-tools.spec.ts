@@ -142,7 +142,9 @@ describe('scope registry', () => {
   const everything = new Set(['directory.admin.full', 'investor_db.edit', 'forum.read', 'ai_apps.read']);
 
   it('puts every catalog tool except whoami in the scope registry', () => {
-    const missing = fullCatalog.map((t) => t.name).filter((name) => !MCP_UNSCOPED_TOOLS.has(name) && !MCP_TOOL_SCOPES[name]);
+    const missing = fullCatalog
+      .map((t) => t.name)
+      .filter((name) => !MCP_UNSCOPED_TOOLS.has(name) && !MCP_TOOL_SCOPES[name]);
     expect(missing).toEqual([]);
   });
 
@@ -157,7 +159,12 @@ describe('scope registry', () => {
     for (const name of writesByName) {
       expect(isWriteTool(name)).toBe(true);
     }
-    expect(fullCatalog.map((t) => t.name).filter(isWriteTool).sort()).toEqual(writesByName.sort());
+    expect(
+      fullCatalog
+        .map((t) => t.name)
+        .filter(isWriteTool)
+        .sort()
+    ).toEqual(writesByName.sort());
   });
 
   it('allows write only on scopes that have write tools', () => {

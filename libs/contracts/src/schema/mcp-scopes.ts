@@ -71,3 +71,16 @@ export type McpAdminScopesResponse = z.infer<typeof McpAdminScopesResponseSchema
 /** PUT /v1/admin/mcp/scopes */
 export const UpdateMcpAdminScopesSchema = z.object({ scopes: levelsMap });
 export type UpdateMcpAdminScopes = z.infer<typeof UpdateMcpAdminScopesSchema>;
+
+/** GET /v1/mcp/access-requests/:uid (LAB-3014): a refused agent call the member can allow in Settings. */
+export const McpAccessRequestSchema = z.object({
+  uid: z.string(),
+  authorizationUid: z.string(),
+  scope: McpScopeKeySchema,
+  level: z.enum(['read', 'write']),
+  toolName: z.string(),
+  /** `expired` after 7 days without a resolving save. */
+  status: z.enum(['open', 'resolved', 'expired']),
+  createdAt: z.string(),
+});
+export type McpAccessRequest = z.infer<typeof McpAccessRequestSchema>;

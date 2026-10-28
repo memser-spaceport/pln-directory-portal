@@ -50,7 +50,12 @@ export function planTools(tools: McpToolDef[], stored: McpStoredLevels, caps: Mc
 }
 
 /** The text an agent gets back for a refused call. */
-export function refusalText(reason: McpRefusalReason, scope: McpScopeKey, toolLevel: 'read' | 'write', settingsUrl: string) {
+export function refusalText(
+  reason: McpRefusalReason,
+  scope: McpScopeKey,
+  toolLevel: 'read' | 'write',
+  settingsUrl: string
+) {
   const label = scopeLabel(scope);
   switch (reason) {
     case 'needs_write':

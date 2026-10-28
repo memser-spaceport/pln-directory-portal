@@ -54,7 +54,7 @@ Write tools become exactly the entries whose level is `write`; `MCP_WRITE_TOOLS`
 - **Listed but refused:** write tools whose effective level is `read` and whose `maxLevel` is `write`. They're registered with a handler that returns the needs-write refusal, and their description is prefixed `[Needs write access — the member can allow it in LabOS]`.
 - **Hidden:** tools at `none` or above the admin maximum.
 
-To give hidden tools a meaningful error instead of "tool not found", the controller pre-reads the JSON-RPC body (single message or batch): for a `tools/call` naming a hidden registry tool, it answers that message itself with `{ isError: true, content: [text] }` and skips the SDK. Every refusal path goes through one `refuse(actor, tool, reason)` helper, which creates or reuses the access request, emits `mcp-tool-refused`, and formats the text. *Alternative:* registering every tool and checking inside the handler. That's simpler, but then `tools/list` would expose admin-off tools, which the Goal forbids.
+To give hidden tools a meaningful error instead of "tool not found", the controller reads the JSON-RPC body (a single message or a batch) for `tools/call` names. It registers a hidden registry tool on the per-request server only when the body names it, with a refusal handler and no input schema. The SDK formats the response as usual, and `tools/list` never shows the tool. The only exception is a batch that both lists and calls the same hidden tool, which is rare because the 2025-06-18 MCP spec dropped batching. *Alternatives:* answering the call ourselves by rewriting the response, which duplicates the SDK's response handling; or registering every tool and checking inside the handler, which lists admin-off tools and the Goal forbids that. Every refusal path goes through one `refuse(tool, reason)` helper, which emits `mcp-tool-refused` and formats the text. LAB-3014 adds the access request there. *Alternative:* registering every tool and checking inside the handler. That's simpler, but then `tools/list` would expose admin-off tools, which the Goal forbids.
 
 **Refusal text.**
 - needs write: `This needs write access to <Label> for this connection. Ask the member to allow it in LabOS: <WEB_UI_BASE_URL>/settings/mcp?request=<uid>`
@@ -79,7 +79,7 @@ To give hidden tools a meaningful error instead of "tool not found", the control
 ## Risks / Trade-offs
 
 - [The "Idle" status is unreachable: any grant unused for 7 days is already `signin_expired`, so "idle after 14 days" never shows] → Keep the precedence (expired first) and raise it with Anuj. Either the badge thresholds or the refresh idle TTL changes.
-- [Pre-parsing the JSON-RPC body duplicates a little SDK behaviour] → Only `tools/call` with a known hidden name is intercepted, and everything else passes through untouched. Covered by controller tests for single and batch bodies.
+- [Reading the JSON-RPC body for tool names] → It's read only to decide which hidden tools to register, and the SDK still handles every message. Covered by controller tests for single and batch bodies.
 - [Listing write tools at read level adds noise to agents' tool lists] → Only scopes where the member can actually allow write are affected (`investors`, `ai_apps` today).
 - [The JSON column isn't enforced by the DB] → Validated with zod against the registry on every write, and unknown keys are ignored on read.
 - [Grants older than this change keep `canWrite`, which is now meaningless] → The backfill maps it, and the follow-up drops the column.

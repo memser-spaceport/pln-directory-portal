@@ -10,7 +10,8 @@ export const MCP_ACTIVE_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
 export function refreshGrantExpired(grant: GrantTimes, now = Date.now()): boolean {
   const lastUsed = grant.lastUsedAt ?? grant.connectedAt;
   return (
-    now - grant.connectedAt.getTime() >= MCP_REFRESH_TOKEN_TTL_MS || now - lastUsed.getTime() >= MCP_REFRESH_TOKEN_IDLE_TTL_MS
+    now - grant.connectedAt.getTime() >= MCP_REFRESH_TOKEN_TTL_MS ||
+    now - lastUsed.getTime() >= MCP_REFRESH_TOKEN_IDLE_TTL_MS
   );
 }
 

@@ -2,7 +2,13 @@ jest.mock('../analytics/service/analytics.service', () => ({ AnalyticsService: j
 
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { connectionStatus } from './mcp-grant-expiry';
-import { initialScopeLevels, McpAdminCaps, McpScopesService, parseStoredLevels, resolveScope } from './mcp-scopes.service';
+import {
+  initialScopeLevels,
+  McpAdminCaps,
+  McpScopesService,
+  parseStoredLevels,
+  resolveScope,
+} from './mcp-scopes.service';
 
 const DAY = 24 * 60 * 60 * 1000;
 const NO_CAPS: McpAdminCaps = {
@@ -50,13 +56,19 @@ function build(settings: Array<{ scope: string; maxLevel: string }> = []) {
   };
   const analytics = { trackEvent: jest.fn().mockResolvedValue(undefined) };
   const service = new McpScopesService(prisma as any, analytics as any);
-  const add = (r: Record<string, unknown>) => rows.set(r.uid as string, { memberUid: 'member-1', revokedAt: null, ...r });
+  const add = (r: Record<string, unknown>) =>
+    rows.set(r.uid as string, { memberUid: 'member-1', revokedAt: null, ...r });
   return { service, prisma, analytics, rows, add };
 }
 
 describe('scope resolution', () => {
   it('treats a missing level as read, capped by the registry', () => {
-    expect(resolveScope({}, NO_CAPS, 'forum')).toEqual({ level: 'read', maxLevel: 'read', adminMax: 'write', lock: null });
+    expect(resolveScope({}, NO_CAPS, 'forum')).toEqual({
+      level: 'read',
+      maxLevel: 'read',
+      adminMax: 'write',
+      lock: null,
+    });
     expect(resolveScope({ forum: 'write' }, NO_CAPS, 'forum').level).toBe('read');
     expect(resolveScope({ ai_apps: 'write' }, NO_CAPS, 'ai_apps')).toMatchObject({ level: 'write', maxLevel: 'write' });
   });
@@ -88,9 +100,17 @@ describe('connectionStatus', () => {
   it.each([
     ['not used yet', { connectedAt: new Date(now - DAY), lastUsedAt: null }, 'not_used'],
     ['used today', { connectedAt: new Date(now - 3 * DAY), lastUsedAt: new Date(now - 60_000) }, 'active'],
-    ['idle past 7 days', { connectedAt: new Date(now - 10 * DAY), lastUsedAt: new Date(now - 8 * DAY) }, 'signin_expired'],
+    [
+      'idle past 7 days',
+      { connectedAt: new Date(now - 10 * DAY), lastUsedAt: new Date(now - 8 * DAY) },
+      'signin_expired',
+    ],
     ['never used for 8 days', { connectedAt: new Date(now - 8 * DAY), lastUsedAt: null }, 'signin_expired'],
-    ['30 days since consent', { connectedAt: new Date(now - 31 * DAY), lastUsedAt: new Date(now - DAY) }, 'signin_expired'],
+    [
+      '30 days since consent',
+      { connectedAt: new Date(now - 31 * DAY), lastUsedAt: new Date(now - DAY) },
+      'signin_expired',
+    ],
   ])('%s', (_label, grant, status) => {
     expect(connectionStatus(grant, now)).toBe(status);
   });
@@ -104,7 +124,14 @@ describe('McpScopesService', () => {
     const { items } = await service.listConnections('member-1');
 
     expect(items.map((i) => i.status)).toEqual(['active', 'signin_expired']);
-    expect(items[0].scopes.map((s) => s.key)).toEqual(['search', 'forum', 'directory', 'events', 'investors', 'ai_apps']);
+    expect(items[0].scopes.map((s) => s.key)).toEqual([
+      'search',
+      'forum',
+      'directory',
+      'events',
+      'investors',
+      'ai_apps',
+    ]);
     expect(items[0].scopes.find((s) => s.key === 'forum')).toEqual({
       key: 'forum',
       label: 'Forum',
@@ -147,9 +174,9 @@ describe('McpScopesService', () => {
     await expect(
       service.updateConnectionLevels('member-1', 'a', { levels: { forum: 'none', ai_apps: 'write' } })
     ).rejects.toBeInstanceOf(ConflictException);
-    await expect(service.updateConnectionLevels('member-1', 'a', { levels: { search: 'write' } })).rejects.toBeInstanceOf(
-      ConflictException
-    );
+    await expect(
+      service.updateConnectionLevels('member-1', 'a', { levels: { search: 'write' } })
+    ).rejects.toBeInstanceOf(ConflictException);
     expect(prisma.mcpAuthorization.update).not.toHaveBeenCalled();
     expect(rows.get('a').scopeLevels).toEqual({});
   });
