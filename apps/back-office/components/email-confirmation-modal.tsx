@@ -1,6 +1,6 @@
 import { useState, Fragment } from 'react';
 import { Transition, Dialog } from '@headlessui/react';
-import { InputField } from '../../../libs/ui/src/lib/input-field/input-field';
+import { InputField } from '@protocol-labs-network/ui';
 
 interface EmailConfirmationModalProps {
   isOpen: boolean;
