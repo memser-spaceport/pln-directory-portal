@@ -13,7 +13,7 @@
   - Generate both clients after install or a schema change: `npx prisma generate --schema=apps/web-api/prisma/schema.prisma` and `npx prisma generate --schema=apps/web-api/prisma/oso-schema.prisma`. The `Dockerfile` and `heroku-postbuild` generate both; `ci-check-up.yml` generates only the main client.
 - Language/testing: TypeScript `4.7.4` (locked; `^4.3.5` in `package.json`), Jest `27.2.3` with `ts-jest` `27.1.5`, `@types/node` `16.11.7`
 - API/schema tooling: `@ts-rest/*` `3.19.3`, Zod `3.19.0`, `nestjs-zod`
-- Observability/analytics: Sentry (`@sentry/nextjs`), OpenTelemetry, PostHog
+- Observability/analytics: Sentry (`@sentry/node`), OpenTelemetry, PostHog (`posthog-node`)
 
 ## Directory Map
 
@@ -35,7 +35,6 @@
 - `libs/ui`: shared UI component library
 - `libs/*/data-access`: shared typed data-access packages per domain (`funding-stages`, `industry-tags`, `locations`, `members`, `membership-sources`, `projects`, `shared`, `skills`, `teams`, `technologies`)
 - `libs/airtable`: Airtable data models used by `web-api` (Airtable service and the `api:migrate-airtable-data` migration)
-- `libs/storybook-host`: Storybook host project (`yarn build:storybook`)
 - `docs/`: product and engineering docs (feature notes, deployment, guidelines, database schema)
 - `lambda/`: AWS Lambda functions (`lambda-opensearch-sync`)
 - `data-sync/`: SQL queries for the data sync tool

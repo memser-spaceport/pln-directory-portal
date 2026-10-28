@@ -26,7 +26,6 @@
       - [Skills](../libs/skills/data-access/README)
       - [Teams](../libs/teams/data-access/README)
       - [Technologies](../libs/technologies/data-access/README)
-    - [Storybook Host](../libs/storybook-host/README.md)
     - [UI Library](../libs/ui/README.md)
 - Guidelines
   - [Branching Guidelines](GUIDELINES_BRANCHING.md)
