@@ -11,6 +11,7 @@ import { RichText } from '../../components/common/rich-text';
 import { AddSpvParticipantModal } from '../../components/spv-spotlights/AddSpvParticipantModal';
 import { EditSpvTemplateVariablesModal } from '../../components/spv-spotlights/EditSpvTemplateVariablesModal';
 import { UploadSpvInvestorsModal } from '../../components/spv-spotlights/UploadSpvInvestorsModal';
+import { SelectSpvInvestorsModal } from '../../components/spv-spotlights/SelectSpvInvestorsModal';
 import { PreviewSpvEmailModal } from '../../components/spv-spotlights/PreviewSpvEmailModal';
 import { TeamPitchConfirmModal } from '../../components/team-pitches/TeamPitchConfirmModal';
 import api from '../../utils/api';
@@ -222,6 +223,7 @@ const SpvSpotlightDetailPage = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [showAddParticipant, setShowAddParticipant] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
+  const [showCsvSelect, setShowCsvSelect] = useState(false);
   const [listSearch, setListSearch] = useState('');
   const [spotlight, setSpotlight] = useState<Record<string, unknown> | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
@@ -1162,13 +1164,25 @@ const SpvSpotlightDetailPage = () => {
 
               {tab !== 'templates' && (
                 <div className={s.participantsFilters}>
-                  <input
-                    type="text"
-                    placeholder="Search by name or email"
-                    value={listSearch}
-                    onChange={(e) => setListSearch(e.target.value)}
-                    className={s.input}
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Search by name or email"
+                      value={listSearch}
+                      onChange={(e) => setListSearch(e.target.value)}
+                      className={s.input}
+                    />
+
+                    {canMutateTeamPitches && tab === 'investors' && (
+                      <button
+                        type="button"
+                        onClick={() => setShowCsvSelect(true)}
+                        className="rounded-lg bg-green-600 px-4 py-2 text-white hover:bg-green-700"
+                      >
+                        Select Members via CSV
+                      </button>
+                    )}
+                  </div>
                   {tab === 'applications' && (
                     <select
                       value={requestStatusFilter}
@@ -1459,10 +1473,10 @@ const SpvSpotlightDetailPage = () => {
                 The body is the email HTML. Built-in tokens: investorName, firstName, investorEmail, spotlightTitle,
                 spotlightLink, teamName, supportEmail, senderName, docSendLink. The invite and follow-up templates have
                 an optional From name, Cc, and Reply-to. The data room access template has its own From address, From
-                name, Cc, and Reply-to. Investor template variables use the CSV column header as the
-                token. Approval emails also have role and organization. Use {'{{firm|your fund}}'} when a value can be
-                empty. Use {'{{#if token}}'} … {'{{else if token}}'} … {'{{else}}'} … {'{{/if}}'} to choose one block
-                when a variable has a value. HTML is allowed.
+                name, Cc, and Reply-to. Investor template variables use the CSV column header as the token. Approval
+                emails also have role and organization. Use {'{{firm|your fund}}'} when a value can be empty. Use{' '}
+                {'{{#if token}}'} … {'{{else if token}}'} … {'{{else}}'} … {'{{/if}}'} to choose one block when a
+                variable has a value. HTML is allowed.
               </p>
               <div className="flex flex-col gap-6">
                 {TEMPLATE_LABELS.map(({ key, label }) => (
@@ -1608,6 +1622,13 @@ const SpvSpotlightDetailPage = () => {
         cohort={tab === 'outreach' ? 'OUTREACH' : 'PRE_APPROVED'}
         variableColumns={csvVariableColumns}
         onUploaded={() => loadParticipants()}
+      />
+      <SelectSpvInvestorsModal
+        isOpen={showCsvSelect}
+        spotlightUid={uid}
+        investors={investors}
+        onSelect={(investorUids) => setSelectedUids((prev) => [...new Set([...prev, ...investorUids])])}
+        onClose={() => setShowCsvSelect(false)}
       />
       <TeamPitchConfirmModal
         isOpen={!!bulkSend}
