@@ -28,18 +28,9 @@ export const saveRegistrationImage = async (payload: any) => {
 
   formData.append('file', payload);
 
-  const requestOptions = {
-    method: 'POST',
-    body: formData,
-  };
+  const response = await api.post('/v1/admin/images', formData, {
+    headers: { 'content-type': 'multipart/form-data' },
+  });
 
-  const response = await fetch(`${process.env.WEB_API_BASE_URL}/v1/images`, requestOptions);
-
-  if (!response?.ok) {
-    throw new Error(response?.statusText);
-  }
-
-  const result = await response?.json();
-
-  return result;
+  return response.data;
 };
