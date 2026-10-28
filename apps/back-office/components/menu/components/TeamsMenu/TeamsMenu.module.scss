@@ -83,6 +83,10 @@
   }
 }
 
+.chipIcon {
+  flex-shrink: 0;
+}
+
 .menuItemLabel {
   overflow: hidden;
   color: var(--action-foreground-neutral-active, #3D4A5C);

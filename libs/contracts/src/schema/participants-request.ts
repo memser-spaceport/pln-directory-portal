@@ -68,9 +68,15 @@ const newDataMemberSchema = z.object({
 });
 
 const TEAM_LOCATIONS_LIMIT = 10;
+const TEAM_LOCATION_LENGTH_LIMIT = 100;
 
 const teamLocationsSchema = z
-  .array(z.string().refine((location) => location.trim().length > 0, 'Location cannot be empty'))
+  .array(
+    z
+      .string()
+      .refine((location) => location.trim().length > 0, 'Location cannot be empty')
+      .refine((location) => location.trim().length <= TEAM_LOCATION_LENGTH_LIMIT, 'Location is too long')
+  )
   .max(TEAM_LOCATIONS_LIMIT)
   .refine(
     (locations) => new Set(locations.map((location) => location.trim().toLowerCase())).size === locations.length,
