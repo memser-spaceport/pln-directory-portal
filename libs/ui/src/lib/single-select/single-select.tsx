@@ -2,7 +2,7 @@ import { Listbox } from '@headlessui/react';
 import React, { Fragment, useEffect, useState } from 'react';
 import { ArrowIcon } from '../icons/arrow/arrow';
 import { DiscardChangesPopup } from '../modals/confirmation';
-import { UserGroupIcon } from '@heroicons/react/solid';
+import { UserGroupIcon } from '@heroicons/react/20/solid';
 
 export interface SingleSelectProps {
   buttonContent?: React.ReactNode;

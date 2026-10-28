@@ -1,4 +1,4 @@
-import { HomeIcon } from '@heroicons/react/solid';
+import { HomeIcon } from '@heroicons/react/20/solid';
 import Link from 'next/link';
 
 export interface BreadcrumbProps {

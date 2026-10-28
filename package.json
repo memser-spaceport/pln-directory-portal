@@ -166,7 +166,7 @@
     "@fontsource/inter": "^4.5.11",
     "@golevelup/ts-jest": "^0.3.3",
     "@headlessui/react": "^2.2.10",
-    "@heroicons/react": "^1.0.6",
+    "@heroicons/react": "^2.2.0",
     "@hookform/resolvers": "^5.9.2",
     "@nestjs/cli": "^9.0.0",
     "@nestjs/schematics": "^9.0.0",

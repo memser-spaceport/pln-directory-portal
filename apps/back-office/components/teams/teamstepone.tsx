@@ -4,7 +4,7 @@ import {
   ProfileImageUpload,
   TextArea,
 } from '@protocol-labs-network/ui';
-import { UserGroupIcon } from '@heroicons/react/solid';
+import { UserGroupIcon } from '@heroicons/react/20/solid';
 import { ReactComponent as InformationCircleIcon } from '../../public/assets/icons/info_icon.svg';
 
 export default function TeamStepOne(props) {

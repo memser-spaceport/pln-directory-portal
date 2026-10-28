@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { XIcon as CloseIcon } from '@heroicons/react/solid';
+import { XMarkIcon as CloseIcon } from '@heroicons/react/20/solid';
 import { ReactComponent as ArrowDown } from '../../assets/icons/arrow-down-filled.svg';
 
 interface Option {

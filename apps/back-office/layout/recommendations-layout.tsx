@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { ReactComponent as ProtocolLabsLogo } from '/public/assets/images/Logo.svg';
 import { ReactComponent as LogOut } from '/public/assets/images/log-out.svg';
-import { PlayIcon, ClockIcon, UserGroupIcon } from '@heroicons/react/solid';
+import { PlayIcon, ClockIcon, UserGroupIcon } from '@heroicons/react/20/solid';
 import { ROUTE_CONSTANTS } from '../utils/constants';
 import { removeToken } from '../utils/auth';
 import { useRouter } from 'next/router';
