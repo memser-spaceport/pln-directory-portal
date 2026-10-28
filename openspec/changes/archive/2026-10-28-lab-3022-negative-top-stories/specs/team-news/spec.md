@@ -1,13 +1,13 @@
 ## ADDED Requirements
 
-### Requirement: Story picking uses Claude Sonnet 5.5
+### Requirement: Story picking uses Claude Opus 5.5
 
-`POST /v1/service/team-news/seed-trending` SHALL rank stories with Claude Sonnet 5.5 (`claude-sonnet-5-5`). The call SHALL use the Anthropic provider. The call SHALL NOT follow `AI_PROVIDER` or `CLAUDE_MODEL`.
+`POST /v1/service/team-news/seed-trending` SHALL rank stories with Claude Opus 5.5 (`claude-opus-5-5`). The call SHALL use the Anthropic provider. The call SHALL NOT follow `AI_PROVIDER` or `CLAUDE_MODEL`.
 
 #### Scenario: The ranking call
 
 - **WHEN** seed-trending ranks a window
-- **THEN** the model call uses provider `anthropic` and model `claude-sonnet-5-5`
+- **THEN** the model call uses provider `anthropic` and model `claude-opus-5-5`
 
 ### Requirement: Negative stories stay off Top stories and Popular this week
 

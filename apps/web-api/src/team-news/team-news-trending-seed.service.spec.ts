@@ -99,7 +99,7 @@ describe('TeamNewsTrendingSeedService', () => {
     expect(getResponsesModel).toHaveBeenCalledWith(undefined, {
       useSearchGrounding: false,
       providerOverride: 'anthropic',
-      modelOverride: 'claude-sonnet-5-5',
+      modelOverride: 'claude-opus-5-5',
     });
     expect(result.candidateCount).toBe(8);
     expect(result.protocolLabsIncluded).toBe(true);

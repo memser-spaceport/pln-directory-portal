@@ -17,7 +17,7 @@ import {
 } from './team-news-trending-seed.util';
 
 const POPULAR_WINDOW_DAYS = 14;
-const STORY_PICK_MODEL = 'claude-sonnet-5-5';
+const STORY_PICK_MODEL = 'claude-opus-5-5';
 
 const LlmRankingSchema = z.object({
   likedUids: z.array(z.string()).max(TRENDING_LIKED_LIMIT),
