@@ -137,6 +137,7 @@ describe('McpScopesService', () => {
       label: 'Forum',
       level: 'none',
       maxLevel: 'none',
+      registryMax: 'read',
       lock: 'admin',
     });
     expect(items[0].scopes.find((s) => s.key === 'ai_apps')).toMatchObject({ level: 'write', maxLevel: 'write' });

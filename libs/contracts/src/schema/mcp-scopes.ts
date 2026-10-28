@@ -23,6 +23,8 @@ export const McpConnectionScopeSchema = z.object({
   level: McpLevelSchema,
   /** The highest level the member may set. */
   maxLevel: McpLevelSchema,
+  /** What the scope's tools allow (`write` if any tool writes), before admin caps. Lets Settings show a locked option. */
+  registryMax: McpLevelSchema,
   /** `admin` when the admin maximum is below what the scope's tools allow. */
   lock: z.enum(['admin']).nullable(),
 });

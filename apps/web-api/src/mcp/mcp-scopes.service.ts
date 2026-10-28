@@ -99,7 +99,14 @@ export class McpScopesService {
     const stored = parseStoredLevels(row.scopeLevels);
     const scopes: McpConnectionScope[] = scopesWithTools().map(({ key, label }) => {
       const state = resolveScope(stored, caps, key);
-      return { key, label, level: state.level, maxLevel: state.maxLevel, lock: state.lock };
+      return {
+        key,
+        label,
+        level: state.level,
+        maxLevel: state.maxLevel,
+        registryMax: registryMaxLevel(key),
+        lock: state.lock,
+      };
     });
     return {
       uid: row.uid,
