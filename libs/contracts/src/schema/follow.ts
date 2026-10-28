@@ -46,8 +46,8 @@ export const FollowedTeamSchema = z.object({
   logoUrl: z.string().nullable(),
   followedAt: z.string(),
   followerCount: z.number().int().min(0),
-  // The team's first top-level focus area, shown under its name on News preferences (LAB-3000).
-  focusArea: z.string().nullable(),
+  // The team's top-level focus areas, shown under its name on News preferences (LAB-3000, LAB-3018).
+  focusAreas: z.array(z.string()),
 });
 export type FollowedTeam = z.infer<typeof FollowedTeamSchema>;
 
