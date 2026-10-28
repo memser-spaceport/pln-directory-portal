@@ -39,7 +39,7 @@ import { MembersHooksService } from '../members/members.hooks.service';
 import { PrismaService } from '../shared/prisma.service';
 import { TeamNewsQueryService } from '../team-news/team-news-query.service';
 import { TeamNewsSuggestionsService } from '../team-news/team-news-suggestions.service';
-import { McpToolDef, toolsForPermissions, WHOAMI_TOOL, warmIntroTools } from './mcp-tools';
+import { McpToolDef, toolInputSchema, toolsForPermissions, WHOAMI_TOOL, warmIntroTools } from './mcp-tools';
 import { McpAdminCaps, McpScopesService, resolveScope } from './mcp-scopes.service';
 import { McpAccessRequestsService } from './mcp-access-requests.service';
 import { calledToolNames, MCP_NEEDS_WRITE_NOTE, McpRefusalReason, planTools, refusalText } from './mcp-tool-plan';
@@ -137,9 +137,9 @@ export class McpController {
       cb: (args?: Record<string, unknown>) => unknown,
       withSchema = true
     ) => {
-      const config: { description: string; inputSchema?: Record<string, unknown> } = { description };
+      const config: { description: string; inputSchema?: unknown } = { description };
       if (withSchema && tool.inputSchema) {
-        config.inputSchema = tool.inputSchema;
+        config.inputSchema = toolInputSchema(tool);
       }
       // MCP SDK registerTool generics blow up TS2589 when passed a union config.
       (

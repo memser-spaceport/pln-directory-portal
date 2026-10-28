@@ -23,8 +23,19 @@ export type McpToolDef = {
   description: string;
   visibility: 'always' | 'investor_db' | 'investor_db_edit' | 'forum';
   inputSchema?: Record<string, z.ZodTypeAny>;
+  /**
+   * Keep arguments the schema doesn't name. The MCP SDK strips unknown keys before `execute` runs, so a tool that
+   * must refuse fields it doesn't allow (update_my_profile) would otherwise never see them (LAB-3020).
+   */
+  keepUnknownArgs?: true;
   execute: (ctx: McpActorContext, args?: Record<string, unknown>) => Promise<Record<string, unknown>>;
 };
+
+/** The schema the SDK validates arguments against: the raw shape, or an object keeping unknown keys. */
+export function toolInputSchema(tool: McpToolDef): Record<string, z.ZodTypeAny> | z.ZodTypeAny | undefined {
+  if (!tool.inputSchema) return undefined;
+  return tool.keepUnknownArgs ? z.object(tool.inputSchema).passthrough() : tool.inputSchema;
+}
 
 const MASTER_PROFILE_TYPES = ['pl_internal', 'investor', 'co_investor', 'founder'] as const;
 const WARM_INTRO_TARGET_SETS = ['neuro-fund-i', 'gold-co-investors'] as const;

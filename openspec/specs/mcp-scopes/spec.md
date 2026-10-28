@@ -141,7 +141,7 @@ The `news` scope SHALL also offer `post_team_news` at `write`, which posts news 
 #### Scenario: Blocked profile field
 
 - **WHEN** an agent calls `update_my_profile` with `bio` and `email`
-- **THEN** the call fails and the profile is unchanged
+- **THEN** the call fails, naming `email` as a field an agent can't change, and the profile is unchanged (the bio is not saved either)
 
 #### Scenario: Posting for another team
 
