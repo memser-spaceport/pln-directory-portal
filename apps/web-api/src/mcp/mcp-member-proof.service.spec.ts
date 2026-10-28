@@ -64,7 +64,7 @@ function build() {
     signIn as any,
     analytics as any,
     cache as any,
-    new McpScopesService(prisma as any, analytics as any)
+    new McpScopesService(prisma as any, analytics as any, {} as any)
   );
   return { service, prisma, oauth, accessControl, signIn, analytics, cache };
 }

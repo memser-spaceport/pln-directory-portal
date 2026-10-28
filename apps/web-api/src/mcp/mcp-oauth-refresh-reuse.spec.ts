@@ -96,7 +96,7 @@ function build() {
   const accessControl = { hasPermission: jest.fn().mockResolvedValue({ allowed: true }) };
   const appSessions = { revokeAgentSessionsForAuthorization: jest.fn().mockResolvedValue(2) };
   const analytics = { trackEvent: jest.fn().mockResolvedValue(undefined) };
-  const scopes = new McpScopesService(store.prisma, analytics as any);
+  const scopes = new McpScopesService(store.prisma, analytics as any, {} as any);
   const service = new McpOAuthService(store.prisma, accessControl as any, appSessions as any, analytics as any, scopes);
   return { ...store, service, appSessions, analytics };
 }
