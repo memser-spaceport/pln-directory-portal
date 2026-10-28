@@ -15,6 +15,7 @@ import { TeamNewsTrendingSeedService } from './team-news-trending-seed.service';
 import { TeamNewsImpressionsService } from './team-news-impressions.service';
 import { TeamNewsPostSummaryService } from './team-news-post-summary.service';
 import { TeamNewsImageService } from './team-news-image.service';
+import { NewsTagVocabularyService } from './news-tag-vocabulary.service';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { TeamNewsImageService } from './team-news-image.service';
     TeamNewsImpressionsService,
     TeamNewsPostSummaryService,
     TeamNewsImageService,
+    NewsTagVocabularyService,
   ],
   exports: [TeamNewsService, TeamNewsQueryService, TeamNewsEnrichmentService, TeamNewsSuggestionsService],
 })

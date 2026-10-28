@@ -16,12 +16,15 @@ import type {
   TeamNewsPopularResponse,
   TeamNewsRecentResponse,
   TeamNewsDigestPicksResponse,
+  TeamNewsTagsResponse,
 } from 'libs/contracts/src/schema/team-news';
 import { buildTeamNewsEventDateWhere } from './team-news-event-date.where';
 import { TEAM_NEWS_EXCLUDED_TEAM_NAMES } from './team-news-public-list.config';
 import { TeamNewsSuggestionsService } from './team-news-suggestions.service';
-import { selectForYouNewsItems } from './select-for-you-news-items';
+import { selectForYouNewsItems, selectNewsItemsByTagsAndTeams } from './select-for-you-news-items';
 import { narrowsNews, readNewsCategories } from './utils/news-categories';
+import { groupUsedNewsTags, NewsTagVocabularyService } from './news-tag-vocabulary.service';
+import { isNewsTagPicksEnabled } from './utils/news-tags';
 
 const EMPTY_DISCUSSION: TeamNewsDiscussion = { count: 0, latestTopicUrl: null };
 const POPULAR_WINDOW_DAYS = 14;
@@ -57,6 +60,9 @@ type UpvoteStamp = {
   viewerUpvoted: Set<string>;
 };
 
+const NEWS_TAGS_WINDOW_DAYS = 90;
+const NEWS_TAGS_CACHE_MS = 10 * 60 * 1000;
+
 const TOP_LEVEL_FOCUS_AREAS = [
   'Digital Human Rights',
   'Economies & Governance',
@@ -67,10 +73,47 @@ const TOP_LEVEL_FOCUS_AREAS = [
 
 @Injectable()
 export class TeamNewsQueryService {
+  /** The tag list changes only as news is ingested; ten minutes is fresh enough (LAB-2998). */
+  private newsTagsCache: { at: number; value: Promise<TeamNewsTagsResponse> } | null = null;
+
   constructor(
     private readonly prisma: PrismaService,
-    @Optional() private readonly suggestionsService?: TeamNewsSuggestionsService
+    @Optional() private readonly suggestionsService?: TeamNewsSuggestionsService,
+    @Optional() private readonly tagVocabulary?: NewsTagVocabularyService
   ) {}
+
+  /**
+   * News tags members can choose (LAB-2998): the focus areas that tagged news
+   * created in the last 90 days, from teams the public feed shows, grouped under
+   * their top-level focus area.
+   */
+  listNewsTags(now: Date = new Date()): Promise<TeamNewsTagsResponse> {
+    if (this.newsTagsCache && now.getTime() - this.newsTagsCache.at < NEWS_TAGS_CACHE_MS) {
+      return this.newsTagsCache.value;
+    }
+    const value = this.loadNewsTags(now);
+    this.newsTagsCache = { at: now.getTime(), value };
+    value.catch(() => {
+      if (this.newsTagsCache?.value === value) this.newsTagsCache = null;
+    });
+    return value;
+  }
+
+  private async loadNewsTags(now: Date): Promise<TeamNewsTagsResponse> {
+    if (!this.tagVocabulary) {
+      throw new Error('NewsTagVocabularyService is not provided to TeamNewsQueryService');
+    }
+    const since = new Date(now.getTime() - NEWS_TAGS_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+    const excluded = this.excludedTeamsWhere();
+    const [vocabulary, rows] = await Promise.all([
+      this.tagVocabulary.getVocabulary(),
+      this.prisma.teamNewsItem.findMany({
+        where: { AND: [{ createdAt: { gte: since } }, ...(excluded ? [excluded] : [])] },
+        select: { tags: true },
+      }),
+    ]);
+    return groupUsedNewsTags(new Set(rows.flatMap((r) => r.tags)), vocabulary);
+  }
 
   /**
    * The excluded-team rule, in one place.
@@ -381,6 +424,8 @@ export class TeamNewsQueryService {
       viewerMemberUid && this.suggestionsService
         ? this.suggestionsService.getForYouTeamUids(viewerMemberUid)
         : Promise.resolve([] as string[]);
+    // LAB-2999: what For You matches on once news tags are on (the frontend flag decides).
+    const forYouTagsPromise = this.loadForYouTagFields(viewerMemberUid);
 
     const where = this.buildWhere(query);
     const rows = await this.prisma.teamNewsItem.findMany({
@@ -399,7 +444,7 @@ export class TeamNewsQueryService {
     });
 
     const itemUids = rows.map((r) => r.uid);
-    const [focusAreas, discussions, upvotes, forYouTeamUids] = await Promise.all([
+    const [focusAreas, discussions, upvotes, forYouTeamUids, { forYouTags, forYouOwnTeamUids }] = await Promise.all([
       this.prisma.focusArea.findMany({
         where: { parentUid: null },
         select: { uid: true, title: true },
@@ -407,6 +452,7 @@ export class TeamNewsQueryService {
       this.loadDiscussions(itemUids),
       this.loadUpvotes(itemUids, viewerMemberUid),
       forYouPromise,
+      forYouTagsPromise,
     ]);
     const focusByTitle = new Map(focusAreas.map((fa) => [fa.title, fa]));
 
@@ -456,6 +502,25 @@ export class TeamNewsQueryService {
       }),
       allTabExtraItems,
       forYouTeamUids,
+      forYouTags,
+      forYouOwnTeamUids,
+    };
+  }
+
+  /** The viewer's effective news tags and own or followed teams; both empty signed out (LAB-2999). */
+  private async loadForYouTagFields(
+    viewerMemberUid?: string
+  ): Promise<{ forYouTags: string[]; forYouOwnTeamUids: string[] }> {
+    if (!viewerMemberUid || !this.suggestionsService || !this.tagVocabulary) {
+      return { forYouTags: [], forYouOwnTeamUids: [] };
+    }
+    const [tagsByMember, ownByMember] = await Promise.all([
+      this.tagVocabulary.getEffectiveTagsForMembers([viewerMemberUid]),
+      this.suggestionsService.getOwnTeamUidsForMembers([viewerMemberUid]),
+    ]);
+    return {
+      forYouTags: [...(tagsByMember.get(viewerMemberUid) ?? [])],
+      forYouOwnTeamUids: [...(ownByMember.get(viewerMemberUid) ?? [])],
     };
   }
 
@@ -511,6 +576,17 @@ export class TeamNewsQueryService {
     const fallback = items.slice(0, limit);
     const uniqueMemberUids = [...new Set(opts.memberUids)];
 
+    if (isNewsTagPicksEnabled() && this.suggestionsService && this.tagVocabulary) {
+      return {
+        generatedAt: new Date().toISOString(),
+        since: since.toISOString(),
+        until: until.toISOString(),
+        windowCount: items.length,
+        picks: await this.pickDigestNewsByTags(items, uniqueMemberUids, limit),
+        topStory,
+      };
+    }
+
     const forYouByMember =
       uniqueMemberUids.length > 0 && this.suggestionsService
         ? await this.suggestionsService.getForYouTeamUidsForMembers(uniqueMemberUids)
@@ -539,6 +615,35 @@ export class TeamNewsQueryService {
       picks,
       topStory,
     };
+  }
+
+  /**
+   * Digest picks by news tags (LAB-2999, behind NEWS_TAG_PICKS_ENABLED): per
+   * member, stories from their own or followed teams plus stories sharing any
+   * of their tags, newest first, one per team. A member with no match gets the
+   * newest network stories. Categories no longer narrow anything here.
+   */
+  private async pickDigestNewsByTags(
+    items: TeamNewsItemDto[],
+    memberUids: string[],
+    limit: number
+  ): Promise<Record<string, TeamNewsItemDto[]>> {
+    const fallback = items.slice(0, limit);
+    const picks: Record<string, TeamNewsItemDto[]> = {};
+    if (memberUids.length === 0) return picks;
+    const [tagsByMember, ownByMember] = await Promise.all([
+      (this.tagVocabulary as NewsTagVocabularyService).getEffectiveTagsForMembers(memberUids),
+      (this.suggestionsService as TeamNewsSuggestionsService).getOwnTeamUidsForMembers(memberUids),
+    ]);
+    for (const memberUid of memberUids) {
+      const matched = selectNewsItemsByTagsAndTeams(
+        items,
+        ownByMember.get(memberUid) ?? new Set(),
+        tagsByMember.get(memberUid) ?? new Set()
+      ).slice(0, limit);
+      picks[memberUid] = matched.length > 0 ? matched : fallback;
+    }
+    return picks;
   }
 
   /**

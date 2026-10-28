@@ -14,6 +14,7 @@ import { OfficeHoursModule } from '../office-hours/office-hours.module';
 import { TeamsModule } from '../teams/teams.module';
 import { OpenSearchModule } from '../opensearch/opensearch.module';
 import { MemberApprovalsModule } from '../member-approvals/member-approvals.module';
+import { NewsTagVocabularyService } from '../team-news/news-tag-vocabulary.service';
 
 @Module({
   imports: [
@@ -28,7 +29,15 @@ import { MemberApprovalsModule } from '../member-approvals/member-approvals.modu
     forwardRef(() => OfficeHoursModule),
     forwardRef(() => TeamsModule),
   ],
-  providers: [MembersService, MembersHooksService, InvestorProfileService, OnboardingRemindersJob],
+  // NewsTagVocabularyService depends only on Prisma, so it is provided here rather
+  // than importing TeamNewsModule, which already depends on this module.
+  providers: [
+    MembersService,
+    MembersHooksService,
+    InvestorProfileService,
+    OnboardingRemindersJob,
+    NewsTagVocabularyService,
+  ],
   controllers: [MemberController],
   exports: [MembersService, MembersHooksService, OnboardingRemindersJob],
 })
