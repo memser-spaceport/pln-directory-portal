@@ -23,7 +23,7 @@ import { aiAppFeedbackTools } from './mcp-ai-app-feedback-tools';
 import { directoryTools } from './mcp-directory-tools';
 import { portfolioTools } from './mcp-portfolio-tools';
 import { newsTools } from './mcp-news-tools';
-import { eventWriteTools, newsWriteTools, profileTools } from './mcp-write-tools';
+import { directoryWriteTools, eventWriteTools, newsWriteTools, profileTools } from './mcp-write-tools';
 import { isWriteTool, MCP_TOOL_SCOPES, MCP_UNSCOPED_TOOLS, registryMaxLevel } from './mcp-scopes.registry';
 
 describe('mcp-redirect', () => {
@@ -144,6 +144,7 @@ describe('scope registry', () => {
     ...newsWriteTools(stub, stub, stub),
     ...profileTools(stub, stub, stub),
     ...eventWriteTools(stub, stub, stub, stub),
+    ...directoryWriteTools(stub, stub, stub, stub),
   ];
   const everything = new Set(['directory.admin.full', 'investor_db.edit', 'forum.read', 'ai_apps.read']);
 
@@ -176,10 +177,10 @@ describe('scope registry', () => {
   });
 
   it('allows write only on scopes that have write tools', () => {
-    for (const scope of ['investors', 'ai_apps', 'news', 'profile', 'events'] as const) {
+    for (const scope of ['investors', 'ai_apps', 'news', 'profile', 'events', 'directory'] as const) {
       expect(registryMaxLevel(scope)).toBe('write');
     }
-    for (const scope of ['search', 'forum', 'directory'] as const) {
+    for (const scope of ['search', 'forum'] as const) {
       expect(registryMaxLevel(scope)).toBe('read');
     }
   });

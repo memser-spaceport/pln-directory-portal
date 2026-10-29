@@ -12,9 +12,11 @@ import {
 } from '../members/job-search-status';
 import { PLEventGuestsService } from '../pl-events/pl-event-guests.service';
 import { PLEventLocationsService } from '../pl-events/pl-event-locations.service';
+import { ProjectsService } from '../projects/projects.service';
 import { PrismaService } from '../shared/prisma.service';
 import { TeamNewsQueryService } from '../team-news/team-news-query.service';
 import { TeamNewsService } from '../team-news/team-news.service';
+import { TeamsService } from '../teams/teams.service';
 import { newsRow } from './mcp-news-tools';
 import { McpActorContext, McpToolDef } from './mcp-tools';
 
@@ -308,6 +310,185 @@ export function eventWriteTools(
         if (!isGoing) return { going: false, wasGoing: false, event };
         await guests.deletePLEventGuests(locationUid, [{ memberUid: ctx.memberUid, events: [event.uid] }]);
         return { going: false, wasGoing: true, event };
+      },
+    },
+  ];
+}
+
+/** Team fields an agent may change (LAB-3030): text and links only. Name, logo, tags, roles stay in LabOS. */
+const TEAM_FIELDS = [
+  'shortDescription',
+  'longDescription',
+  'website',
+  'blog',
+  'contactMethod',
+  'twitterHandler',
+  'linkedinHandler',
+  'telegramHandler',
+  'blueskyHandler',
+  'officeHours',
+  'moreDetails',
+] as const;
+const PROJECT_TEXT_FIELDS = ['tagline', 'description', 'readMe'] as const;
+const PROJECT_FIELDS = [...PROJECT_TEXT_FIELDS, 'lookingForFunding', 'tags', 'projectLinks'] as const;
+const DIRECTORY_TEXT_MAX = 5000;
+const PROJECT_LIST_MAX = 20;
+
+function refuseUnknown(args: Record<string, unknown>, allowed: readonly string[]) {
+  const unknown = Object.keys(args).filter((k) => !allowed.includes(k));
+  if (unknown.length > 0) {
+    throw new BadRequestException(`These fields can't be changed by an agent: ${unknown.join(', ')}`);
+  }
+}
+
+function requiredUid(args: Record<string, unknown>, key: string): string {
+  const uid = typeof args[key] === 'string' ? (args[key] as string).trim() : '';
+  if (!uid) throw new BadRequestException(`${key} is required`);
+  return uid;
+}
+
+/** Trimmed text, or null for an empty string; refuses non-text and over-long values. */
+function textField(field: string, value: unknown): string | null {
+  if (typeof value !== 'string') throw new BadRequestException(`${field} must be text`);
+  if (value.length > DIRECTORY_TEXT_MAX) throw new BadRequestException(`${field} is too long`);
+  return value.trim() === '' ? null : value.trim();
+}
+
+/**
+ * `update_team` and `update_project` in the `directory` scope (LAB-3030). Same edit rights as the pages: team leads
+ * (or directory admins) for a team; a member of the maintaining or a contributing team, the creator, or an admin for a
+ * project. Only the listed fields change; everything else is refused by name.
+ */
+export function directoryWriteTools(
+  teams: TeamsService,
+  projects: ProjectsService,
+  members: MembersService,
+  prisma: PrismaService
+): McpToolDef[] {
+  const isAdmin = (ctx: McpActorContext) => ctx.permissions.has(ADMIN_PERMISSIONS.DIRECTORY_FULL);
+  const roles = async (ctx: McpActorContext): Promise<Array<{ teamUid: string; teamLead?: boolean | null }>> =>
+    (await members.findMemberByUid(ctx.memberUid)).teamMemberRoles ?? [];
+
+  return [
+    {
+      name: 'update_team',
+      description:
+        `Update a team you lead in LabOS. Only these fields can change: ${TEAM_FIELDS.join(', ')}. ` +
+        'Send only the fields to change; an empty string clears a field. Name, logo, tags, focus areas and members ' +
+        'stay in LabOS. Read the current values with get_team first.',
+      visibility: 'always',
+      keepUnknownArgs: true,
+      inputSchema: {
+        teamUid: z.string().describe('Team uid from search_teams; you must lead the team'),
+        ...Object.fromEntries(TEAM_FIELDS.map((field) => [field, z.string().optional()])),
+      },
+      execute: async (ctx, args = {}) => {
+        refuseUnknown(args, ['teamUid', ...TEAM_FIELDS]);
+        const teamUid = requiredUid(args, 'teamUid');
+        const data: Record<string, string | null> = {};
+        for (const field of TEAM_FIELDS) {
+          if (field in args) data[field] = textField(field, args[field]);
+        }
+        if (Object.keys(data).length === 0) throw new BadRequestException('Nothing to update');
+
+        if (!isAdmin(ctx) && !(await roles(ctx)).some((role) => role.teamUid === teamUid && role.teamLead)) {
+          throw new ForbiddenException('Only team leads can update a team');
+        }
+        const team = await prisma.team.findFirst({ where: { uid: teamUid }, select: { uid: true } });
+        if (!team) throw new NotFoundException(`Team not found: ${teamUid}`);
+
+        const updated = await teams.updateTeamProfileFields(teamUid, data, ctx.email ?? '');
+        return {
+          updated: Object.keys(data),
+          team: Object.fromEntries(['uid', 'name', ...TEAM_FIELDS].map((key) => [key, updated[key] ?? null])),
+        };
+      },
+    },
+    {
+      name: 'update_project',
+      description:
+        `Update a LabOS project of one of your teams (or one you created). Only these fields can change: ` +
+        `${PROJECT_FIELDS.join(', ')}. tags and projectLinks replace the whole list (up to ${PROJECT_LIST_MAX}); ` +
+        'links need https://. Name, logo, teams, contributions and focus areas stay in LabOS. Read the current ' +
+        'values with get_project first.',
+      visibility: 'always',
+      keepUnknownArgs: true,
+      inputSchema: {
+        projectUid: z.string().describe('Project uid from search_projects'),
+        tagline: z.string().optional(),
+        description: z.string().optional(),
+        readMe: z.string().optional().describe('Markdown'),
+        lookingForFunding: z.boolean().optional(),
+        tags: z.array(z.string()).optional().describe('Replaces the list'),
+        projectLinks: z
+          .array(z.object({ name: z.string(), url: z.string() }))
+          .optional()
+          .describe('Replaces the list'),
+      },
+      execute: async (ctx, args = {}) => {
+        refuseUnknown(args, ['projectUid', ...PROJECT_FIELDS]);
+        const projectUid = requiredUid(args, 'projectUid');
+        const data: Record<string, unknown> = {};
+        for (const field of PROJECT_TEXT_FIELDS) {
+          if (!(field in args)) continue;
+          const value = textField(field, args[field]);
+          // tagline and description are required on a project; readMe may be cleared.
+          if (value === null && field !== 'readMe') throw new BadRequestException(`${field} can't be empty`);
+          data[field] = value;
+        }
+        if ('lookingForFunding' in args) {
+          if (typeof args.lookingForFunding !== 'boolean') {
+            throw new BadRequestException('lookingForFunding must be true or false');
+          }
+          data.lookingForFunding = args.lookingForFunding;
+        }
+        if ('tags' in args) {
+          const tags = Array.isArray(args.tags)
+            ? [...new Set(args.tags.map((t) => String(t).trim()).filter(Boolean))]
+            : null;
+          if (!tags || tags.length > PROJECT_LIST_MAX) {
+            throw new BadRequestException(`tags must be a list of at most ${PROJECT_LIST_MAX}`);
+          }
+          data.tags = tags;
+        }
+        if ('projectLinks' in args) {
+          const links = Array.isArray(args.projectLinks) ? args.projectLinks : null;
+          if (!links || links.length > PROJECT_LIST_MAX) {
+            throw new BadRequestException(`projectLinks must be a list of at most ${PROJECT_LIST_MAX}`);
+          }
+          data.projectLinks = links.map((link) => {
+            const name = typeof link?.name === 'string' ? link.name.trim() : '';
+            const url = typeof link?.url === 'string' ? link.url.trim() : '';
+            if (!name || !/^https:\/\/\S+$/i.test(url)) {
+              throw new BadRequestException('Each project link needs a name and an https:// url');
+            }
+            return { name, url };
+          });
+        }
+        if (Object.keys(data).length === 0) throw new BadRequestException('Nothing to update');
+
+        const project = await prisma.project.findFirst({
+          where: { uid: projectUid, isDeleted: false },
+          select: {
+            uid: true,
+            createdBy: true,
+            maintainingTeamUid: true,
+            contributingTeams: { select: { uid: true } },
+          },
+        });
+        if (!project) throw new NotFoundException(`Project not found: ${projectUid}`);
+        if (!isAdmin(ctx) && project.createdBy !== ctx.memberUid) {
+          const projectTeams = [project.maintainingTeamUid, ...project.contributingTeams.map((team) => team.uid)];
+          if (!(await roles(ctx)).some((role) => projectTeams.includes(role.teamUid))) {
+            throw new ForbiddenException('You can only update projects of your teams or ones you created');
+          }
+        }
+
+        const updated = await projects.updateProjectProfileFields(projectUid, data);
+        return {
+          updated: Object.keys(data),
+          project: Object.fromEntries(['uid', 'name', ...PROJECT_FIELDS].map((key) => [key, updated?.[key] ?? null])),
+        };
       },
     },
   ];
