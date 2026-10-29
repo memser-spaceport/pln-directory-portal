@@ -94,10 +94,6 @@ Set of free and open-source SVG icons for the web, designed to be easily customi
 
 Collection of self-hosted, open-source fonts for the web, optimized for performance and accessibility, and available as NPM packages, that can be easily integrated into modern front-end frameworks and tools.
 
-**[Storybook](https://storybook.js.org/)**
-
-Storybook is an open-source tool for building UI components and pages in isolation, promoting a component-based approach to our development process.
-
 ## 🧪 Unit Testing
 
 **[Jest](https://www.jestjs.io/)**

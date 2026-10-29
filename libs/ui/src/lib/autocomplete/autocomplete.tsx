@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { UserIcon, UserGroupIcon } from '@heroicons/react/solid';
+import { UserIcon, UserGroupIcon } from '@heroicons/react/20/solid';
 import { InputField } from '../input-field/input-field';
 import { ReactComponent as ArrowDown } from '../../assets/icons/arrow-down-filled.svg';
 import { debounce } from 'lodash';

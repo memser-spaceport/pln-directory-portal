@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { ReactNode, useMemo } from 'react';
 import Select from 'react-select';
 import { Level0Icon, Level1Icon, Level2Icon } from '../../icons';
 import { useFormContext } from 'react-hook-form';
@@ -6,7 +6,13 @@ import { TMemberForm } from '../../../types/member';
 import s from './StatusSelector.module.scss';
 import { clsx } from 'clsx';
 
-export const options = [
+type StatusOption = NonNullable<TMemberForm['memberStateStatus']> & {
+  icon: ReactNode;
+  name: string;
+  desc: string;
+};
+
+export const options: StatusOption[] = [
   {
     icon: (
       <span className={s.orange}>
@@ -14,6 +20,7 @@ export const options = [
       </span>
     ),
     name: 'Pending',
+    label: 'Pending',
     value: 'Pending',
     desc: '- Pending Account Verification',
   },
@@ -24,6 +31,7 @@ export const options = [
       </span>
     ),
     name: 'Verified',
+    label: 'Verified',
     value: 'Verified',
     desc: '- Verified via LinkedIn',
   },
@@ -34,6 +42,7 @@ export const options = [
       </span>
     ),
     name: 'Approved',
+    label: 'Approved',
     value: 'Approved',
     desc: '- Approved - Pending Missing Alignment Check',
   },
@@ -44,6 +53,7 @@ export const options = [
       </span>
     ),
     name: 'Rejected',
+    label: 'Rejected',
     value: 'Rejected',
     desc: '- Access Denied',
   },
@@ -68,11 +78,11 @@ export const StatusSelector = ({ isAddNew }: { isAddNew: boolean }) => {
   return (
     <div className={s.field}>
       <div className={clsx(s.label, s.required)}>Select Status</div>
-      <Select
+      <Select<StatusOption, false>
         menuPlacement="bottom"
         options={_options}
         isClearable={false}
-        value={memberStateStatus}
+        value={options.find((option) => option.value === memberStateStatus?.value) ?? null}
         onChange={(val) => {
           setValue('memberStateStatus', val, { shouldValidate: true, shouldDirty: true });
         }}
@@ -133,9 +143,6 @@ export const StatusSelector = ({ isAddNew }: { isAddNew: boolean }) => {
             ...baseStyles,
             outline: 'none',
             zIndex: 3,
-          }),
-          indicatorContainer: (base) => ({
-            display: 'none',
           }),
           indicatorSeparator: (base) => ({
             display: 'none',

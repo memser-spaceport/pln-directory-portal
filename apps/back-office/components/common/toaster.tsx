@@ -1,8 +1,8 @@
 // Toaster.js
 
 import React from 'react';
-import { ToastContainer, ToastPosition, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.min.css';
+// react-toastify injects its own CSS from the main entry.
+import { ToastContainer, ToastPosition } from 'react-toastify';
 
 interface ToasterProps {
   position?: ToastPosition;
@@ -14,7 +14,7 @@ interface ToasterProps {
 }
 
 function Toaster({
-  position = toast.POSITION.BOTTOM_RIGHT,
+  position = 'bottom-right',
   autoClose = 5000,
   hideProgressBar = false,
   closeOnClick = true,

@@ -46,8 +46,11 @@ export function RecommendationDetailsModal({ isOpen, onClose, notification }: Re
                   <div className="mb-4">
                     <h4 className="text-sm font-medium text-gray-700">Run Id</h4>
                     <p className="text-gray-600">
-                      <Link href={`${ROUTE_CONSTANTS.RECOMMENDATIONS_RUNS}/${notification.recommendationRun.uid}`}>
-                        <a className="text-blue-600 hover:underline">{notification.recommendationRun.uid}</a>
+                      <Link
+                        href={`${ROUTE_CONSTANTS.RECOMMENDATIONS_RUNS}/${notification.recommendationRun.uid}`}
+                        className="text-blue-600 hover:underline"
+                      >
+                        {notification.recommendationRun.uid}
                       </Link>
                     </p>
                   </div>

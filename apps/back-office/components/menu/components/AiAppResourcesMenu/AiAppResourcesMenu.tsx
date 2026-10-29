@@ -4,11 +4,9 @@ import s from '../TeamsMenu/TeamsMenu.module.scss';
 
 export const AiAppResourcesMenu = () => {
   return (
-    <Link href="/ai-app-resources" passHref>
-      <a className={s.menuItem}>
-        <ChipIcon className={s.chipIcon} />
-        <span className={s.menuItemLabel}>AI Apps Resources</span>
-      </a>
+    <Link href="/ai-app-resources" className={s.menuItem}>
+      <ChipIcon className={s.chipIcon} />
+      <span className={s.menuItemLabel}>AI Apps Resources</span>
     </Link>
   );
 };

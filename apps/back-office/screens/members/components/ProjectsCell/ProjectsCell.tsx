@@ -79,7 +79,9 @@ export const ProjectsCell = ({ member }: { member: Member }) => {
       {items.map((item, idx) => {
         if (idx < visibleCount) {
           const badge = (
-            <span key={idx} ref={(el) => (itemRefs.current[idx] = el)} className={clsx(s.badge, item.isNew && s.new)}>
+            <span key={idx} ref={(el) => {
+                itemRefs.current[idx] = el;
+              }} className={clsx(s.badge, item.isNew && s.new)}>
               {item.icon}
               <span className={s.label}>{item.label}</span>
               {item.isNew && <span className={s.newLabel}>new</span>}

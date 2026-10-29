@@ -17,10 +17,8 @@ export function Navbar() {
     <div className="header sticky top-0 z-50 h-[8%] min-h-[80px] bg-white">
       <nav className="navbar gap-6only-of-type:shadow-[0_1px_4px_0_#e2e8f0] top-0 mx-auto flex h-[80px] w-full max-w-[1440px] items-center justify-start px-12 py-4">
         <div className="flex h-full items-center space-x-5">
-          <Link href="/">
-            <a className="">
-              <AppLogo />
-            </a>
+          <Link href="/" className="">
+            <AppLogo />
           </Link>
         </div>
         <div>{showMenu && <Menu />}</div>

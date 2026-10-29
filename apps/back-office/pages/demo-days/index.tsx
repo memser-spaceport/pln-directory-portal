@@ -137,8 +137,8 @@ const DemoDaysPage = () => {
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm font-medium">
-                      <Link href={`/demo-days/${demoDay.slugURL}`}>
-                        <a className="text-blue-600 hover:text-blue-900">View Details</a>
+                      <Link href={`/demo-days/${demoDay.slugURL}`} className="text-blue-600 hover:text-blue-900">
+                        View Details
                       </Link>
                     </td>
                   </tr>

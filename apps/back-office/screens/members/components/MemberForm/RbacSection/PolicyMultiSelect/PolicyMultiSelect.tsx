@@ -85,7 +85,10 @@ export function PolicyMultiSelect({
       {({ open, close }) => (
         <>
           <Popover.Button
-            ref={triggerRef}
+            // Rendered as a div (`as="div"`); v2 types this ref as HTMLButtonElement regardless of `as`.
+            ref={(el: HTMLElement | null) => {
+              triggerRef.current = el as HTMLDivElement | null;
+            }}
             as="div"
             role="button"
             tabIndex={disabled ? -1 : 0}

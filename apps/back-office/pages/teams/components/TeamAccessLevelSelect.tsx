@@ -121,9 +121,6 @@ export const TeamAccessLevelSelect = ({ value, onChange, disabled }: Props) => {
             width: 'max-content',
             minWidth: '100%',
           }),
-          indicatorContainer: () => ({
-            display: 'none',
-          }),
           indicatorSeparator: () => ({
             display: 'none',
           }),

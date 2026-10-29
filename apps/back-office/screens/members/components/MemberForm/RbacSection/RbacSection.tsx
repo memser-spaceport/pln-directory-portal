@@ -163,7 +163,7 @@ export const RbacSection = ({ policyOptions, exceptionsOptions, isLoadingOptions
     <div className={s.rbacSection}>
       <div className={s.field}>
         <div className={clsx(s.label, s.required)}>Status</div>
-        <Select
+        <Select<SelectOption, false>
           options={MEMBER_STATE_OPTIONS}
           value={memberStateStatus ?? null}
           onChange={handleMemberStateChange}
