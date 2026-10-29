@@ -28,6 +28,8 @@ import { buildMultiRelationMapping, copyObj } from '../utils/helper/helper';
 import { CacheService } from '../utils/cache/cache.service';
 import { MembersHooksService } from './members.hooks.service';
 import { toPreferencePatch } from './member-preferences';
+import { NewsTagVocabularyService } from '../team-news/news-tag-vocabulary.service';
+import { resolveNewsTags } from '../team-news/utils/news-tags';
 import { readNewsCategories } from '../team-news/utils/news-categories';
 import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
 import { OfficeHoursService } from '../office-hours/office-hours.service';
@@ -69,7 +71,8 @@ export class MembersService {
     @Inject(forwardRef(() => OfficeHoursService))
     private officeHoursService: OfficeHoursService,
     private openSearchService: OpenSearchService,
-    private memberApprovalsService: MemberApprovalsService
+    private memberApprovalsService: MemberApprovalsService,
+    private newsTagVocabulary: NewsTagVocabularyService
   ) {}
 
   /**
@@ -1791,7 +1794,12 @@ export class MembersService {
    * @returns The updated member object.
    */
   async updatePreference(id: string, preferences: any): Promise<Member> {
-    const patch = toPreferencePatch(preferences);
+    // Loaded only when needed: most saves don't carry news tags (LAB-2998).
+    const vocabulary =
+      preferences && typeof preferences === 'object' && 'newsTags' in preferences
+        ? await this.newsTagVocabulary.getVocabulary()
+        : undefined;
+    const patch = toPreferencePatch(preferences, vocabulary);
 
     const updated = await this.prisma.$executeRaw`
       UPDATE "Member"
@@ -1879,7 +1887,13 @@ export class MembersService {
         isSubscribedToNewsletter: true,
       },
     });
-    return this.buildPreferenceResponse(member);
+    const response = this.buildPreferenceResponse(member);
+    /* LAB-2998: a member who never saved news tags gets their teams' focus areas
+       as starting tags, marked as seeded; nothing is stored until they save. */
+    return {
+      ...response,
+      ...(await resolveNewsTags(member?.preferences, () => this.newsTagVocabulary.seedTagsForMember(uid))),
+    };
   }
 
   /**
