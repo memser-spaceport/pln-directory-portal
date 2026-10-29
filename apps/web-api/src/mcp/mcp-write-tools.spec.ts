@@ -171,6 +171,8 @@ describe('profile tools', () => {
   });
 });
 
+const DAY = 24 * 60 * 60 * 1000;
+
 describe('event RSVP tools', () => {
   const GOING = { ...CTX, permissions: new Set(['irlg.going.write']) };
   const EVENT = {
@@ -178,8 +180,8 @@ describe('event RSVP tools', () => {
     name: 'Builder Day',
     type: 'IN_PERSON',
     slugURL: 'builder-day',
-    startDate: new Date('2026-11-10T09:00:00Z'),
-    endDate: new Date('2026-11-10T18:00:00Z'),
+    startDate: new Date(Date.now() + 10 * DAY),
+    endDate: new Date(Date.now() + 11 * DAY),
     locationUid: 'loc-1',
   };
   const ROLES = [
@@ -279,6 +281,14 @@ describe('event RSVP tools', () => {
       BadRequestException,
     ],
     ['an event that has ended', GOING, { eventUid: 'ev-1' }, { upcoming: [] }, BadRequestException],
+    // The gathering lists events that ended within the last 90 days as upcoming; an ended event is still ended.
+    [
+      'an event that ended but is still in the gathering list',
+      GOING,
+      { eventUid: 'ev-1' },
+      { event: { ...EVENT, startDate: new Date(Date.now() - 3 * DAY), endDate: new Date(Date.now() - 2 * DAY) } },
+      BadRequestException,
+    ],
     ['a team the member is not on', GOING, { eventUid: 'ev-1', teamUid: 'team-9' }, {}, BadRequestException],
     ['a member with no team', GOING, { eventUid: 'ev-1' }, { roles: [] }, BadRequestException],
     [
@@ -320,6 +330,12 @@ describe('event RSVP tools', () => {
   it.each([
     ['no going permission', CTX, {}, ForbiddenException],
     ['an event that has ended', GOING, { upcoming: [] }, BadRequestException],
+    [
+      'an event that ended but is still in the gathering list',
+      GOING,
+      { event: { ...EVENT, startDate: new Date(Date.now() - 3 * DAY), endDate: new Date(Date.now() - 2 * DAY) } },
+      BadRequestException,
+    ],
   ])('refuses to cancel for %s', async (_label, ctx, setup, error) => {
     const { cancel, guests } = build({ existingGuest: { uid: 'g1' }, ...(setup as any) });
     await expect(cancel.execute(ctx as McpActorContext, { eventUid: 'ev-1' })).rejects.toBeInstanceOf(error);

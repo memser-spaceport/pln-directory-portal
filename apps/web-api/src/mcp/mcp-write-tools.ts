@@ -229,6 +229,11 @@ export function eventWriteTools(
     });
     if (!event) throw new NotFoundException(`Event not found: ${eventUid}`);
     if (!event.locationUid) throw new BadRequestException(`${event.name} doesn't take RSVPs in LabOS`);
+    // The gathering's `upcomingEvents` also holds events that ended in the last IRL_CURRENT_EVENT_WINDOW_IN_DAYS (90),
+    // so check the end date itself.
+    if (new Date(event.endDate).getTime() < Date.now()) {
+      throw new BadRequestException(`${event.name} has already ended`);
+    }
     const location = await locations.getPLEventLocationByUid(event.locationUid);
     if (!(location.upcomingEvents ?? []).some((upcoming) => upcoming.uid === event.uid)) {
       throw new BadRequestException(`${event.name} has already ended`);
