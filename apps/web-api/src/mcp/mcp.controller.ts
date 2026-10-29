@@ -22,6 +22,8 @@ import { WarmIntrosV2Service } from '../warm-intros-v2/warm-intros-v2.service';
 import { MembersService } from '../members/members.service';
 import { TeamsService } from '../teams/teams.service';
 import { ProjectsService } from '../projects/projects.service';
+import { PLEventGuestsService } from '../pl-events/pl-event-guests.service';
+import { PLEventLocationsService } from '../pl-events/pl-event-locations.service';
 import { PLEventsService } from '../pl-events/pl-events.service';
 import { SearchService } from '../search/search.service';
 import { AiAppsService } from '../ai-apps/ai-apps.service';
@@ -32,7 +34,7 @@ import { directoryTools } from './mcp-directory-tools';
 import { McpOAuthService } from './mcp-oauth.service';
 import { portfolioTools } from './mcp-portfolio-tools';
 import { newsTools } from './mcp-news-tools';
-import { newsWriteTools, profileTools } from './mcp-write-tools';
+import { eventWriteTools, newsWriteTools, profileTools } from './mcp-write-tools';
 import { McpWriteLimitService } from './mcp-write-limit.service';
 import { TeamNewsService } from '../team-news/team-news.service';
 import { MembersHooksService } from '../members/members.hooks.service';
@@ -70,7 +72,9 @@ export class McpController {
     private readonly teamNews: TeamNewsService,
     private readonly memberHooks: MembersHooksService,
     private readonly prisma: PrismaService,
-    private readonly writeLimit: McpWriteLimitService
+    private readonly writeLimit: McpWriteLimitService,
+    private readonly eventGuests: PLEventGuestsService,
+    private readonly eventLocations: PLEventLocationsService
   ) {}
 
   private readonly logger = new Logger(McpController.name);
@@ -114,6 +118,7 @@ export class McpController {
         ...newsTools(this.newsQuery, this.newsSuggestions),
         ...newsWriteTools(this.teamNews, this.newsQuery, this.members),
         ...profileTools(this.members, this.memberHooks, this.prisma),
+        ...eventWriteTools(this.eventGuests, this.eventLocations, this.members, this.prisma),
       ]),
       actor.scopeLevels,
       caps

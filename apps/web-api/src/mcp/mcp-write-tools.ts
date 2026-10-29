@@ -1,8 +1,8 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { CreateTeamNewsPostRequestSchema } from 'libs/contracts/src/schema/team-news';
-import { ADMIN_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
+import { ADMIN_PERMISSIONS, IRL_GATHERINGS_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { MembersHooksService } from '../members/members.hooks.service';
 import { MembersService } from '../members/members.service';
 import {
@@ -10,6 +10,8 @@ import {
   assignJobSearchStatusFromInput,
   toWireJobSearchStatus,
 } from '../members/job-search-status';
+import { PLEventGuestsService } from '../pl-events/pl-event-guests.service';
+import { PLEventLocationsService } from '../pl-events/pl-event-locations.service';
 import { PrismaService } from '../shared/prisma.service';
 import { TeamNewsQueryService } from '../team-news/team-news-query.service';
 import { TeamNewsService } from '../team-news/team-news.service';
@@ -182,6 +184,130 @@ export function profileTools(members: MembersService, hooks: MembersHooksService
         const updated = await members.updateMemberByUid(ctx.memberUid, data as Prisma.MemberUncheckedUpdateInput);
         await hooks.postUpdateActions(updated, ctx.email ?? updated.email ?? '');
         return { updated: Object.keys(data), profile: profileView(await members.findMemberByUid(ctx.memberUid)) };
+      },
+    },
+  ];
+}
+
+function eventUidArg(args: Record<string, unknown>, allowed: string[]): string {
+  const unknown = Object.keys(args).filter((k) => !allowed.includes(k));
+  if (unknown.length > 0) {
+    throw new BadRequestException(`An agent can't set these on an RSVP: ${unknown.join(', ')}`);
+  }
+  const uid = typeof args.eventUid === 'string' ? args.eventUid.trim() : '';
+  if (!uid) throw new BadRequestException('eventUid is required');
+  return uid;
+}
+
+/**
+ * `rsvp_event` and `cancel_event_rsvp` in the `events` scope (LAB-3029): the member's own "I'm going" for one upcoming
+ * event, through the same guest service as the IRL gathering page. Nothing else on the guest record changes.
+ */
+export function eventWriteTools(
+  guests: PLEventGuestsService,
+  locations: PLEventLocationsService,
+  members: MembersService,
+  prisma: PrismaService
+): McpToolDef[] {
+  // The page's RSVP routes need the same permission (RbacGuard on the pl-events guest endpoints).
+  const assertCanGo = (ctx: McpActorContext) => {
+    if (
+      !ctx.permissions.has(IRL_GATHERINGS_PERMISSIONS.GOING_WRITE) &&
+      !ctx.permissions.has(ADMIN_PERMISSIONS.DIRECTORY_FULL)
+    ) {
+      throw new ForbiddenException("Your LabOS account can't mark itself as going to events.");
+    }
+  };
+
+  /** The event, its gathering, and whether the member is already a guest. Refuses events that have ended. */
+  const upcomingEvent = async (ctx: McpActorContext, eventUid: string) => {
+    const event = await prisma.pLEvent.findFirst({
+      where: { uid: eventUid, isDeleted: false },
+      select: { uid: true, name: true, type: true, slugURL: true, startDate: true, endDate: true, locationUid: true },
+    });
+    if (!event) throw new NotFoundException(`Event not found: ${eventUid}`);
+    if (!event.locationUid) throw new BadRequestException(`${event.name} doesn't take RSVPs in LabOS`);
+    const location = await locations.getPLEventLocationByUid(event.locationUid);
+    if (!(location.upcomingEvents ?? []).some((upcoming) => upcoming.uid === event.uid)) {
+      throw new BadRequestException(`${event.name} has already ended`);
+    }
+    const guest = await prisma.pLEventGuest.findFirst({
+      where: { memberUid: ctx.memberUid, eventUid: event.uid, locationUid: event.locationUid },
+      select: { uid: true },
+    });
+    const { locationUid, ...row } = event;
+    return { event: row, locationUid, location, isGoing: guest !== null };
+  };
+
+  return [
+    {
+      name: 'rsvp_event',
+      description:
+        "Mark yourself as going to an upcoming Directory IRL event (the event page's I'm going). Other members see you " +
+        'in the guest list. Uses your main team unless you name another of your teams. Calling it again when you are ' +
+        'already going changes nothing. Get the event uid from search_events.',
+      visibility: 'always',
+      // Refuse topics, reason, dates and the rest instead of letting the SDK drop them and reporting success.
+      keepUnknownArgs: true,
+      inputSchema: {
+        eventUid: z.string().describe('Event uid from search_events'),
+        teamUid: z.string().optional().describe('One of your teams to show next to your name; default your main team'),
+      },
+      execute: async (ctx, args = {}) => {
+        assertCanGo(ctx);
+        const eventUid = eventUidArg(args, ['eventUid', 'teamUid']);
+        const { event, locationUid, location, isGoing } = await upcomingEvent(ctx, eventUid);
+        if (isGoing) return { going: true, alreadyGoing: true, event };
+        // Members see an invite-only event only once they're a guest (filterEventsByAttendanceAndAdminStatus).
+        if (event.type === 'INVITE_ONLY' && !ctx.permissions.has(ADMIN_PERMISSIONS.DIRECTORY_FULL)) {
+          throw new ForbiddenException(`${event.name} is invite-only; its organisers add guests`);
+        }
+
+        const member = await members.findMemberByUid(ctx.memberUid);
+        const roles: Array<{ teamUid: string; mainTeam?: boolean | null }> = member.teamMemberRoles ?? [];
+        const requested = typeof args.teamUid === 'string' ? args.teamUid.trim() : '';
+        if (requested && !roles.some((role) => role.teamUid === requested)) {
+          throw new BadRequestException(`You are not on team ${requested}`);
+        }
+        const teamUid = requested || (roles.find((role) => role.mainTeam) ?? roles[0])?.teamUid;
+        if (!teamUid) throw new BadRequestException('You need to be on a team to RSVP to events');
+
+        // Own telegram and office hours, so the service's "update if changed" leaves the member's profile alone.
+        await guests.createPLEventGuestByLocation(
+          {
+            memberUid: member.uid,
+            teamUid,
+            telegramId: member.telegramHandler,
+            officeHours: member.officeHours,
+            events: [{ uid: event.uid }],
+            additionalInfo: {},
+          } as Parameters<PLEventGuestsService['createPLEventGuestByLocation']>[0],
+          member,
+          locationUid,
+          ctx.email ?? member.email ?? '',
+          location,
+          'CREATE',
+          undefined,
+          'upcoming'
+        );
+        return { going: true, alreadyGoing: false, event };
+      },
+    },
+    {
+      name: 'cancel_event_rsvp',
+      description:
+        "Take yourself off the guest list of an upcoming Directory IRL event you said you'd go to. Only your own RSVP " +
+        'changes. Calling it when you are not going changes nothing.',
+      visibility: 'always',
+      keepUnknownArgs: true,
+      inputSchema: { eventUid: z.string().describe('Event uid from search_events') },
+      execute: async (ctx, args = {}) => {
+        assertCanGo(ctx);
+        const eventUid = eventUidArg(args, ['eventUid']);
+        const { event, locationUid, isGoing } = await upcomingEvent(ctx, eventUid);
+        if (!isGoing) return { going: false, wasGoing: false, event };
+        await guests.deletePLEventGuests(locationUid, [{ memberUid: ctx.memberUid, events: [event.uid] }]);
+        return { going: false, wasGoing: true, event };
       },
     },
   ];

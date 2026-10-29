@@ -37,6 +37,8 @@ export const MCP_TOOL_SCOPES: Readonly<Record<string, McpToolScope>> = {
   list_portfolio_teams: { scope: 'directory', level: 'read' },
 
   get_event: { scope: 'events', level: 'read' },
+  rsvp_event: { scope: 'events', level: 'write' },
+  cancel_event_rsvp: { scope: 'events', level: 'write' },
 
   search_master_profiles: { scope: 'investors', level: 'read' },
   get_master_profile: { scope: 'investors', level: 'read' },
