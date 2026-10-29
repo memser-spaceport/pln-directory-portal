@@ -6,6 +6,8 @@ jest.mock('../members/members.service', () => ({ MembersService: jest.fn() }));
 jest.mock('../teams/teams.service', () => ({ TeamsService: jest.fn() }));
 jest.mock('../projects/projects.service', () => ({ ProjectsService: jest.fn() }));
 jest.mock('../pl-events/pl-events.service', () => ({ PLEventsService: jest.fn() }));
+jest.mock('../pl-events/pl-event-guests.service', () => ({ PLEventGuestsService: jest.fn() }));
+jest.mock('../pl-events/pl-event-locations.service', () => ({ PLEventLocationsService: jest.fn() }));
 jest.mock('../search/search.service', () => ({ SearchService: jest.fn() }));
 jest.mock('../ai-apps/ai-apps.service', () => ({ AiAppsService: jest.fn() }));
 jest.mock('../spv-spotlights/pl-network-portfolio.service', () => ({ PlNetworkPortfolioService: jest.fn() }));
@@ -115,7 +117,9 @@ function build(
     stub,
     stub,
     stub,
-    writeLimit as any
+    writeLimit as any,
+    {} as any,
+    {} as any
   );
   /** One MCP request: returns what `tools/list` would show and a way to call a tool by name. */
   const handle = async (body: unknown = { jsonrpc: '2.0', id: 1, method: 'tools/list' }) => {

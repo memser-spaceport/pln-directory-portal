@@ -148,6 +148,25 @@ The `news` scope SHALL also offer `post_team_news` at `write`, which posts news 
 - **WHEN** an agent posts news for a team the member does not belong to
 - **THEN** the call fails and nothing is posted
 
+### Requirement: Agents RSVP to events for the member
+
+The `events` scope SHALL offer `rsvp_event` and `cancel_event_rsvp` at `write`. Both SHALL act only on the calling member's own guest record for one upcoming event, through the same guest service as the IRL gathering page, and SHALL require `irlg.going.write` or directory admin, like the page's RSVP routes. `rsvp_event` SHALL use the member's main team unless the agent names another of the member's teams, SHALL keep the member's own telegram and office hours, and SHALL change nothing when the member is already going. `cancel_event_rsvp` SHALL remove only that event's guest row and SHALL change nothing when the member is not going. Both SHALL refuse events that have ended or have no gathering; `rsvp_event` SHALL also refuse invite-only events unless the member is a directory admin or already a guest, as the event page hides them; and SHALL refuse any argument other than `eventUid` (and `teamUid` for `rsvp_event`) without writing.
+
+#### Scenario: RSVP twice
+
+- **WHEN** an agent calls `rsvp_event` for an upcoming event the member is already going to
+- **THEN** the result says the member is already going and no guest row is added
+
+#### Scenario: RSVP with attendance details
+
+- **WHEN** an agent calls `rsvp_event` with `topics`
+- **THEN** the call fails naming `topics`, and the member is not added
+
+#### Scenario: Ended event
+
+- **WHEN** an agent calls `rsvp_event` or `cancel_event_rsvp` for an event that has ended
+- **THEN** the call fails and the guest list is unchanged
+
 ### Requirement: Agent writes are rate limited per member
 
 Each write tool SHALL allow at most 10 calls per member per tool per hour. A call over the limit SHALL be refused with an error that names the limit, SHALL NOT run, SHALL NOT create an access request, and SHALL emit `mcp-tool-refused` with reason `rate_limited`. If the limit store is unavailable the call SHALL be allowed.

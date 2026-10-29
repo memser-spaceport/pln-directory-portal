@@ -2,11 +2,13 @@ jest.mock('../team-news/team-news.service', () => ({ TeamNewsService: jest.fn() 
 jest.mock('../team-news/team-news-query.service', () => ({ TeamNewsQueryService: jest.fn() }));
 jest.mock('../members/members.service', () => ({ MembersService: jest.fn() }));
 jest.mock('../members/members.hooks.service', () => ({ MembersHooksService: jest.fn() }));
+jest.mock('../pl-events/pl-event-guests.service', () => ({ PLEventGuestsService: jest.fn() }));
+jest.mock('../pl-events/pl-event-locations.service', () => ({ PLEventLocationsService: jest.fn() }));
 
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
 import { McpActorContext, McpToolDef, toolInputSchema } from './mcp-tools';
-import { newsWriteTools, profileTools } from './mcp-write-tools';
+import { eventWriteTools, newsWriteTools, profileTools } from './mcp-write-tools';
 import { McpWriteLimitService, MCP_WRITE_LIMIT_PER_HOUR } from './mcp-write-limit.service';
 
 const CTX: McpActorContext = {
@@ -164,6 +166,162 @@ describe('profile tools', () => {
     expect(parsed).toEqual({ bio: 'ok', email: 'evil@example.com' });
     await expect(update.execute(CTX, parsed)).rejects.toThrow("These fields can't be changed by an agent: email");
     expect(members.updateMemberByUid).not.toHaveBeenCalled();
+  });
+});
+
+describe('event RSVP tools', () => {
+  const GOING = { ...CTX, permissions: new Set(['irlg.going.write']) };
+  const EVENT = {
+    uid: 'ev-1',
+    name: 'Builder Day',
+    type: 'IN_PERSON',
+    slugURL: 'builder-day',
+    startDate: new Date('2026-11-10T09:00:00Z'),
+    endDate: new Date('2026-11-10T18:00:00Z'),
+    locationUid: 'loc-1',
+  };
+  const ROLES = [
+    { teamUid: 'team-2', mainTeam: false },
+    { teamUid: 'team-1', mainTeam: true },
+  ];
+
+  function build({
+    event = EVENT as typeof EVENT | null,
+    upcoming = ['ev-1'],
+    existingGuest = null as { uid: string } | null,
+    roles = ROLES,
+  } = {}) {
+    const location = { uid: 'loc-1', location: 'Lisbon', upcomingEvents: upcoming.map((uid) => ({ uid })) };
+    const guests = {
+      createPLEventGuestByLocation: jest.fn().mockResolvedValue({ count: 1 }),
+      deletePLEventGuests: jest.fn().mockResolvedValue({ events: { count: 1 } }),
+    };
+    const locations = { getPLEventLocationByUid: jest.fn().mockResolvedValue(location) };
+    const member = { ...MEMBER, telegramHandler: 'ada_tg', officeHours: 'https://cal.com/ada', teamMemberRoles: roles };
+    const members = { findMemberByUid: jest.fn().mockResolvedValue(member) };
+    const prisma = {
+      pLEvent: { findFirst: jest.fn().mockResolvedValue(event) },
+      pLEventGuest: { findFirst: jest.fn().mockResolvedValue(existingGuest) },
+    };
+    const tools = eventWriteTools(guests as any, locations as any, members as any, prisma as any);
+    return {
+      rsvp: tool(tools, 'rsvp_event'),
+      cancel: tool(tools, 'cancel_event_rsvp'),
+      guests,
+      prisma,
+      member,
+      location,
+    };
+  }
+
+  it("marks the member as going with their main team and their own contact details, like the UI's I'm going", async () => {
+    const { rsvp, guests, member, location } = build();
+    const result: any = await rsvp.execute(GOING, { eventUid: 'ev-1' });
+    expect(guests.createPLEventGuestByLocation).toHaveBeenCalledWith(
+      {
+        memberUid: 'member-1',
+        teamUid: 'team-1',
+        telegramId: 'ada_tg',
+        officeHours: 'https://cal.com/ada',
+        events: [{ uid: 'ev-1' }],
+        additionalInfo: {},
+      },
+      member,
+      'loc-1',
+      'ada@example.com',
+      location,
+      'CREATE',
+      undefined,
+      'upcoming'
+    );
+    expect(result).toMatchObject({ going: true, alreadyGoing: false, event: { uid: 'ev-1', name: 'Builder Day' } });
+  });
+
+  it("uses the team the agent names when it is one of the member's teams", async () => {
+    const { rsvp, guests } = build();
+    await rsvp.execute(GOING, { eventUid: 'ev-1', teamUid: 'team-2' });
+    expect(guests.createPLEventGuestByLocation.mock.calls[0][0]).toMatchObject({ teamUid: 'team-2' });
+  });
+
+  it('allows directory admins without the going permission', async () => {
+    const { rsvp, guests } = build();
+    await rsvp.execute({ ...CTX, permissions: new Set(['directory.admin.full']) }, { eventUid: 'ev-1' });
+    expect(guests.createPLEventGuestByLocation).toHaveBeenCalled();
+  });
+
+  it('lets directory admins RSVP to invite-only events, like the page', async () => {
+    const { rsvp, guests } = build({ event: { ...EVENT, type: 'INVITE_ONLY' } as any });
+    await rsvp.execute({ ...CTX, permissions: new Set(['directory.admin.full']) }, { eventUid: 'ev-1' });
+    expect(guests.createPLEventGuestByLocation).toHaveBeenCalled();
+  });
+
+  it('does not add a second guest row when the member is already going', async () => {
+    const { rsvp, guests, prisma } = build({ existingGuest: { uid: 'g1' } });
+    const result: any = await rsvp.execute(GOING, { eventUid: 'ev-1' });
+    expect(prisma.pLEventGuest.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { memberUid: 'member-1', eventUid: 'ev-1', locationUid: 'loc-1' } })
+    );
+    expect(guests.createPLEventGuestByLocation).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ going: true, alreadyGoing: true });
+  });
+
+  it.each([
+    ['no going permission', CTX, { eventUid: 'ev-1' }, {}, ForbiddenException],
+    ['no eventUid', GOING, {}, {}, BadRequestException],
+    ['an unknown event', GOING, { eventUid: 'ev-1' }, { event: null }, NotFoundException],
+    [
+      'an event with no gathering',
+      GOING,
+      { eventUid: 'ev-1' },
+      { event: { ...EVENT, locationUid: null } },
+      BadRequestException,
+    ],
+    ['an event that has ended', GOING, { eventUid: 'ev-1' }, { upcoming: [] }, BadRequestException],
+    ['a team the member is not on', GOING, { eventUid: 'ev-1', teamUid: 'team-9' }, {}, BadRequestException],
+    ['a member with no team', GOING, { eventUid: 'ev-1' }, { roles: [] }, BadRequestException],
+    [
+      'an invite-only event',
+      GOING,
+      { eventUid: 'ev-1' },
+      { event: { ...EVENT, type: 'INVITE_ONLY' } },
+      ForbiddenException,
+    ],
+  ])('refuses %s without writing', async (_label, ctx, args, setup, error) => {
+    const { rsvp, guests } = build(setup as any);
+    await expect(rsvp.execute(ctx as McpActorContext, args)).rejects.toBeInstanceOf(error);
+    expect(guests.createPLEventGuestByLocation).not.toHaveBeenCalled();
+  });
+
+  it('refuses fields an agent may not set, even through the SDK schema', async () => {
+    const { rsvp, cancel, guests } = build({ existingGuest: { uid: 'g1' } });
+    const args = { eventUid: 'ev-1', topics: ['AI'], reason: 'networking' };
+    expect((toolInputSchema(rsvp) as z.ZodTypeAny).parse(args)).toEqual(args);
+    await expect(build().rsvp.execute(GOING, args)).rejects.toThrow('topics, reason');
+    await expect(cancel.execute(GOING, { eventUid: 'ev-1', memberUid: 'someone-else' })).rejects.toThrow('memberUid');
+    expect(guests.deletePLEventGuests).not.toHaveBeenCalled();
+  });
+
+  it("removes only the member's own guest row for that event", async () => {
+    const { cancel, guests } = build({ existingGuest: { uid: 'g1' } });
+    const result: any = await cancel.execute(GOING, { eventUid: 'ev-1' });
+    expect(guests.deletePLEventGuests).toHaveBeenCalledWith('loc-1', [{ memberUid: 'member-1', events: ['ev-1'] }]);
+    expect(result).toMatchObject({ going: false, wasGoing: true, event: { uid: 'ev-1' } });
+  });
+
+  it('reports not going without deleting when the member was not going', async () => {
+    const { cancel, guests } = build();
+    const result: any = await cancel.execute(GOING, { eventUid: 'ev-1' });
+    expect(guests.deletePLEventGuests).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ going: false, wasGoing: false });
+  });
+
+  it.each([
+    ['no going permission', CTX, {}, ForbiddenException],
+    ['an event that has ended', GOING, { upcoming: [] }, BadRequestException],
+  ])('refuses to cancel for %s', async (_label, ctx, setup, error) => {
+    const { cancel, guests } = build({ existingGuest: { uid: 'g1' }, ...(setup as any) });
+    await expect(cancel.execute(ctx as McpActorContext, { eventUid: 'ev-1' })).rejects.toBeInstanceOf(error);
+    expect(guests.deletePLEventGuests).not.toHaveBeenCalled();
   });
 });
 
