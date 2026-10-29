@@ -56,6 +56,7 @@ import {
 } from './member-contact-sanitizer';
 import { assignJobSearchStatusFromInput, presentJobSearchStatusForViewer } from './job-search-status';
 import { presentEmailForViewer } from './inactive-email';
+import { parseMemberSelfUpdate } from './member-self-update';
 
 const server = initNestServer(apiMembers);
 type RouteShape = typeof server.routeShapes;
@@ -261,9 +262,16 @@ export class MemberController {
   async updateMember(@Param('uid') uid, @Body() participantsRequest, @Req() req) {
     this.logger.info(`Member update request - Initated by -> ${req.userEmail}`);
     const requestor = await this.membersService.findMemberByEmail(req.userEmail);
-    const { referenceUid } = participantsRequest;
-    if (!requestor.isDirectoryAdmin && referenceUid !== requestor.uid) {
+    const { referenceUid, participantType } = participantsRequest;
+    if (participantType !== 'MEMBER') {
+      throw new BadRequestException('participantType must be MEMBER');
+    }
+    // The write goes to the path uid, so that is the uid the requestor must own.
+    if (!requestor.isDirectoryAdmin && uid !== requestor.uid) {
       throw new ForbiddenException(`Member isn't authorized to update the member`);
+    }
+    if (referenceUid && referenceUid !== uid) {
+      throw new BadRequestException('referenceUid must match the member uid in the path');
     }
     if (!isEmpty(participantsRequest.newData.isVerified) && !this.membersService.checkIfAdminUser(requestor)) {
       throw new ForbiddenException(`Member isn't authorized to verify a member`);
@@ -323,11 +331,9 @@ export class MemberController {
     if (!requestor.isDirectoryAdmin && uid !== requestor.uid) {
       throw new ForbiddenException(`Member isn't authorized to update the member`);
     }
-    if (!isEmpty(body.isVerified) && !this.membersService.checkIfAdminUser(requestor)) {
-      throw new ForbiddenException(`Member isn't authorized to verify a member`);
-    }
+    const update: Record<string, unknown> = parseMemberSelfUpdate(body);
     /**
-     * `updateMemberByUid` hands its body straight to `prisma.member.update`, so
+     * `updateMemberByUid` hands its data straight to `prisma.member.update`, so
      * anything arriving on the wire has to already speak Prisma. Every other
      * field on this route is a scalar and needs no translation; the job search
      * status is an enum, and the values the API documents and returns
@@ -341,8 +347,8 @@ export class MemberController {
      * `toPrismaJobSearchStatus` accepts only wire values. This is the wire
      * boundary; that one isn't.
      */
-    assignJobSearchStatusFromInput(body, body);
-    return await this.membersService.updateMemberByUid(uid, body);
+    assignJobSearchStatusFromInput(update, update);
+    return await this.membersService.updateMemberByUid(uid, update);
   }
 
   /**
