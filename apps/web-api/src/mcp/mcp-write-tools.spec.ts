@@ -4,11 +4,13 @@ jest.mock('../members/members.service', () => ({ MembersService: jest.fn() }));
 jest.mock('../members/members.hooks.service', () => ({ MembersHooksService: jest.fn() }));
 jest.mock('../pl-events/pl-event-guests.service', () => ({ PLEventGuestsService: jest.fn() }));
 jest.mock('../pl-events/pl-event-locations.service', () => ({ PLEventLocationsService: jest.fn() }));
+jest.mock('../teams/teams.service', () => ({ TeamsService: jest.fn() }));
+jest.mock('../projects/projects.service', () => ({ ProjectsService: jest.fn() }));
 
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
 import { McpActorContext, McpToolDef, toolInputSchema } from './mcp-tools';
-import { eventWriteTools, newsWriteTools, profileTools } from './mcp-write-tools';
+import { directoryWriteTools, eventWriteTools, newsWriteTools, profileTools } from './mcp-write-tools';
 import { McpWriteLimitService, MCP_WRITE_LIMIT_PER_HOUR } from './mcp-write-limit.service';
 
 const CTX: McpActorContext = {
@@ -322,6 +324,155 @@ describe('event RSVP tools', () => {
     const { cancel, guests } = build({ existingGuest: { uid: 'g1' }, ...(setup as any) });
     await expect(cancel.execute(ctx as McpActorContext, { eventUid: 'ev-1' })).rejects.toBeInstanceOf(error);
     expect(guests.deletePLEventGuests).not.toHaveBeenCalled();
+  });
+});
+
+describe('directory write tools', () => {
+  const ADMIN = { ...CTX, permissions: new Set(['directory.admin.full']) };
+  const ROLES = [
+    { teamUid: 'team-1', teamLead: true },
+    { teamUid: 'team-2', teamLead: false },
+  ];
+  const PROJECT = { uid: 'p1', createdBy: 'someone', maintainingTeamUid: 'team-2', contributingTeams: [] };
+
+  function build({ roles = ROLES, project = PROJECT as any, team = { uid: 'team-1' } as any } = {}) {
+    const teams = {
+      updateTeamProfileFields: jest.fn(async (uid: string, data: Record<string, unknown>) => ({
+        uid,
+        name: 'T',
+        ...data,
+      })),
+    };
+    const projects = {
+      updateProjectProfileFields: jest.fn(async (uid: string, data: Record<string, unknown>) => ({
+        uid,
+        name: 'P',
+        ...data,
+      })),
+    };
+    const members = { findMemberByUid: jest.fn().mockResolvedValue({ ...MEMBER, teamMemberRoles: roles }) };
+    const prisma = {
+      team: { findFirst: jest.fn().mockResolvedValue(team) },
+      project: { findFirst: jest.fn().mockResolvedValue(project) },
+    };
+    const tools = directoryWriteTools(teams as any, projects as any, members as any, prisma as any);
+    return { updateTeam: tool(tools, 'update_team'), updateProject: tool(tools, 'update_project'), teams, projects };
+  }
+
+  describe('update_team', () => {
+    it('saves the allowed fields for a team the member leads, trimming text and clearing on empty', async () => {
+      const { updateTeam, teams } = build();
+      const result: any = await updateTeam.execute(CTX, {
+        teamUid: 'team-1',
+        shortDescription: '  We build things ',
+        blog: '',
+      });
+      expect(teams.updateTeamProfileFields).toHaveBeenCalledWith(
+        'team-1',
+        { shortDescription: 'We build things', blog: null },
+        'ada@example.com'
+      );
+      expect(result).toMatchObject({ updated: ['shortDescription', 'blog'], team: { uid: 'team-1' } });
+    });
+
+    it('lets directory admins edit any team', async () => {
+      const { updateTeam, teams } = build({ roles: [] });
+      await updateTeam.execute(ADMIN, { teamUid: 'team-9', website: 'https://t9.xyz' });
+      expect(teams.updateTeamProfileFields).toHaveBeenCalled();
+    });
+
+    it.each([
+      ['a team the member is on but does not lead', CTX, { teamUid: 'team-2', blog: 'x' }, {}, ForbiddenException],
+      ['a team the member is not on', CTX, { teamUid: 'team-9', blog: 'x' }, {}, ForbiddenException],
+      ['an unknown team', ADMIN, { teamUid: 'team-9', blog: 'x' }, { team: null }, NotFoundException],
+      ['no teamUid', CTX, { blog: 'x' }, {}, BadRequestException],
+      ['nothing to change', CTX, { teamUid: 'team-1' }, {}, BadRequestException],
+      ['a non-text value', CTX, { teamUid: 'team-1', blog: 42 }, {}, BadRequestException],
+      ['text over the limit', CTX, { teamUid: 'team-1', longDescription: 'x'.repeat(5001) }, {}, BadRequestException],
+    ])('refuses %s without writing', async (_label, ctx, args, setup, error) => {
+      const { updateTeam, teams } = build(setup as any);
+      await expect(updateTeam.execute(ctx as McpActorContext, args)).rejects.toBeInstanceOf(error);
+      expect(teams.updateTeamProfileFields).not.toHaveBeenCalled();
+    });
+
+    it('refuses fields an agent may not change, naming them, even through the SDK schema', async () => {
+      const { updateTeam, teams } = build();
+      const args = { teamUid: 'team-1', name: 'Renamed', teamMemberRoles: [], blog: 'x' };
+      expect((toolInputSchema(updateTeam) as z.ZodTypeAny).parse(args)).toEqual(args);
+      await expect(updateTeam.execute(CTX, args)).rejects.toThrow('name, teamMemberRoles');
+      expect(teams.updateTeamProfileFields).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('update_project', () => {
+    it("saves the allowed fields for a project of one of the member's teams", async () => {
+      const { updateProject, projects } = build();
+      const result: any = await updateProject.execute(CTX, {
+        projectUid: 'p1',
+        tagline: ' Faster storage ',
+        lookingForFunding: true,
+        tags: [' storage ', 'ipfs', 'storage'],
+        projectLinks: [{ name: 'Docs', url: 'https://docs.p1.xyz' }],
+      });
+      expect(projects.updateProjectProfileFields).toHaveBeenCalledWith('p1', {
+        tagline: 'Faster storage',
+        lookingForFunding: true,
+        tags: ['storage', 'ipfs'],
+        projectLinks: [{ name: 'Docs', url: 'https://docs.p1.xyz' }],
+      });
+      expect(result).toMatchObject({ updated: ['tagline', 'lookingForFunding', 'tags', 'projectLinks'] });
+    });
+
+    it.each([
+      ['its creator', { roles: [], project: { ...PROJECT, createdBy: 'member-1' } }],
+      [
+        'a member of a contributing team',
+        { roles: [{ teamUid: 'team-7' }], project: { ...PROJECT, contributingTeams: [{ uid: 'team-7' }] } },
+      ],
+    ])('lets %s edit it, like the project page', async (_label, setup) => {
+      const { updateProject, projects } = build(setup as any);
+      await updateProject.execute(CTX, { projectUid: 'p1', readMe: '# Hi' });
+      expect(projects.updateProjectProfileFields).toHaveBeenCalled();
+    });
+
+    it.each([
+      [
+        "a project of none of the member's teams",
+        CTX,
+        { projectUid: 'p1', readMe: 'x' },
+        { roles: [] },
+        ForbiddenException,
+      ],
+      ['an unknown project', ADMIN, { projectUid: 'p1', readMe: 'x' }, { project: null }, NotFoundException],
+      ['an empty description', CTX, { projectUid: 'p1', description: '  ' }, {}, BadRequestException],
+      [
+        'a link without https',
+        CTX,
+        { projectUid: 'p1', projectLinks: [{ name: 'x', url: 'javascript:alert(1)' }] },
+        {},
+        BadRequestException,
+      ],
+      [
+        'too many tags',
+        CTX,
+        { projectUid: 'p1', tags: Array.from({ length: 21 }, (_, i) => `t${i}`) },
+        {},
+        BadRequestException,
+      ],
+      ['a non-boolean funding flag', CTX, { projectUid: 'p1', lookingForFunding: 'yes' }, {}, BadRequestException],
+    ])('refuses %s without writing', async (_label, ctx, args, setup, error) => {
+      const { updateProject, projects } = build(setup as any);
+      await expect(updateProject.execute(ctx as McpActorContext, args)).rejects.toBeInstanceOf(error);
+      expect(projects.updateProjectProfileFields).not.toHaveBeenCalled();
+    });
+
+    it('refuses fields an agent may not change, naming them', async () => {
+      const { updateProject, projects } = build();
+      await expect(
+        updateProject.execute(CTX, { projectUid: 'p1', contributingTeams: [], contactEmail: 'x@y.z', readMe: 'x' })
+      ).rejects.toThrow('contributingTeams, contactEmail');
+      expect(projects.updateProjectProfileFields).not.toHaveBeenCalled();
+    });
   });
 });
 

@@ -34,7 +34,7 @@ import { directoryTools } from './mcp-directory-tools';
 import { McpOAuthService } from './mcp-oauth.service';
 import { portfolioTools } from './mcp-portfolio-tools';
 import { newsTools } from './mcp-news-tools';
-import { eventWriteTools, newsWriteTools, profileTools } from './mcp-write-tools';
+import { directoryWriteTools, eventWriteTools, newsWriteTools, profileTools } from './mcp-write-tools';
 import { McpWriteLimitService } from './mcp-write-limit.service';
 import { TeamNewsService } from '../team-news/team-news.service';
 import { MembersHooksService } from '../members/members.hooks.service';
@@ -119,6 +119,7 @@ export class McpController {
         ...newsWriteTools(this.teamNews, this.newsQuery, this.members),
         ...profileTools(this.members, this.memberHooks, this.prisma),
         ...eventWriteTools(this.eventGuests, this.eventLocations, this.members, this.prisma),
+        ...directoryWriteTools(this.teams, this.projects, this.members, this.prisma),
       ]),
       actor.scopeLevels,
       caps

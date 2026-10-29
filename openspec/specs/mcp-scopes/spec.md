@@ -167,6 +167,25 @@ The `events` scope SHALL offer `rsvp_event` and `cancel_event_rsvp` at `write`. 
 - **WHEN** an agent calls `rsvp_event` or `cancel_event_rsvp` for an event that has ended
 - **THEN** the call fails and the guest list is unchanged
 
+### Requirement: Agents edit teams and projects the member may edit
+
+The `directory` scope SHALL offer `update_team` and `update_project` at `write`, with the same edit rights as the pages: a team lead or directory admin for a team; a member of the project's maintaining or a contributing team, its creator, or a directory admin for a project. `update_team` SHALL change only shortDescription, longDescription, website, blog, contactMethod, the social handles (twitter, linkedin, telegram, bluesky), officeHours and moreDetails. `update_project` SHALL change only tagline, description, readMe, lookingForFunding, tags and projectLinks (https links). Both SHALL reject a call that names any other field without changing anything, and SHALL leave the logo, name, tags/relations, focus areas, members, contributing teams and contributions untouched. Team updates SHALL run the normal team post-update actions and record the change against AI-enriched fields; project updates SHALL reset the project cache.
+
+#### Scenario: Team member who is not a lead
+
+- **WHEN** an agent calls `update_team` for a team where the member is not a lead (and not an admin)
+- **THEN** the call fails and the team is unchanged
+
+#### Scenario: Renaming a team
+
+- **WHEN** an agent calls `update_team` with `name` and `blog`
+- **THEN** the call fails naming `name`, and neither field is saved
+
+#### Scenario: Partial project update
+
+- **WHEN** an agent updates only a project's `tagline`
+- **THEN** its contributing teams, contributions and focus areas are unchanged
+
 ### Requirement: Agent writes are rate limited per member
 
 Each write tool SHALL allow at most 10 calls per member per tool per hour. A call over the limit SHALL be refused with an error that names the limit, SHALL NOT run, SHALL NOT create an access request, and SHALL emit `mcp-tool-refused` with reason `rate_limited`. If the limit store is unavailable the call SHALL be allowed.
