@@ -260,7 +260,7 @@ export class MemberController {
   @UseGuards(UserTokenValidation)
   @UsePipes(new ParticipantsReqValidationPipe())
   async updateMember(@Param('uid') uid, @Body() participantsRequest, @Req() req) {
-    this.logger.info(`Member update request - Initated by -> ${req.userEmail}`);
+    this.auditMemberUpdate('modifyMember', req.userEmail, uid);
     const requestor = await this.membersService.findMemberByEmail(req.userEmail);
     const { referenceUid, participantType } = participantsRequest;
     if (participantType !== 'MEMBER') {
@@ -303,7 +303,7 @@ export class MemberController {
   @UseGuards(UserTokenValidation)
   @Patch('/members/:uid/self-role')
   async updateOwnRole(@Param('uid') uid: string, @Body() body: any, @Req() req: any) {
-    this.logger.info(`Member self-role update request - Initiated by -> ${req.userEmail}`);
+    this.auditMemberUpdate('updateRole', req.userEmail, uid);
 
     const requestor = await this.membersService.findMemberByEmail(req.userEmail);
     if (!requestor) {
@@ -326,7 +326,7 @@ export class MemberController {
   @Api(server.route.updateMember)
   @UseGuards(UserTokenValidation)
   async updateMemberByUid(@Param('uid') uid, @Body() body, @Req() req) {
-    this.logger.info(`Member update request - Initated by -> ${req.userEmail}`);
+    this.auditMemberUpdate('updateMember', req.userEmail, uid);
     const requestor = await this.membersService.findMemberByEmail(req.userEmail);
     if (!requestor.isDirectoryAdmin && uid !== requestor.uid) {
       throw new ForbiddenException(`Member isn't authorized to update the member`);
@@ -449,6 +449,7 @@ export class MemberController {
     if (!memberInfo || !memberInfo.externalId) {
       throw new ForbiddenException('Please login again and try');
     }
+    this.auditMemberUpdate('updateMemberEmail', req.userEmail, memberInfo.uid);
     return await this.membersService.updateMemberEmail(changeEmailRequest.newEmail, req.userEmail, memberInfo);
   }
 
@@ -651,6 +652,7 @@ export class MemberController {
     @Body() body: UpdateMemberInvestorSettingRequestDto,
     @Req() req
   ) {
+    this.auditMemberUpdate('updateMemberInvestorSetting', req.userEmail, uid);
     const member = await this.membersService.findMemberByEmail(req.userEmail);
 
     if (!member) {
@@ -703,5 +705,13 @@ export class MemberController {
     const requestor = email ? await this.membersService.findMemberByEmail(email) : null;
     const canSee = !!requestor && (requestor.uid === memberUid || requestor.isDirectoryAdmin === true);
     return presentEmailForViewer(presentJobSearchStatusForViewer({ ...member }, canSee), canSee);
+  }
+
+  /**
+   * One searchable line per member-update attempt, written before the access
+   * checks so refused attempts are recorded too.
+   */
+  private auditMemberUpdate(action: string, requestorEmail: string, targetUid: string) {
+    this.logger.info(`Member update audit - action=${action} requestor=${requestorEmail} target=${targetUid}`);
   }
 }
