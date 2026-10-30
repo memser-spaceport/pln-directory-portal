@@ -24,16 +24,20 @@ export class SetupService {
         }),
       ],
     });
-    if (process.env.NODE_ENV === 'production') {
-      this.addProductionTransport(instance);
-    }
+    this.addCloudWatchTransport(instance);
     return instance;
   }
 
-  private addProductionTransport(instance: winston.Logger) {
-    const missing = ['CLOUDWATCH_GROUP_NAME', 'DEPLOYMENT_ENVIRONMENT', 'CLOUDWATCH_REGION'].filter(
-      (name) => !process.env[name]
-    );
+  /**
+   * CloudWatch is on when its settings are present (deployed envs) and off when
+   * none are (local runs). A partial set is a config mistake, so it warns.
+   */
+  private addCloudWatchTransport(instance: winston.Logger) {
+    const settings = ['CLOUDWATCH_GROUP_NAME', 'DEPLOYMENT_ENVIRONMENT', 'CLOUDWATCH_REGION'];
+    const missing = settings.filter((name) => !process.env[name]);
+    if (missing.length === settings.length) {
+      return;
+    }
     if (missing.length) {
       console.warn(`CloudWatch logging disabled: missing ${missing.join(', ')}`);
       return;
