@@ -1,3 +1,8 @@
+jest.mock('../push-notifications/push-notifications.service', () => ({ PushNotificationsService: jest.fn() }));
+jest.mock('../deals/deals.service', () => ({ DealsService: jest.fn() }));
+jest.mock('../articles/articles.service', () => ({ ArticlesService: jest.fn() }));
+jest.mock('../member-follow-ups/member-follow-ups.service', () => ({ MemberFollowUpsService: jest.fn() }));
+jest.mock('../office-hours/office-hours.service', () => ({ OfficeHoursService: jest.fn() }));
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { isAllowedRedirectUri, isLoopbackRedirectUri, isRegisteredRedirectUri } from './mcp-redirect';
 import { pkceS256Challenge, verifyPkceS256 } from './mcp.crypto';
@@ -32,6 +37,13 @@ import {
   jobAlertTools,
   savedJobTools,
 } from './mcp-member-action-tools';
+import {
+  dealTools,
+  demoDayFeedbackTools,
+  guideLikeTools,
+  notificationTools,
+  officeHoursFeedbackTools,
+} from './mcp-self-service-tools';
 import { isWriteTool, MCP_TOOL_SCOPES, MCP_UNSCOPED_TOOLS, registryMaxLevel } from './mcp-scopes.registry';
 
 describe('mcp-redirect', () => {
@@ -159,6 +171,11 @@ describe('scope registry', () => {
     ...jobAlertTools(stub, stub),
     ...emailPreferenceTools(stub, stub, stub, stub, stub),
     ...demoDaySaveTools(stub, stub, stub),
+    ...notificationTools(stub),
+    ...dealTools(stub),
+    ...guideLikeTools(stub),
+    ...demoDayFeedbackTools(stub),
+    ...officeHoursFeedbackTools(stub, stub),
     ...eventWriteTools(stub, stub, stub, stub),
     ...directoryWriteTools(stub, stub, stub, stub),
   ];
@@ -180,7 +197,7 @@ describe('scope registry', () => {
     const writesByName = fullCatalog
       .map((t) => t.name)
       .filter((name) =>
-        /^(update|submit|post|rsvp|cancel|join|leave|add|delete|follow|unfollow|save|unsave|set|redeploy|rename)_/.test(
+        /^(update|submit|post|rsvp|cancel|join|leave|add|delete|follow|unfollow|save|unsave|set|mark|unmark|report|like|unlike|redeploy|rename)_/.test(
           name
         )
       );

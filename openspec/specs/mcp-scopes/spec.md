@@ -234,6 +234,15 @@ The `profile` scope SHALL also offer `get_my_email_preferences` at `read` and `u
 - **WHEN** an agent sets `forumDigest` to `daily`
 - **THEN** the digest becomes daily and its forum-activity and network-news choices are unchanged
 
+### Requirement: Agents handle the member's notifications, deals, guide likes and feedback
+
+The `profile` scope SHALL also offer `list_my_notifications`, `list_deals` and `list_my_office_hours_followups` at `read`, and `mark_notification_read`, `mark_all_notifications_read`, `mark_deal_used`, `unmark_deal_used`, `report_deal_issue`, `like_guide`, `unlike_guide`, `submit_demo_day_feedback` and `submit_office_hours_feedback` at `write`. Each SHALL use the same service and checks as its LabOS route: the deals access gate for deal tools, `founder_guides.view` (or directory admin) for guide likes, and for office-hours feedback only the member's own follow-ups that are PENDING or CLOSED. Free-text fields SHALL be capped (2000 characters; 500 for each office-hours reason). Office-hours feedback SHALL take the form's reason labels only, and "Got rescheduled" SHALL need the new date. No tool here SHALL contact another person; guide comments, asks and office-hours broken-link reports, which do, SHALL NOT be tools until agent actions that reach others get the member's confirm (LAB-2903). Each SHALL refuse any other argument without writing.
+
+#### Scenario: Someone else's office-hours follow-up
+
+- **WHEN** an agent calls `submit_office_hours_feedback` with a follow-up the member did not create
+- **THEN** the call fails as not found and no feedback is stored
+
 ### Requirement: Agents redeploy, rename and describe the member's AI Apps
 
 The `ai_apps` scope SHALL also offer `redeploy_ai_app`, `rename_ai_app` and `update_ai_app_description` at `write`. They SHALL use the same service calls as the LabOS app page, so only the app's creator or a directory admin can use them, and SHALL require `ai_apps.write`, like the page's deploy and edit routes. `redeploy_ai_app` SHALL deploy the stored bundle with the stored secrets, SHALL take no bundle or secret values, and SHALL return the app's status and deployment id (not the status endpoint, which needs the app's deploy token); a deploy already running SHALL be refused. `rename_ai_app` SHALL take a name of 1 to 200 characters after trimming; `update_ai_app_description` SHALL take up to 4000 characters, and an empty string SHALL clear it; neither SHALL redeploy. Each SHALL refuse any other argument without writing.

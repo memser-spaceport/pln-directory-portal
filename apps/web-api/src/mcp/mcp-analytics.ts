@@ -234,6 +234,37 @@ export const MCP_TOOL_PROPERTY_BUILDERS: Readonly<Record<string, McpToolProperty
   }),
   rename_ai_app: fieldsOnly('appUid'),
   update_ai_app_description: fieldsOnly('appUid'),
+
+  list_my_notifications: (args, result) => ({
+    unreadOnly: args.unreadOnly === true,
+    resultCount: countOf(result?.notifications),
+    unreadCount: numberProp(result?.unreadCount),
+  }),
+  mark_notification_read: uidsOnly('notificationUid'),
+  mark_all_notifications_read: none,
+  list_deals: (args, result) => ({
+    category: stringProp(args.category),
+    resultCount: countOf(result?.deals),
+  }),
+  mark_deal_used: uidsOnly('dealUid'),
+  unmark_deal_used: uidsOnly('dealUid'),
+  report_deal_issue: (args, result) => ({ dealUid: stringProp(args.dealUid), issueUid: stringProp(result?.issueUid) }),
+  like_guide: uidsOnly('guide'),
+  unlike_guide: uidsOnly('guide'),
+  submit_demo_day_feedback: (args) => ({
+    demoDay: stringProp(args.demoDay),
+    rating: numberProp(args.rating),
+    issueCount: countOf(args.issues),
+    ...fieldNames(args, ['demoDay', 'rating', 'issues']),
+  }),
+  list_my_office_hours_followups: (_args, result) => ({ resultCount: countOf(result?.followUps) }),
+  submit_office_hours_feedback: (args) => ({
+    followUpUid: stringProp(args.followUpUid),
+    happened: typeof args.happened === 'boolean' ? args.happened : undefined,
+    rating: numberProp(args.rating),
+    reasonCount: countOf(args.reasons),
+    hasOtherReasons: (countOf(args.otherReasons) ?? 0) > 0,
+  }),
 };
 
 /**
