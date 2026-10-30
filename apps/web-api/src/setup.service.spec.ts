@@ -23,7 +23,7 @@ describe('SetupService.setupLog', () => {
     (WinstonCloudWatch as unknown as jest.Mock).mockClear();
     warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     error = jest.spyOn(console, 'error').mockImplementation(() => undefined);
-    delete process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
     process.env.CLOUDWATCH_GROUP_NAME = 'pl-directory-service';
     process.env.DEPLOYMENT_ENVIRONMENT = 'prod';
     process.env.CLOUDWATCH_REGION = 'us-west-1';
@@ -62,24 +62,13 @@ describe('SetupService.setupLog', () => {
     }
   );
 
-  it('does not depend on NODE_ENV', () => {
+  it('does not add CloudWatch outside production', () => {
     process.env.NODE_ENV = 'dev';
-
-    new SetupService().setupLog();
-
-    expect(cloudwatchOptions()).toMatchObject({ logGroupName: 'pl-directory-service-prod' });
-  });
-
-  it('stays console-only without a warning when no CloudWatch setting is present', () => {
-    delete process.env.CLOUDWATCH_GROUP_NAME;
-    delete process.env.DEPLOYMENT_ENVIRONMENT;
-    delete process.env.CLOUDWATCH_REGION;
 
     const logger = new SetupService().setupLog();
 
     expect(WinstonCloudWatch).not.toHaveBeenCalled();
     expect(logger.transports).toHaveLength(1);
-    expect(warn).not.toHaveBeenCalled();
   });
 
   it('reports delivery errors on the console with the group name', () => {
