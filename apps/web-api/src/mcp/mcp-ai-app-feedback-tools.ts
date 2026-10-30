@@ -1,8 +1,9 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { z } from 'zod';
 import type { AiAppsService } from '../ai-apps/ai-apps.service';
 import { FEEDBACK_COMMENT_MAX_LENGTH } from '../ai-apps/dto/feedback-comment.dto';
-import { McpToolDef } from './mcp-tools';
+import { AI_APPS_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
+import { McpActorContext, McpToolDef } from './mcp-tools';
 
 const FEEDBACK_LIMIT_MAX = 50;
 const FEEDBACK_LIMIT_DEFAULT = 20;
@@ -130,6 +131,104 @@ export function aiAppFeedbackTools(aiApps: AiAppsService): McpToolDef[] {
           note
         );
         return { uid: updated.uid, appUid: updated.appUid, status: updated.status, hasNote: Boolean(note) };
+      },
+    },
+  ];
+}
+
+/** Name and description rules of the LabOS app edit form (`UpdateAppMetadataSchema`). */
+const APP_NAME_MAX = 200;
+const APP_DESCRIPTION_MAX = 4000;
+
+function appRow(app: { uid: string; appId: string; name: string; description?: string | null; status: string }) {
+  return { uid: app.uid, appId: app.appId, name: app.name, description: app.description ?? null, status: app.status };
+}
+
+function onlyArgs(args: Record<string, unknown>, allowed: string[]) {
+  const unknown = Object.keys(args).filter((key) => !allowed.includes(key));
+  if (unknown.length > 0) {
+    throw new BadRequestException(`An agent can't send these: ${unknown.join(', ')}`);
+  }
+  const appUid = stringArg(args.appUid);
+  if (!appUid) throw new BadRequestException('appUid is required');
+  return appUid;
+}
+
+/**
+ * `redeploy_ai_app`, `rename_ai_app` and `update_ai_app_description` in the `ai_apps` scope (LAB-3061): the same
+ * service calls as the LabOS app page (`POST /v1/ai-apps/:uid/deploy`, `PATCH /v1/ai-apps/:uid`), so only the app's
+ * creator or a directory admin can use them, and the member needs `ai_apps.write` like those routes. Redeploy takes
+ * no bundle and no secret values: it deploys the stored bundle with the stored secrets.
+ */
+export function aiAppWriteTools(aiApps: AiAppsService): McpToolDef[] {
+  const assertCanWrite = (ctx: McpActorContext) => {
+    if (!ctx.permissions.has(AI_APPS_PERMISSIONS.WRITE)) {
+      throw new ForbiddenException("Your LabOS account can't deploy or edit AI Apps.");
+    }
+  };
+
+  return [
+    {
+      name: 'redeploy_ai_app',
+      description:
+        'Redeploy one of your AI Apps from its last uploaded bundle, with the secrets already stored in LabOS (the ' +
+        "app page's Deploy). Only the app's creator or a directory admin can. Returns the deploy status; check it " +
+        'again with list_my_ai_apps. A deploy that is still running must finish first.',
+      visibility: 'always',
+      keepUnknownArgs: true,
+      inputSchema: { appUid: z.string().min(1).describe('App uid from list_my_ai_apps') },
+      execute: async (ctx, args = {}) => {
+        const appUid = onlyArgs(args, ['appUid']);
+        assertCanWrite(ctx);
+        const result = await aiApps.deployDraft(ctx.memberUid, appUid, undefined, 'prod');
+        // The status endpoint needs the app's deploy token, which an agent doesn't hold, so it is not returned.
+        return {
+          app: appRow(result),
+          deploymentId: (result as { deploymentId?: string | null }).deploymentId ?? null,
+          pollIntervalSec: result.pollIntervalSec,
+          checkStatusWith: 'list_my_ai_apps',
+        };
+      },
+    },
+    {
+      name: 'rename_ai_app',
+      description: `Rename one of your AI Apps in LabOS (up to ${APP_NAME_MAX} characters). It does not redeploy the app.`,
+      visibility: 'always',
+      keepUnknownArgs: true,
+      inputSchema: {
+        appUid: z.string().min(1).describe('App uid from list_my_ai_apps'),
+        name: z.string().describe('New name'),
+      },
+      execute: async (ctx, args = {}) => {
+        const appUid = onlyArgs(args, ['appUid', 'name']);
+        const name = typeof args.name === 'string' ? args.name.trim() : '';
+        if (!name) throw new BadRequestException("name can't be empty");
+        if (name.length > APP_NAME_MAX) throw new BadRequestException(`name is too long (max ${APP_NAME_MAX})`);
+        assertCanWrite(ctx);
+        return { app: appRow(await aiApps.updateMetadata(ctx.memberUid, appUid, { name })) };
+      },
+    },
+    {
+      name: 'update_ai_app_description',
+      description:
+        `Change the description of one of your AI Apps in LabOS (up to ${APP_DESCRIPTION_MAX} characters; an empty ` +
+        'string clears it). It does not redeploy the app.',
+      visibility: 'always',
+      keepUnknownArgs: true,
+      inputSchema: {
+        appUid: z.string().min(1).describe('App uid from list_my_ai_apps'),
+        description: z.string().describe('New description; empty clears it'),
+      },
+      execute: async (ctx, args = {}) => {
+        const appUid = onlyArgs(args, ['appUid', 'description']);
+        if (typeof args.description !== 'string') throw new BadRequestException('description must be text');
+        if (args.description.length > APP_DESCRIPTION_MAX) {
+          throw new BadRequestException(`description is too long (max ${APP_DESCRIPTION_MAX})`);
+        }
+        assertCanWrite(ctx);
+        return {
+          app: appRow(await aiApps.updateMetadata(ctx.memberUid, appUid, { description: args.description })),
+        };
       },
     },
   ];
