@@ -1,6 +1,6 @@
 import { AnalyticsService } from '../analytics/service/analytics.service';
 import { ANALYTICS_EVENTS } from '../utils/constants';
-import { isWriteTool } from './mcp-scopes.registry';
+import { isWriteTool, toolScope } from './mcp-scopes.registry';
 import type { McpTokenActor } from './mcp-oauth.service';
 
 export type McpToolOperation = 'read' | 'write';
@@ -40,106 +40,268 @@ export function errorKindOf(error: unknown): string {
   return 'Error';
 }
 
+type McpToolArgs = Record<string, unknown>;
+type McpToolResult = Record<string, unknown> | null | undefined;
+type McpToolPropertyBuilder = (args: McpToolArgs, result: McpToolResult) => Record<string, unknown>;
+
+const QUERY_MAX = 200;
+
+const none: McpToolPropertyBuilder = () => ({});
+
+/** Names of the fields a write call sends, never their values (LAB-3050). */
+function fieldNames(args: McpToolArgs, idKeys: string[] = []): string[] {
+  return Object.keys(args)
+    .filter((key) => !idKeys.includes(key) && args[key] !== undefined)
+    .sort();
+}
+
+function fieldsOnly(...idKeys: string[]): McpToolPropertyBuilder {
+  return (args) => {
+    const props: Record<string, unknown> = {};
+    for (const key of idKeys) props[key] = stringProp(args[key]);
+    const fields = fieldNames(args, idKeys);
+    return { ...props, fields, fieldCount: fields.length };
+  };
+}
+
+function uidsOnly(...keys: string[]): McpToolPropertyBuilder {
+  return (args) => Object.fromEntries(keys.map((key) => [key, stringProp(args[key])]));
+}
+
+const directorySearch: McpToolPropertyBuilder = (args, result) => ({
+  limit: numberProp(result?.limit) ?? numberProp(args.limit),
+  resultCount: countOf(result?.results),
+});
+
+const warmPathRead: McpToolPropertyBuilder = (args, result) => ({
+  warmPathUid: stringProp(args.warmPathUid),
+  connectorProfileUid: stringProp(args.connectorProfileUid),
+  hasNote: typeof result?.note === 'string' && result.note.length > 0,
+});
+
+const warmPathSubmit: McpToolPropertyBuilder = (args) => ({
+  warmPathUid: stringProp(args.warmPathUid),
+  connectorProfileUid: stringProp(args.connectorProfileUid),
+  isClear: args.note === null,
+});
+
+const lockedFieldsUpdate: McpToolPropertyBuilder = (args) => ({
+  uid: stringProp(args.uid),
+  fieldCount: fieldCount(args.fields),
+});
+
+const getByUid = uidsOnly('uid');
+
+/**
+ * One property builder per MCP tool (LAB-3050): every tool in `MCP_TOOL_SCOPES` plus `whoami`. A spec fails when a
+ * tool has no entry. Builders send ids, counts, filters and field names; never message text, bodies, notes or contact
+ * details. Free-text search queries are added separately, by `MCP_TOOL_QUERY_ARGS`, on the per-tool event only.
+ */
+export const MCP_TOOL_PROPERTY_BUILDERS: Readonly<Record<string, McpToolPropertyBuilder>> = {
+  whoami: none,
+
+  search_members: directorySearch,
+  search_teams: directorySearch,
+  search_projects: directorySearch,
+  search_events: directorySearch,
+
+  search_forum_threads: directorySearch,
+  get_forum_thread: getByUid,
+
+  list_news: (args, result) => ({
+    feed: stringProp(result?.feed) ?? stringProp(args.feed) ?? 'latest',
+    teamUid: stringProp(args.teamUid),
+    limit: numberProp(args.limit),
+    page: numberProp(result?.page) ?? numberProp(args.page),
+    resultCount: countOf(result?.items),
+    hasMore: typeof result?.hasMore === 'boolean' ? result.hasMore : undefined,
+  }),
+  get_news_item: getByUid,
+  post_team_news: (args, result) => {
+    const posted = result?.posted as Record<string, unknown> | undefined;
+    return {
+      teamUid: stringProp(args.teamUid),
+      newsUid: stringProp(posted?.uid),
+      hasBody: Boolean(stringProp(args.body)),
+    };
+  },
+
+  get_member: getByUid,
+  get_team: getByUid,
+  get_project: getByUid,
+  list_portfolio_teams: (args, result) => ({
+    hasQuery: Boolean(stringProp(args.q)),
+    island: stringProp(args.island),
+    limit: numberProp(result?.limit) ?? numberProp(args.limit),
+    offset: numberProp(result?.offset) ?? numberProp(args.offset),
+    resultCount: countOf(result?.teams),
+    total: numberProp(result?.total),
+  }),
+  update_team: fieldsOnly('teamUid'),
+  update_project: fieldsOnly('projectUid'),
+
+  get_event: getByUid,
+  rsvp_event: (args, result) => ({
+    eventUid: stringProp(args.eventUid),
+    teamUid: stringProp(args.teamUid),
+    alreadyGoing: typeof result?.alreadyGoing === 'boolean' ? result.alreadyGoing : undefined,
+  }),
+  cancel_event_rsvp: (args, result) => ({
+    eventUid: stringProp(args.eventUid),
+    wasGoing: typeof result?.wasGoing === 'boolean' ? result.wasGoing : undefined,
+  }),
+
+  search_master_profiles: (args, result) => ({
+    type: stringProp(args.type),
+    limit: numberProp(result?.limit) ?? numberProp(args.limit),
+    offset: numberProp(result?.offset) ?? numberProp(args.offset),
+    resultCount: countOf(result?.profiles),
+  }),
+  get_master_profile: getByUid,
+  search_warm_intro_investors: (args, result) => ({
+    limit: numberProp(result?.limit) ?? numberProp(args.limit),
+    offset: numberProp(result?.offset) ?? numberProp(args.offset),
+    resultCount: countOf(result?.investors),
+    total: numberProp(result?.total),
+  }),
+  get_warm_intro_investor: (args, result) => ({
+    profileUid: stringProp(args.profileUid),
+    pathCount: countOf(result?.paths),
+  }),
+  get_warm_path_feedback: warmPathRead,
+  get_warm_path_note: warmPathRead,
+  submit_warm_path_feedback: warmPathSubmit,
+  submit_warm_path_note: warmPathSubmit,
+  update_master_profile: lockedFieldsUpdate,
+  update_connection_edge: lockedFieldsUpdate,
+  update_warm_path: lockedFieldsUpdate,
+
+  get_my_profile: none,
+  update_my_profile: fieldsOnly(),
+  join_team: (args) => ({
+    teamUid: stringProp(args.teamUid),
+    mainTeam: typeof args.mainTeam === 'boolean' ? args.mainTeam : undefined,
+    hasRole: Boolean(stringProp(args.role)),
+  }),
+  leave_team: uidsOnly('teamUid'),
+  join_project: fieldsOnly('projectUid'),
+  leave_project: uidsOnly('projectUid'),
+  list_my_experiences: (_args, result) => ({ resultCount: countOf(result?.experiences) }),
+  add_experience: (args, result) => {
+    const added = result?.added as Record<string, unknown> | undefined;
+    const fields = fieldNames(args);
+    return { experienceUid: stringProp(added?.uid), fields, fieldCount: fields.length };
+  },
+  update_experience: fieldsOnly('experienceUid'),
+  delete_experience: uidsOnly('experienceUid'),
+  follow_team: uidsOnly('teamUid'),
+  unfollow_team: uidsOnly('teamUid'),
+  save_job: uidsOnly('jobUid'),
+  unsave_job: uidsOnly('jobUid'),
+  get_my_job_alert: none,
+  set_job_alert: fieldsOnly(),
+  delete_job_alert: none,
+  get_my_email_preferences: none,
+  update_email_preferences: fieldsOnly(),
+  save_demo_day_team: uidsOnly('demoDay', 'teamUid'),
+  unsave_demo_day_team: uidsOnly('demoDay', 'teamUid'),
+
+  list_my_ai_apps: (_args, result) => ({ resultCount: countOf(result?.apps) }),
+  list_ai_app_feedback: (args, result) => ({
+    appUid: stringProp(args.appUid),
+    status: stringProp(args.status),
+    limit: numberProp(result?.limit) ?? numberProp(args.limit),
+    offset: numberProp(result?.offset) ?? numberProp(args.offset),
+    resultCount: countOf(result?.items),
+    total: numberProp(result?.total),
+  }),
+  update_ai_app_feedback_status: (args) => ({
+    appUid: stringProp(args.appUid),
+    feedbackUid: stringProp(args.feedbackUid),
+    status: stringProp(args.status),
+    hasNote: Boolean(stringProp(args.note)),
+  }),
+};
+
+/**
+ * The free-text query argument of search and list tools, sent as `query` (trimmed to 200 characters) on the per-tool
+ * event (LAB-3050). Investor DB searches are left out: their text is a person's name or email.
+ */
+export const MCP_TOOL_QUERY_ARGS: Readonly<Record<string, string>> = {
+  search_members: 'q',
+  search_teams: 'q',
+  search_projects: 'q',
+  search_events: 'q',
+  search_forum_threads: 'q',
+  list_news: 'search',
+  list_portfolio_teams: 'q',
+};
+
 export function buildMcpToolAnalyticsProperties(
   toolName: string,
   args: Record<string, unknown> = {},
   result?: Record<string, unknown> | null,
   error?: unknown
 ): Record<string, unknown> {
-  const props: Record<string, unknown> = {};
-
-  switch (toolName) {
-    case 'search_master_profiles':
-      props.limit = numberProp(result?.limit) ?? numberProp(args.limit);
-      props.offset = numberProp(result?.offset) ?? numberProp(args.offset);
-      props.resultCount = countOf(result?.profiles);
-      break;
-    case 'search_warm_intro_investors':
-      props.limit = numberProp(result?.limit) ?? numberProp(args.limit);
-      props.offset = numberProp(result?.offset) ?? numberProp(args.offset);
-      props.resultCount = countOf(result?.investors);
-      if (typeof result?.total === 'number') {
-        props.total = result.total;
-      }
-      break;
-    case 'get_master_profile':
-      props.uid = stringProp(args.uid);
-      break;
-    case 'get_warm_intro_investor':
-      props.profileUid = stringProp(args.profileUid);
-      props.pathCount = countOf(result?.paths);
-      break;
-    case 'get_warm_path_feedback':
-    case 'get_warm_path_note':
-      props.warmPathUid = stringProp(args.warmPathUid);
-      props.connectorProfileUid = stringProp(args.connectorProfileUid);
-      props.hasNote = typeof result?.note === 'string' && result.note.length > 0;
-      break;
-    case 'submit_warm_path_feedback':
-    case 'submit_warm_path_note':
-      props.warmPathUid = stringProp(args.warmPathUid);
-      props.connectorProfileUid = stringProp(args.connectorProfileUid);
-      props.isClear = args.note === null;
-      break;
-    case 'update_master_profile':
-    case 'update_connection_edge':
-    case 'update_warm_path':
-      props.uid = stringProp(args.uid);
-      props.fieldCount = fieldCount(args.fields);
-      break;
-    case 'search_members':
-    case 'search_teams':
-    case 'search_projects':
-    case 'search_events':
-    case 'search_forum_threads':
-      props.limit = numberProp(result?.limit) ?? numberProp(args.limit);
-      props.resultCount = countOf(result?.results);
-      break;
-    case 'list_my_ai_apps':
-      props.resultCount = countOf(result?.apps);
-      break;
-    case 'list_portfolio_teams':
-      props.hasQuery = Boolean(stringProp(args.q));
-      props.island = stringProp(args.island);
-      props.limit = numberProp(result?.limit) ?? numberProp(args.limit);
-      props.offset = numberProp(result?.offset) ?? numberProp(args.offset);
-      props.resultCount = countOf(result?.teams);
-      if (typeof result?.total === 'number') {
-        props.total = result.total;
-      }
-      break;
-    case 'list_ai_app_feedback':
-      props.appUid = stringProp(args.appUid);
-      props.status = stringProp(args.status);
-      props.limit = numberProp(result?.limit) ?? numberProp(args.limit);
-      props.offset = numberProp(result?.offset) ?? numberProp(args.offset);
-      props.resultCount = countOf(result?.items);
-      if (typeof result?.total === 'number') {
-        props.total = result.total;
-      }
-      break;
-    case 'update_ai_app_feedback_status':
-      props.appUid = stringProp(args.appUid);
-      props.feedbackUid = stringProp(args.feedbackUid);
-      props.status = stringProp(args.status);
-      props.hasNote = Boolean(stringProp(args.note));
-      break;
-    case 'get_member':
-    case 'get_team':
-    case 'get_project':
-    case 'get_event':
-    case 'get_forum_thread':
-      props.uid = stringProp(args.uid);
-      break;
-    default:
-      break;
-  }
+  const builder = MCP_TOOL_PROPERTY_BUILDERS[toolName] ?? none;
+  const props: Record<string, unknown> = { ...builder(args, result) };
 
   if (error !== undefined) {
     props.errorKind = errorKindOf(error);
   }
 
   return compact(props);
+}
+
+/** `search_members` -> `mcp-search-members-called` (LAB-3050). */
+export function mcpToolCalledEventName(toolName: string): string {
+  return `mcp-${toolName.replace(/_/g, '-')}-called`;
+}
+
+function queryProps(toolName: string, args: Record<string, unknown>): Record<string, unknown> {
+  const key = MCP_TOOL_QUERY_ARGS[toolName];
+  const query = key ? stringProp(args[key]) : undefined;
+  return query ? { query: query.slice(0, QUERY_MAX) } : {};
+}
+
+export type McpToolCallResult = 'ok' | 'refused' | 'error';
+
+/**
+ * Sends the per-tool event `mcp-<tool>-called` (LAB-3050) for a call that ran (`ok`), threw (`error`) or was refused
+ * (`refused`). `mcp-tool-invoked` and `mcp-tool-refused` are sent as before, beside it.
+ */
+export function trackMcpToolCalled(
+  analytics: AnalyticsService,
+  actor: Pick<McpTokenActor, 'memberUid' | 'clientName' | 'authorizationUid'>,
+  input: {
+    toolName: string;
+    result: McpToolCallResult;
+    args?: Record<string, unknown>;
+    output?: Record<string, unknown> | null;
+    reason?: string;
+    error?: unknown;
+  }
+): void {
+  const args = input.args ?? {};
+  const properties = compact({
+    toolName: input.toolName,
+    memberUid: actor.memberUid,
+    authorizationUid: actor.authorizationUid,
+    clientName: actor.clientName,
+    scope: toolScope(input.toolName)?.scope ?? 'unscoped',
+    operation: mcpToolOperation(input.toolName),
+    result: input.result,
+    reason: input.reason,
+    ...(input.result === 'refused'
+      ? {}
+      : buildMcpToolAnalyticsProperties(input.toolName, args, input.output, input.error)),
+    ...(input.result === 'refused' ? {} : queryProps(input.toolName, args)),
+  });
+  void analytics.trackEvent({
+    name: mcpToolCalledEventName(input.toolName),
+    distinctId: actor.memberUid,
+    properties,
+  });
 }
 
 export function trackMcpToolInvocation(
