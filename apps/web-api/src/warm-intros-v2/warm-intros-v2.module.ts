@@ -14,6 +14,6 @@ import { WarmIntrosV2Controller } from './warm-intros-v2.controller';
   imports: [SharedModule, RbacModule, AccessControlV2Module, ManualFieldLockModule, DataEnrichmentClientModule],
   controllers: [WarmIntrosV2ServiceController, WarmIntrosV2Controller],
   providers: [WarmIntrosV2Service, WarmIntrosV2RunService, WarmIntrosV2RegenerateService],
-  exports: [WarmIntrosV2Service],
+  exports: [WarmIntrosV2Service, WarmIntrosV2RegenerateService],
 })
 export class WarmIntrosV2Module {}

@@ -36,6 +36,12 @@ import { TeamNewsImageService } from './team-news-image.service';
     TeamNewsPostSummaryService,
     TeamNewsImageService,
   ],
-  exports: [TeamNewsService, TeamNewsQueryService, TeamNewsEnrichmentService, TeamNewsSuggestionsService],
+  exports: [
+    TeamNewsService,
+    TeamNewsQueryService,
+    TeamNewsEnrichmentService,
+    TeamNewsSuggestionsService,
+    TeamNewsUpvotesService,
+  ],
 })
 export class TeamNewsModule {}

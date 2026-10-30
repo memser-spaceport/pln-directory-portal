@@ -35,6 +35,10 @@ import { McpOAuthService } from './mcp-oauth.service';
 import { portfolioTools } from './mcp-portfolio-tools';
 import { newsTools } from './mcp-news-tools';
 import { directoryWriteTools, eventWriteTools, membershipTools, newsWriteTools, profileTools } from './mcp-write-tools';
+import { profileCoverageTools } from './mcp-profile-coverage-tools';
+import { directoryCoverageTools } from './mcp-directory-coverage-tools';
+import { actionCoverageTools } from './mcp-action-coverage-tools';
+import { platformCoverageTools } from './mcp-platform-coverage-tools';
 import {
   demoDaySaveTools,
   emailPreferenceTools,
@@ -46,6 +50,31 @@ import {
 import { pitchProfileTools } from './mcp-pitch-profile-tools';
 import { DemoDayFundraisingProfilesService } from '../demo-days/demo-day-fundraising-profiles.service';
 import { TeamPitchProfilesService } from '../team-pitches/team-pitch-profiles.service';
+import { TeamPitchEngagementService } from '../team-pitches/team-pitch-engagement.service';
+import { TeamPitchesService } from '../team-pitches/team-pitches.service';
+import { InvestorProfileService } from '../members/investor-profile.service';
+import { ParticipantsRequestService } from '../participants-request/participants-request.service';
+import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
+import { AskService } from '../asks/asks.service';
+import { EventsService } from '../events/events.service';
+import { ArticleCommentsService } from '../articles/article-comments.service';
+import { ArticleRequestsService } from '../article-requests/article-requests.service';
+import { DealRequestsService } from '../deal-requests/deal-requests.service';
+import { ContactSupportService } from '../contact-support/contact-support.service';
+import { SpvSpotlightsService } from '../spv-spotlights/spv-spotlights.service';
+import { JobOpeningsApplicationService } from '../job-openings/job-openings-application.service';
+import { JobOpeningsInterestService } from '../job-openings/job-openings-interest.service';
+import { JobOpeningsReferralService } from '../job-openings/job-openings-referral.service';
+import { JobMatchService } from '../job-match/job-match.service';
+import { TeamHiringService } from '../team-hiring/team-hiring.service';
+import { TeamNewsUpvotesService } from '../team-news/team-news-upvotes.service';
+import { PathfinderService } from '../pathfinder/pathfinder.service';
+import { InvestorListsService } from '../investor-lists/investor-lists.service';
+import { FounderSourcingReviewService } from '../founder-sourcing/founder-sourcing-review.service';
+import { RoadmapService } from '../roadmap/roadmap.service';
+import { RoadmapPinsService } from '../roadmap/roadmap-pins.service';
+import { WarmIntrosV2RegenerateService } from '../warm-intros-v2/warm-intros-v2-regenerate.service';
+import { AiAppsAccessService } from '../ai-apps/ai-apps-access.service';
 import {
   dealTools,
   demoDayFeedbackTools,
@@ -124,7 +153,32 @@ export class McpController {
     private readonly followUps: MemberFollowUpsService,
     private readonly officeHours: OfficeHoursService,
     private readonly fundraisingProfiles: DemoDayFundraisingProfilesService,
-    private readonly teamPitchProfiles: TeamPitchProfilesService
+    private readonly teamPitchProfiles: TeamPitchProfilesService,
+    private readonly investorProfiles: InvestorProfileService,
+    private readonly participants: ParticipantsRequestService,
+    private readonly enrichment: TeamEnrichmentService,
+    private readonly asks: AskService,
+    private readonly events: EventsService,
+    private readonly articleComments: ArticleCommentsService,
+    private readonly articleRequests: ArticleRequestsService,
+    private readonly dealRequests: DealRequestsService,
+    private readonly support: ContactSupportService,
+    private readonly spotlights: SpvSpotlightsService,
+    private readonly jobApplications: JobOpeningsApplicationService,
+    private readonly jobInterests: JobOpeningsInterestService,
+    private readonly jobReferrals: JobOpeningsReferralService,
+    private readonly jobMatch: JobMatchService,
+    private readonly hiring: TeamHiringService,
+    private readonly newsUpvotes: TeamNewsUpvotesService,
+    private readonly pathfinder: PathfinderService,
+    private readonly investorLists: InvestorListsService,
+    private readonly founderReviews: FounderSourcingReviewService,
+    private readonly roadmap: RoadmapService,
+    private readonly roadmapPins: RoadmapPinsService,
+    private readonly warmIntroRegenerate: WarmIntrosV2RegenerateService,
+    private readonly aiAccess: AiAppsAccessService,
+    private readonly pitches: TeamPitchesService,
+    private readonly pitchEngagement: TeamPitchEngagementService
   ) {}
 
   private readonly logger = new Logger(McpController.name);
@@ -188,8 +242,57 @@ export class McpController {
         ...demoDayFeedbackTools(this.demoDays),
         ...officeHoursFeedbackTools(this.followUps, this.officeHours),
         ...eventWriteTools(this.eventGuests, this.eventLocations, this.members, this.prisma),
-        ...directoryWriteTools(this.teams, this.projects, this.members, this.prisma),
+        ...directoryWriteTools(this.teams, this.projects, this.members, this.prisma, this.enrichment),
         ...pitchProfileTools(this.fundraisingProfiles, this.teamPitchProfiles, this.prisma),
+        ...profileCoverageTools({
+          members: this.members,
+          investorProfiles: this.investorProfiles,
+          notificationSettings: this.notificationSettings,
+        }),
+        ...directoryCoverageTools({
+          teams: this.teams,
+          members: this.members,
+          projects: this.projects,
+          prisma: this.prisma,
+          participants: this.participants,
+          enrichment: this.enrichment,
+        }),
+        ...actionCoverageTools({
+          events: this.events,
+          guests: this.eventGuests,
+          prisma: this.prisma,
+          applications: this.jobApplications,
+          interests: this.jobInterests,
+          referrals: this.jobReferrals,
+          jobMatch: this.jobMatch,
+          hiring: this.hiring,
+          asks: this.asks,
+          projects: this.projects,
+          upvotes: this.newsUpvotes,
+          comments: this.articleComments,
+          articleRequests: this.articleRequests,
+          officeHours: this.officeHours,
+          demoDays: this.demoDays,
+          demoDayEngagement: this.demoDayEngagement,
+          pitches: this.pitches,
+          pitchEngagement: this.pitchEngagement,
+          deals: this.deals,
+          dealRequests: this.dealRequests,
+          spotlights: this.spotlights,
+          support: this.support,
+          notifications: this.pushNotifications,
+        }),
+        ...platformCoverageTools({
+          aiApps: this.aiApps,
+          aiAccess: this.aiAccess,
+          regenerate: this.warmIntroRegenerate,
+          warmIntros: this.warmIntros,
+          lists: this.investorLists,
+          pathfinder: this.pathfinder,
+          founders: this.founderReviews,
+          roadmap: this.roadmap,
+          pins: this.roadmapPins,
+        }),
       ]),
       actor.scopeLevels,
       caps

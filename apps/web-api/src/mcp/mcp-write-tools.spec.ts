@@ -413,9 +413,9 @@ describe('directory write tools', () => {
 
     it('refuses fields an agent may not change, naming them, even through the SDK schema', async () => {
       const { updateTeam, teams } = build();
-      const args = { teamUid: 'team-1', name: 'Renamed', teamMemberRoles: [], blog: 'x' };
+      const args = { teamUid: 'team-1', logo: 'x', teamMemberRoles: [], blog: 'x' };
       expect((toolInputSchema(updateTeam) as z.ZodTypeAny).parse(args)).toEqual(args);
-      await expect(updateTeam.execute(CTX, args)).rejects.toThrow('name, teamMemberRoles');
+      await expect(updateTeam.execute(CTX, args)).rejects.toThrow('logo, teamMemberRoles');
       expect(teams.updateTeamProfileFields).not.toHaveBeenCalled();
     });
   });

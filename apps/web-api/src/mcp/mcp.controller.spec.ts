@@ -38,6 +38,31 @@ jest.mock('../members/members.hooks.service', () => ({ MembersHooksService: jest
 jest.mock('../team-news/team-news.service', () => ({ TeamNewsService: jest.fn() }));
 jest.mock('../team-news/team-news-query.service', () => ({ TeamNewsQueryService: jest.fn() }));
 jest.mock('../team-news/team-news-suggestions.service', () => ({ TeamNewsSuggestionsService: jest.fn() }));
+jest.mock('../team-news/team-news-upvotes.service', () => ({ TeamNewsUpvotesService: jest.fn() }));
+jest.mock('../members/investor-profile.service', () => ({ InvestorProfileService: jest.fn() }));
+jest.mock('../participants-request/participants-request.service', () => ({ ParticipantsRequestService: jest.fn() }));
+jest.mock('../team-enrichment/team-enrichment.service', () => ({ TeamEnrichmentService: jest.fn() }));
+jest.mock('../asks/asks.service', () => ({ AskService: jest.fn() }));
+jest.mock('../events/events.service', () => ({ EventsService: jest.fn() }));
+jest.mock('../articles/article-comments.service', () => ({ ArticleCommentsService: jest.fn() }));
+jest.mock('../article-requests/article-requests.service', () => ({ ArticleRequestsService: jest.fn() }));
+jest.mock('../deal-requests/deal-requests.service', () => ({ DealRequestsService: jest.fn() }));
+jest.mock('../contact-support/contact-support.service', () => ({ ContactSupportService: jest.fn() }));
+jest.mock('../spv-spotlights/spv-spotlights.service', () => ({ SpvSpotlightsService: jest.fn() }));
+jest.mock('../job-openings/job-openings-application.service', () => ({ JobOpeningsApplicationService: jest.fn() }));
+jest.mock('../job-openings/job-openings-interest.service', () => ({ JobOpeningsInterestService: jest.fn() }));
+jest.mock('../job-openings/job-openings-referral.service', () => ({ JobOpeningsReferralService: jest.fn() }));
+jest.mock('../job-match/job-match.service', () => ({ JobMatchService: jest.fn() }));
+jest.mock('../team-hiring/team-hiring.service', () => ({ TeamHiringService: jest.fn() }));
+jest.mock('../pathfinder/pathfinder.service', () => ({ PathfinderService: jest.fn() }));
+jest.mock('../investor-lists/investor-lists.service', () => ({ InvestorListsService: jest.fn() }));
+jest.mock('../founder-sourcing/founder-sourcing-review.service', () => ({ FounderSourcingReviewService: jest.fn() }));
+jest.mock('../roadmap/roadmap.service', () => ({ RoadmapService: jest.fn() }));
+jest.mock('../roadmap/roadmap-pins.service', () => ({ RoadmapPinsService: jest.fn() }));
+jest.mock('../warm-intros-v2/warm-intros-v2-regenerate.service', () => ({ WarmIntrosV2RegenerateService: jest.fn() }));
+jest.mock('../ai-apps/ai-apps-access.service', () => ({ AiAppsAccessService: jest.fn() }));
+jest.mock('../team-pitches/team-pitches.service', () => ({ TeamPitchesService: jest.fn() }));
+jest.mock('../team-pitches/team-pitch-engagement.service', () => ({ TeamPitchEngagementService: jest.fn() }));
 // The SDK's ESM build can't load under Jest 27, so a fake server records what the controller registers: the SDK lists
 // exactly the registered tools and routes `tools/call` to their callbacks.
 const registered = new Map<string, { description: string; inputSchema?: unknown; cb: (args?: unknown) => unknown }>();
@@ -142,6 +167,31 @@ function build(
     writeLimit as any,
     {} as any,
     {} as any,
+    stub,
+    stub,
+    stub,
+    stub,
+    stub,
+    stub,
+    stub,
+    stub,
+    stub,
+    stub,
+    stub,
+    stub,
+    stub,
+    stub,
+    stub,
+    stub,
+    stub,
+    stub,
+    stub,
+    stub,
+    stub,
+    stub,
+    stub,
+    stub,
+    stub,
     stub,
     stub,
     stub,
