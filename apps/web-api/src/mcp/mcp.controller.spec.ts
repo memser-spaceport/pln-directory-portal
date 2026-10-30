@@ -1,3 +1,8 @@
+jest.mock('../push-notifications/push-notifications.service', () => ({ PushNotificationsService: jest.fn() }));
+jest.mock('../deals/deals.service', () => ({ DealsService: jest.fn() }));
+jest.mock('../articles/articles.service', () => ({ ArticlesService: jest.fn() }));
+jest.mock('../member-follow-ups/member-follow-ups.service', () => ({ MemberFollowUpsService: jest.fn() }));
+jest.mock('../office-hours/office-hours.service', () => ({ OfficeHoursService: jest.fn() }));
 jest.mock('../notification-settings/notification-settings.service', () => ({ NotificationSettingsService: jest.fn() }));
 jest.mock('../notification-settings/suggested-candidates-email-preference.service', () => ({
   SuggestedCandidatesEmailPreferenceService: jest.fn(),
@@ -132,6 +137,11 @@ function build(
     writeLimit as any,
     {} as any,
     {} as any,
+    stub,
+    stub,
+    stub,
+    stub,
+    stub,
     stub,
     stub,
     stub,

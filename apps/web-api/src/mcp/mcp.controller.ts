@@ -43,6 +43,18 @@ import {
   jobAlertTools,
   savedJobTools,
 } from './mcp-member-action-tools';
+import {
+  dealTools,
+  demoDayFeedbackTools,
+  guideLikeTools,
+  notificationTools,
+  officeHoursFeedbackTools,
+} from './mcp-self-service-tools';
+import { PushNotificationsService } from '../push-notifications/push-notifications.service';
+import { DealsService } from '../deals/deals.service';
+import { ArticlesService } from '../articles/articles.service';
+import { MemberFollowUpsService } from '../member-follow-ups/member-follow-ups.service';
+import { OfficeHoursService } from '../office-hours/office-hours.service';
 import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
 import { SuggestedCandidatesEmailPreferenceService } from '../notification-settings/suggested-candidates-email-preference.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
@@ -102,7 +114,12 @@ export class McpController {
     private readonly notificationClient: NotificationServiceClient,
     private readonly suggestedCandidatesEmail: SuggestedCandidatesEmailPreferenceService,
     private readonly demoDays: DemoDaysService,
-    private readonly demoDayEngagement: DemoDayEngagementService
+    private readonly demoDayEngagement: DemoDayEngagementService,
+    private readonly pushNotifications: PushNotificationsService,
+    private readonly deals: DealsService,
+    private readonly articles: ArticlesService,
+    private readonly followUps: MemberFollowUpsService,
+    private readonly officeHours: OfficeHoursService
   ) {}
 
   private readonly logger = new Logger(McpController.name);
@@ -159,6 +176,11 @@ export class McpController {
           this.prisma
         ),
         ...demoDaySaveTools(this.demoDays, this.demoDayEngagement, this.prisma),
+        ...notificationTools(this.pushNotifications),
+        ...dealTools(this.deals),
+        ...guideLikeTools(this.articles),
+        ...demoDayFeedbackTools(this.demoDays),
+        ...officeHoursFeedbackTools(this.followUps, this.officeHours),
         ...eventWriteTools(this.eventGuests, this.eventLocations, this.members, this.prisma),
         ...directoryWriteTools(this.teams, this.projects, this.members, this.prisma),
       ]),

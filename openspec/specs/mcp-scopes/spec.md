@@ -233,6 +233,15 @@ The `profile` scope SHALL also offer `get_my_email_preferences` at `read` and `u
 - **WHEN** an agent sets `forumDigest` to `daily`
 - **THEN** the digest becomes daily and its forum-activity and network-news choices are unchanged
 
+### Requirement: Agents handle the member's notifications, deals, guide likes and feedback
+
+The `profile` scope SHALL also offer `list_my_notifications`, `list_deals` and `list_my_office_hours_followups` at `read`, and `mark_notification_read`, `mark_all_notifications_read`, `mark_deal_used`, `unmark_deal_used`, `report_deal_issue`, `like_guide`, `unlike_guide`, `submit_demo_day_feedback` and `submit_office_hours_feedback` at `write`. Each SHALL use the same service and checks as its LabOS route: the deals access gate for deal tools, `founder_guides.view` (or directory admin) for guide likes, and for office-hours feedback only the member's own follow-ups that are PENDING or CLOSED. Free-text fields SHALL be capped (2000 characters; 500 for each office-hours reason). Office-hours feedback SHALL take the form's reason labels only, and "Got rescheduled" SHALL need the new date. No tool here SHALL contact another person; guide comments, asks and office-hours broken-link reports, which do, SHALL NOT be tools until agent actions that reach others get the member's confirm (LAB-2903). Each SHALL refuse any other argument without writing.
+
+#### Scenario: Someone else's office-hours follow-up
+
+- **WHEN** an agent calls `submit_office_hours_feedback` with a follow-up the member did not create
+- **THEN** the call fails as not found and no feedback is stored
+
 ### Requirement: Agent writes are rate limited per member
 
 Each write tool SHALL allow at most 10 calls per member per tool per hour. A call over the limit SHALL be refused with an error that names the limit, SHALL NOT run, SHALL NOT create an access request, and SHALL emit `mcp-tool-refused` with reason `rate_limited`. If the limit store is unavailable the call SHALL be allowed.
