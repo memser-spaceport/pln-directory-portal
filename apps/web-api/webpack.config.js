@@ -14,9 +14,15 @@
 // Note: the main webpack process still runs the @nestjs/swagger transformer,
 // which needs a larger V8 stack — launch serve/build with the node flags in the
 // `start:api` npm script (`--stack-size` + `--max-old-space-size`).
+//
+// We also turn off `optimization.nodeEnv`, so `process.env.NODE_ENV` is read
+// from the pod's environment at runtime. By default webpack replaces it with
+// the build mode, and the image is built in development mode, so production
+// checks such as the CloudWatch transport in `setup.service.ts` became `false`.
 module.exports = (config) => {
   config.plugins = (config.plugins || []).filter(
     (plugin) => plugin?.constructor?.name !== 'ForkTsCheckerWebpackPlugin'
   );
+  config.optimization = { ...config.optimization, nodeEnv: false };
   return config;
 };
