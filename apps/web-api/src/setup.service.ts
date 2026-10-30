@@ -31,15 +31,25 @@ export class SetupService {
   }
 
   private addProductionTransport(instance: winston.Logger) {
+    const missing = ['CLOUDWATCH_GROUP_NAME', 'DEPLOYMENT_ENVIRONMENT', 'CLOUDWATCH_REGION'].filter(
+      (name) => !process.env[name]
+    );
+    if (missing.length) {
+      console.warn(`CloudWatch logging disabled: missing ${missing.join(', ')}`);
+      return;
+    }
+    const logGroupName = `${process.env.CLOUDWATCH_GROUP_NAME}-${process.env.DEPLOYMENT_ENVIRONMENT}`;
     const cloudwatchConfig = {
-      logGroupName: `${process.env.CLOUDWATCH_GROUP_NAME}-${process.env.DEPLOYMENT_ENVIRONMENT}`,
+      logGroupName,
       logStreamName: `${ip.address()}`,
       awsRegion: process.env.CLOUDWATCH_REGION,
       awsOptions: {
         region: process.env.CLOUDWATCH_REGION,
       },
-      messageFormatter: (item: any) =>
-        `[${item.level}] : ${JSON.stringify(item)}`,
+      messageFormatter: (item: any) => `[${item.level}] : ${JSON.stringify(item)}`,
+      // Written with console, not winston, so a failing transport cannot log into itself.
+      errorHandler: (error: Error) =>
+        console.error(`CloudWatch log delivery failed: group=${logGroupName} ${error?.name}: ${error?.message}`),
     };
     instance.add(new WinstonCloudWatch(cloudwatchConfig));
   }
