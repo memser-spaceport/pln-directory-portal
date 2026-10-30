@@ -48,19 +48,27 @@ const QUERY_MAX = 200;
 
 const none: McpToolPropertyBuilder = () => ({});
 
-/** Names of the fields a write call sends, never their values (LAB-3050). */
-function fieldNames(args: McpToolArgs, idKeys: string[] = []): string[] {
-  return Object.keys(args)
-    .filter((key) => !idKeys.includes(key) && args[key] !== undefined)
-    .sort();
+const FIELD_NAME_MAX = 64;
+const FIELD_NAMES_MAX = 30;
+
+/**
+ * Names of the fields a write call sends, never their values (LAB-3050). Tools that keep unknown arguments pass the
+ * agent's own key names through, so the names are capped in length and number.
+ */
+function fieldNames(args: McpToolArgs, idKeys: string[] = []): { fields: string[]; fieldCount: number } {
+  const keys = Object.keys(args).filter((key) => !idKeys.includes(key) && args[key] !== undefined);
+  const fields = keys
+    .map((key) => key.slice(0, FIELD_NAME_MAX))
+    .sort()
+    .slice(0, FIELD_NAMES_MAX);
+  return { fields, fieldCount: keys.length };
 }
 
 function fieldsOnly(...idKeys: string[]): McpToolPropertyBuilder {
   return (args) => {
     const props: Record<string, unknown> = {};
     for (const key of idKeys) props[key] = stringProp(args[key]);
-    const fields = fieldNames(args, idKeys);
-    return { ...props, fields, fieldCount: fields.length };
+    return { ...props, ...fieldNames(args, idKeys) };
   };
 }
 
@@ -189,8 +197,7 @@ export const MCP_TOOL_PROPERTY_BUILDERS: Readonly<Record<string, McpToolProperty
   list_my_experiences: (_args, result) => ({ resultCount: countOf(result?.experiences) }),
   add_experience: (args, result) => {
     const added = result?.added as Record<string, unknown> | undefined;
-    const fields = fieldNames(args);
-    return { experienceUid: stringProp(added?.uid), fields, fieldCount: fields.length };
+    return { experienceUid: stringProp(added?.uid), ...fieldNames(args) };
   },
   update_experience: fieldsOnly('experienceUid'),
   delete_experience: uidsOnly('experienceUid'),
@@ -292,10 +299,13 @@ export function trackMcpToolCalled(
     operation: mcpToolOperation(input.toolName),
     result: input.result,
     reason: input.reason,
+    // A refusal runs nothing, so it sends nothing from the arguments.
     ...(input.result === 'refused'
       ? {}
-      : buildMcpToolAnalyticsProperties(input.toolName, args, input.output, input.error)),
-    ...(input.result === 'refused' ? {} : queryProps(input.toolName, args)),
+      : {
+          ...buildMcpToolAnalyticsProperties(input.toolName, args, input.output, input.error),
+          ...queryProps(input.toolName, args),
+        }),
   });
   void analytics.trackEvent({
     name: mcpToolCalledEventName(input.toolName),
