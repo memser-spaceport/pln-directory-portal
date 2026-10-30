@@ -11,6 +11,7 @@ import { AtsPushService } from './ats-push.service';
 import { AccessControlV2Module } from '../access-control-v2/access-control-v2.module';
 import { MemberSignInController } from './member-sign-in.controller';
 import { MemberSignInService } from './member-sign-in.service';
+import { PlaaAccessController } from './plaa-access.controller';
 
 /**
  * Team-scoped integration keys: admin issue/list/revoke, and the guard that
@@ -20,7 +21,7 @@ import { MemberSignInService } from './member-sign-in.service';
  */
 @Module({
   imports: [SharedModule, MemberCvImportsModule, AccessControlV2Module],
-  controllers: [AdminIntegrationKeysController, IntegrationsController, MemberSignInController],
+  controllers: [AdminIntegrationKeysController, IntegrationsController, MemberSignInController, PlaaAccessController],
   providers: [
     IntegrationKeysService,
     IntegrationKeyGuard,
