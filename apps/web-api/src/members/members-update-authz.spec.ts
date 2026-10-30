@@ -2,6 +2,16 @@ import { BadRequestException, ForbiddenException } from '@nestjs/common';
 
 import { MemberController } from './members.controller';
 
+// The real services and guards pull in ES-module-only dependencies that this Jest setup cannot load.
+jest.mock('./members.service', () => ({ MembersService: class {} }));
+jest.mock('./investor-profile.service', () => ({ InvestorProfileService: class {} }));
+jest.mock('../guards/user-token-validation.guard', () => ({ UserTokenValidation: class {} }));
+jest.mock('../guards/auth.guard', () => ({ AuthGuard: class {} }));
+jest.mock('../guards/user-access-token-validate.guard', () => ({ UserAccessTokenValidateGuard: class {} }));
+jest.mock('../guards/user-token-check.guard', () => ({ OptionalUserTokenCheckGuard: class {} }));
+jest.mock('../guards/service-auth.guard', () => ({ ServiceAuthGuard: class {} }));
+jest.mock('../interceptors/verified-member.interceptor', () => ({ IsVerifiedMemberInterceptor: class {} }));
+
 /**
  * Who may write which member record, on the two member update routes.
  * `PUT /v1/member/:uid` writes to the path uid, so ownership is checked on the
@@ -19,10 +29,17 @@ describe('MemberController — member update authorization', () => {
       checkIfAdminUser: jest.fn().mockReturnValue(requestor.isDirectoryAdmin),
       updateMemberByUid: jest.fn().mockResolvedValue({ uid: 'member-1' }),
       updateMemberFromParticipantsRequest: jest.fn().mockResolvedValue({ uid: 'member-1' }),
+      setMemberRole: jest.fn().mockResolvedValue({ uid: 'member-1' }),
+      updateMemberEmail: jest.fn().mockResolvedValue({ uid: 'member-1' }),
+      updateMemberInvestorSetting: jest.fn().mockResolvedValue({ uid: 'member-1' }),
     };
     const logger = { info: jest.fn(), error: jest.fn() };
     const controller = new MemberController(membersService as any, {} as any, logger as any);
-    return { controller, membersService };
+    return { controller, membersService, logger };
+  }
+
+  function auditLine(action: string, targetUid: string) {
+    return `Member update audit - action=${action} requestor=${req.userEmail} target=${targetUid}`;
   }
 
   function participantsRequest(referenceUid: string | undefined, newData: Record<string, unknown> = {}) {
@@ -140,6 +157,64 @@ describe('MemberController — member update authorization', () => {
         controller.updateMemberByUid('member-1', { ohInterest: { set: ['x'] } }, req)
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(membersService.updateMemberByUid).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('audit line', () => {
+    it('records a member updating their own profile', async () => {
+      const { controller, logger } = setup(MEMBER);
+
+      await controller.updateMember('member-1', participantsRequest('member-1'), req);
+
+      expect(logger.info).toHaveBeenCalledWith(auditLine('modifyMember', 'member-1'));
+    });
+
+    it("records a directory admin updating another member's profile", async () => {
+      const { controller, logger } = setup(ADMIN);
+
+      await controller.updateMemberByUid('member-1', { bio: 'x' }, req);
+
+      expect(logger.info).toHaveBeenCalledWith(auditLine('updateMember', 'member-1'));
+    });
+
+    it.each([
+      ['modifyMember', (c: MemberController) => c.updateMember('victim-1', participantsRequest('victim-1'), req)],
+      ['updateMember', (c: MemberController) => c.updateMemberByUid('victim-1', { bio: 'x' }, req)],
+      ['updateRole', (c: MemberController) => c.updateOwnRole('victim-1', { role: 'Founder' }, req)],
+      [
+        'updateMemberInvestorSetting',
+        (c: MemberController) => c.updateMemberInvestorSetting('victim-1', { isInvestor: true } as any, req),
+      ],
+    ])('records a refused %s attempt', async (action, call) => {
+      const { controller, logger } = setup(MEMBER);
+
+      await expect(call(controller)).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(logger.info).toHaveBeenCalledWith(auditLine(action, 'victim-1'));
+    });
+
+    it('records a role update', async () => {
+      const { controller, logger } = setup(MEMBER);
+
+      await controller.updateOwnRole('member-1', { role: 'Founder' }, req);
+
+      expect(logger.info).toHaveBeenCalledWith(auditLine('updateRole', 'member-1'));
+    });
+
+    it('records an investor setting update', async () => {
+      const { controller, logger } = setup(MEMBER);
+
+      await controller.updateMemberInvestorSetting('member-1', { isInvestor: true } as any, req);
+
+      expect(logger.info).toHaveBeenCalledWith(auditLine('updateMemberInvestorSetting', 'member-1'));
+    });
+
+    it("records an email change against the requestor's own uid", async () => {
+      const { controller, logger } = setup({ ...MEMBER, externalId: 'ext-1' } as any);
+
+      await controller.updateMemberEmail({ newEmail: 'new@example.com' } as any, req);
+
+      expect(logger.info).toHaveBeenCalledWith(auditLine('updateMemberEmail', 'member-1'));
     });
   });
 });
