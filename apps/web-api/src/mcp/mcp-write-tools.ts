@@ -340,14 +340,14 @@ const PROJECT_FIELDS = [...PROJECT_TEXT_FIELDS, 'lookingForFunding', 'tags', 'pr
 const DIRECTORY_TEXT_MAX = 5000;
 const PROJECT_LIST_MAX = 20;
 
-function refuseUnknown(args: Record<string, unknown>, allowed: readonly string[]) {
+export function refuseUnknown(args: Record<string, unknown>, allowed: readonly string[]) {
   const unknown = Object.keys(args).filter((k) => !allowed.includes(k));
   if (unknown.length > 0) {
     throw new BadRequestException(`These fields can't be changed by an agent: ${unknown.join(', ')}`);
   }
 }
 
-function requiredUid(args: Record<string, unknown>, key: string): string {
+export function requiredUid(args: Record<string, unknown>, key: string): string {
   const uid = typeof args[key] === 'string' ? (args[key] as string).trim() : '';
   if (!uid) throw new BadRequestException(`${key} is required`);
   return uid;

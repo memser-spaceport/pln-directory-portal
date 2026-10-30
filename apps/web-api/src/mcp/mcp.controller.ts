@@ -35,6 +35,12 @@ import { McpOAuthService } from './mcp-oauth.service';
 import { portfolioTools } from './mcp-portfolio-tools';
 import { newsTools } from './mcp-news-tools';
 import { directoryWriteTools, eventWriteTools, membershipTools, newsWriteTools, profileTools } from './mcp-write-tools';
+import { experienceTools, followTools, jobAlertTools, savedJobTools } from './mcp-member-action-tools';
+import { MemberExperiencesService } from '../member-experiences/member-experiences.service';
+import { FollowsService } from '../follows/follows.service';
+import { JobOpeningsSavedService } from '../job-openings/job-openings-saved.service';
+import { JobOpeningsQueryService } from '../job-openings/job-openings-query.service';
+import { JobAlertsService } from '../job-alerts/job-alerts.service';
 import { McpWriteLimitService } from './mcp-write-limit.service';
 import { TeamNewsService } from '../team-news/team-news.service';
 import { MembersHooksService } from '../members/members.hooks.service';
@@ -74,7 +80,12 @@ export class McpController {
     private readonly prisma: PrismaService,
     private readonly writeLimit: McpWriteLimitService,
     private readonly eventGuests: PLEventGuestsService,
-    private readonly eventLocations: PLEventLocationsService
+    private readonly eventLocations: PLEventLocationsService,
+    private readonly experiences: MemberExperiencesService,
+    private readonly follows: FollowsService,
+    private readonly savedJobs: JobOpeningsSavedService,
+    private readonly jobAlerts: JobAlertsService,
+    private readonly jobQuery: JobOpeningsQueryService
   ) {}
 
   private readonly logger = new Logger(McpController.name);
@@ -119,6 +130,10 @@ export class McpController {
         ...newsWriteTools(this.teamNews, this.newsQuery, this.members),
         ...profileTools(this.members, this.memberHooks, this.prisma),
         ...membershipTools(this.members, this.memberHooks, this.prisma),
+        ...experienceTools(this.experiences, this.prisma),
+        ...followTools(this.follows),
+        ...savedJobTools(this.savedJobs),
+        ...jobAlertTools(this.jobAlerts, this.jobQuery),
         ...eventWriteTools(this.eventGuests, this.eventLocations, this.members, this.prisma),
         ...directoryWriteTools(this.teams, this.projects, this.members, this.prisma),
       ]),
