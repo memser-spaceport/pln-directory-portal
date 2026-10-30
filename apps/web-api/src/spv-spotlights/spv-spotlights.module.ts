@@ -5,6 +5,7 @@ import { AuthModule } from '../auth/auth.module';
 import { InvestorsModule } from '../investors/investors.module';
 import { SpvSpotlightsService } from './spv-spotlights.service';
 import { SpvSpotlightAdminService } from './spv-spotlight-admin.service';
+import { SpvSpotlightInvestorListsService } from './spv-spotlight-investor-lists.service';
 import { SpvSpotlightMailer } from './spv-spotlight-mailer';
 import { PlNetworkPortfolioModule } from './pl-network-portfolio.module';
 import { SpvSpotlightsController } from './spv-spotlights.controller';
@@ -12,7 +13,7 @@ import { SpvSpotlightsController } from './spv-spotlights.controller';
 @Module({
   imports: [SharedModule, NotificationsModule, AuthModule, InvestorsModule, PlNetworkPortfolioModule],
   controllers: [SpvSpotlightsController],
-  providers: [SpvSpotlightsService, SpvSpotlightAdminService, SpvSpotlightMailer],
-  exports: [SpvSpotlightsService, SpvSpotlightAdminService],
+  providers: [SpvSpotlightsService, SpvSpotlightAdminService, SpvSpotlightInvestorListsService, SpvSpotlightMailer],
+  exports: [SpvSpotlightsService, SpvSpotlightAdminService, SpvSpotlightInvestorListsService],
 })
 export class SpvSpotlightsModule {}
