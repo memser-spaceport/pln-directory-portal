@@ -5,11 +5,9 @@ import s from '../TeamsMenu/TeamsMenu.module.scss';
 
 export function DemoDayRolesNav() {
   return (
-    <Link href="/roles" passHref>
-      <a className={s.menuItem}>
-        <DemoDayRolesIcon />
-        <span className={s.menuItemLabel}>Roles</span>
-      </a>
+    <Link href="/roles" className={s.menuItem}>
+      <DemoDayRolesIcon />
+      <span className={s.menuItemLabel}>Roles</span>
     </Link>
   );
 }

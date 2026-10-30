@@ -4,11 +4,9 @@ import s from '../TeamsMenu/TeamsMenu.module.scss';
 
 export const FounderGuidesMenu = () => {
   return (
-    <Link href="/founder-guides" passHref>
-      <a className={s.menuItem}>
-        <BookIcon />
-        <span className={s.menuItemLabel}>Guides</span>
-      </a>
+    <Link href="/founder-guides" className={s.menuItem}>
+      <BookIcon />
+      <span className={s.menuItemLabel}>Guides</span>
     </Link>
   );
 };

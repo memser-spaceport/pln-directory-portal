@@ -27,31 +27,25 @@ export const RecommendationsMenu = () => {
         </span>
       </button>
       <div ref={menuRef} className={`${s.menu} ${open ? s.open : ''}`}>
-        <Link href="/recommendations/runs" passHref>
-          <a className={s.menuItem}>
-            <RunsIcon />
-            <span className={s.menuItemLabel}>Runs</span>
-            <span className={s.menuItemCount}>2</span>
-            <CaretIcon />
-          </a>
+        <Link href="/recommendations/runs" className={s.menuItem}>
+          <RunsIcon />
+          <span className={s.menuItemLabel}>Runs</span>
+          <span className={s.menuItemCount}>2</span>
+          <CaretIcon />
         </Link>
 
-        <Link href="/recommendations/members" passHref>
-          <a className={s.menuItem}>
-            <OptinIcon />
-            <span className={s.menuItemLabel}>Opted-in</span>
-            <span className={s.menuItemCount}>1</span>
-            <CaretIcon />
-          </a>
+        <Link href="/recommendations/members" className={s.menuItem}>
+          <OptinIcon />
+          <span className={s.menuItemLabel}>Opted-in</span>
+          <span className={s.menuItemCount}>1</span>
+          <CaretIcon />
         </Link>
 
-        <Link href="/recommendations/history" passHref>
-          <a className={s.menuItem}>
-            <HistoryIcon />
-            <span className={s.menuItemLabel}>History</span>
-            <span className={s.menuItemCount}>2</span>
-            <CaretIcon />
-          </a>
+        <Link href="/recommendations/history" className={s.menuItem}>
+          <HistoryIcon />
+          <span className={s.menuItemLabel}>History</span>
+          <span className={s.menuItemCount}>2</span>
+          <CaretIcon />
         </Link>
       </div>
     </div>

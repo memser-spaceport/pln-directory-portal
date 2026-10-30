@@ -33,6 +33,7 @@ export function Accordion({ items }: AccordionProps) {
                   </span>
                 </Disclosure.Button>
                 <Transition
+                  as="div"
                   show={open}
                   className="overflow-hidden"
                   enter="transition-[max-height] duration-300 ease-in-out"

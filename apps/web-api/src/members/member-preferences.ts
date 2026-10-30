@@ -1,5 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { parseNewsCategories } from '../team-news/utils/news-categories';
+import { parseNewsTags } from '../team-news/utils/news-tags';
+import type { NewsTagVocabulary } from '../team-news/news-tag-vocabulary.service';
 
 /**
  * Keys the GET response *injects* rather than stores.
@@ -23,6 +25,9 @@ export const DERIVED_PREFERENCE_KEYS = [
   'twitter',
   'bluesky',
   'subscription',
+  // Computed on read for a member who never saved news tags (LAB-2998); a client
+  // echoing it back must not freeze "seeded" into the blob.
+  'newsTagsSeeded',
 ] as const;
 
 /**
@@ -36,10 +41,13 @@ export const DERIVED_PREFERENCE_KEYS = [
  * enforce is that the body is a plain object, so a string or an array cannot
  * reach a `jsonb` merge.
  *
+ * @param newsTagVocabulary - The focus-area vocabulary, needed only when the body
+ *   carries `newsTags`.
  * @throws BadRequestException when the body is not a plain object, or when it
- *   carries an invalid `newsCategories` (see parseNewsCategories).
+ *   carries an invalid `newsCategories` (see parseNewsCategories) or `newsTags`
+ *   (see parseNewsTags).
  */
-export function toPreferencePatch(body: unknown): Record<string, unknown> {
+export function toPreferencePatch(body: unknown, newsTagVocabulary?: NewsTagVocabulary): Record<string, unknown> {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     throw new BadRequestException('preferences must be an object');
   }
@@ -52,6 +60,13 @@ export function toPreferencePatch(body: unknown): Record<string, unknown> {
      typo or an empty list must not reach the blob. */
   if ('newsCategories' in patch) {
     patch.newsCategories = parseNewsCategories(patch.newsCategories);
+  }
+  // LAB-2998: For You and the digest match news on these, so only focus-area slugs reach the blob.
+  if ('newsTags' in patch) {
+    if (!newsTagVocabulary) {
+      throw new Error('toPreferencePatch needs the news tag vocabulary to validate newsTags');
+    }
+    patch.newsTags = parseNewsTags(patch.newsTags, newsTagVocabulary);
   }
   return patch;
 }

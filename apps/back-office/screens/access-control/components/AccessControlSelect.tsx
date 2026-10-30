@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import Select from 'react-select';
+import Select, { StylesConfig } from 'react-select';
 import clsx from 'clsx';
 
 import s from '../../members/components/MemberForm/StatusSelector/StatusSelector.module.scss';
@@ -10,12 +10,12 @@ export type AccessControlSelectOption = {
   desc?: string;
 };
 
-const selectStyles = {
-  container: (base: Record<string, unknown>) => ({
+const selectStyles: StylesConfig<AccessControlSelectOption, false> = {
+  container: (base) => ({
     ...base,
     width: '100%',
   }),
-  control: (baseStyles: Record<string, unknown>) => ({
+  control: (baseStyles) => ({
     ...baseStyles,
     alignItems: 'center',
     gap: '8px',
@@ -40,19 +40,19 @@ const selectStyles = {
       boxShadow: '0 0 0 4px rgba(27, 56, 96, 0.12) !important',
     },
   }),
-  input: (baseStyles: Record<string, unknown>) => ({
+  input: (baseStyles) => ({
     ...baseStyles,
     height: '32px',
     padding: 0,
     opacity: 0,
   }),
-  placeholder: (base: Record<string, unknown>) => ({
+  placeholder: (base) => ({
     ...base,
     width: 'fit-content',
     fontSize: '14px',
     color: '#455468A0',
   }),
-  option: (baseStyles: Record<string, unknown>) => ({
+  option: (baseStyles) => ({
     ...baseStyles,
     fontSize: '14px',
     fontWeight: 300,
@@ -61,20 +61,16 @@ const selectStyles = {
       background: 'rgba(27, 56, 96, 0.12)',
     },
   }),
-  menu: (baseStyles: Record<string, unknown>) => ({
+  menu: (baseStyles) => ({
     ...baseStyles,
     outline: 'none',
     zIndex: 100,
   }),
-  menuPortal: (base: Record<string, unknown>) => ({
+  menuPortal: (base) => ({
     ...base,
     zIndex: 100,
   }),
-  indicatorContainer: (base: Record<string, unknown>) => ({
-    ...base,
-    display: 'none',
-  }),
-  indicatorSeparator: (base: Record<string, unknown>) => ({
+  indicatorSeparator: (base) => ({
     ...base,
     display: 'none',
   }),

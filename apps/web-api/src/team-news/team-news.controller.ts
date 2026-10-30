@@ -81,6 +81,14 @@ export class TeamNewsController {
     return this.teamNewsQueryService.getFilters(params);
   }
 
+  // Must stay above `getTeamNewsItem`: Nest registers routes in method order, and
+  // `/team-news/:newsItemUid` would take `tags` as a news item uid (LAB-2998).
+  @Api(server.route.getTeamNewsTags)
+  @NoCache()
+  async getTeamNewsTags() {
+    return this.teamNewsQueryService.listNewsTags();
+  }
+
   // The notification service pulls this at digest-cron time
   // to build the "Latest Network News" email section. Selection is by the
   // ingestion-time watermark window (sinceCreatedAt, untilCreatedAt].

@@ -1,5 +1,5 @@
 import { InputField, ProfileImageUpload } from '@protocol-labs-network/ui';
-import { UserIcon } from '@heroicons/react/solid';
+import { UserIcon } from '@heroicons/react/20/solid';
 import { ReactComponent as InformationCircleIcon } from '../../public/assets/icons/info_icon.svg';
 
 export default function AddMemberBasicForm(props) {

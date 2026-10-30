@@ -1,5 +1,5 @@
-import { EyeIcon, EyeOffIcon, XIcon } from '@heroicons/react/outline';
-import { UserIcon, UserGroupIcon } from '@heroicons/react/solid';
+import { EyeIcon, EyeSlashIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { UserIcon, UserGroupIcon } from '@heroicons/react/20/solid';
 import React, { useEffect, useState } from 'react';
 
 type HeroIcon = (props: React.ComponentProps<'svg'>) => JSX.Element;
@@ -100,7 +100,7 @@ export function InputField({
        my-auto h-[20px] w-[20px] text-slate-600"
           onClick={showPasswordAction}
         >
-          {showPassword ? <EyeIcon /> : <EyeOffIcon />}
+          {showPassword ? <EyeIcon /> : <EyeSlashIcon />}
         </div>
       )}
 
@@ -111,7 +111,7 @@ export function InputField({
           } ${inputValue ? '' : 'hidden'}`}
           onClick={handleClear}
         >
-          <XIcon className="h-3 w-3 fill-slate-600" />
+          <XMarkIcon className="h-3 w-3 fill-slate-600" />
         </button>
       ) : null}
     </label>

@@ -4,11 +4,9 @@ import s from '../TeamsMenu/TeamsMenu.module.scss';
 
 export const DealsMenu = () => {
   return (
-    <Link href="/deals" passHref>
-      <a className={s.menuItem}>
-        <DealsIcon />
-        <span className={s.menuItemLabel}>Deals</span>
-      </a>
+    <Link href="/deals" className={s.menuItem}>
+      <DealsIcon />
+      <span className={s.menuItemLabel}>Deals</span>
     </Link>
   );
 };

@@ -25,6 +25,7 @@ import {
   TeamNewsCountsResponseSchema,
   CreateTeamNewsPostRequestSchema,
   TeamNewsItemSchema,
+  TeamNewsTagsResponseSchema,
 } from '../schema/team-news';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
@@ -136,6 +137,15 @@ export const apiTeamNews = contract.router({
       }),
     },
     summary: 'Post a team news update from the team profile (members and directory admins)',
+  },
+  // Declared before `getTeamNewsItem`: its `/team-news/:newsItemUid` would otherwise take `tags` as an item uid.
+  getTeamNewsTags: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/team-news/tags`,
+    responses: {
+      200: TeamNewsTagsResponseSchema,
+    },
+    summary: 'News tags members can choose: focus areas used by news in the last 90 days, grouped by parent',
   },
   getTeamNewsItem: {
     method: 'GET',

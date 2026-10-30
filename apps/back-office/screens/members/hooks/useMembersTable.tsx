@@ -10,7 +10,7 @@ import {
   SortingState,
   useReactTable,
 } from '@tanstack/react-table';
-import { Row } from '@tanstack/table-core/src/types';
+import { Row } from '@tanstack/react-table';
 
 import RoleCell from '../components/RoleCell/RoleCell';
 import MemberCell from '../components/MemberCell/MemberCell';

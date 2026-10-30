@@ -2,7 +2,7 @@ import { Listbox } from '@headlessui/react';
 import React, { Fragment, useEffect, useState } from 'react';
 import { ArrowIcon } from '../icons/arrow/arrow';
 import { DiscardChangesPopup } from '../modals/confirmation';
-import { UserGroupIcon } from '@heroicons/react/solid';
+import { UserGroupIcon } from '@heroicons/react/20/solid';
 
 export interface DropdownProps {
   buttonContent?: React.ReactNode;
@@ -99,7 +99,6 @@ export function Dropdown({
         name={name}
         value={selectedOption?.value}
         onChange={onChangeHandler}
-        placeholder="Enter value"
         className="w-full text-sm"
         disabled={disabled}
       >
@@ -143,12 +142,12 @@ export function Dropdown({
                       key={option.value}
                       value={option.value}
                     >
-                      {({ active, selected }) => (
+                      {({ focus, selected }) => (
                         <div
                           className={`${selected
                             ? 'border-blue-600 bg-blue-600 text-white'
                             : 'border-white bg-white'
-                            } ${!selected && active
+                            } ${!selected && focus
                               ? 'border-slate-100 bg-slate-100 active:border-blue-600 active:bg-white active:ring-2 active:ring-blue-300'
                               : ''
                             }

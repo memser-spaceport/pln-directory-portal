@@ -1,6 +1,6 @@
 import { ChangeEvent, useState } from 'react';
 import { InputField, Autocomplete } from '@protocol-labs-network/ui';
-import { XIcon as CloseIcon } from '@heroicons/react/outline';
+import { XMarkIcon as CloseIcon } from '@heroicons/react/24/outline';
 import { fetchTeamsForAutocomplete } from '../../utils/services/team';
 
 interface Team {

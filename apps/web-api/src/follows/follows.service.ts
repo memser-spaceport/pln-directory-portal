@@ -70,7 +70,12 @@ export class FollowsService {
     const [teams, counts] = await Promise.all([
       this.prisma.team.findMany({
         where: { uid: { in: teamUids } },
-        select: { uid: true, name: true, logo: { select: { url: true } } },
+        select: {
+          uid: true,
+          name: true,
+          logo: { select: { url: true } },
+          teamFocusAreas: { select: { ancestorArea: { select: { title: true } } }, orderBy: { id: 'asc' } },
+        },
       }),
       this.countFollowersByTeam(teamUids),
     ]);
@@ -88,6 +93,7 @@ export class FollowsService {
           logoUrl: team.logo?.url ?? null,
           followedAt: f.createdAt.toISOString(),
           followerCount: counts.get(team.uid) ?? 0,
+          focusAreas: [...new Set(team.teamFocusAreas.map((tfa) => tfa.ancestorArea.title))],
         };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);

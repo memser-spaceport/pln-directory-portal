@@ -9,7 +9,7 @@ import {
   SortingState,
   useReactTable,
 } from '@tanstack/react-table';
-import { Row } from '@tanstack/table-core/src/types';
+import { Row } from '@tanstack/react-table';
 
 import { Member } from '../../members/types/member';
 import MemberCell from '../../members/components/MemberCell/MemberCell';

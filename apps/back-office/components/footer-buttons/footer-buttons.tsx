@@ -1,4 +1,4 @@
-import { CheckIcon, XIcon } from '@heroicons/react/outline';
+import { CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import api from '../../utils/api';
 import { useRouter } from 'next/router';
 import Modal from '../modal/modal';
