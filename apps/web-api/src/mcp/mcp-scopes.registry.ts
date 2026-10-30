@@ -71,6 +71,10 @@ export const MCP_TOOL_SCOPES: Readonly<Record<string, McpToolScope>> = {
   get_my_job_alert: { scope: 'profile', level: 'read' },
   set_job_alert: { scope: 'profile', level: 'write' },
   delete_job_alert: { scope: 'profile', level: 'write' },
+  get_my_email_preferences: { scope: 'profile', level: 'read' },
+  update_email_preferences: { scope: 'profile', level: 'write' },
+  save_demo_day_team: { scope: 'profile', level: 'write' },
+  unsave_demo_day_team: { scope: 'profile', level: 'write' },
 
   list_my_ai_apps: { scope: 'ai_apps', level: 'read' },
   list_ai_app_feedback: { scope: 'ai_apps', level: 'read' },

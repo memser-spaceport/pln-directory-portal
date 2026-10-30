@@ -35,7 +35,19 @@ import { McpOAuthService } from './mcp-oauth.service';
 import { portfolioTools } from './mcp-portfolio-tools';
 import { newsTools } from './mcp-news-tools';
 import { directoryWriteTools, eventWriteTools, membershipTools, newsWriteTools, profileTools } from './mcp-write-tools';
-import { experienceTools, followTools, jobAlertTools, savedJobTools } from './mcp-member-action-tools';
+import {
+  demoDaySaveTools,
+  emailPreferenceTools,
+  experienceTools,
+  followTools,
+  jobAlertTools,
+  savedJobTools,
+} from './mcp-member-action-tools';
+import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
+import { SuggestedCandidatesEmailPreferenceService } from '../notification-settings/suggested-candidates-email-preference.service';
+import { NotificationServiceClient } from '../notifications/notification-service.client';
+import { DemoDaysService } from '../demo-days/demo-days.service';
+import { DemoDayEngagementService } from '../demo-days/demo-day-engagement.service';
 import { MemberExperiencesService } from '../member-experiences/member-experiences.service';
 import { FollowsService } from '../follows/follows.service';
 import { JobOpeningsSavedService } from '../job-openings/job-openings-saved.service';
@@ -85,7 +97,12 @@ export class McpController {
     private readonly follows: FollowsService,
     private readonly savedJobs: JobOpeningsSavedService,
     private readonly jobAlerts: JobAlertsService,
-    private readonly jobQuery: JobOpeningsQueryService
+    private readonly jobQuery: JobOpeningsQueryService,
+    private readonly notificationSettings: NotificationSettingsService,
+    private readonly notificationClient: NotificationServiceClient,
+    private readonly suggestedCandidatesEmail: SuggestedCandidatesEmailPreferenceService,
+    private readonly demoDays: DemoDaysService,
+    private readonly demoDayEngagement: DemoDayEngagementService
   ) {}
 
   private readonly logger = new Logger(McpController.name);
@@ -134,6 +151,14 @@ export class McpController {
         ...followTools(this.follows),
         ...savedJobTools(this.savedJobs),
         ...jobAlertTools(this.jobAlerts, this.jobQuery),
+        ...emailPreferenceTools(
+          this.notificationSettings,
+          this.notificationClient,
+          this.suggestedCandidatesEmail,
+          this.members,
+          this.prisma
+        ),
+        ...demoDaySaveTools(this.demoDays, this.demoDayEngagement, this.prisma),
         ...eventWriteTools(this.eventGuests, this.eventLocations, this.members, this.prisma),
         ...directoryWriteTools(this.teams, this.projects, this.members, this.prisma),
       ]),

@@ -1,11 +1,22 @@
-import { BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { z } from 'zod';
 import { JobsListQueryParams } from 'libs/contracts/src/schema/job-opening';
+import {
+  ADMIN_PERMISSIONS,
+  FORUM_PERMISSIONS,
+  MEMBER_PERMISSIONS,
+} from '../access-control-v2/access-control-v2.constants';
+import { DemoDayEngagementService } from '../demo-days/demo-day-engagement.service';
+import { DemoDaysService } from '../demo-days/demo-days.service';
 import { FollowsService } from '../follows/follows.service';
 import { JobAlertsService } from '../job-alerts/job-alerts.service';
 import { JobOpeningsQueryService } from '../job-openings/job-openings-query.service';
 import { JobOpeningsSavedService } from '../job-openings/job-openings-saved.service';
 import { MemberExperiencesService } from '../member-experiences/member-experiences.service';
+import { MembersService } from '../members/members.service';
+import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
+import { SuggestedCandidatesEmailPreferenceService } from '../notification-settings/suggested-candidates-email-preference.service';
+import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { PrismaService } from '../shared/prisma.service';
 import { McpActorContext, McpToolDef } from './mcp-tools';
 import { refuseUnknown, requiredUid } from './mcp-write-tools';
@@ -355,6 +366,220 @@ export function jobAlertTools(alerts: JobAlertsService, query: JobOpeningsQueryS
         await alerts.delete(ctx.memberUid, existing.uid);
         return { deleted: true, alert: existing };
       },
+    },
+  ];
+}
+
+const FORUM_DIGEST = { off: null, daily: 1, weekly: 7 } as const;
+type ForumDigest = keyof typeof FORUM_DIGEST;
+const EMAIL_PREFERENCE_FIELDS = [
+  'forumDigest',
+  'forumDigestForumActivity',
+  'forumDigestNetworkNews',
+  'newsletter',
+  'demoDayUpdates',
+  'investorInvites',
+  'investorDealflow',
+  'suggestedCandidatesEmail',
+] as const;
+
+/**
+ * `get_my_email_preferences` (read) and `update_email_preferences` (write) in the `profile` scope (LAB-3059): the
+ * switches on Settings → Email Preferences, through the same services and with the same gates as the page — investor
+ * mail for members with investor access, forum activity in the digest for members who can read the forum, the
+ * suggested candidates email for team leads. The notification service upserts per column, so unchanged settings stay.
+ */
+export function emailPreferenceTools(
+  settings: NotificationSettingsService,
+  client: NotificationServiceClient,
+  suggested: SuggestedCandidatesEmailPreferenceService,
+  members: MembersService,
+  prisma: PrismaService
+): McpToolDef[] {
+  const isAdmin = (ctx: McpActorContext) => ctx.permissions.has(ADMIN_PERMISSIONS.DIRECTORY_FULL);
+  const canInvest = (ctx: McpActorContext) => ctx.permissions.has(MEMBER_PERMISSIONS.INVESTOR_MANAGE) || isAdmin(ctx);
+  const canReadForum = (ctx: McpActorContext) => ctx.permissions.has(FORUM_PERMISSIONS.READ);
+  const isTeamLead = async (ctx: McpActorContext) =>
+    (await prisma.teamMemberRole.count({ where: { memberUid: ctx.memberUid, teamLead: true } })) > 0;
+
+  const read = async (ctx: McpActorContext) => {
+    const [stored, member, lead] = await Promise.all([
+      client.getNotificationSetting(ctx.memberUid),
+      prisma.member.findUnique({ where: { uid: ctx.memberUid }, select: { isSubscribedToNewsletter: true } }),
+      isTeamLead(ctx),
+    ]);
+    const forumDigest: ForumDigest = !stored?.forumDigestEnabled
+      ? 'off'
+      : stored.forumDigestFrequency === 1
+      ? 'daily'
+      : stored.forumDigestFrequency === 7
+      ? 'weekly'
+      : 'off';
+    return {
+      forumDigest,
+      forumDigestForumActivity: canReadForum(ctx) && (stored?.forumDigestForumEnabled ?? true),
+      forumDigestNetworkNews: stored?.forumDigestNewsEnabled ?? true,
+      newsletter: member?.isSubscribedToNewsletter ?? true,
+      demoDayUpdates: !!stored?.demoDaySubscriptionEnabled,
+      ...(canInvest(ctx)
+        ? {
+            investorInvites: !!stored?.investorInvitesEnabled,
+            investorDealflow: !!stored?.investorDealflowEnabled,
+          }
+        : {}),
+      ...(lead
+        ? { suggestedCandidatesEmail: (await suggested.get(ctx.memberUid)).suggestedCandidatesEmailEnabled }
+        : {}),
+    };
+  };
+
+  return [
+    {
+      name: 'get_my_email_preferences',
+      description:
+        'Read your LabOS email preferences (Settings → Email Preferences): forum digest, newsletter, Demo Day ' +
+        'updates, and investor or team-lead emails when they apply to you.',
+      visibility: 'always',
+      execute: async (ctx) => ({ preferences: await read(ctx) }),
+    },
+    {
+      name: 'update_email_preferences',
+      description:
+        'Change your LabOS email preferences. Send only what to change. forumDigest is off, daily or weekly; ' +
+        'forumDigestForumActivity and forumDigestNetworkNews choose what the digest holds. investorInvites and ' +
+        'investorDealflow need investor access; suggestedCandidatesEmail is for team leads.',
+      visibility: 'always',
+      keepUnknownArgs: true,
+      inputSchema: {
+        forumDigest: z.enum(['off', 'daily', 'weekly']).optional(),
+        forumDigestForumActivity: z.boolean().optional(),
+        forumDigestNetworkNews: z.boolean().optional(),
+        newsletter: z.boolean().optional().describe('Protocol Labs newsletter'),
+        demoDayUpdates: z.boolean().optional(),
+        investorInvites: z.boolean().optional(),
+        investorDealflow: z.boolean().optional(),
+        suggestedCandidatesEmail: z.boolean().optional().describe('Weekly suggested candidates email (team leads)'),
+      },
+      execute: async (ctx, args = {}) => {
+        refuseUnknown(args, EMAIL_PREFERENCE_FIELDS);
+        const changed = EMAIL_PREFERENCE_FIELDS.filter((field) => field in args);
+        if (changed.length === 0) throw new BadRequestException('Nothing to update');
+        for (const field of changed) {
+          if (field === 'forumDigest') {
+            if (!((args.forumDigest as string) in FORUM_DIGEST)) {
+              throw new BadRequestException('forumDigest must be off, daily or weekly');
+            }
+          } else if (typeof args[field] !== 'boolean') {
+            throw new BadRequestException(`${field} must be true or false`);
+          }
+        }
+        // Check every gate before writing anything, so a refused call changes nothing.
+        if (('investorInvites' in args || 'investorDealflow' in args) && !canInvest(ctx)) {
+          throw new ForbiddenException('Investor emails are only for members with investor access');
+        }
+        if (args.forumDigestForumActivity === true && !canReadForum(ctx)) {
+          throw new ForbiddenException("Forum activity can't be added to your digest without forum access");
+        }
+        if ('suggestedCandidatesEmail' in args && !(await isTeamLead(ctx))) {
+          throw new ForbiddenException('The suggested candidates email is only for team leads');
+        }
+
+        const member = await members.findMemberByUid(ctx.memberUid);
+        const stored = await client.getNotificationSetting(ctx.memberUid);
+        const externalId = member.externalId;
+
+        if (['forumDigest', 'forumDigestForumActivity', 'forumDigestNetworkNews'].some((f) => f in args)) {
+          const digest = (args.forumDigest as ForumDigest | undefined) ?? undefined;
+          await client.upsertNotificationSetting(ctx.memberUid, {
+            // The page's PUT needs both; keep the stored value for the one not being changed.
+            forumDigestEnabled: digest ? digest !== 'off' : !!stored?.forumDigestEnabled,
+            forumDigestFrequency: (digest && FORUM_DIGEST[digest]) ?? stored?.forumDigestFrequency ?? 7,
+            ...('forumDigestForumActivity' in args ? { forumDigestForumEnabled: args.forumDigestForumActivity } : {}),
+            ...('forumDigestNetworkNews' in args ? { forumDigestNewsEnabled: args.forumDigestNetworkNews } : {}),
+            memberUid: ctx.memberUid,
+            memberExternalId: externalId,
+          });
+        }
+        if ('investorInvites' in args || 'investorDealflow' in args) {
+          await client.upsertNotificationSetting(ctx.memberUid, {
+            investorInvitesEnabled: (args.investorInvites as boolean | undefined) ?? !!stored?.investorInvitesEnabled,
+            investorDealflowEnabled:
+              (args.investorDealflow as boolean | undefined) ?? !!stored?.investorDealflowEnabled,
+            memberUid: ctx.memberUid,
+            memberExternalId: externalId,
+          });
+        }
+        if ('demoDayUpdates' in args) {
+          await settings.setDemoDaySubscription(
+            { uid: member.uid, name: member.name, email: member.email },
+            args.demoDayUpdates as boolean,
+            externalId
+          );
+        }
+        if ('newsletter' in args) {
+          await members.updateMemberByUid(ctx.memberUid, { isSubscribedToNewsletter: args.newsletter as boolean });
+        }
+        if ('suggestedCandidatesEmail' in args) {
+          await suggested.set(ctx.memberUid, args.suggestedCandidatesEmail as boolean);
+        }
+        return { updated: changed, preferences: await read(ctx) };
+      },
+    },
+  ];
+}
+
+/**
+ * `save_demo_day_team` and `unsave_demo_day_team` in the `profile` scope (LAB-3059): the Demo Day page's bookmark on a
+ * team, for enabled Demo Day participants, through the same engagement service. Saving is private; founders are not
+ * told. The agent names the team, and the tool finds its fundraising profile in that Demo Day.
+ */
+export function demoDaySaveTools(
+  demoDays: DemoDaysService,
+  engagement: DemoDayEngagementService,
+  prisma: PrismaService
+): McpToolDef[] {
+  const run = async (ctx: McpActorContext, args: Record<string, unknown>, value: boolean) => {
+    refuseUnknown(args, ['demoDay', 'teamUid']);
+    const demoDayRef = requiredUid(args, 'demoDay');
+    const teamUid = requiredUid(args, 'teamUid');
+    const email = viewerEmail(ctx);
+    const demoDay = await demoDays.getDemoDayByUidOrSlug(demoDayRef).catch(() => null);
+    if (!demoDay) throw new NotFoundException(`Demo Day not found: ${demoDayRef}`);
+    const profile = await prisma.teamFundraisingProfile.findFirst({
+      where: { demoDayUid: demoDay.uid, teamUid },
+      select: { uid: true, team: { select: { name: true } } },
+    });
+    if (!profile) throw new NotFoundException(`That team is not in ${demoDay.title ?? demoDayRef}`);
+    // The live Demo Day page's save; the prep and showcase pages keep their own saves.
+    await engagement.updateSaveInterest(email, demoDay.uid, profile.uid, false, value);
+    return {
+      saved: value,
+      demoDay: { uid: demoDay.uid, slug: demoDay.slugURL },
+      team: { uid: teamUid, name: profile.team?.name ?? null },
+    };
+  };
+  const inputSchema = {
+    demoDay: z.string().describe('Demo Day slug or uid, as in its LabOS link'),
+    teamUid: z.string().describe('Team uid from search_teams'),
+  };
+  return [
+    {
+      name: 'save_demo_day_team',
+      description:
+        "Save a team on a LabOS Demo Day to your saved list, as with the Demo Day page's Save. Only enabled Demo Day " +
+        'participants can save; founders are not told. Saving a team you already saved changes nothing.',
+      visibility: 'always',
+      keepUnknownArgs: true,
+      inputSchema,
+      execute: async (ctx, args = {}) => run(ctx, args, true),
+    },
+    {
+      name: 'unsave_demo_day_team',
+      description: 'Remove a team from your saved list for a LabOS Demo Day.',
+      visibility: 'always',
+      keepUnknownArgs: true,
+      inputSchema,
+      execute: async (ctx, args = {}) => run(ctx, args, false),
     },
   ];
 }

@@ -1,3 +1,10 @@
+jest.mock('../notification-settings/notification-settings.service', () => ({ NotificationSettingsService: jest.fn() }));
+jest.mock('../notification-settings/suggested-candidates-email-preference.service', () => ({
+  SuggestedCandidatesEmailPreferenceService: jest.fn(),
+}));
+jest.mock('../notifications/notification-service.client', () => ({ NotificationServiceClient: jest.fn() }));
+jest.mock('../demo-days/demo-days.service', () => ({ DemoDaysService: jest.fn() }));
+jest.mock('../demo-days/demo-day-engagement.service', () => ({ DemoDayEngagementService: jest.fn() }));
 jest.mock('../member-experiences/member-experiences.service', () => ({ MemberExperiencesService: jest.fn() }));
 jest.mock('../follows/follows.service', () => ({ FollowsService: jest.fn() }));
 jest.mock('../job-openings/job-openings-saved.service', () => ({ JobOpeningsSavedService: jest.fn() }));
@@ -15,7 +22,14 @@ jest.mock('../projects/projects.service', () => ({ ProjectsService: jest.fn() })
 import { BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { z } from 'zod';
 import { McpActorContext, McpToolDef, toolInputSchema } from './mcp-tools';
-import { experienceTools, followTools, jobAlertTools, savedJobTools } from './mcp-member-action-tools';
+import {
+  demoDaySaveTools,
+  emailPreferenceTools,
+  experienceTools,
+  followTools,
+  jobAlertTools,
+  savedJobTools,
+} from './mcp-member-action-tools';
 
 const CTX: McpActorContext = {
   memberUid: 'member-1',
@@ -261,5 +275,172 @@ describe('job alert tools', () => {
     const result: any = await tool(tools, 'get_my_job_alert').execute(CTX, {});
     expect(result.alert).toEqual({ uid: 'a1' });
     expect(result.filterOptions.focus).toEqual(['Digital Human Rights', 'Privacy']);
+  });
+});
+
+describe('email preference tools', () => {
+  const STORED = {
+    forumDigestEnabled: true,
+    forumDigestFrequency: 7,
+    forumDigestForumEnabled: true,
+    forumDigestNewsEnabled: true,
+    demoDaySubscriptionEnabled: false,
+    investorInvitesEnabled: true,
+    investorDealflowEnabled: false,
+  };
+
+  function build({ teamLeads = 0 } = {}) {
+    const settings = { setDemoDaySubscription: jest.fn().mockResolvedValue({}) };
+    const client = {
+      getNotificationSetting: jest.fn().mockResolvedValue(STORED),
+      upsertNotificationSetting: jest.fn().mockResolvedValue({}),
+    };
+    const suggested = {
+      get: jest.fn().mockResolvedValue({ suggestedCandidatesEmailEnabled: true }),
+      set: jest.fn().mockResolvedValue({}),
+    };
+    const members = {
+      findMemberByUid: jest
+        .fn()
+        .mockResolvedValue({ uid: 'member-1', name: 'Ada', email: 'ada@example.com', externalId: 'ext-1' }),
+      updateMemberByUid: jest.fn().mockResolvedValue({}),
+    };
+    const prisma = {
+      teamMemberRole: { count: jest.fn().mockResolvedValue(teamLeads) },
+      member: { findUnique: jest.fn().mockResolvedValue({ isSubscribedToNewsletter: true }) },
+    };
+    const tools = emailPreferenceTools(settings as any, client as any, suggested as any, members as any, prisma as any);
+    return { tools, settings, client, suggested, members };
+  }
+  const update = (tools: McpToolDef[]) => tool(tools, 'update_email_preferences');
+
+  it('reads the page switches and hides the ones that do not apply', async () => {
+    const { tools } = build();
+    const { preferences }: any = await tool(tools, 'get_my_email_preferences').execute(CTX, {});
+    expect(preferences).toEqual({
+      forumDigest: 'weekly',
+      forumDigestForumActivity: false, // no forum.read
+      forumDigestNetworkNews: true,
+      newsletter: true,
+      demoDayUpdates: false,
+    });
+  });
+
+  it('switches the digest to daily, keeping its content choices', async () => {
+    const { tools, client } = build();
+    await update(tools).execute(CTX, { forumDigest: 'daily' });
+    expect(client.upsertNotificationSetting).toHaveBeenCalledTimes(1);
+    expect(client.upsertNotificationSetting).toHaveBeenCalledWith('member-1', {
+      forumDigestEnabled: true,
+      forumDigestFrequency: 1,
+      memberUid: 'member-1',
+      memberExternalId: 'ext-1',
+    });
+  });
+
+  it('turns the digest off without forgetting its frequency', async () => {
+    const { tools, client } = build();
+    await update(tools).execute(CTX, { forumDigest: 'off' });
+    expect(client.upsertNotificationSetting.mock.calls[0][1]).toMatchObject({
+      forumDigestEnabled: false,
+      forumDigestFrequency: 7,
+    });
+  });
+
+  it('sends both investor switches, keeping the stored one', async () => {
+    const { tools, client } = build();
+    await update(tools).execute(
+      { ...CTX, permissions: new Set(['member.investor.manage']) },
+      { investorDealflow: true }
+    );
+    expect(client.upsertNotificationSetting.mock.calls[0][1]).toMatchObject({
+      investorInvitesEnabled: true,
+      investorDealflowEnabled: true,
+    });
+  });
+
+  it('uses the shared Demo Day subscription step and the member record for the newsletter', async () => {
+    const { tools, settings, members, client } = build();
+    await update(tools).execute(CTX, { demoDayUpdates: true, newsletter: false });
+    expect(settings.setDemoDaySubscription).toHaveBeenCalledWith(
+      { uid: 'member-1', name: 'Ada', email: 'ada@example.com' },
+      true,
+      'ext-1'
+    );
+    expect(members.updateMemberByUid).toHaveBeenCalledWith('member-1', { isSubscribedToNewsletter: false });
+    expect(client.upsertNotificationSetting).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['investor mail without investor access', { investorInvites: true }],
+    ['forum activity without forum access', { forumDigestForumActivity: true }],
+    ['the team-lead email for a non-lead', { suggestedCandidatesEmail: false }],
+  ])('refuses %s and writes nothing', async (_label, args) => {
+    const { tools, client, settings, suggested, members } = build();
+    await expect(update(tools).execute(CTX, { demoDayUpdates: true, ...args })).rejects.toThrow();
+    expect(client.upsertNotificationSetting).not.toHaveBeenCalled();
+    expect(settings.setDemoDaySubscription).not.toHaveBeenCalled();
+    expect(suggested.set).not.toHaveBeenCalled();
+    expect(members.updateMemberByUid).not.toHaveBeenCalled();
+  });
+
+  it('lets a team lead turn off the suggested candidates email', async () => {
+    const { tools, suggested } = build({ teamLeads: 1 });
+    await update(tools).execute(CTX, { suggestedCandidatesEmail: false });
+    expect(suggested.set).toHaveBeenCalledWith('member-1', false);
+  });
+
+  it.each([
+    ['a bad digest value', { forumDigest: 'hourly' }],
+    ['nothing', {}],
+    ['an unknown field', { recommendationsEnabled: true }],
+  ])('refuses %s', async (_label, args) => {
+    const { tools, client } = build();
+    await expect(update(tools).execute(CTX, args)).rejects.toBeInstanceOf(BadRequestException);
+    expect(client.upsertNotificationSetting).not.toHaveBeenCalled();
+  });
+});
+
+describe('Demo Day save tools', () => {
+  function build(profile: any = { uid: 'fp-1', team: { name: 'Team One' } }) {
+    const demoDays = {
+      getDemoDayByUidOrSlug: jest.fn().mockResolvedValue({ uid: 'dd-1', slugURL: 'plf25', title: 'PL F25' }),
+    };
+    const engagement = { updateSaveInterest: jest.fn().mockResolvedValue({}) };
+    const prisma = { teamFundraisingProfile: { findFirst: jest.fn().mockResolvedValue(profile) } };
+    return { tools: demoDaySaveTools(demoDays as any, engagement as any, prisma as any), engagement, prisma };
+  }
+
+  it("finds the team's fundraising profile in that Demo Day and saves it as the caller", async () => {
+    const { tools, engagement, prisma } = build();
+    const result: any = await tool(tools, 'save_demo_day_team').execute(CTX, { demoDay: 'plf25', teamUid: 't1' });
+    expect(prisma.teamFundraisingProfile.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { demoDayUid: 'dd-1', teamUid: 't1' } })
+    );
+    expect(engagement.updateSaveInterest).toHaveBeenCalledWith('ada@example.com', 'dd-1', 'fp-1', false, true);
+    expect(result).toMatchObject({ saved: true, team: { name: 'Team One' } });
+  });
+
+  it('unsaves', async () => {
+    const { tools, engagement } = build();
+    await tool(tools, 'unsave_demo_day_team').execute(CTX, { demoDay: 'plf25', teamUid: 't1' });
+    expect(engagement.updateSaveInterest).toHaveBeenCalledWith('ada@example.com', 'dd-1', 'fp-1', false, false);
+  });
+
+  it('refuses a team that is not in the Demo Day', async () => {
+    const { tools, engagement } = build(null);
+    await expect(
+      tool(tools, 'save_demo_day_team').execute(CTX, { demoDay: 'plf25', teamUid: 't9' })
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(engagement.updateSaveInterest).not.toHaveBeenCalled();
+  });
+
+  it('refuses extra arguments such as a raw fundraising profile uid', async () => {
+    const { tools, engagement } = build();
+    const save = tool(tools, 'save_demo_day_team');
+    await expect(
+      save.execute(CTX, sdkArgs(save, { demoDay: 'plf25', teamUid: 't1', isPrepDemoDay: true }))
+    ).rejects.toThrow('isPrepDemoDay');
+    expect(engagement.updateSaveInterest).not.toHaveBeenCalled();
   });
 });

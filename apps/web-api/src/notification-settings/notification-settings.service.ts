@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
 import { LogService } from '../shared/log.service';
 import { UpdateNotificationSettingsDto, UpdateParticipationDto } from 'libs/contracts/src/schema/notification-settings';
@@ -108,5 +108,39 @@ export class NotificationSettingsService {
       memberUid,
     });
     return notificationSetting;
+  }
+  /**
+   * Turns the member's Demo Day updates on or off: the DEMO_DAY event subscriber in the notification service plus the
+   * `demoDaySubscriptionEnabled` setting. Shared by the settings page route and the MCP tool (LAB-3059).
+   */
+  async setDemoDaySubscription(
+    member: { uid: string; name: string; email: string | null },
+    enabled: boolean,
+    memberExternalId?: string | null
+  ) {
+    if (!member.email) {
+      throw new BadRequestException('Member email is required for demo day subscription');
+    }
+    const existingSubscriber = await this.notificationServiceClient.getEventSubscriberByEmailAndType(
+      member.email,
+      'DEMO_DAY'
+    );
+    if (enabled) {
+      if (!existingSubscriber) {
+        await this.notificationServiceClient.createEventSubscriber({
+          email: member.email,
+          eventType: 'DEMO_DAY',
+          name: member.name,
+          memberId: member.uid,
+        });
+      }
+    } else if (existingSubscriber) {
+      await this.notificationServiceClient.deleteEventSubscriberByEmailAndType(member.email, 'DEMO_DAY');
+    }
+    return this.notificationServiceClient.upsertNotificationSetting(member.uid, {
+      demoDaySubscriptionEnabled: enabled,
+      memberUid: member.uid,
+      memberExternalId,
+    });
   }
 }
