@@ -205,6 +205,20 @@ The `profile` scope SHALL offer `join_team`, `leave_team`, `join_project` and `l
 - **WHEN** an agent calls `join_team` with `teamLead: true`
 - **THEN** the call fails naming `teamLead`, and nothing changes
 
+### Requirement: Agents manage the member's experience, follows, saved jobs and job alert
+
+The `profile` scope SHALL also offer `list_my_experiences` and `get_my_job_alert` at `read`, and `add_experience`, `update_experience`, `delete_experience`, `follow_team`, `unfollow_team`, `save_job`, `unsave_job`, `set_job_alert` and `delete_job_alert` at `write`. Each SHALL act only on the calling member's own data, through the same service as the page. The experience tools SHALL change only experiences that belong to the member (any other uid is not found), SHALL accept only title, company, location, startDate, endDate and isCurrent, and SHALL require an end date for a role that is not current. `set_job_alert` SHALL create the member's alert or replace its filters, SHALL accept only filter values the job board currently offers (matched case-insensitively and stored in the board's spelling), and SHALL refuse an unknown value by naming it and the accepted values. Follow, save and delete calls SHALL change nothing when already in the requested state. Each tool SHALL refuse any other argument without writing.
+
+#### Scenario: Another member's experience
+
+- **WHEN** an agent calls `update_experience` or `delete_experience` with the uid of an experience of another member
+- **THEN** the call fails as not found and the experience is unchanged
+
+#### Scenario: Misspelt job alert filter
+
+- **WHEN** an agent calls `set_job_alert` with a role category the board does not offer
+- **THEN** the call fails naming the value and the accepted values, and no alert is saved
+
 ### Requirement: Agent writes are rate limited per member
 
 Each write tool SHALL allow at most 10 calls per member per tool per hour. A call over the limit SHALL be refused with an error that names the limit, SHALL NOT run, SHALL NOT create an access request, and SHALL emit `mcp-tool-refused` with reason `rate_limited`. If the limit store is unavailable the call SHALL be allowed.

@@ -13,6 +13,10 @@ import { SharedModule } from '../shared/shared.module';
 import { PlNetworkPortfolioModule } from '../spv-spotlights/pl-network-portfolio.module';
 import { WarmIntrosV2Module } from '../warm-intros-v2/warm-intros-v2.module';
 import { TeamNewsModule } from '../team-news/team-news.module';
+import { MemberExperiencesModule } from '../member-experiences/member-experiences.module';
+import { FollowsModule } from '../follows/follows.module';
+import { JobOpeningsModule } from '../job-openings/job-openings.module';
+import { JobAlertsModule } from '../job-alerts/job-alerts.module';
 import { McpAdminScopesController } from './mcp-admin-scopes.controller';
 import { McpAppSessionService } from './mcp-app-session.service';
 import { McpAppSessionsController } from './mcp-app-sessions.controller';
@@ -43,6 +47,10 @@ import { JwtService } from '../utils/jwt/jwt.service';
     PlNetworkPortfolioModule,
     IntegrationKeysModule,
     TeamNewsModule,
+    MemberExperiencesModule,
+    FollowsModule,
+    JobOpeningsModule,
+    JobAlertsModule,
   ],
   controllers: [
     McpOAuthController,

@@ -24,6 +24,7 @@ import { directoryTools } from './mcp-directory-tools';
 import { portfolioTools } from './mcp-portfolio-tools';
 import { newsTools } from './mcp-news-tools';
 import { directoryWriteTools, eventWriteTools, membershipTools, newsWriteTools, profileTools } from './mcp-write-tools';
+import { experienceTools, followTools, jobAlertTools, savedJobTools } from './mcp-member-action-tools';
 import { isWriteTool, MCP_TOOL_SCOPES, MCP_UNSCOPED_TOOLS, registryMaxLevel } from './mcp-scopes.registry';
 
 describe('mcp-redirect', () => {
@@ -144,6 +145,10 @@ describe('scope registry', () => {
     ...newsWriteTools(stub, stub, stub),
     ...profileTools(stub, stub, stub),
     ...membershipTools(stub, stub, stub),
+    ...experienceTools(stub, stub),
+    ...followTools(stub),
+    ...savedJobTools(stub),
+    ...jobAlertTools(stub, stub),
     ...eventWriteTools(stub, stub, stub, stub),
     ...directoryWriteTools(stub, stub, stub, stub),
   ];
@@ -164,7 +169,9 @@ describe('scope registry', () => {
   it('marks every tool that changes data as a write tool', () => {
     const writesByName = fullCatalog
       .map((t) => t.name)
-      .filter((name) => /^(update|submit|post|rsvp|cancel|join|leave)_/.test(name));
+      .filter((name) =>
+        /^(update|submit|post|rsvp|cancel|join|leave|add|delete|follow|unfollow|save|unsave|set)_/.test(name)
+      );
     expect(writesByName.length).toBeGreaterThan(0);
     for (const name of writesByName) {
       expect(isWriteTool(name)).toBe(true);
