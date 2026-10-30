@@ -21,6 +21,7 @@ import { NotificationSettingsModule } from '../notification-settings/notificatio
 import { SuggestedCandidatesEmailPreferenceModule } from '../notification-settings/suggested-candidates-email-preference.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { DemoDaysModule } from '../demo-days/demo-days.module';
+import { TeamPitchesModule } from '../team-pitches/team-pitches.module';
 import { McpAdminScopesController } from './mcp-admin-scopes.controller';
 import { McpAppSessionService } from './mcp-app-session.service';
 import { McpAppSessionsController } from './mcp-app-sessions.controller';
@@ -59,6 +60,7 @@ import { JwtService } from '../utils/jwt/jwt.service';
     SuggestedCandidatesEmailPreferenceModule,
     NotificationsModule,
     DemoDaysModule,
+    TeamPitchesModule,
   ],
   controllers: [
     McpOAuthController,

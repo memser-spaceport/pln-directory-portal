@@ -43,6 +43,9 @@ import {
   jobAlertTools,
   savedJobTools,
 } from './mcp-member-action-tools';
+import { pitchProfileTools } from './mcp-pitch-profile-tools';
+import { DemoDayFundraisingProfilesService } from '../demo-days/demo-day-fundraising-profiles.service';
+import { TeamPitchProfilesService } from '../team-pitches/team-pitch-profiles.service';
 import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
 import { SuggestedCandidatesEmailPreferenceService } from '../notification-settings/suggested-candidates-email-preference.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
@@ -102,7 +105,9 @@ export class McpController {
     private readonly notificationClient: NotificationServiceClient,
     private readonly suggestedCandidatesEmail: SuggestedCandidatesEmailPreferenceService,
     private readonly demoDays: DemoDaysService,
-    private readonly demoDayEngagement: DemoDayEngagementService
+    private readonly demoDayEngagement: DemoDayEngagementService,
+    private readonly fundraisingProfiles: DemoDayFundraisingProfilesService,
+    private readonly teamPitchProfiles: TeamPitchProfilesService
   ) {}
 
   private readonly logger = new Logger(McpController.name);
@@ -161,6 +166,7 @@ export class McpController {
         ...demoDaySaveTools(this.demoDays, this.demoDayEngagement, this.prisma),
         ...eventWriteTools(this.eventGuests, this.eventLocations, this.members, this.prisma),
         ...directoryWriteTools(this.teams, this.projects, this.members, this.prisma),
+        ...pitchProfileTools(this.fundraisingProfiles, this.teamPitchProfiles, this.prisma),
       ]),
       actor.scopeLevels,
       caps

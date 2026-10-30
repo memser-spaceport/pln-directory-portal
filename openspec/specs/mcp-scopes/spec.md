@@ -233,6 +233,15 @@ The `profile` scope SHALL also offer `get_my_email_preferences` at `read` and `u
 - **WHEN** an agent sets `forumDigest` to `daily`
 - **THEN** the digest becomes daily and its forum-activity and network-news choices are unchanged
 
+### Requirement: Agents edit the team's fundraising and pitch profiles
+
+The `directory` scope SHALL also offer `update_fundraising_profile` and `update_team_pitch_profile` at `write`, through the same services as the Demo Day fundraising profile and team pitch pages, which check access themselves (an enabled Demo Day FOUNDER of that team, or an admin; a team pitch participant with EDIT access, or an admin). They SHALL change only the description and the team's name, short description, website (http or https), industry tags and funding stage; tags and stage SHALL be given as LabOS titles and unknown ones refused before any write. Logo, program, one-pager and video SHALL NOT be tools. The result SHALL NOT carry the founders' contact details. Each SHALL refuse any other argument without writing.
+
+#### Scenario: Not a founder of the team
+
+- **WHEN** an agent calls `update_fundraising_profile` for a team the member is not a Demo Day founder of
+- **THEN** the call fails as not allowed and the profile is unchanged
+
 ### Requirement: Agent writes are rate limited per member
 
 Each write tool SHALL allow at most 10 calls per member per tool per hour. A call over the limit SHALL be refused with an error that names the limit, SHALL NOT run, SHALL NOT create an access request, and SHALL emit `mcp-tool-refused` with reason `rate_limited`. If the limit store is unavailable the call SHALL be allowed.

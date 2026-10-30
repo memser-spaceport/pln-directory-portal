@@ -1,3 +1,7 @@
+jest.mock('../demo-days/demo-day-fundraising-profiles.service', () => ({
+  DemoDayFundraisingProfilesService: jest.fn(),
+}));
+jest.mock('../team-pitches/team-pitch-profiles.service', () => ({ TeamPitchProfilesService: jest.fn() }));
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { isAllowedRedirectUri, isLoopbackRedirectUri, isRegisteredRedirectUri } from './mcp-redirect';
 import { pkceS256Challenge, verifyPkceS256 } from './mcp.crypto';
@@ -32,6 +36,7 @@ import {
   jobAlertTools,
   savedJobTools,
 } from './mcp-member-action-tools';
+import { pitchProfileTools } from './mcp-pitch-profile-tools';
 import { isWriteTool, MCP_TOOL_SCOPES, MCP_UNSCOPED_TOOLS, registryMaxLevel } from './mcp-scopes.registry';
 
 describe('mcp-redirect', () => {
@@ -158,6 +163,7 @@ describe('scope registry', () => {
     ...jobAlertTools(stub, stub),
     ...emailPreferenceTools(stub, stub, stub, stub, stub),
     ...demoDaySaveTools(stub, stub, stub),
+    ...pitchProfileTools(stub, stub, stub),
     ...eventWriteTools(stub, stub, stub, stub),
     ...directoryWriteTools(stub, stub, stub, stub),
   ];

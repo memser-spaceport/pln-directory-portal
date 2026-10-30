@@ -1,3 +1,7 @@
+jest.mock('../demo-days/demo-day-fundraising-profiles.service', () => ({
+  DemoDayFundraisingProfilesService: jest.fn(),
+}));
+jest.mock('../team-pitches/team-pitch-profiles.service', () => ({ TeamPitchProfilesService: jest.fn() }));
 jest.mock('../notification-settings/notification-settings.service', () => ({ NotificationSettingsService: jest.fn() }));
 jest.mock('../notification-settings/suggested-candidates-email-preference.service', () => ({
   SuggestedCandidatesEmailPreferenceService: jest.fn(),
@@ -132,6 +136,8 @@ function build(
     writeLimit as any,
     {} as any,
     {} as any,
+    stub,
+    stub,
     stub,
     stub,
     stub,
