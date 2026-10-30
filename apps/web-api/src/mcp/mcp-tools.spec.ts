@@ -24,7 +24,7 @@ import {
 } from './mcp-tools';
 import { MasterProfileService } from '../master-profile/master-profile.service';
 import { WarmIntrosV2Service } from '../warm-intros-v2/warm-intros-v2.service';
-import { aiAppFeedbackTools } from './mcp-ai-app-feedback-tools';
+import { aiAppFeedbackTools, aiAppWriteTools } from './mcp-ai-app-feedback-tools';
 import { directoryTools } from './mcp-directory-tools';
 import { portfolioTools } from './mcp-portfolio-tools';
 import { newsTools } from './mcp-news-tools';
@@ -159,6 +159,7 @@ describe('scope registry', () => {
     ...warmIntroTools(stub, stub),
     ...directoryTools(stub, stub, stub, stub, stub),
     ...aiAppFeedbackTools(stub),
+    ...aiAppWriteTools(stub),
     ...portfolioTools(stub),
     ...newsTools(stub, stub),
     ...newsWriteTools(stub, stub, stub),
@@ -196,7 +197,7 @@ describe('scope registry', () => {
     const writesByName = fullCatalog
       .map((t) => t.name)
       .filter((name) =>
-        /^(update|submit|post|rsvp|cancel|join|leave|add|delete|follow|unfollow|save|unsave|set|mark|unmark|report|like|unlike)_/.test(
+        /^(update|submit|post|rsvp|cancel|join|leave|add|delete|follow|unfollow|save|unsave|set|mark|unmark|report|like|unlike|redeploy|rename)_/.test(
           name
         )
       );

@@ -28,8 +28,8 @@ import { PLEventsService } from '../pl-events/pl-events.service';
 import { SearchService } from '../search/search.service';
 import { AiAppsService } from '../ai-apps/ai-apps.service';
 import { PlNetworkPortfolioService } from '../spv-spotlights/pl-network-portfolio.service';
-import { aiAppFeedbackTools } from './mcp-ai-app-feedback-tools';
-import { trackMcpToolInvocation } from './mcp-analytics';
+import { aiAppFeedbackTools, aiAppWriteTools } from './mcp-ai-app-feedback-tools';
+import { trackMcpToolCalled, trackMcpToolInvocation } from './mcp-analytics';
 import { directoryTools } from './mcp-directory-tools';
 import { McpOAuthService } from './mcp-oauth.service';
 import { portfolioTools } from './mcp-portfolio-tools';
@@ -159,6 +159,7 @@ export class McpController {
         ...warmIntroTools(this.masterProfiles, this.warmIntros),
         ...directoryTools(this.members, this.teams, this.projects, this.plEvents, this.search),
         ...aiAppFeedbackTools(this.aiApps),
+        ...aiAppWriteTools(this.aiApps),
         ...portfolioTools(this.portfolio),
         ...newsTools(this.newsQuery, this.newsSuggestions),
         ...newsWriteTools(this.teamNews, this.newsQuery, this.members),
@@ -224,6 +225,7 @@ export class McpController {
       if (!entry) {
         return { isError: true, content: [{ type: 'text' as const, text: `Tool ${tool.name} not found` }] };
       }
+      trackMcpToolCalled(this.analytics, actor, { toolName: tool.name, result: 'refused', reason });
       if (reason !== 'unavailable') {
         void this.analytics.trackEvent({
           name: ANALYTICS_EVENTS.MCP.TOOL_REFUSED,
@@ -290,6 +292,12 @@ export class McpController {
             success: true,
             isError: false,
           });
+          trackMcpToolCalled(this.analytics, actor, {
+            toolName: tool.name,
+            result: 'ok',
+            args: toolArgs,
+            output: result,
+          });
           return {
             content: [{ type: 'text' as const, text: JSON.stringify(result) }],
           };
@@ -302,6 +310,7 @@ export class McpController {
             isError: isSoftError,
             error,
           });
+          trackMcpToolCalled(this.analytics, actor, { toolName: tool.name, result: 'error', args: toolArgs, error });
           if (isSoftError) {
             return {
               isError: true,
