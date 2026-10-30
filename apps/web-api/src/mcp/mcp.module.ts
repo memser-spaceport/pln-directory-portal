@@ -27,6 +27,20 @@ import { DealsModule } from '../deals/deals.module';
 import { ArticlesModule } from '../articles/articles.module';
 import { MemberFollowUpsModule } from '../member-follow-ups/member-follow-ups.module';
 import { OfficeHoursModule } from '../office-hours/office-hours.module';
+import { ParticipantsRequestModule } from '../participants-request/participants-request.module';
+import { TeamEnrichmentModule } from '../team-enrichment/team-enrichment.module';
+import { AskModule } from '../asks/asks.module';
+import { EventsModule } from '../events/events.module';
+import { ArticleRequestsModule } from '../article-requests/article-requests.module';
+import { DealRequestsModule } from '../deal-requests/deal-requests.module';
+import { ContactSupportModule } from '../contact-support/contact-support.module';
+import { SpvSpotlightsModule } from '../spv-spotlights/spv-spotlights.module';
+import { JobMatchModule } from '../job-match/job-match.module';
+import { TeamHiringModule } from '../team-hiring/team-hiring.module';
+import { PathfinderModule } from '../pathfinder/pathfinder.module';
+import { InvestorListsModule } from '../investor-lists/investor-lists.module';
+import { FounderSourcingModule } from '../founder-sourcing/founder-sourcing.module';
+import { RoadmapModule } from '../roadmap/roadmap.module';
 import { McpAdminScopesController } from './mcp-admin-scopes.controller';
 import { McpAppSessionService } from './mcp-app-session.service';
 import { McpAppSessionsController } from './mcp-app-sessions.controller';
@@ -71,6 +85,20 @@ import { JwtService } from '../utils/jwt/jwt.service';
     ArticlesModule,
     MemberFollowUpsModule,
     OfficeHoursModule,
+    ParticipantsRequestModule,
+    TeamEnrichmentModule,
+    AskModule,
+    EventsModule,
+    ArticleRequestsModule,
+    DealRequestsModule,
+    ContactSupportModule,
+    SpvSpotlightsModule,
+    JobMatchModule,
+    TeamHiringModule,
+    PathfinderModule,
+    InvestorListsModule,
+    FounderSourcingModule,
+    RoadmapModule,
   ],
   controllers: [
     McpOAuthController,

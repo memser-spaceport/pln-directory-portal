@@ -137,7 +137,7 @@ The MCP server SHALL offer `list_news` and `get_news_item` in the `news` scope a
 
 ### Requirement: Agents post team news and edit their own profile
 
-The `news` scope SHALL also offer `post_team_news` at `write`, which posts news for one of the member's teams with the same checks as the team page (team member or directory admin, active team, safe link, no duplicate link for the team). A new `profile` scope ("Your profile") SHALL offer `get_my_profile` at `read` and `update_my_profile` at `write`. `update_my_profile` SHALL accept only bio, moreDetails, the social handles, officeHours, openToWork, jobSearchStatus and skills (existing skill titles), SHALL reject a call that names any other field without changing anything, and SHALL run the normal member post-update actions.
+The `news` scope SHALL also offer `post_team_news` at `write`, which posts news for one of the member's teams with the same checks as the team page (team member or directory admin, active team, safe link, no duplicate link for the team). A new `profile` scope ("Your profile") SHALL offer `get_my_profile` at `read` and `update_my_profile` at `write`. `update_my_profile` SHALL accept bio, moreDetails, the social handles (including bluesky), officeHours, openToWork, jobSearchStatus, skills (existing skill titles), name, currentCompany, teamOrProjectURL, plnFriend, plnStartDate, and city, region and country. It SHALL reject email and any other field without changing anything, and SHALL run the normal member post-update actions.
 
 #### Scenario: Blocked profile field
 
@@ -170,17 +170,17 @@ The `events` scope SHALL offer `rsvp_event` and `cancel_event_rsvp` at `write`. 
 
 ### Requirement: Agents edit teams and projects the member may edit
 
-The `directory` scope SHALL offer `update_team` and `update_project` at `write`, with the same edit rights as the pages: a team lead or directory admin for a team; a member of the project's maintaining or a contributing team, its creator, or a directory admin for a project. `update_team` SHALL change only shortDescription, longDescription, website, blog, contactMethod, the social handles (twitter, linkedin, telegram, bluesky), officeHours and moreDetails. `update_project` SHALL change only tagline, description, readMe, lookingForFunding, tags and projectLinks (https links). Both SHALL reject a call that names any other field without changing anything, and SHALL leave the logo, name, tags/relations, focus areas, members, contributing teams and contributions untouched. Team updates SHALL run the normal team post-update actions and record the change against AI-enriched fields; project updates SHALL reset the project cache.
+The `directory` scope SHALL offer `update_team` and `update_project` at `write`, with the same edit rights as the pages: a team lead or directory admin for a team; a member of the project's maintaining or a contributing team, its creator, or a directory admin for a project. `update_team` SHALL change shortDescription, longDescription, website, blog, contactMethod, the social handles (twitter, linkedin, telegram, bluesky), officeHours, moreDetails, name, dateFounded, teamSize, location, locations, fundingStage and industryTags (existing titles). Directory admins MAY also set status to ACTIVE or INACTIVE. `update_project` SHALL change only tagline, description, readMe, lookingForFunding, tags and projectLinks (https links). Both SHALL reject a call that names any other field without changing anything. Team updates SHALL leave the logo, focus areas, members and membership sources untouched. Project updates SHALL leave the logo, name, contributing teams and contributions untouched. Team updates SHALL run the normal team post-update actions and record the change against AI-enriched fields; project updates SHALL reset the project cache.
 
 #### Scenario: Team member who is not a lead
 
 - **WHEN** an agent calls `update_team` for a team where the member is not a lead (and not an admin)
 - **THEN** the call fails and the team is unchanged
 
-#### Scenario: Renaming a team
+#### Scenario: A field the team page does not give an agent
 
-- **WHEN** an agent calls `update_team` with `name` and `blog`
-- **THEN** the call fails naming `name`, and neither field is saved
+- **WHEN** an agent calls `update_team` with `logo` and `blog`
+- **THEN** the call fails naming `logo`, and neither field is saved
 
 #### Scenario: Partial project update
 
@@ -289,3 +289,34 @@ Each MCP tool call SHALL send a PostHog event named `mcp-<tool name with dashes>
 #### Scenario: Every tool has an event
 - **WHEN** a tool is in the registry, or is `whoami`
 - **THEN** it has one per-tool event name and one property builder
+
+### Requirement: Agents can do the remaining member actions
+
+The connected agent SHALL be able to do the member actions LabOS allows by hand, except sign-in, email change, forum writes, file uploads, deal redeem codes, and AI-app deploy keys. Each action SHALL be its own tool, SHALL call the same service as the page, and SHALL use that page's permission check. A call that names a field the tool does not accept SHALL change nothing.
+
+The `profile` scope SHALL offer investor profile, privacy, role on a team the member already belongs to, an existing project contribution, the profile role label, photo delete, recommendation notification settings, job apply and interest, guide comments, office hours, Demo Day and pitch actions that are not file uploads, deal submit and request, support, notification delete, and roadmap create, edit, pin and unpin when the member has that roadmap permission.
+
+The `directory` scope SHALL offer team fund profile, membership sources (directory admins only), community tags, roster edits, team create, team delete (directory admins only), enrichment review, project create and delete, and team and project asks.
+
+The `events` scope SHALL offer event submit, an update of the member's own RSVP details, and a presence request.
+
+The `news` scope SHALL offer upvote and remove upvote.
+
+The `ai_apps` scope SHALL offer delete, deployment delete, access, public paths, and feedback submit. It SHALL NOT accept a bundle, a secret, or a deploy key.
+
+The `investors` scope SHALL offer warm-intro regenerate, list membership, pathfinder correction and crosswalk resolve, clear refer, and sourced-founder review, each behind the same edit permission as that page.
+
+#### Scenario: Investor profile
+
+- **WHEN** an agent calls `update_my_investor_profile` with `investmentFocus`
+- **THEN** the member's investor profile saves that focus and no other member is changed
+
+#### Scenario: Fund profile by a member who is not a lead
+
+- **WHEN** an agent calls `update_team_fund_profile` for a team the member does not lead
+- **THEN** the call fails and `isFund` is unchanged
+
+#### Scenario: Membership sources
+
+- **WHEN** an agent who is not a directory admin calls `update_team_membership_sources`
+- **THEN** the call fails and the team's sources are unchanged

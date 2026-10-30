@@ -16,7 +16,9 @@ import { ProjectsService } from '../projects/projects.service';
 import { PrismaService } from '../shared/prisma.service';
 import { TeamNewsQueryService } from '../team-news/team-news-query.service';
 import { TeamNewsService } from '../team-news/team-news.service';
+import { normalizeBlueskyHandler } from '../teams/team-handle-normalizer';
 import { TeamsService } from '../teams/teams.service';
+import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
 import { newsRow } from './mcp-news-tools';
 import { McpActorContext, McpToolDef } from './mcp-tools';
 
@@ -29,9 +31,22 @@ const PROFILE_TEXT_FIELDS = [
   'linkedinHandler',
   'twitterHandler',
   'discordHandler',
+  'blueskyHandler',
   'officeHours',
+  'currentCompany',
+  'teamOrProjectURL',
 ] as const;
-const PROFILE_FIELDS = [...PROFILE_TEXT_FIELDS, 'openToWork', 'jobSearchStatus', 'skills'] as const;
+const PROFILE_LOCATION_FIELDS = ['city', 'region', 'country'] as const;
+const PROFILE_FIELDS = [
+  ...PROFILE_TEXT_FIELDS,
+  'name',
+  'openToWork',
+  'jobSearchStatus',
+  'skills',
+  'plnFriend',
+  'plnStartDate',
+  ...PROFILE_LOCATION_FIELDS,
+] as const;
 const PROFILE_TEXT_MAX = 2000;
 const SKILLS_MAX = 30;
 
@@ -90,10 +105,16 @@ function profileView(member: {
   linkedinHandler: string | null;
   twitterHandler: string | null;
   discordHandler: string | null;
+  blueskyHandler?: string | null;
   officeHours: string | null;
   openToWork: boolean | null;
   jobSearchStatus: Parameters<typeof toWireJobSearchStatus>[0];
   skills?: Array<{ title: string }>;
+  currentCompany?: string | null;
+  teamOrProjectURL?: string | null;
+  plnFriend?: boolean | null;
+  plnStartDate?: Date | null;
+  location?: { city?: string | null; region?: string | null; country?: string | null } | null;
 }) {
   return {
     uid: member.uid,
@@ -105,10 +126,18 @@ function profileView(member: {
     linkedinHandler: member.linkedinHandler,
     twitterHandler: member.twitterHandler,
     discordHandler: member.discordHandler,
+    blueskyHandler: member.blueskyHandler ?? null,
     officeHours: member.officeHours,
     openToWork: member.openToWork ?? false,
     jobSearchStatus: toWireJobSearchStatus(member.jobSearchStatus),
     skills: (member.skills ?? []).map((s) => s.title),
+    currentCompany: member.currentCompany ?? null,
+    teamOrProjectURL: member.teamOrProjectURL ?? null,
+    plnFriend: member.plnFriend ?? false,
+    plnStartDate: member.plnStartDate ? member.plnStartDate.toISOString().slice(0, 10) : null,
+    city: member.location?.city ?? null,
+    region: member.location?.region ?? null,
+    country: member.location?.country ?? null,
   };
 }
 
@@ -127,9 +156,10 @@ export function profileTools(members: MembersService, hooks: MembersHooksService
       name: 'update_my_profile',
       description:
         `Update your own LabOS profile. Only these fields can change: ${PROFILE_FIELDS.join(', ')}. ` +
-        'Send only the fields to change; an empty string clears a text field. skills replaces the whole list and ' +
-        'takes existing LabOS skill titles. Join or leave teams and projects with join_team, leave_team, join_project ' +
-        'and leave_project. Name, email, team roles and photo stay in LabOS.',
+        'Send only the fields to change; an empty string clears a text field. name cannot be cleared. skills replaces ' +
+        'the whole list and takes existing LabOS skill titles. city, region and country set your location together. ' +
+        'Join or leave teams and projects with join_team, leave_team, join_project and leave_project. Email and photo ' +
+        'upload stay in LabOS. Delete a photo with delete_my_image.',
       visibility: 'always',
       // Without it the SDK drops `email` and friends silently, and the rest of the call saves as if they were never
       // sent; with it the call is refused and names them.
@@ -143,7 +173,16 @@ export function profileTools(members: MembersService, hooks: MembersHooksService
         twitterHandler: z.string().optional(),
         discordHandler: z.string().optional(),
         officeHours: z.string().optional().describe('Booking link'),
+        blueskyHandler: z.string().optional(),
+        currentCompany: z.string().optional(),
+        teamOrProjectURL: z.string().optional(),
+        name: z.string().optional(),
         openToWork: z.boolean().optional(),
+        plnFriend: z.boolean().optional(),
+        plnStartDate: z.string().optional().describe('ISO date, or empty to clear'),
+        city: z.string().optional(),
+        region: z.string().optional(),
+        country: z.string().optional(),
         jobSearchStatus: z.enum(JOB_SEARCH_STATUS_WIRE).optional(),
         skills: z.array(z.string()).optional().describe('Existing LabOS skill titles; replaces the list'),
       },
@@ -158,11 +197,62 @@ export function profileTools(members: MembersService, hooks: MembersHooksService
           const value = args[field];
           if (typeof value !== 'string') throw new BadRequestException(`${field} must be text`);
           if (value.length > PROFILE_TEXT_MAX) throw new BadRequestException(`${field} is too long`);
-          data[field] = value.trim() === '' ? null : value.trim();
+          if (field === 'blueskyHandler') {
+            data[field] = value.trim() === '' ? null : normalizeBlueskyHandler(value.trim()) ?? null;
+          } else {
+            data[field] = value.trim() === '' ? null : value.trim();
+          }
+        }
+        if ('name' in args) {
+          if (typeof args.name !== 'string' || args.name.trim() === '') {
+            throw new BadRequestException('name must be non-empty text');
+          }
+          if (args.name.length > 200) throw new BadRequestException('name is too long');
+          data.name = args.name.trim();
         }
         if ('openToWork' in args) {
           if (typeof args.openToWork !== 'boolean') throw new BadRequestException('openToWork must be true or false');
           data.openToWork = args.openToWork;
+        }
+        if ('plnFriend' in args) {
+          if (typeof args.plnFriend !== 'boolean') throw new BadRequestException('plnFriend must be true or false');
+          data.plnFriend = args.plnFriend;
+        }
+        if ('plnStartDate' in args) {
+          if (args.plnStartDate === '') {
+            data.plnStartDate = null;
+          } else {
+            const date = typeof args.plnStartDate === 'string' ? new Date(args.plnStartDate) : null;
+            if (!date || Number.isNaN(date.getTime())) {
+              throw new BadRequestException('plnStartDate must be a date like 2026-10-30');
+            }
+            data.plnStartDate = date;
+          }
+        }
+        if (PROFILE_LOCATION_FIELDS.some((field) => field in args)) {
+          for (const field of PROFILE_LOCATION_FIELDS) {
+            if (field in args && typeof args[field] !== 'string') {
+              throw new BadRequestException(`${field} must be text`);
+            }
+          }
+          const existing = await members.findMemberByUid(ctx.memberUid);
+          const stored = existing.location;
+          const text = (field: typeof PROFILE_LOCATION_FIELDS[number], fallback: string | null | undefined) =>
+            field in args ? String(args[field]).trim() : fallback ?? '';
+          const locationPatch: Record<string, unknown> = {};
+          await prisma.$transaction(async (tx) => {
+            await members.mapLocationToMember(
+              {
+                city: text('city', stored?.city),
+                region: text('region', stored?.region),
+                country: text('country', stored?.country),
+              },
+              existing,
+              locationPatch,
+              tx
+            );
+          });
+          if (locationPatch.location) data.location = locationPatch.location;
         }
         assignJobSearchStatusFromInput(args, data);
         if ('skills' in args) {
@@ -186,7 +276,10 @@ export function profileTools(members: MembersService, hooks: MembersHooksService
 
         const updated = await members.updateMemberByUid(ctx.memberUid, data as Prisma.MemberUncheckedUpdateInput);
         await hooks.postUpdateActions(updated, ctx.email ?? updated.email ?? '');
-        return { updated: Object.keys(data), profile: profileView(await members.findMemberByUid(ctx.memberUid)) };
+        const updatedFields = Object.keys(data).flatMap((key) =>
+          key === 'location' ? PROFILE_LOCATION_FIELDS.filter((field) => field in args) : [key]
+        );
+        return { updated: updatedFields, profile: profileView(await members.findMemberByUid(ctx.memberUid)) };
       },
     },
   ];
@@ -365,11 +458,23 @@ function textField(field: string, value: unknown): string | null {
  * (or directory admins) for a team; a member of the maintaining or a contributing team, the creator, or an admin for a
  * project. Only the listed fields change; everything else is refused by name.
  */
+const TEAM_EXTRA_FIELDS = [
+  'name',
+  'dateFounded',
+  'teamSize',
+  'location',
+  'locations',
+  'fundingStage',
+  'industryTags',
+  'status',
+] as const;
+
 export function directoryWriteTools(
   teams: TeamsService,
   projects: ProjectsService,
   members: MembersService,
-  prisma: PrismaService
+  prisma: PrismaService,
+  enrichment?: Pick<TeamEnrichmentService, 'handleUserFieldChange'>
 ): McpToolDef[] {
   const isAdmin = (ctx: McpActorContext) => ctx.permissions.has(ADMIN_PERMISSIONS.DIRECTORY_FULL);
   const roles = async (ctx: McpActorContext): Promise<Array<{ teamUid: string; teamLead?: boolean | null }>> =>
@@ -379,33 +484,112 @@ export function directoryWriteTools(
     {
       name: 'update_team',
       description:
-        `Update a team you lead in LabOS. Only these fields can change: ${TEAM_FIELDS.join(', ')}. ` +
-        'Send only the fields to change; an empty string clears a field. Name, logo, tags, focus areas and members ' +
-        'stay in LabOS. Read the current values with get_team first.',
+        `Update a team you lead in LabOS. Text fields: ${TEAM_FIELDS.join(', ')}. Also name, dateFounded (a year), ` +
+        'teamSize, location, locations, fundingStage and industryTags (existing titles). Directory admins may set ' +
+        'status to ACTIVE or INACTIVE. Logo, focus areas, members and membership sources stay on their own tools. ' +
+        'Send only the fields to change; an empty string clears a text field.',
       visibility: 'always',
       keepUnknownArgs: true,
       inputSchema: {
         teamUid: z.string().describe('Team uid from search_teams; you must lead the team'),
         ...Object.fromEntries(TEAM_FIELDS.map((field) => [field, z.string().optional()])),
+        name: z.string().optional(),
+        dateFounded: z.number().int().nullable().optional(),
+        teamSize: z.string().nullable().optional(),
+        location: z.string().nullable().optional(),
+        locations: z.array(z.string()).optional(),
+        fundingStage: z.string().nullable().optional().describe('Existing funding stage title, or empty to clear'),
+        industryTags: z.array(z.string()).optional().describe('Existing industry tag titles; replaces the list'),
+        status: z.enum(['ACTIVE', 'INACTIVE']).optional().describe('Directory admins only'),
       },
       execute: async (ctx, args = {}) => {
-        refuseUnknown(args, ['teamUid', ...TEAM_FIELDS]);
+        refuseUnknown(args, ['teamUid', ...TEAM_FIELDS, ...TEAM_EXTRA_FIELDS]);
         const teamUid = requiredUid(args, 'teamUid');
-        const data: Record<string, string | null> = {};
+        const data: Record<string, unknown> = {};
         for (const field of TEAM_FIELDS) {
           if (field in args) data[field] = textField(field, args[field]);
         }
-        if (Object.keys(data).length === 0) throw new BadRequestException('Nothing to update');
-
-        if (!isAdmin(ctx) && !(await roles(ctx)).some((role) => role.teamUid === teamUid && role.teamLead)) {
+        if ('name' in args) {
+          if (typeof args.name !== 'string' || args.name.trim() === '') {
+            throw new BadRequestException('name must be non-empty text');
+          }
+          data.name = args.name.trim();
+        }
+        if ('dateFounded' in args) {
+          if (args.dateFounded !== null && (typeof args.dateFounded !== 'number' || args.dateFounded < 1000)) {
+            throw new BadRequestException('dateFounded must be a 4-digit year or null');
+          }
+          data.dateFounded = args.dateFounded;
+        }
+        if ('teamSize' in args) data.teamSize = args.teamSize === null ? null : textField('teamSize', args.teamSize);
+        if ('location' in args) data.location = args.location === null ? null : textField('location', args.location);
+        if ('locations' in args) {
+          if (!Array.isArray(args.locations) || args.locations.some((item) => typeof item !== 'string')) {
+            throw new BadRequestException('locations must be a list of text');
+          }
+          data.locations = args.locations.map((item) => String(item).trim()).filter(Boolean);
+        }
+        if ('status' in args) {
+          if (!isAdmin(ctx)) throw new ForbiddenException('Only directory admins can change whether a team is active');
+          data.status = args.status;
+        }
+        const admin = isAdmin(ctx);
+        if (!admin && !(await roles(ctx)).some((role) => role.teamUid === teamUid && role.teamLead)) {
           throw new ForbiddenException('Only team leads can update a team');
         }
         const team = await prisma.team.findFirst({ where: { uid: teamUid }, select: { uid: true } });
         if (!team) throw new NotFoundException(`Team not found: ${teamUid}`);
 
-        const updated = await teams.updateTeamProfileFields(teamUid, data, ctx.email ?? '');
+        if ('fundingStage' in args) {
+          if (args.fundingStage === null || args.fundingStage === '') {
+            data.fundingStageUid = null;
+          } else if (typeof args.fundingStage !== 'string') {
+            throw new BadRequestException('fundingStage must be a title');
+          } else {
+            const stage = await prisma.fundingStage.findFirst({
+              where: { title: { equals: args.fundingStage.trim(), mode: 'insensitive' } },
+              select: { uid: true },
+            });
+            if (!stage) throw new BadRequestException(`Unknown funding stage: ${args.fundingStage}`);
+            data.fundingStageUid = stage.uid;
+          }
+        }
+        let industryTagUids: string[] | undefined;
+        if ('industryTags' in args) {
+          if (!Array.isArray(args.industryTags)) throw new BadRequestException('industryTags must be a list of titles');
+          const titles = args.industryTags.map((title) => String(title).trim()).filter(Boolean);
+          const found = await prisma.industryTag.findMany({
+            where: { OR: titles.map((title) => ({ title: { equals: title, mode: 'insensitive' as const } })) },
+            select: { uid: true, title: true },
+          });
+          const missing = titles.filter(
+            (title) => !found.some((tag) => tag.title.toLowerCase() === title.toLowerCase())
+          );
+          if (missing.length > 0) throw new BadRequestException(`Unknown industry tags: ${missing.join(', ')}`);
+          industryTagUids = found.map((tag) => tag.uid);
+        }
+        if (Object.keys(data).length === 0 && !industryTagUids) throw new BadRequestException('Nothing to update');
+
+        const updated =
+          Object.keys(data).length > 0
+            ? await teams.updateTeamProfileFields(teamUid, data, ctx.email ?? '')
+            : await prisma.team.findFirstOrThrow({ where: { uid: teamUid } });
+        if (industryTagUids) {
+          await prisma.team.update({
+            where: { uid: teamUid },
+            data: { industryTags: { set: industryTagUids.map((uid) => ({ uid })) } },
+          });
+        }
+        const owned: Record<string, unknown> = {};
+        if ('dateFounded' in data) owned.dateFounded = data.dateFounded;
+        if (industryTagUids) owned.industryTags = industryTagUids;
+        if (Object.keys(owned).length > 0) await enrichment?.handleUserFieldChange(teamUid, owned);
+        const updatedNames = [
+          ...Object.keys(data).map((key) => (key === 'fundingStageUid' ? 'fundingStage' : key)),
+          ...(industryTagUids ? ['industryTags'] : []),
+        ];
         return {
-          updated: Object.keys(data),
+          updated: updatedNames,
           team: Object.fromEntries(['uid', 'name', ...TEAM_FIELDS].map((key) => [key, updated[key] ?? null])),
         };
       },
@@ -730,6 +914,105 @@ export function membershipTools(
           project: { uid: projectUid, name: leaving.projectName },
           projects: await myProjects(prisma, ctx.memberUid),
         };
+      },
+    },
+    {
+      name: 'update_my_team_membership',
+      description:
+        'Change your role, main team, or investment-team flag on a team you already belong to. join_team does not ' +
+        'change a team you are already on. You stay a member, not a lead. Setting investmentTeam true clears it on ' +
+        'your other teams.',
+      visibility: 'always',
+      keepUnknownArgs: true,
+      inputSchema: {
+        teamUid: z.string().describe('A team you already belong to'),
+        role: z.string().optional(),
+        mainTeam: z.boolean().optional(),
+        investmentTeam: z.boolean().optional(),
+      },
+      execute: async (ctx, args = {}) => {
+        refuseUnknown(args, ['teamUid', 'role', 'mainTeam', 'investmentTeam']);
+        const teamUid = requiredUid(args, 'teamUid');
+        if (!('role' in args) && !('mainTeam' in args) && !('investmentTeam' in args)) {
+          throw new BadRequestException('Nothing to update');
+        }
+        const role = 'role' in args ? optionalText('role', args.role) ?? null : undefined;
+        if ('mainTeam' in args && typeof args.mainTeam !== 'boolean') {
+          throw new BadRequestException('mainTeam must be true or false');
+        }
+        if ('investmentTeam' in args && typeof args.investmentTeam !== 'boolean') {
+          throw new BadRequestException('investmentTeam must be true or false');
+        }
+        const current = await myTeams(prisma, ctx.memberUid);
+        const mine = current.find((row) => row.teamUid === teamUid);
+        if (!mine) throw new NotFoundException(`You are not on team ${teamUid}. Use join_team first.`);
+        if ('role' in args || 'mainTeam' in args) {
+          const mainTeam = args.mainTeam === true;
+          await saveTeams(ctx, (rows) =>
+            rows.map((row) => {
+              if (row.teamUid !== teamUid) {
+                return { ...row, mainTeam: mainTeam ? false : row.mainTeam };
+              }
+              return {
+                ...row,
+                role: role === undefined ? row.role : role,
+                mainTeam: 'mainTeam' in args ? mainTeam : row.mainTeam,
+              };
+            })
+          );
+        }
+        if ('investmentTeam' in args) {
+          await prisma.$transaction(async (tx) => {
+            if (args.investmentTeam === true) {
+              await tx.teamMemberRole.updateMany({
+                where: { memberUid: ctx.memberUid, teamUid: { not: teamUid } },
+                data: { investmentTeam: false },
+              });
+            }
+            await tx.teamMemberRole.update({
+              where: { memberUid_teamUid: { memberUid: ctx.memberUid, teamUid } },
+              data: { investmentTeam: args.investmentTeam === true },
+            });
+          });
+        }
+        return { teamUid, teams: await myTeams(prisma, ctx.memberUid) };
+      },
+    },
+    {
+      name: 'update_my_project_contribution',
+      description:
+        'Change your role, description, or dates on a project you already contribute to. join_project does not change ' +
+        'a current contribution. Leave endDate out to keep working on it; send an empty endDate to clear it.',
+      visibility: 'always',
+      keepUnknownArgs: true,
+      inputSchema: {
+        projectUid: z.string(),
+        role: z.string().optional(),
+        description: z.string().optional(),
+        startDate: z.string().optional(),
+        endDate: z.string().optional().describe('ISO date, or empty to clear'),
+      },
+      execute: async (ctx, args = {}) => {
+        refuseUnknown(args, ['projectUid', 'role', 'description', 'startDate', 'endDate']);
+        const projectUid = requiredUid(args, 'projectUid');
+        if (!['role', 'description', 'startDate', 'endDate'].some((field) => field in args)) {
+          throw new BadRequestException('Nothing to update');
+        }
+        const row = await prisma.projectContribution.findFirst({
+          where: { memberUid: ctx.memberUid, projectUid, project: { isDeleted: false } },
+          orderBy: { currentProject: 'desc' },
+        });
+        if (!row) throw new NotFoundException(`You have no contribution to project ${projectUid}`);
+        const data: Record<string, unknown> = {};
+        if ('role' in args) data.role = optionalText('role', args.role) ?? null;
+        if ('description' in args) data.description = optionalText('description', args.description, 1000) ?? null;
+        if ('startDate' in args) data.startDate = optionalDate('startDate', args.startDate);
+        if ('endDate' in args) {
+          data.endDate = args.endDate === '' ? null : optionalDate('endDate', args.endDate);
+          data.currentProject = data.endDate == null;
+        }
+        await prisma.projectContribution.update({ where: { uid: row.uid }, data });
+        return { projectUid, contributionUid: row.uid, projects: await myProjects(prisma, ctx.memberUid) };
       },
     },
   ];

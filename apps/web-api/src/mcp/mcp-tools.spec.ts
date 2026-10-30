@@ -33,6 +33,10 @@ import { directoryTools } from './mcp-directory-tools';
 import { portfolioTools } from './mcp-portfolio-tools';
 import { newsTools } from './mcp-news-tools';
 import { directoryWriteTools, eventWriteTools, membershipTools, newsWriteTools, profileTools } from './mcp-write-tools';
+import { profileCoverageTools } from './mcp-profile-coverage-tools';
+import { directoryCoverageTools } from './mcp-directory-coverage-tools';
+import { actionCoverageTools } from './mcp-action-coverage-tools';
+import { platformCoverageTools } from './mcp-platform-coverage-tools';
 import {
   demoDaySaveTools,
   emailPreferenceTools,
@@ -184,6 +188,10 @@ describe('scope registry', () => {
     ...officeHoursFeedbackTools(stub, stub),
     ...eventWriteTools(stub, stub, stub, stub),
     ...directoryWriteTools(stub, stub, stub, stub),
+    ...profileCoverageTools(stub),
+    ...directoryCoverageTools(stub),
+    ...actionCoverageTools(stub),
+    ...platformCoverageTools(stub),
   ];
   const everything = new Set(['directory.admin.full', 'investor_db.edit', 'forum.read', 'ai_apps.read']);
 
@@ -203,7 +211,7 @@ describe('scope registry', () => {
     const writesByName = fullCatalog
       .map((t) => t.name)
       .filter((name) =>
-        /^(update|submit|post|rsvp|cancel|join|leave|add|delete|follow|unfollow|save|unsave|set|mark|unmark|report|like|unlike|redeploy|rename)_/.test(
+        /^(update|submit|post|rsvp|cancel|join|leave|add|delete|follow|unfollow|save|unsave|set|mark|unmark|report|like|unlike|redeploy|rename|create|upvote|remove|request|refer|apply|close|review|accept|express|contact|regenerate|clear|resolve|pin|unpin|reply)_/.test(
           name
         )
       );
