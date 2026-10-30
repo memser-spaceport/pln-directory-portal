@@ -2,6 +2,12 @@ jest.mock('../demo-days/demo-day-fundraising-profiles.service', () => ({
   DemoDayFundraisingProfilesService: jest.fn(),
 }));
 jest.mock('../team-pitches/team-pitch-profiles.service', () => ({ TeamPitchProfilesService: jest.fn() }));
+jest.mock('../push-notifications/push-notifications.service', () => ({ PushNotificationsService: jest.fn() }));
+jest.mock('../deals/deals.service', () => ({ DealsService: jest.fn() }));
+jest.mock('../articles/articles.service', () => ({ ArticlesService: jest.fn() }));
+jest.mock('../member-follow-ups/member-follow-ups.service', () => ({ MemberFollowUpsService: jest.fn() }));
+jest.mock('../office-hours/office-hours.service', () => ({ OfficeHoursService: jest.fn() }));
+import { NotFoundException } from '@nestjs/common';
 jest.mock('../notification-settings/notification-settings.service', () => ({ NotificationSettingsService: jest.fn() }));
 jest.mock('../notification-settings/suggested-candidates-email-preference.service', () => ({
   SuggestedCandidatesEmailPreferenceService: jest.fn(),
@@ -136,6 +142,11 @@ function build(
     writeLimit as any,
     {} as any,
     {} as any,
+    stub,
+    stub,
+    stub,
+    stub,
+    stub,
     stub,
     stub,
     stub,
@@ -329,5 +340,73 @@ describe('McpController scope enforcement', () => {
     expect(tools.has('search_teams')).toBe(true);
     expect(tools.has('search_members')).toBe(false);
     expect(tools.get('search_teams')?.inputSchema).toBeUndefined();
+  });
+});
+
+describe('McpController per-tool events (LAB-3050)', () => {
+  const perTool = (h: Harness, name: string) =>
+    h.analytics.trackEvent.mock.calls.map(([event]) => event).filter((event) => event.name === name);
+
+  it('sends mcp-<tool>-called with result ok and the common properties, beside mcp-tool-invoked', async () => {
+    const h = build();
+    await call(h, 'list_my_ai_apps');
+    expect(perTool(h, 'mcp-list-my-ai-apps-called')).toEqual([
+      {
+        name: 'mcp-list-my-ai-apps-called',
+        distinctId: 'member-1',
+        properties: {
+          toolName: 'list_my_ai_apps',
+          memberUid: 'member-1',
+          authorizationUid: 'auth-1',
+          clientName: 'Codex',
+          scope: 'ai_apps',
+          operation: 'read',
+          result: 'ok',
+          resultCount: 1,
+        },
+      },
+    ]);
+    expect(perTool(h, 'mcp-tool-invoked')).toHaveLength(1);
+  });
+
+  it('sends result error with errorKind when the tool throws', async () => {
+    const h = build();
+    h.aiApps.listOwnAppsForMcp.mockRejectedValueOnce(new NotFoundException('App gone'));
+    await call(h, 'list_my_ai_apps');
+    const [event] = perTool(h, 'mcp-list-my-ai-apps-called');
+    expect(event.properties).toMatchObject({ result: 'error', errorKind: 'NotFoundException', scope: 'ai_apps' });
+    expect(JSON.stringify(event)).not.toContain('App gone');
+  });
+
+  it('sends result refused with the reason, and mcp-tool-refused as before', async () => {
+    const h = build();
+    await call(h, 'update_ai_app_feedback_status', { feedbackUid: 'fb-1', status: 'VIEWED', note: 'secret note' });
+    const [event] = perTool(h, 'mcp-update-ai-app-feedback-status-called');
+    expect(event.properties).toEqual({
+      toolName: 'update_ai_app_feedback_status',
+      memberUid: 'member-1',
+      authorizationUid: 'auth-1',
+      clientName: 'Codex',
+      scope: 'ai_apps',
+      operation: 'write',
+      result: 'refused',
+      reason: 'needs_write',
+    });
+    expect(perTool(h, 'mcp-tool-refused')).toHaveLength(1);
+  });
+
+  it.each([
+    [
+      'admin_off',
+      { scopeLevels: { forum: 'read' }, settings: [{ scope: 'forum', maxLevel: 'none' }] },
+      'get_forum_thread',
+    ],
+    ['scope_none', { scopeLevels: { search: 'none' } }, 'search_members'],
+    ['rate_limited', { scopeLevels: { ai_apps: 'write' }, writeLimited: true }, 'update_ai_app_feedback_status'],
+  ] as const)('sends result refused with reason %s', async (reason, opts, toolName) => {
+    const h = build(opts as Parameters<typeof build>[0]);
+    await call(h, toolName, { uid: 't-1', q: 'ada', feedbackUid: 'fb-1', status: 'VIEWED' });
+    const [event] = perTool(h, `mcp-${toolName.replace(/_/g, '-')}-called`);
+    expect(event.properties).toMatchObject({ toolName, result: 'refused', reason });
   });
 });

@@ -77,10 +77,25 @@ export const MCP_TOOL_SCOPES: Readonly<Record<string, McpToolScope>> = {
   update_email_preferences: { scope: 'profile', level: 'write' },
   save_demo_day_team: { scope: 'profile', level: 'write' },
   unsave_demo_day_team: { scope: 'profile', level: 'write' },
+  list_my_notifications: { scope: 'profile', level: 'read' },
+  mark_notification_read: { scope: 'profile', level: 'write' },
+  mark_all_notifications_read: { scope: 'profile', level: 'write' },
+  list_deals: { scope: 'profile', level: 'read' },
+  mark_deal_used: { scope: 'profile', level: 'write' },
+  unmark_deal_used: { scope: 'profile', level: 'write' },
+  report_deal_issue: { scope: 'profile', level: 'write' },
+  like_guide: { scope: 'profile', level: 'write' },
+  unlike_guide: { scope: 'profile', level: 'write' },
+  submit_demo_day_feedback: { scope: 'profile', level: 'write' },
+  list_my_office_hours_followups: { scope: 'profile', level: 'read' },
+  submit_office_hours_feedback: { scope: 'profile', level: 'write' },
 
   list_my_ai_apps: { scope: 'ai_apps', level: 'read' },
   list_ai_app_feedback: { scope: 'ai_apps', level: 'read' },
   update_ai_app_feedback_status: { scope: 'ai_apps', level: 'write' },
+  redeploy_ai_app: { scope: 'ai_apps', level: 'write' },
+  rename_ai_app: { scope: 'ai_apps', level: 'write' },
+  update_ai_app_description: { scope: 'ai_apps', level: 'write' },
 };
 
 /** Tools outside every scope. Always listed. */

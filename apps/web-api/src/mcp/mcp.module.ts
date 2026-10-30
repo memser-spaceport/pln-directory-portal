@@ -22,6 +22,11 @@ import { SuggestedCandidatesEmailPreferenceModule } from '../notification-settin
 import { NotificationsModule } from '../notifications/notifications.module';
 import { DemoDaysModule } from '../demo-days/demo-days.module';
 import { TeamPitchesModule } from '../team-pitches/team-pitches.module';
+import { PushNotificationsModule } from '../push-notifications/push-notifications.module';
+import { DealsModule } from '../deals/deals.module';
+import { ArticlesModule } from '../articles/articles.module';
+import { MemberFollowUpsModule } from '../member-follow-ups/member-follow-ups.module';
+import { OfficeHoursModule } from '../office-hours/office-hours.module';
 import { McpAdminScopesController } from './mcp-admin-scopes.controller';
 import { McpAppSessionService } from './mcp-app-session.service';
 import { McpAppSessionsController } from './mcp-app-sessions.controller';
@@ -61,6 +66,11 @@ import { JwtService } from '../utils/jwt/jwt.service';
     NotificationsModule,
     DemoDaysModule,
     TeamPitchesModule,
+    PushNotificationsModule,
+    DealsModule,
+    ArticlesModule,
+    MemberFollowUpsModule,
+    OfficeHoursModule,
   ],
   controllers: [
     McpOAuthController,

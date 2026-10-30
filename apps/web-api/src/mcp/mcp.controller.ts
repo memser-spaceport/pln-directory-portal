@@ -28,8 +28,8 @@ import { PLEventsService } from '../pl-events/pl-events.service';
 import { SearchService } from '../search/search.service';
 import { AiAppsService } from '../ai-apps/ai-apps.service';
 import { PlNetworkPortfolioService } from '../spv-spotlights/pl-network-portfolio.service';
-import { aiAppFeedbackTools } from './mcp-ai-app-feedback-tools';
-import { trackMcpToolInvocation } from './mcp-analytics';
+import { aiAppFeedbackTools, aiAppWriteTools } from './mcp-ai-app-feedback-tools';
+import { trackMcpToolCalled, trackMcpToolInvocation } from './mcp-analytics';
 import { directoryTools } from './mcp-directory-tools';
 import { McpOAuthService } from './mcp-oauth.service';
 import { portfolioTools } from './mcp-portfolio-tools';
@@ -46,6 +46,18 @@ import {
 import { pitchProfileTools } from './mcp-pitch-profile-tools';
 import { DemoDayFundraisingProfilesService } from '../demo-days/demo-day-fundraising-profiles.service';
 import { TeamPitchProfilesService } from '../team-pitches/team-pitch-profiles.service';
+import {
+  dealTools,
+  demoDayFeedbackTools,
+  guideLikeTools,
+  notificationTools,
+  officeHoursFeedbackTools,
+} from './mcp-self-service-tools';
+import { PushNotificationsService } from '../push-notifications/push-notifications.service';
+import { DealsService } from '../deals/deals.service';
+import { ArticlesService } from '../articles/articles.service';
+import { MemberFollowUpsService } from '../member-follow-ups/member-follow-ups.service';
+import { OfficeHoursService } from '../office-hours/office-hours.service';
 import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
 import { SuggestedCandidatesEmailPreferenceService } from '../notification-settings/suggested-candidates-email-preference.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
@@ -106,6 +118,11 @@ export class McpController {
     private readonly suggestedCandidatesEmail: SuggestedCandidatesEmailPreferenceService,
     private readonly demoDays: DemoDaysService,
     private readonly demoDayEngagement: DemoDayEngagementService,
+    private readonly pushNotifications: PushNotificationsService,
+    private readonly deals: DealsService,
+    private readonly articles: ArticlesService,
+    private readonly followUps: MemberFollowUpsService,
+    private readonly officeHours: OfficeHoursService,
     private readonly fundraisingProfiles: DemoDayFundraisingProfilesService,
     private readonly teamPitchProfiles: TeamPitchProfilesService
   ) {}
@@ -147,6 +164,7 @@ export class McpController {
         ...warmIntroTools(this.masterProfiles, this.warmIntros),
         ...directoryTools(this.members, this.teams, this.projects, this.plEvents, this.search),
         ...aiAppFeedbackTools(this.aiApps),
+        ...aiAppWriteTools(this.aiApps),
         ...portfolioTools(this.portfolio),
         ...newsTools(this.newsQuery, this.newsSuggestions),
         ...newsWriteTools(this.teamNews, this.newsQuery, this.members),
@@ -164,6 +182,11 @@ export class McpController {
           this.prisma
         ),
         ...demoDaySaveTools(this.demoDays, this.demoDayEngagement, this.prisma),
+        ...notificationTools(this.pushNotifications),
+        ...dealTools(this.deals),
+        ...guideLikeTools(this.articles),
+        ...demoDayFeedbackTools(this.demoDays),
+        ...officeHoursFeedbackTools(this.followUps, this.officeHours),
         ...eventWriteTools(this.eventGuests, this.eventLocations, this.members, this.prisma),
         ...directoryWriteTools(this.teams, this.projects, this.members, this.prisma),
         ...pitchProfileTools(this.fundraisingProfiles, this.teamPitchProfiles, this.prisma),
@@ -208,6 +231,7 @@ export class McpController {
       if (!entry) {
         return { isError: true, content: [{ type: 'text' as const, text: `Tool ${tool.name} not found` }] };
       }
+      trackMcpToolCalled(this.analytics, actor, { toolName: tool.name, result: 'refused', reason });
       if (reason !== 'unavailable') {
         void this.analytics.trackEvent({
           name: ANALYTICS_EVENTS.MCP.TOOL_REFUSED,
@@ -274,6 +298,12 @@ export class McpController {
             success: true,
             isError: false,
           });
+          trackMcpToolCalled(this.analytics, actor, {
+            toolName: tool.name,
+            result: 'ok',
+            args: toolArgs,
+            output: result,
+          });
           return {
             content: [{ type: 'text' as const, text: JSON.stringify(result) }],
           };
@@ -286,6 +316,7 @@ export class McpController {
             isError: isSoftError,
             error,
           });
+          trackMcpToolCalled(this.analytics, actor, { toolName: tool.name, result: 'error', args: toolArgs, error });
           if (isSoftError) {
             return {
               isError: true,

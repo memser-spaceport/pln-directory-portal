@@ -2,6 +2,11 @@ jest.mock('../demo-days/demo-day-fundraising-profiles.service', () => ({
   DemoDayFundraisingProfilesService: jest.fn(),
 }));
 jest.mock('../team-pitches/team-pitch-profiles.service', () => ({ TeamPitchProfilesService: jest.fn() }));
+jest.mock('../push-notifications/push-notifications.service', () => ({ PushNotificationsService: jest.fn() }));
+jest.mock('../deals/deals.service', () => ({ DealsService: jest.fn() }));
+jest.mock('../articles/articles.service', () => ({ ArticlesService: jest.fn() }));
+jest.mock('../member-follow-ups/member-follow-ups.service', () => ({ MemberFollowUpsService: jest.fn() }));
+jest.mock('../office-hours/office-hours.service', () => ({ OfficeHoursService: jest.fn() }));
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { isAllowedRedirectUri, isLoopbackRedirectUri, isRegisteredRedirectUri } from './mcp-redirect';
 import { pkceS256Challenge, verifyPkceS256 } from './mcp.crypto';
@@ -23,7 +28,7 @@ import {
 } from './mcp-tools';
 import { MasterProfileService } from '../master-profile/master-profile.service';
 import { WarmIntrosV2Service } from '../warm-intros-v2/warm-intros-v2.service';
-import { aiAppFeedbackTools } from './mcp-ai-app-feedback-tools';
+import { aiAppFeedbackTools, aiAppWriteTools } from './mcp-ai-app-feedback-tools';
 import { directoryTools } from './mcp-directory-tools';
 import { portfolioTools } from './mcp-portfolio-tools';
 import { newsTools } from './mcp-news-tools';
@@ -37,6 +42,13 @@ import {
   savedJobTools,
 } from './mcp-member-action-tools';
 import { pitchProfileTools } from './mcp-pitch-profile-tools';
+import {
+  dealTools,
+  demoDayFeedbackTools,
+  guideLikeTools,
+  notificationTools,
+  officeHoursFeedbackTools,
+} from './mcp-self-service-tools';
 import { isWriteTool, MCP_TOOL_SCOPES, MCP_UNSCOPED_TOOLS, registryMaxLevel } from './mcp-scopes.registry';
 
 describe('mcp-redirect', () => {
@@ -152,6 +164,7 @@ describe('scope registry', () => {
     ...warmIntroTools(stub, stub),
     ...directoryTools(stub, stub, stub, stub, stub),
     ...aiAppFeedbackTools(stub),
+    ...aiAppWriteTools(stub),
     ...portfolioTools(stub),
     ...newsTools(stub, stub),
     ...newsWriteTools(stub, stub, stub),
@@ -164,6 +177,11 @@ describe('scope registry', () => {
     ...emailPreferenceTools(stub, stub, stub, stub, stub),
     ...demoDaySaveTools(stub, stub, stub),
     ...pitchProfileTools(stub, stub, stub),
+    ...notificationTools(stub),
+    ...dealTools(stub),
+    ...guideLikeTools(stub),
+    ...demoDayFeedbackTools(stub),
+    ...officeHoursFeedbackTools(stub, stub),
     ...eventWriteTools(stub, stub, stub, stub),
     ...directoryWriteTools(stub, stub, stub, stub),
   ];
@@ -185,7 +203,9 @@ describe('scope registry', () => {
     const writesByName = fullCatalog
       .map((t) => t.name)
       .filter((name) =>
-        /^(update|submit|post|rsvp|cancel|join|leave|add|delete|follow|unfollow|save|unsave|set)_/.test(name)
+        /^(update|submit|post|rsvp|cancel|join|leave|add|delete|follow|unfollow|save|unsave|set|mark|unmark|report|like|unlike|redeploy|rename)_/.test(
+          name
+        )
       );
     expect(writesByName.length).toBeGreaterThan(0);
     for (const name of writesByName) {
