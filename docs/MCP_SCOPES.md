@@ -48,6 +48,78 @@ so it never appears in `tools/list`. Every refusal except the last sends PostHog
 `scope`, `reason`: `needs_write`, `scope_none`, `admin_off`). Level saves send `mcp-scope-levels-updated`; admin changes
 `mcp-admin-scope-updated`.
 
+## Analytics: one event per tool (LAB-3050)
+
+Every MCP tool call sends a server-side PostHog event named `mcp-<tool name with dashes>-called`
+(`apps/web-api/src/mcp/mcp-analytics.ts`): when the tool runs (`result: ok`), when it throws (`result: error`, with
+`errorKind`, the exception class name), and when it is refused (`result: refused`, with `reason`: `needs_write`,
+`scope_none`, `admin_off`, `rate_limited` or `unavailable`). `mcp-tool-invoked` and `mcp-tool-refused` are still sent
+as before, beside it.
+
+Every per-tool event has `toolName`, `memberUid`, `authorizationUid` (the connection), `clientName`, `scope` (from the
+registry; `unscoped` for `whoami`), `operation` (`read` or `write`) and `result`. A refused event has no other
+property. Search and list tools add their query text as `query`, trimmed to 200 characters (investor DB searches
+excepted: their text is a person's name or email). Write tools send item ids, field names and counts, never values:
+no message text, body, note, email, Telegram or LinkedIn value reaches an event. `MCP_TOOL_PROPERTY_BUILDERS` has
+one entry per tool; a spec fails when a registry tool has none, so a new tool needs one.
+
+| Event | Sent when | Properties beside the common ones (ok and error) |
+| --- | --- | --- |
+| `mcp-whoami-called` | an agent calls `whoami` | none |
+| `mcp-search-members-called` | an agent calls `search_members` | `query`, `limit`, `resultCount` |
+| `mcp-search-teams-called` | an agent calls `search_teams` | `query`, `limit`, `resultCount` |
+| `mcp-search-projects-called` | an agent calls `search_projects` | `query`, `limit`, `resultCount` |
+| `mcp-search-events-called` | an agent calls `search_events` | `query`, `limit`, `resultCount` |
+| `mcp-search-forum-threads-called` | an agent calls `search_forum_threads` | `query`, `limit`, `resultCount` |
+| `mcp-get-forum-thread-called` | an agent calls `get_forum_thread` | `uid` |
+| `mcp-list-news-called` | an agent calls `list_news` | `query`, `feed`, `teamUid`, `limit`, `page`, `resultCount`, `hasMore` |
+| `mcp-get-news-item-called` | an agent calls `get_news_item` | `uid` |
+| `mcp-post-team-news-called` | an agent calls `post_team_news` | `teamUid`, `newsUid`, `hasBody` |
+| `mcp-get-member-called` | an agent calls `get_member` | `uid` |
+| `mcp-get-team-called` | an agent calls `get_team` | `uid` |
+| `mcp-get-project-called` | an agent calls `get_project` | `uid` |
+| `mcp-list-portfolio-teams-called` | an agent calls `list_portfolio_teams` | `query`, `hasQuery`, `island`, `limit`, `offset`, `resultCount`, `total` |
+| `mcp-update-team-called` | an agent calls `update_team` | `teamUid`, `fields`, `fieldCount` |
+| `mcp-update-project-called` | an agent calls `update_project` | `projectUid`, `fields`, `fieldCount` |
+| `mcp-get-event-called` | an agent calls `get_event` | `uid` |
+| `mcp-rsvp-event-called` | an agent calls `rsvp_event` | `eventUid`, `teamUid`, `alreadyGoing` |
+| `mcp-cancel-event-rsvp-called` | an agent calls `cancel_event_rsvp` | `eventUid`, `wasGoing` |
+| `mcp-search-master-profiles-called` | an agent calls `search_master_profiles` | `type`, `limit`, `offset`, `resultCount` (no name or email) |
+| `mcp-get-master-profile-called` | an agent calls `get_master_profile` | `uid` |
+| `mcp-search-warm-intro-investors-called` | an agent calls `search_warm_intro_investors` | `limit`, `offset`, `resultCount`, `total` (no search text) |
+| `mcp-get-warm-intro-investor-called` | an agent calls `get_warm_intro_investor` | `profileUid`, `pathCount` |
+| `mcp-get-warm-path-feedback-called` | an agent calls `get_warm_path_feedback` | `warmPathUid`, `connectorProfileUid`, `hasNote` |
+| `mcp-get-warm-path-note-called` | an agent calls `get_warm_path_note` | `warmPathUid`, `connectorProfileUid`, `hasNote` |
+| `mcp-submit-warm-path-feedback-called` | an agent calls `submit_warm_path_feedback` | `warmPathUid`, `connectorProfileUid`, `isClear` |
+| `mcp-submit-warm-path-note-called` | an agent calls `submit_warm_path_note` | `warmPathUid`, `connectorProfileUid`, `isClear` |
+| `mcp-update-master-profile-called` | an agent calls `update_master_profile` | `uid`, `fieldCount` |
+| `mcp-update-connection-edge-called` | an agent calls `update_connection_edge` | `uid`, `fieldCount` |
+| `mcp-update-warm-path-called` | an agent calls `update_warm_path` | `uid`, `fieldCount` |
+| `mcp-get-my-profile-called` | an agent calls `get_my_profile` | none |
+| `mcp-update-my-profile-called` | an agent calls `update_my_profile` | `fields`, `fieldCount` |
+| `mcp-join-team-called` | an agent calls `join_team` | `teamUid`, `mainTeam`, `hasRole` |
+| `mcp-leave-team-called` | an agent calls `leave_team` | `teamUid` |
+| `mcp-join-project-called` | an agent calls `join_project` | `projectUid`, `fields`, `fieldCount` |
+| `mcp-leave-project-called` | an agent calls `leave_project` | `projectUid` |
+| `mcp-list-my-experiences-called` | an agent calls `list_my_experiences` | `resultCount` |
+| `mcp-add-experience-called` | an agent calls `add_experience` | `experienceUid`, `fields`, `fieldCount` |
+| `mcp-update-experience-called` | an agent calls `update_experience` | `experienceUid`, `fields`, `fieldCount` |
+| `mcp-delete-experience-called` | an agent calls `delete_experience` | `experienceUid` |
+| `mcp-follow-team-called` | an agent calls `follow_team` | `teamUid` |
+| `mcp-unfollow-team-called` | an agent calls `unfollow_team` | `teamUid` |
+| `mcp-save-job-called` | an agent calls `save_job` | `jobUid` |
+| `mcp-unsave-job-called` | an agent calls `unsave_job` | `jobUid` |
+| `mcp-get-my-job-alert-called` | an agent calls `get_my_job_alert` | none |
+| `mcp-set-job-alert-called` | an agent calls `set_job_alert` | `fields`, `fieldCount` |
+| `mcp-delete-job-alert-called` | an agent calls `delete_job_alert` | none |
+| `mcp-get-my-email-preferences-called` | an agent calls `get_my_email_preferences` | none |
+| `mcp-update-email-preferences-called` | an agent calls `update_email_preferences` | `fields`, `fieldCount` |
+| `mcp-save-demo-day-team-called` | an agent calls `save_demo_day_team` | `demoDay`, `teamUid` |
+| `mcp-unsave-demo-day-team-called` | an agent calls `unsave_demo_day_team` | `demoDay`, `teamUid` |
+| `mcp-list-my-ai-apps-called` | an agent calls `list_my_ai_apps` | `resultCount` |
+| `mcp-list-ai-app-feedback-called` | an agent calls `list_ai_app_feedback` | `appUid`, `status`, `limit`, `offset`, `resultCount`, `total` |
+| `mcp-update-ai-app-feedback-status-called` | an agent calls `update_ai_app_feedback_status` | `appUid`, `feedbackUid`, `status`, `hasNote` |
+
 ## Access requests
 
 Each member-fixable refusal (`needs_write`, `scope_none`) creates an `McpAccessRequest` or reuses the open one for the
