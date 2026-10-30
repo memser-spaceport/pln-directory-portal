@@ -1,3 +1,12 @@
+jest.mock('../demo-days/demo-day-fundraising-profiles.service', () => ({
+  DemoDayFundraisingProfilesService: jest.fn(),
+}));
+jest.mock('../team-pitches/team-pitch-profiles.service', () => ({ TeamPitchProfilesService: jest.fn() }));
+jest.mock('../push-notifications/push-notifications.service', () => ({ PushNotificationsService: jest.fn() }));
+jest.mock('../deals/deals.service', () => ({ DealsService: jest.fn() }));
+jest.mock('../articles/articles.service', () => ({ ArticlesService: jest.fn() }));
+jest.mock('../member-follow-ups/member-follow-ups.service', () => ({ MemberFollowUpsService: jest.fn() }));
+jest.mock('../office-hours/office-hours.service', () => ({ OfficeHoursService: jest.fn() }));
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { isAllowedRedirectUri, isLoopbackRedirectUri, isRegisteredRedirectUri } from './mcp-redirect';
 import { pkceS256Challenge, verifyPkceS256 } from './mcp.crypto';
@@ -19,10 +28,32 @@ import {
 } from './mcp-tools';
 import { MasterProfileService } from '../master-profile/master-profile.service';
 import { WarmIntrosV2Service } from '../warm-intros-v2/warm-intros-v2.service';
-import { aiAppFeedbackTools } from './mcp-ai-app-feedback-tools';
+import { aiAppFeedbackTools, aiAppWriteTools } from './mcp-ai-app-feedback-tools';
 import { directoryTools } from './mcp-directory-tools';
 import { portfolioTools } from './mcp-portfolio-tools';
-import { MCP_WRITE_TOOLS } from './mcp.constants';
+import { newsTools } from './mcp-news-tools';
+import { directoryWriteTools, eventWriteTools, membershipTools, newsWriteTools, profileTools } from './mcp-write-tools';
+import { profileCoverageTools } from './mcp-profile-coverage-tools';
+import { directoryCoverageTools } from './mcp-directory-coverage-tools';
+import { actionCoverageTools } from './mcp-action-coverage-tools';
+import { platformCoverageTools } from './mcp-platform-coverage-tools';
+import {
+  demoDaySaveTools,
+  emailPreferenceTools,
+  experienceTools,
+  followTools,
+  jobAlertTools,
+  savedJobTools,
+} from './mcp-member-action-tools';
+import { pitchProfileTools } from './mcp-pitch-profile-tools';
+import {
+  dealTools,
+  demoDayFeedbackTools,
+  guideLikeTools,
+  notificationTools,
+  officeHoursFeedbackTools,
+} from './mcp-self-service-tools';
+import { isWriteTool, MCP_TOOL_SCOPES, MCP_UNSCOPED_TOOLS, registryMaxLevel } from './mcp-scopes.registry';
 
 describe('mcp-redirect', () => {
   it('treats localhost, 127.0.0.1, and ::1 as loopback', () => {
@@ -130,31 +161,83 @@ describe('toolsForPermissions', () => {
   });
 });
 
-describe('read-only grants', () => {
+describe('scope registry', () => {
   const stub = {} as any;
   const fullCatalog = [
     WHOAMI_TOOL,
     ...warmIntroTools(stub, stub),
     ...directoryTools(stub, stub, stub, stub, stub),
     ...aiAppFeedbackTools(stub),
+    ...aiAppWriteTools(stub),
     ...portfolioTools(stub),
+    ...newsTools(stub, stub),
+    ...newsWriteTools(stub, stub, stub),
+    ...profileTools(stub, stub, stub),
+    ...membershipTools(stub, stub, stub),
+    ...experienceTools(stub, stub),
+    ...followTools(stub),
+    ...savedJobTools(stub),
+    ...jobAlertTools(stub, stub),
+    ...emailPreferenceTools(stub, stub, stub, stub, stub),
+    ...demoDaySaveTools(stub, stub, stub),
+    ...pitchProfileTools(stub, stub, stub),
+    ...notificationTools(stub),
+    ...dealTools(stub),
+    ...guideLikeTools(stub),
+    ...demoDayFeedbackTools(stub),
+    ...officeHoursFeedbackTools(stub, stub),
+    ...eventWriteTools(stub, stub, stub, stub),
+    ...directoryWriteTools(stub, stub, stub, stub),
+    ...profileCoverageTools(stub),
+    ...directoryCoverageTools(stub),
+    ...actionCoverageTools(stub),
+    ...platformCoverageTools(stub),
   ];
   const everything = new Set(['directory.admin.full', 'investor_db.edit', 'forum.read', 'ai_apps.read']);
 
-  it('lists every tool that changes data in MCP_WRITE_TOOLS', () => {
-    const writesByName = fullCatalog.map((t) => t.name).filter((name) => /^(update|submit)_/.test(name));
+  it('puts every catalog tool except whoami in the scope registry', () => {
+    const missing = fullCatalog
+      .map((t) => t.name)
+      .filter((name) => !MCP_UNSCOPED_TOOLS.has(name) && !MCP_TOOL_SCOPES[name]);
+    expect(missing).toEqual([]);
+  });
+
+  it('registers no tool that is not in the catalog', () => {
+    const names = new Set(fullCatalog.map((t) => t.name));
+    expect(Object.keys(MCP_TOOL_SCOPES).filter((name) => !names.has(name))).toEqual([]);
+  });
+
+  it('marks every tool that changes data as a write tool', () => {
+    const writesByName = fullCatalog
+      .map((t) => t.name)
+      .filter((name) =>
+        /^(update|submit|post|rsvp|cancel|join|leave|add|delete|follow|unfollow|save|unsave|set|mark|unmark|report|like|unlike|redeploy|rename|create|upvote|remove|request|refer|apply|close|review|accept|express|contact|regenerate|clear|resolve|pin|unpin|reply)_/.test(
+          name
+        )
+      );
     expect(writesByName.length).toBeGreaterThan(0);
     for (const name of writesByName) {
-      expect(MCP_WRITE_TOOLS.has(name)).toBe(true);
+      expect(isWriteTool(name)).toBe(true);
+    }
+    expect(
+      fullCatalog
+        .map((t) => t.name)
+        .filter(isWriteTool)
+        .sort()
+    ).toEqual(writesByName.sort());
+  });
+
+  it('allows write only on scopes that have write tools', () => {
+    for (const scope of ['investors', 'ai_apps', 'news', 'profile', 'events', 'directory'] as const) {
+      expect(registryMaxLevel(scope)).toBe('write');
+    }
+    for (const scope of ['search', 'forum'] as const) {
+      expect(registryMaxLevel(scope)).toBe('read');
     }
   });
 
-  it('drops every write tool on a read-only grant and keeps the read tools', () => {
-    const write = toolsForPermissions(everything, fullCatalog, true).map((t) => t.name);
-    const read = toolsForPermissions(everything, fullCatalog, false).map((t) => t.name);
-    expect(read.filter((name) => MCP_WRITE_TOOLS.has(name))).toEqual([]);
-    expect(read).toEqual(write.filter((name) => !MCP_WRITE_TOOLS.has(name)));
-    expect(write).toEqual(expect.arrayContaining(['update_ai_app_feedback_status', 'update_master_profile']));
+  it('keeps RBAC visibility independent of scopes', () => {
+    expect(toolsForPermissions(everything, fullCatalog).map((t) => t.name)).toEqual(fullCatalog.map((t) => t.name));
   });
 
   it('reports the grant level from whoami', async () => {

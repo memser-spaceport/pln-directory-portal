@@ -12,6 +12,36 @@ import { RbacModule } from '../rbac/rbac.module';
 import { SharedModule } from '../shared/shared.module';
 import { PlNetworkPortfolioModule } from '../spv-spotlights/pl-network-portfolio.module';
 import { WarmIntrosV2Module } from '../warm-intros-v2/warm-intros-v2.module';
+import { TeamNewsModule } from '../team-news/team-news.module';
+import { MemberExperiencesModule } from '../member-experiences/member-experiences.module';
+import { FollowsModule } from '../follows/follows.module';
+import { JobOpeningsModule } from '../job-openings/job-openings.module';
+import { JobAlertsModule } from '../job-alerts/job-alerts.module';
+import { NotificationSettingsModule } from '../notification-settings/notification-settings.module';
+import { SuggestedCandidatesEmailPreferenceModule } from '../notification-settings/suggested-candidates-email-preference.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { DemoDaysModule } from '../demo-days/demo-days.module';
+import { TeamPitchesModule } from '../team-pitches/team-pitches.module';
+import { PushNotificationsModule } from '../push-notifications/push-notifications.module';
+import { DealsModule } from '../deals/deals.module';
+import { ArticlesModule } from '../articles/articles.module';
+import { MemberFollowUpsModule } from '../member-follow-ups/member-follow-ups.module';
+import { OfficeHoursModule } from '../office-hours/office-hours.module';
+import { ParticipantsRequestModule } from '../participants-request/participants-request.module';
+import { TeamEnrichmentModule } from '../team-enrichment/team-enrichment.module';
+import { AskModule } from '../asks/asks.module';
+import { EventsModule } from '../events/events.module';
+import { ArticleRequestsModule } from '../article-requests/article-requests.module';
+import { DealRequestsModule } from '../deal-requests/deal-requests.module';
+import { ContactSupportModule } from '../contact-support/contact-support.module';
+import { SpvSpotlightsModule } from '../spv-spotlights/spv-spotlights.module';
+import { JobMatchModule } from '../job-match/job-match.module';
+import { TeamHiringModule } from '../team-hiring/team-hiring.module';
+import { PathfinderModule } from '../pathfinder/pathfinder.module';
+import { InvestorListsModule } from '../investor-lists/investor-lists.module';
+import { FounderSourcingModule } from '../founder-sourcing/founder-sourcing.module';
+import { RoadmapModule } from '../roadmap/roadmap.module';
+import { McpAdminScopesController } from './mcp-admin-scopes.controller';
 import { McpAppSessionService } from './mcp-app-session.service';
 import { McpAppSessionsController } from './mcp-app-sessions.controller';
 import { McpAuthorizationsController } from './mcp-authorizations.controller';
@@ -20,6 +50,10 @@ import { McpMemberProofsController, McpMemberProofsIntegrationController } from 
 import { McpOAuthController } from './mcp-oauth.controller';
 import { McpOAuthService } from './mcp-oauth.service';
 import { McpController } from './mcp.controller';
+import { McpScopesService } from './mcp-scopes.service';
+import { McpAccessRequestsService } from './mcp-access-requests.service';
+import { McpWriteLimitService } from './mcp-write-limit.service';
+import { JwtService } from '../utils/jwt/jwt.service';
 
 @Module({
   imports: [
@@ -36,15 +70,53 @@ import { McpController } from './mcp.controller';
     AiAppsModule,
     PlNetworkPortfolioModule,
     IntegrationKeysModule,
+    TeamNewsModule,
+    MemberExperiencesModule,
+    FollowsModule,
+    JobOpeningsModule,
+    JobAlertsModule,
+    NotificationSettingsModule,
+    SuggestedCandidatesEmailPreferenceModule,
+    NotificationsModule,
+    DemoDaysModule,
+    TeamPitchesModule,
+    PushNotificationsModule,
+    DealsModule,
+    ArticlesModule,
+    MemberFollowUpsModule,
+    OfficeHoursModule,
+    ParticipantsRequestModule,
+    TeamEnrichmentModule,
+    AskModule,
+    EventsModule,
+    ArticleRequestsModule,
+    DealRequestsModule,
+    ContactSupportModule,
+    SpvSpotlightsModule,
+    JobMatchModule,
+    TeamHiringModule,
+    PathfinderModule,
+    InvestorListsModule,
+    FounderSourcingModule,
+    RoadmapModule,
   ],
   controllers: [
     McpOAuthController,
     McpAuthorizationsController,
+    McpAdminScopesController,
     McpAppSessionsController,
     McpMemberProofsController,
     McpMemberProofsIntegrationController,
     McpController,
   ],
-  providers: [McpOAuthService, McpAppSessionService, McpMemberProofService],
+  providers: [
+    McpOAuthService,
+    McpAppSessionService,
+    McpMemberProofService,
+    McpScopesService,
+    McpAccessRequestsService,
+    McpWriteLimitService,
+    JwtService,
+  ],
 })
 export class McpModule {}

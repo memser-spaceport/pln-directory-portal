@@ -683,8 +683,8 @@ A deployed app signs the member in with a **session bound to one app**. A token 
   the gate uses the code round trip.
   `POST sessions/revoke` (member JWT) ends all of a member's app sessions; LabOS calls it on sign-out.
 - **Agent sessions.** An agent connected through LabOS MCP mints one with `POST /v1/mcp/app-sessions` `{ appId }`
-  (Bearer MCP access token). It carries `isAgent: true` and `agentAccess` (`read` or `write`: the grant's level chosen
-  at MCP consent; `/me` returns both), stores the MCP authorization that minted it (revoking the
+  (Bearer MCP access token). It carries `isAgent: true` and `agentAccess` (`write` when the connection's AI Apps scope is at
+  write, otherwise `read`; see `docs/MCP_SCOPES.md`; `/me` returns both), stores the MCP authorization that minted it (revoking the
   agent ends it), and lasts a fixed 1 hour from mint (`AI_APPS_AGENT_SESSION_MAX_MS`, no env override): use does not
   extend it, and the agent mints a new one when it ends.
 - **Using one.** Only on `GET /v1/ai-apps/me` (`AiAppMemberContextGuard`: live for the app it names, and `Origin`, if

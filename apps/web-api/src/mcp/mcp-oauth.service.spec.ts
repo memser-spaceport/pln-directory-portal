@@ -14,6 +14,7 @@ import {
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { McpOAuthController } from './mcp-oauth.controller';
 import { McpOAuthService } from './mcp-oauth.service';
+import { McpScopesService } from './mcp-scopes.service';
 import {
   MCP_ACCESS_TOKEN_TTL_SEC,
   MCP_CLIENT_REGISTER_LIMIT,
@@ -61,6 +62,7 @@ function buildService(
       findUnique: jest.fn().mockResolvedValue(null),
       deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
+    mcpScopeSetting: { findMany: jest.fn().mockResolvedValue([]) },
     member: { findUnique: jest.fn().mockResolvedValue(MEMBER) },
     $transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma)),
     ...overrides.prisma,
@@ -72,7 +74,14 @@ function buildService(
     revokeAgentSessionsForAuthorization: jest.fn().mockResolvedValue(0),
   };
   const analytics = { trackEvent: jest.fn().mockResolvedValue(undefined) };
-  const service = new McpOAuthService(prisma as any, accessControl as any, appSessions as any, analytics as any);
+  const scopes = new McpScopesService(prisma as any, analytics as any, {} as any);
+  const service = new McpOAuthService(
+    prisma as any,
+    accessControl as any,
+    appSessions as any,
+    analytics as any,
+    scopes
+  );
   return { service, prisma, accessControl, appSessions, analytics };
 }
 
@@ -278,38 +287,68 @@ describe('McpOAuthService', () => {
     expect(tokens.token_type).toBe('Bearer');
   });
 
+  const APPROVE = {
+    clientId: CLIENT.clientId,
+    redirectUri: CLIENT.redirectUris[0],
+    codeChallenge: 'abc',
+    codeChallengeMethod: 'S256',
+  };
+  const ALL_READ = {
+    search: 'read',
+    forum: 'read',
+    news: 'read',
+    directory: 'read',
+    events: 'read',
+    investors: 'read',
+    profile: 'read',
+    ai_apps: 'read',
+  };
+
   it.each([
-    ['ticked', true, true],
-    ['unticked', false, false],
-    ['absent', undefined, false],
-  ])('stores the access level the member chose at consent (%s)', async (_label, allowChanges, canWrite) => {
+    ['ticked', true],
+    ['unticked', false],
+    ['absent', undefined],
+  ])('starts every consent read only, whatever allowChanges says (%s)', async (_label, allowChanges) => {
     const { service, prisma } = buildService();
-    await service.approve(MEMBER.uid, {
-      clientId: CLIENT.clientId,
-      redirectUri: CLIENT.redirectUris[0],
-      codeChallenge: 'abc',
-      codeChallengeMethod: 'S256',
-      ...(allowChanges === undefined ? {} : { allowChanges }),
-    });
+    await service.approve(MEMBER.uid, { ...APPROVE, ...(allowChanges === undefined ? {} : { allowChanges }) });
     const { create, update } = prisma.mcpAuthorization.upsert.mock.calls[0][0];
-    expect(create.canWrite).toBe(canWrite);
-    expect(update.canWrite).toBe(canWrite);
+    expect(create.scopeLevels).toEqual(ALL_READ);
+    expect(update.scopeLevels).toEqual(ALL_READ);
+    expect(create.canWrite).toBe(false);
+    expect(update.canWrite).toBe(false);
   });
 
-  it('returns the grant access level with the token actor', async () => {
+  it('starts a scope at none when admins turned it off', async () => {
     const { service, prisma } = buildService();
-    const row = {
+    prisma.mcpScopeSetting.findMany.mockResolvedValue([{ scope: 'forum', maxLevel: 'none' }]);
+    await service.approve(MEMBER.uid, APPROVE);
+    const { create } = prisma.mcpAuthorization.upsert.mock.calls[0][0];
+    expect(create.scopeLevels).toEqual({ ...ALL_READ, forum: 'none' });
+  });
+
+  it('records the contact-details acknowledgement only when it is sent', async () => {
+    const { service, prisma } = buildService();
+    await service.approve(MEMBER.uid, { ...APPROVE, acknowledgedContactDetails: true });
+    await service.approve(MEMBER.uid, APPROVE);
+    expect(prisma.mcpAuthorization.upsert.mock.calls[0][0].create.contactAckAt).toBeInstanceOf(Date);
+    expect(prisma.mcpAuthorization.upsert.mock.calls[0][0].update.contactAckAt).toBeInstanceOf(Date);
+    expect(prisma.mcpAuthorization.upsert.mock.calls[1][0].create.contactAckAt).toBeNull();
+  });
+
+  it('returns the stored scope levels with the token actor, dropping unknown keys', async () => {
+    const { service, prisma } = buildService();
+    prisma.mcpAuthorization.findUnique.mockResolvedValueOnce({
       uid: 'auth-1',
       memberUid: MEMBER.uid,
       clientName: CLIENT.clientName,
       revokedAt: null,
       accessExpiresAt: new Date(Date.now() + 60_000),
       member: MEMBER,
-    };
-    prisma.mcpAuthorization.findUnique.mockResolvedValueOnce({ ...row, canWrite: false });
-    await expect(service.authenticateAccessToken('mcp_at_read')).resolves.toMatchObject({ canWrite: false });
-    prisma.mcpAuthorization.findUnique.mockResolvedValueOnce({ ...row, canWrite: true });
-    await expect(service.authenticateAccessToken('mcp_at_write')).resolves.toMatchObject({ canWrite: true });
+      scopeLevels: { forum: 'write', search: 'none', bogus: 'write', events: 'admin' },
+    });
+    await expect(service.authenticateAccessToken('mcp_at_x')).resolves.toMatchObject({
+      scopeLevels: { forum: 'write', search: 'none' },
+    });
   });
 
   it('rejects a bad PKCE verifier', async () => {

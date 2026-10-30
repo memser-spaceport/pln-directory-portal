@@ -4,6 +4,7 @@ import { AiAppsAccessService } from '../ai-apps/ai-apps-access.service';
 import { AiAppSessionGrant, AiAppsSessionService } from '../ai-apps/ai-apps-session.service';
 import { ANALYTICS_EVENTS } from '../utils/constants';
 import { McpOAuthService } from './mcp-oauth.service';
+import { McpScopesService } from './mcp-scopes.service';
 
 /**
  * Mints one app session for the member behind a live MCP access token (LAB-2763).
@@ -16,7 +17,8 @@ export class McpAppSessionService {
     private readonly oauth: McpOAuthService,
     private readonly access: AiAppsAccessService,
     private readonly sessions: AiAppsSessionService,
-    private readonly analytics: AnalyticsService
+    private readonly analytics: AnalyticsService,
+    private readonly scopes: McpScopesService
   ) {}
 
   async mint(accessToken: string, appId: string): Promise<AiAppSessionGrant> {
@@ -30,7 +32,7 @@ export class McpAppSessionService {
       actor.memberUid,
       appId,
       actor.authorizationUid,
-      actor.canWrite ? 'write' : 'read'
+      await this.scopes.aiAppsAccess(actor.scopeLevels)
     );
     void this.analytics.trackEvent({
       name: ANALYTICS_EVENTS.MCP.APP_SESSION_OPEN,

@@ -24,6 +24,6 @@ import { TeamPitchesController } from './team-pitches.controller';
   ],
   controllers: [TeamPitchesController],
   providers: [TeamPitchesService, TeamPitchParticipantsService, TeamPitchProfilesService, TeamPitchEngagementService],
-  exports: [TeamPitchesService, TeamPitchParticipantsService, TeamPitchProfilesService],
+  exports: [TeamPitchesService, TeamPitchParticipantsService, TeamPitchProfilesService, TeamPitchEngagementService],
 })
 export class TeamPitchesModule {}

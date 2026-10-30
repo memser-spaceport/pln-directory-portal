@@ -37,6 +37,14 @@ import { JobOpeningsIntegrationService } from './job-openings-integration.servic
     JobOpeningsInterestService,
     JobOpeningsSavedService,
   ],
-  exports: [JobOpeningsQueryService, JobOpeningsService, JobOpeningsEnrichmentService],
+  exports: [
+    JobOpeningsQueryService,
+    JobOpeningsService,
+    JobOpeningsEnrichmentService,
+    JobOpeningsSavedService,
+    JobOpeningsApplicationService,
+    JobOpeningsInterestService,
+    JobOpeningsReferralService,
+  ],
 })
 export class JobOpeningsModule {}

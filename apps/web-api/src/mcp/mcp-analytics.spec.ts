@@ -1,6 +1,15 @@
 import { NotFoundException } from '@nestjs/common';
 import { ANALYTICS_EVENTS } from '../utils/constants';
-import { buildMcpToolAnalyticsProperties, mcpToolOperation, trackMcpToolInvocation } from './mcp-analytics';
+import {
+  buildMcpToolAnalyticsProperties,
+  MCP_TOOL_PROPERTY_BUILDERS,
+  MCP_TOOL_QUERY_ARGS,
+  mcpToolCalledEventName,
+  mcpToolOperation,
+  trackMcpToolCalled,
+  trackMcpToolInvocation,
+} from './mcp-analytics';
+import { MCP_TOOL_SCOPES, MCP_UNSCOPED_TOOLS } from './mcp-scopes.registry';
 
 const TOOLS = [
   'whoami',
@@ -173,5 +182,202 @@ describe('trackMcpToolInvocation', () => {
     const props = trackEvent.mock.calls[0][0].properties;
     expect(props).not.toHaveProperty('email');
     expect(props).not.toHaveProperty('name');
+  });
+});
+
+describe('per-tool events (LAB-3050)', () => {
+  const ALL_TOOLS = [...Object.keys(MCP_TOOL_SCOPES), ...MCP_UNSCOPED_TOOLS];
+  const actor = { memberUid: 'm1', clientName: 'Claude Code', authorizationUid: 'auth-1' };
+
+  it('maps every registry tool and whoami to one property builder', () => {
+    expect(Object.keys(MCP_TOOL_PROPERTY_BUILDERS).sort()).toEqual([...ALL_TOOLS].sort());
+  });
+
+  it('gives every tool its own mcp-<tool>-called event name', () => {
+    const names = ALL_TOOLS.map(mcpToolCalledEventName);
+    expect(new Set(names).size).toBe(ALL_TOOLS.length);
+    for (const name of names) {
+      expect(name).toMatch(/^mcp-[a-z0-9]+(-[a-z0-9]+)*-called$/);
+    }
+    expect(mcpToolCalledEventName('search_members')).toBe('mcp-search-members-called');
+    expect(mcpToolCalledEventName('post_team_news')).toBe('mcp-post-team-news-called');
+  });
+
+  it('only takes query text from tools that are in the registry', () => {
+    for (const tool of Object.keys(MCP_TOOL_QUERY_ARGS)) {
+      expect(MCP_TOOL_PROPERTY_BUILDERS[tool]).toBeDefined();
+    }
+  });
+
+  it('sends the common properties, the query trimmed to 200 characters and the result count for a search', () => {
+    const trackEvent = jest.fn();
+    const q = `  ${'a'.repeat(250)}  `;
+    trackMcpToolCalled({ trackEvent } as never, actor, {
+      toolName: 'search_members',
+      result: 'ok',
+      args: { q, limit: 5 },
+      output: { results: [{ uid: 'u1' }, { uid: 'u2' }], limit: 5 },
+    });
+    expect(trackEvent).toHaveBeenCalledWith({
+      name: 'mcp-search-members-called',
+      distinctId: 'm1',
+      properties: {
+        toolName: 'search_members',
+        memberUid: 'm1',
+        authorizationUid: 'auth-1',
+        clientName: 'Claude Code',
+        scope: 'search',
+        operation: 'read',
+        result: 'ok',
+        limit: 5,
+        resultCount: 2,
+        query: 'a'.repeat(200),
+      },
+    });
+  });
+
+  it('sends list_news filters and its search text', () => {
+    const trackEvent = jest.fn();
+    trackMcpToolCalled({ trackEvent } as never, actor, {
+      toolName: 'list_news',
+      result: 'ok',
+      args: { feed: 'for_you', search: 'funding', teamUid: 't1', limit: 10, page: 2 },
+      output: { feed: 'latest', page: 2, hasMore: false, items: [{ uid: 'n1' }] },
+    });
+    expect(trackEvent.mock.calls[0][0].properties).toMatchObject({
+      feed: 'latest',
+      teamUid: 't1',
+      limit: 10,
+      page: 2,
+      resultCount: 1,
+      hasMore: false,
+      query: 'funding',
+    });
+  });
+
+  it('sends no query text for investor DB searches', () => {
+    const trackEvent = jest.fn();
+    trackMcpToolCalled({ trackEvent } as never, actor, {
+      toolName: 'search_master_profiles',
+      result: 'ok',
+      args: { name: 'Jane Doe', email: 'jane@example.com', type: 'investor' },
+      output: { profiles: [] },
+    });
+    const props = trackEvent.mock.calls[0][0].properties;
+    expect(props).toMatchObject({ scope: 'investors', type: 'investor', resultCount: 0 });
+    expect(JSON.stringify(props)).not.toMatch(/Jane|jane@example\.com/);
+  });
+
+  it('sends whoami with scope unscoped and without the member email', () => {
+    const trackEvent = jest.fn();
+    trackMcpToolCalled({ trackEvent } as never, actor, {
+      toolName: 'whoami',
+      result: 'ok',
+      output: { memberUid: 'm1', name: 'Ada', email: 'ada@example.com' },
+    });
+    const props = trackEvent.mock.calls[0][0].properties;
+    expect(props).toMatchObject({ scope: 'unscoped', operation: 'read', result: 'ok' });
+    expect(JSON.stringify(props)).not.toContain('ada@example.com');
+  });
+
+  it('sends a refusal with its reason and nothing from the arguments', () => {
+    const trackEvent = jest.fn();
+    trackMcpToolCalled({ trackEvent } as never, actor, {
+      toolName: 'post_team_news',
+      result: 'refused',
+      reason: 'needs_write',
+      args: { teamUid: 't1', title: 'Big raise', body: 'Secret details' },
+    });
+    expect(trackEvent).toHaveBeenCalledWith({
+      name: 'mcp-post-team-news-called',
+      distinctId: 'm1',
+      properties: {
+        toolName: 'post_team_news',
+        memberUid: 'm1',
+        authorizationUid: 'auth-1',
+        clientName: 'Claude Code',
+        scope: 'news',
+        operation: 'write',
+        result: 'refused',
+        reason: 'needs_write',
+      },
+    });
+  });
+
+  it('sends errorKind and not the error message on an error', () => {
+    const trackEvent = jest.fn();
+    trackMcpToolCalled({ trackEvent } as never, actor, {
+      toolName: 'get_team',
+      result: 'error',
+      args: { uid: 't1' },
+      error: new NotFoundException('Team not found: t1 (secret)'),
+    });
+    const props = trackEvent.mock.calls[0][0].properties;
+    expect(props).toMatchObject({ result: 'error', errorKind: 'NotFoundException', uid: 't1' });
+    expect(JSON.stringify(props)).not.toContain('secret');
+  });
+
+  describe('write tools send ids, field names and counts only', () => {
+    const SECRET = 'SECRET-VALUE';
+    const cases: Array<[string, Record<string, unknown>, Record<string, unknown>?]> = [
+      [
+        'post_team_news',
+        { teamUid: 't1', title: SECRET, url: `https://x.io/${SECRET}`, body: SECRET },
+        { posted: { uid: 'n1', title: SECRET } },
+      ],
+      [
+        'update_my_profile',
+        {
+          bio: SECRET,
+          moreDetails: SECRET,
+          telegramHandler: SECRET,
+          linkedinHandler: SECRET,
+          email: `${SECRET}@example.com`,
+        },
+      ],
+      ['update_team', { teamUid: 't1', shortDescription: SECRET, contactMethod: `${SECRET}@example.com` }],
+      [
+        'update_project',
+        { projectUid: 'p1', description: SECRET, readMe: SECRET, projectLinks: [{ name: SECRET, url: SECRET }] },
+      ],
+      ['join_team', { teamUid: 't1', role: SECRET, mainTeam: true }],
+      ['join_project', { projectUid: 'p1', role: SECRET, description: SECRET }],
+      [
+        'add_experience',
+        { title: SECRET, company: SECRET, location: SECRET, startDate: '2024-01-01' },
+        { added: { uid: 'e1', title: SECRET } },
+      ],
+      ['update_experience', { experienceUid: 'e1', title: SECRET, company: SECRET }],
+      ['set_job_alert', { name: SECRET, q: SECRET, roleCategories: [SECRET] }],
+      ['update_email_preferences', { forumDigest: 'weekly', newsletter: false }],
+      ['submit_warm_path_note', { warmPathUid: 'w1', connectorProfileUid: 'c1', note: SECRET }],
+      ['update_master_profile', { uid: 'u1', fields: { bio: SECRET } }],
+      ['update_ai_app_feedback_status', { appUid: 'a1', feedbackUid: 'f1', status: 'VIEWED', note: SECRET }],
+    ];
+
+    // Every row has three cells, so Jest never takes the third argument for a done callback.
+    it.each(cases.map(([toolName, args, output]) => [toolName, args, output ?? null] as const))(
+      '%s',
+      (toolName, args, output) => {
+        const trackEvent = jest.fn();
+        trackMcpToolCalled({ trackEvent } as never, actor, { toolName, result: 'ok', args, output });
+        const sent = JSON.stringify(trackEvent.mock.calls[0][0]);
+        expect(sent).not.toContain(SECRET);
+        expect(trackEvent.mock.calls[0][0].properties).toMatchObject({ operation: 'write', result: 'ok' });
+      }
+    );
+
+    it('names the changed fields', () => {
+      expect(
+        buildMcpToolAnalyticsProperties('update_team', { teamUid: 't1', website: 'x', shortDescription: 'y' })
+      ).toEqual({ teamUid: 't1', fields: ['shortDescription', 'website'], fieldCount: 2 });
+      expect(
+        buildMcpToolAnalyticsProperties('post_team_news', { teamUid: 't1', body: 'b' }, { posted: { uid: 'n1' } })
+      ).toEqual({
+        teamUid: 't1',
+        newsUid: 'n1',
+        hasBody: true,
+      });
+    });
   });
 });

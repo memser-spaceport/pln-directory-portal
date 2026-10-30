@@ -38,6 +38,12 @@ import { NewsTagVocabularyService } from './news-tag-vocabulary.service';
     TeamNewsImageService,
     NewsTagVocabularyService,
   ],
-  exports: [TeamNewsService, TeamNewsQueryService, TeamNewsEnrichmentService, TeamNewsSuggestionsService],
+  exports: [
+    TeamNewsService,
+    TeamNewsQueryService,
+    TeamNewsEnrichmentService,
+    TeamNewsSuggestionsService,
+    TeamNewsUpvotesService,
+  ],
 })
 export class TeamNewsModule {}
