@@ -228,6 +228,12 @@ export const MCP_TOOL_PROPERTY_BUILDERS: Readonly<Record<string, McpToolProperty
     status: stringProp(args.status),
     hasNote: Boolean(stringProp(args.note)),
   }),
+  redeploy_ai_app: (args, result) => ({
+    appUid: stringProp(args.appUid),
+    deploymentId: stringProp(result?.deploymentId),
+  }),
+  rename_ai_app: fieldsOnly('appUid'),
+  update_ai_app_description: fieldsOnly('appUid'),
 };
 
 /**

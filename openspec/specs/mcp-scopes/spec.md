@@ -234,6 +234,15 @@ The `profile` scope SHALL also offer `get_my_email_preferences` at `read` and `u
 - **WHEN** an agent sets `forumDigest` to `daily`
 - **THEN** the digest becomes daily and its forum-activity and network-news choices are unchanged
 
+### Requirement: Agents redeploy, rename and describe the member's AI Apps
+
+The `ai_apps` scope SHALL also offer `redeploy_ai_app`, `rename_ai_app` and `update_ai_app_description` at `write`. They SHALL use the same service calls as the LabOS app page, so only the app's creator or a directory admin can use them, and SHALL require `ai_apps.write`, like the page's deploy and edit routes. `redeploy_ai_app` SHALL deploy the stored bundle with the stored secrets, SHALL take no bundle or secret values, and SHALL return the app's status and deployment id (not the status endpoint, which needs the app's deploy token); a deploy already running SHALL be refused. `rename_ai_app` SHALL take a name of 1 to 200 characters after trimming; `update_ai_app_description` SHALL take up to 4000 characters, and an empty string SHALL clear it; neither SHALL redeploy. Each SHALL refuse any other argument without writing.
+
+#### Scenario: Someone else's app
+
+- **WHEN** an agent of a member who did not create the app, and is not a directory admin, calls `redeploy_ai_app`
+- **THEN** the call fails as not allowed and no deploy starts
+
 ### Requirement: Agent writes are rate limited per member
 
 Each write tool SHALL allow at most 10 calls per member per tool per hour. A call over the limit SHALL be refused with an error that names the limit, SHALL NOT run, SHALL NOT create an access request, and SHALL emit `mcp-tool-refused` with reason `rate_limited`. If the limit store is unavailable the call SHALL be allowed.

@@ -79,6 +79,9 @@ export const MCP_TOOL_SCOPES: Readonly<Record<string, McpToolScope>> = {
   list_my_ai_apps: { scope: 'ai_apps', level: 'read' },
   list_ai_app_feedback: { scope: 'ai_apps', level: 'read' },
   update_ai_app_feedback_status: { scope: 'ai_apps', level: 'write' },
+  redeploy_ai_app: { scope: 'ai_apps', level: 'write' },
+  rename_ai_app: { scope: 'ai_apps', level: 'write' },
+  update_ai_app_description: { scope: 'ai_apps', level: 'write' },
 };
 
 /** Tools outside every scope. Always listed. */
