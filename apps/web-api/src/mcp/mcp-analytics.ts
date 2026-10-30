@@ -265,6 +265,8 @@ export const MCP_TOOL_PROPERTY_BUILDERS: Readonly<Record<string, McpToolProperty
     reasonCount: countOf(args.reasons),
     hasOtherReasons: (countOf(args.otherReasons) ?? 0) > 0,
   }),
+  update_fundraising_profile: fieldsOnly('demoDay', 'teamUid'),
+  update_team_pitch_profile: fieldsOnly('pitch'),
 };
 
 /**

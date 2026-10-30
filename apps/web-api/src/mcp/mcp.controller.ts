@@ -43,6 +43,9 @@ import {
   jobAlertTools,
   savedJobTools,
 } from './mcp-member-action-tools';
+import { pitchProfileTools } from './mcp-pitch-profile-tools';
+import { DemoDayFundraisingProfilesService } from '../demo-days/demo-day-fundraising-profiles.service';
+import { TeamPitchProfilesService } from '../team-pitches/team-pitch-profiles.service';
 import {
   dealTools,
   demoDayFeedbackTools,
@@ -119,7 +122,9 @@ export class McpController {
     private readonly deals: DealsService,
     private readonly articles: ArticlesService,
     private readonly followUps: MemberFollowUpsService,
-    private readonly officeHours: OfficeHoursService
+    private readonly officeHours: OfficeHoursService,
+    private readonly fundraisingProfiles: DemoDayFundraisingProfilesService,
+    private readonly teamPitchProfiles: TeamPitchProfilesService
   ) {}
 
   private readonly logger = new Logger(McpController.name);
@@ -184,6 +189,7 @@ export class McpController {
         ...officeHoursFeedbackTools(this.followUps, this.officeHours),
         ...eventWriteTools(this.eventGuests, this.eventLocations, this.members, this.prisma),
         ...directoryWriteTools(this.teams, this.projects, this.members, this.prisma),
+        ...pitchProfileTools(this.fundraisingProfiles, this.teamPitchProfiles, this.prisma),
       ]),
       actor.scopeLevels,
       caps

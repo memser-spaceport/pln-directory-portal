@@ -21,6 +21,7 @@ import { NotificationSettingsModule } from '../notification-settings/notificatio
 import { SuggestedCandidatesEmailPreferenceModule } from '../notification-settings/suggested-candidates-email-preference.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { DemoDaysModule } from '../demo-days/demo-days.module';
+import { TeamPitchesModule } from '../team-pitches/team-pitches.module';
 import { PushNotificationsModule } from '../push-notifications/push-notifications.module';
 import { DealsModule } from '../deals/deals.module';
 import { ArticlesModule } from '../articles/articles.module';
@@ -64,6 +65,7 @@ import { JwtService } from '../utils/jwt/jwt.service';
     SuggestedCandidatesEmailPreferenceModule,
     NotificationsModule,
     DemoDaysModule,
+    TeamPitchesModule,
     PushNotificationsModule,
     DealsModule,
     ArticlesModule,

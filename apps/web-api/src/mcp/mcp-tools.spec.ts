@@ -1,3 +1,7 @@
+jest.mock('../demo-days/demo-day-fundraising-profiles.service', () => ({
+  DemoDayFundraisingProfilesService: jest.fn(),
+}));
+jest.mock('../team-pitches/team-pitch-profiles.service', () => ({ TeamPitchProfilesService: jest.fn() }));
 jest.mock('../push-notifications/push-notifications.service', () => ({ PushNotificationsService: jest.fn() }));
 jest.mock('../deals/deals.service', () => ({ DealsService: jest.fn() }));
 jest.mock('../articles/articles.service', () => ({ ArticlesService: jest.fn() }));
@@ -37,6 +41,7 @@ import {
   jobAlertTools,
   savedJobTools,
 } from './mcp-member-action-tools';
+import { pitchProfileTools } from './mcp-pitch-profile-tools';
 import {
   dealTools,
   demoDayFeedbackTools,
@@ -171,6 +176,7 @@ describe('scope registry', () => {
     ...jobAlertTools(stub, stub),
     ...emailPreferenceTools(stub, stub, stub, stub, stub),
     ...demoDaySaveTools(stub, stub, stub),
+    ...pitchProfileTools(stub, stub, stub),
     ...notificationTools(stub),
     ...dealTools(stub),
     ...guideLikeTools(stub),
