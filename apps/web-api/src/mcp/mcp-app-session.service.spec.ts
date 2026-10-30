@@ -8,6 +8,7 @@ jest.mock('../analytics/service/analytics.service', () => ({
 
 import { ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { McpAppSessionService } from './mcp-app-session.service';
+import { McpScopesService } from './mcp-scopes.service';
 
 const ACTOR = {
   authorizationUid: 'auth-1',
@@ -15,7 +16,7 @@ const ACTOR = {
   email: 'ada@example.com',
   name: 'Ada',
   clientName: 'Claude',
-  canWrite: true,
+  scopeLevels: { ai_apps: 'write' },
 };
 const APP = { uid: 'app-row', memberUid: 'owner-1', access: 'OPEN', publicPaths: [], previewAccess: 'PRIVATE' };
 const GRANT = { token: 'app-session-token', expiresAt: new Date('2026-11-06T12:00:00Z') };
@@ -28,15 +29,31 @@ function build() {
   };
   const sessions = { openAgentSession: jest.fn().mockResolvedValue(GRANT) };
   const analytics = { trackEvent: jest.fn().mockResolvedValue(undefined) };
-  const service = new McpAppSessionService(oauth as any, access as any, sessions as any, analytics as any);
-  return { service, oauth, access, sessions, analytics };
+  const prisma = { mcpScopeSetting: { findMany: jest.fn().mockResolvedValue([]) } };
+  const scopes = new McpScopesService(prisma as any, analytics as any, {} as any);
+  const service = new McpAppSessionService(oauth as any, access as any, sessions as any, analytics as any, scopes);
+  return { service, oauth, access, sessions, analytics, prisma };
 }
 
 describe('McpAppSessionService', () => {
-  it('mints a read-level session for a read-only grant', async () => {
+  it('mints a read-level session when the AI Apps scope is read', async () => {
     const { service, oauth, sessions } = build();
-    oauth.authenticateAccessToken.mockResolvedValue({ ...ACTOR, canWrite: false });
+    oauth.authenticateAccessToken.mockResolvedValue({ ...ACTOR, scopeLevels: { ai_apps: 'read', forum: 'write' } });
     await expect(service.mint('mcp_at_live', 'foo')).resolves.toEqual(GRANT);
+    expect(sessions.openAgentSession).toHaveBeenCalledWith('member-1', 'foo', 'auth-1', 'read');
+  });
+
+  it('mints a read-level session when admins cap AI Apps at read', async () => {
+    const { service, sessions, prisma } = build();
+    prisma.mcpScopeSetting.findMany.mockResolvedValue([{ scope: 'ai_apps', maxLevel: 'read' }]);
+    await service.mint('mcp_at_live', 'foo');
+    expect(sessions.openAgentSession).toHaveBeenCalledWith('member-1', 'foo', 'auth-1', 'read');
+  });
+
+  it('mints a read-level session when scope settings cannot be read', async () => {
+    const { service, sessions, prisma } = build();
+    prisma.mcpScopeSetting.findMany.mockRejectedValue(new Error('db down'));
+    await service.mint('mcp_at_live', 'foo');
     expect(sessions.openAgentSession).toHaveBeenCalledWith('member-1', 'foo', 'auth-1', 'read');
   });
 

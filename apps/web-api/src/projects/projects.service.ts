@@ -107,6 +107,20 @@ export class ProjectsService {
     }
   }
 
+  /**
+   * Updates only the project's own fields (LAB-3030, MCP agents). Unlike `updateProjectByUid` it leaves contributing
+   * teams, contributions and focus areas alone, so a partial payload is safe. Callers check edit rights.
+   */
+  async updateProjectProfileFields(uid: string, data: Prisma.ProjectUncheckedUpdateInput) {
+    try {
+      const result = await this.prisma.project.update({ where: { uid }, data });
+      await this.postUpdateActions(result.uid);
+      return result;
+    } catch (err) {
+      this.handleErrors(err, `${uid}`);
+    }
+  }
+
   async getProjects(queryOptions: Prisma.ProjectFindManyArgs) {
     try {
       const whereWithFilter: Prisma.ProjectWhereInput = {
