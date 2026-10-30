@@ -17,7 +17,7 @@ has no entry. Adding a tool to MCP means adding it there.
 | `directory` | Members, teams and projects | `get_member`, `get_team`, `get_project`, `list_portfolio_teams` | none |
 | `events` | Events | `get_event` | none |
 | `investors` | Investors and warm intros | master-profile and warm-intro reads | `submit_warm_path_feedback`, `submit_warm_path_note`, `update_master_profile`, `update_connection_edge`, `update_warm_path` |
-| `profile` | Your profile | `get_my_profile` | `update_my_profile` (allowlist: bio, moreDetails, social handles, officeHours, openToWork, jobSearchStatus, skills) |
+| `profile` | Your profile | `get_my_profile` | `update_my_profile` (allowlist: bio, moreDetails, social handles, officeHours, openToWork, jobSearchStatus, skills); `join_team`, `leave_team`, `join_project`, `leave_project` (own teams and project contributions, as on the profile page) |
 | `ai_apps` | AI Apps | `list_my_ai_apps`, `list_ai_app_feedback` | `update_ai_app_feedback_status` |
 
 Member RBAC still applies on top (investor DB tools need `investor_db.view` / `.edit`, forum tools `forum.read`).

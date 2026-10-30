@@ -23,7 +23,7 @@ import { aiAppFeedbackTools } from './mcp-ai-app-feedback-tools';
 import { directoryTools } from './mcp-directory-tools';
 import { portfolioTools } from './mcp-portfolio-tools';
 import { newsTools } from './mcp-news-tools';
-import { directoryWriteTools, eventWriteTools, newsWriteTools, profileTools } from './mcp-write-tools';
+import { directoryWriteTools, eventWriteTools, membershipTools, newsWriteTools, profileTools } from './mcp-write-tools';
 import { isWriteTool, MCP_TOOL_SCOPES, MCP_UNSCOPED_TOOLS, registryMaxLevel } from './mcp-scopes.registry';
 
 describe('mcp-redirect', () => {
@@ -143,6 +143,7 @@ describe('scope registry', () => {
     ...newsTools(stub, stub),
     ...newsWriteTools(stub, stub, stub),
     ...profileTools(stub, stub, stub),
+    ...membershipTools(stub, stub, stub),
     ...eventWriteTools(stub, stub, stub, stub),
     ...directoryWriteTools(stub, stub, stub, stub),
   ];
@@ -163,7 +164,7 @@ describe('scope registry', () => {
   it('marks every tool that changes data as a write tool', () => {
     const writesByName = fullCatalog
       .map((t) => t.name)
-      .filter((name) => /^(update|submit|post|rsvp|cancel)_/.test(name));
+      .filter((name) => /^(update|submit|post|rsvp|cancel|join|leave)_/.test(name));
     expect(writesByName.length).toBeGreaterThan(0);
     for (const name of writesByName) {
       expect(isWriteTool(name)).toBe(true);
