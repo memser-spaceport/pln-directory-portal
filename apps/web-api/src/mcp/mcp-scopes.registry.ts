@@ -56,6 +56,10 @@ export const MCP_TOOL_SCOPES: Readonly<Record<string, McpToolScope>> = {
 
   get_my_profile: { scope: 'profile', level: 'read' },
   update_my_profile: { scope: 'profile', level: 'write' },
+  join_team: { scope: 'profile', level: 'write' },
+  leave_team: { scope: 'profile', level: 'write' },
+  join_project: { scope: 'profile', level: 'write' },
+  leave_project: { scope: 'profile', level: 'write' },
 
   list_my_ai_apps: { scope: 'ai_apps', level: 'read' },
   list_ai_app_feedback: { scope: 'ai_apps', level: 'read' },

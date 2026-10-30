@@ -10,7 +10,7 @@ jest.mock('../projects/projects.service', () => ({ ProjectsService: jest.fn() })
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
 import { McpActorContext, McpToolDef, toolInputSchema } from './mcp-tools';
-import { directoryWriteTools, eventWriteTools, newsWriteTools, profileTools } from './mcp-write-tools';
+import { directoryWriteTools, eventWriteTools, membershipTools, newsWriteTools, profileTools } from './mcp-write-tools';
 import { McpWriteLimitService, MCP_WRITE_LIMIT_PER_HOUR } from './mcp-write-limit.service';
 
 const CTX: McpActorContext = {
@@ -488,6 +488,198 @@ describe('directory write tools', () => {
         updateProject.execute(CTX, { projectUid: 'p1', contributingTeams: [], contactEmail: 'x@y.z', readMe: 'x' })
       ).rejects.toThrow('contributingTeams, contactEmail');
       expect(projects.updateProjectProfileFields).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe('team and project membership tools', () => {
+  const ROLES = [
+    { teamUid: 'team-1', role: 'Engineer', mainTeam: true, teamLead: true, roleTags: ['Engineer'] },
+    { teamUid: 'team-2', role: null, mainTeam: false, teamLead: false, roleTags: [] },
+  ];
+  const CONTRIBUTIONS = [
+    { uid: 'c1', projectUid: 'proj-1', memberUid: 'member-1', role: 'Dev', currentProject: true },
+    { uid: 'c2', projectUid: 'proj-2', memberUid: 'member-1', role: null, currentProject: false },
+  ];
+
+  function build({
+    team = { uid: 'team-3', name: 'Team Three', status: 'ACTIVE' } as any,
+    project = undefined as any,
+  } = {}) {
+    const existing = { ...MEMBER, teamMemberRoles: ROLES, projectContributions: CONTRIBUTIONS };
+    const tx = { tx: true };
+    const members = {
+      findMemberByUid: jest.fn().mockResolvedValue(existing),
+      updateTeamMemberRoles: jest.fn().mockResolvedValue(undefined),
+      updateProjectContributions: jest.fn().mockResolvedValue(undefined),
+    };
+    const hooks = { postUpdateActions: jest.fn().mockResolvedValue(undefined) };
+    const prisma = {
+      $transaction: jest.fn(async (fn: (t: unknown) => unknown) => fn(tx)),
+      team: { findFirst: jest.fn().mockResolvedValue(team) },
+      project: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue(project === undefined ? { uid: 'proj-3', name: 'Project Three' } : project),
+      },
+      teamMemberRole: {
+        findMany: jest.fn().mockResolvedValue(ROLES.map((r) => ({ ...r, team: { name: r.teamUid } }))),
+      },
+      projectContribution: {
+        findMany: jest.fn().mockResolvedValue(CONTRIBUTIONS.map((c) => ({ ...c, project: { name: c.projectUid } }))),
+      },
+    };
+    const tools = membershipTools(members as any, hooks as any, prisma as any);
+    return { tools, members, hooks, prisma, existing, tx };
+  }
+
+  describe('join_team', () => {
+    it('adds the team to the full list through the profile-page step and runs the hooks', async () => {
+      const { tools, members, hooks, existing, tx } = build();
+      const result: any = await tool(tools, 'join_team').execute(CTX, { teamUid: 'team-3', role: ' Designer ' });
+      expect(members.updateTeamMemberRoles).toHaveBeenCalledWith(
+        {
+          teamAndRoles: [
+            { teamUid: 'team-1', role: 'Engineer', mainTeam: true, teamLead: true },
+            { teamUid: 'team-2', role: null, mainTeam: false, teamLead: false },
+            { teamUid: 'team-3', role: 'Designer', mainTeam: false, teamLead: false },
+          ],
+        },
+        existing,
+        'member-1',
+        tx
+      );
+      expect(hooks.postUpdateActions).toHaveBeenCalledWith(existing, 'ada@example.com');
+      expect(result).toMatchObject({ joined: true, team: { uid: 'team-3', name: 'Team Three' } });
+    });
+
+    it('moves the main team when asked', async () => {
+      const { tools, members } = build();
+      await tool(tools, 'join_team').execute(CTX, { teamUid: 'team-3', mainTeam: true });
+      const { teamAndRoles } = members.updateTeamMemberRoles.mock.calls[0][0];
+      expect(teamAndRoles.map((r: any) => [r.teamUid, r.mainTeam])).toEqual([
+        ['team-1', false],
+        ['team-2', false],
+        ['team-3', true],
+      ]);
+    });
+
+    it('changes nothing when the member is already on the team', async () => {
+      const { tools, members, hooks } = build({ team: { uid: 'team-2', name: 'Team Two', status: 'ACTIVE' } });
+      const result: any = await tool(tools, 'join_team').execute(CTX, { teamUid: 'team-2' });
+      expect(result).toMatchObject({ joined: false, alreadyOnTeam: true });
+      expect(members.updateTeamMemberRoles).not.toHaveBeenCalled();
+      expect(hooks.postUpdateActions).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['an inactive team', { uid: 'team-3', name: 'Gone', status: 'INACTIVE' }],
+      ['a missing team', null],
+    ])('refuses %s', async (_label, team) => {
+      const { tools, members } = build({ team });
+      await expect(tool(tools, 'join_team').execute(CTX, { teamUid: 'team-3' })).rejects.toBeInstanceOf(
+        NotFoundException
+      );
+      expect(members.updateTeamMemberRoles).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['teamLead', { teamUid: 'team-3', teamLead: true }],
+      ['memberUid', { teamUid: 'team-3', memberUid: 'someone-else' }],
+    ])('refuses %s after the SDK has parsed the arguments', async (field, args) => {
+      const { tools, members } = build();
+      const join = tool(tools, 'join_team');
+      const parsed = (toolInputSchema(join) as z.ZodTypeAny).parse(args);
+      await expect(join.execute(CTX, parsed)).rejects.toThrow(`These fields can't be changed by an agent: ${field}`);
+      expect(members.updateTeamMemberRoles).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('leave_team', () => {
+    it('drops only that team from the list', async () => {
+      const { tools, members } = build();
+      const result: any = await tool(tools, 'leave_team').execute(CTX, { teamUid: 'team-1' });
+      expect(members.updateTeamMemberRoles.mock.calls[0][0]).toEqual({
+        teamAndRoles: [{ teamUid: 'team-2', role: null, mainTeam: false, teamLead: false }],
+      });
+      expect(result).toMatchObject({ left: true, team: { uid: 'team-1' } });
+    });
+
+    it('changes nothing for a team the member is not on', async () => {
+      const { tools, members } = build();
+      const result: any = await tool(tools, 'leave_team').execute(CTX, { teamUid: 'team-9' });
+      expect(result).toMatchObject({ left: false, wasOnTeam: false });
+      expect(members.updateTeamMemberRoles).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('join_project', () => {
+    it('keeps the existing contributions as they are and adds a current one', async () => {
+      const { tools, members, hooks, existing, tx } = build();
+      await tool(tools, 'join_project').execute(CTX, {
+        projectUid: 'proj-3',
+        role: 'Maintainer',
+        startDate: '2026-01-15',
+      });
+      expect(members.updateProjectContributions).toHaveBeenCalledWith(
+        {
+          projectContributions: [
+            CONTRIBUTIONS[0],
+            CONTRIBUTIONS[1],
+            {
+              projectUid: 'proj-3',
+              role: 'Maintainer',
+              description: null,
+              startDate: new Date('2026-01-15'),
+              endDate: null,
+              currentProject: true,
+            },
+          ],
+        },
+        existing,
+        'member-1',
+        tx
+      );
+      expect(hooks.postUpdateActions).toHaveBeenCalled();
+    });
+
+    it('changes nothing when the member already has a current contribution', async () => {
+      const { tools, members } = build();
+      const result: any = await tool(tools, 'join_project').execute(CTX, { projectUid: 'proj-1' });
+      expect(result).toMatchObject({ joined: false, alreadyContributing: true });
+      expect(members.updateProjectContributions).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['a deleted or missing project', { projectUid: 'proj-3' }, null, NotFoundException],
+      ['a bad date', { projectUid: 'proj-3', startDate: 'soon' }, undefined, BadRequestException],
+      [
+        'an end before the start',
+        { projectUid: 'proj-3', startDate: '2026-02-01', endDate: '2026-01-01' },
+        undefined,
+        BadRequestException,
+      ],
+      ['an unknown field', { projectUid: 'proj-3', memberUid: 'x' }, undefined, BadRequestException],
+    ])('refuses %s', async (_label, args, project, error) => {
+      const { tools, members } = build({ project });
+      await expect(tool(tools, 'join_project').execute(CTX, args)).rejects.toBeInstanceOf(error);
+      expect(members.updateProjectContributions).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('leave_project', () => {
+    it('drops only that project and keeps the rest unchanged', async () => {
+      const { tools, members } = build();
+      const result: any = await tool(tools, 'leave_project').execute(CTX, { projectUid: 'proj-1' });
+      expect(members.updateProjectContributions.mock.calls[0][0]).toEqual({ projectContributions: [CONTRIBUTIONS[1]] });
+      expect(result).toMatchObject({ left: true, project: { uid: 'proj-1' } });
+    });
+
+    it('changes nothing for a project the member does not contribute to', async () => {
+      const { tools, members } = build();
+      const result: any = await tool(tools, 'leave_project').execute(CTX, { projectUid: 'proj-9' });
+      expect(result).toMatchObject({ left: false, wasContributing: false });
+      expect(members.updateProjectContributions).not.toHaveBeenCalled();
     });
   });
 });

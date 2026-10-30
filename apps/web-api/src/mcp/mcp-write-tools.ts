@@ -128,7 +128,8 @@ export function profileTools(members: MembersService, hooks: MembersHooksService
       description:
         `Update your own LabOS profile. Only these fields can change: ${PROFILE_FIELDS.join(', ')}. ` +
         'Send only the fields to change; an empty string clears a text field. skills replaces the whole list and ' +
-        'takes existing LabOS skill titles. Name, email, teams, roles and photo stay in LabOS.',
+        'takes existing LabOS skill titles. Join or leave teams and projects with join_team, leave_team, join_project ' +
+        'and leave_project. Name, email, team roles and photo stay in LabOS.',
       visibility: 'always',
       // Without it the SDK drops `email` and friends silently, and the rest of the call saves as if they were never
       // sent; with it the call is refused and names them.
@@ -493,6 +494,241 @@ export function directoryWriteTools(
         return {
           updated: Object.keys(data),
           project: Object.fromEntries(['uid', 'name', ...PROJECT_FIELDS].map((key) => [key, updated?.[key] ?? null])),
+        };
+      },
+    },
+  ];
+}
+
+const MEMBERSHIP_TEXT_MAX = 200;
+
+/** Optional trimmed text for a role or description; undefined when absent or empty. */
+function optionalText(field: string, value: unknown, max = MEMBERSHIP_TEXT_MAX): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string') throw new BadRequestException(`${field} must be text`);
+  if (value.length > max) throw new BadRequestException(`${field} is too long`);
+  return value.trim() || undefined;
+}
+
+function optionalDate(field: string, value: unknown): Date | undefined {
+  if (value === undefined) return undefined;
+  const date = typeof value === 'string' ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) throw new BadRequestException(`${field} must be a date like 2026-10-30`);
+  return date;
+}
+
+type TeamRoleRow = { teamUid: string; role: string | null; mainTeam: boolean; teamLead: boolean };
+
+async function myTeams(prisma: PrismaService, memberUid: string) {
+  const roles = await prisma.teamMemberRole.findMany({
+    where: { memberUid },
+    select: { teamUid: true, role: true, mainTeam: true, teamLead: true, team: { select: { name: true } } },
+    orderBy: { mainTeam: 'desc' },
+  });
+  return roles.map(({ team, ...role }) => ({ ...role, teamName: team?.name ?? null }));
+}
+
+async function myProjects(prisma: PrismaService, memberUid: string) {
+  const contributions = await prisma.projectContribution.findMany({
+    where: { memberUid, project: { isDeleted: false } },
+    select: {
+      projectUid: true,
+      role: true,
+      currentProject: true,
+      startDate: true,
+      endDate: true,
+      project: { select: { name: true } },
+    },
+  });
+  return contributions.map(({ project, ...row }) => ({ ...row, projectName: project?.name ?? null }));
+}
+
+/**
+ * `join_team`, `leave_team`, `join_project` and `leave_project` in the `profile` scope (LAB-3057): the member's own
+ * teams and project contributions, as on the profile page. The page sends the whole list to `PUT /v1/member/:uid`;
+ * these send the current list plus or minus one entry through the same service steps, so nothing else changes.
+ * There is no approval step, as in the UI; a new team role is never a lead.
+ */
+export function membershipTools(
+  members: MembersService,
+  hooks: MembersHooksService,
+  prisma: PrismaService
+): McpToolDef[] {
+  /** Runs the page's team-role step with `next` as the full list, then the member post-update actions. */
+  const saveTeams = async (ctx: McpActorContext, next: (current: TeamRoleRow[]) => TeamRoleRow[]) => {
+    await prisma.$transaction(async (tx) => {
+      const existing = await members.findMemberByUid(ctx.memberUid, tx);
+      const teamAndRoles = next(
+        existing.teamMemberRoles.map((role) => ({
+          teamUid: role.teamUid,
+          role: role.role,
+          mainTeam: role.mainTeam,
+          teamLead: role.teamLead,
+        }))
+      );
+      await members.updateTeamMemberRoles({ teamAndRoles }, existing, ctx.memberUid, tx);
+    });
+    const updated = await members.findMemberByUid(ctx.memberUid);
+    await hooks.postUpdateActions(updated, ctx.email ?? updated.email ?? '');
+  };
+
+  const saveContributions = async (
+    ctx: McpActorContext,
+    next: (current: Array<Record<string, unknown>>) => Array<Record<string, unknown>>
+  ) => {
+    await prisma.$transaction(async (tx) => {
+      const existing = await members.findMemberByUid(ctx.memberUid, tx);
+      const projectContributions = next(existing.projectContributions as unknown as Array<Record<string, unknown>>);
+      await members.updateProjectContributions({ projectContributions }, existing, ctx.memberUid, tx);
+    });
+    const updated = await members.findMemberByUid(ctx.memberUid);
+    await hooks.postUpdateActions(updated, ctx.email ?? updated.email ?? '');
+  };
+
+  return [
+    {
+      name: 'join_team',
+      description:
+        'Add yourself to a LabOS team, as on your profile page. The team shows on your profile and you show on the ' +
+        'team page. You join as a member, not a lead. Set mainTeam to make it your main team. Calling it when you are ' +
+        'already on the team changes nothing. Get the team uid from search_teams.',
+      visibility: 'always',
+      keepUnknownArgs: true,
+      inputSchema: {
+        teamUid: z.string().describe('Team uid from search_teams'),
+        role: z.string().optional().describe('Your role on the team, e.g. "Engineer"'),
+        mainTeam: z.boolean().optional().describe('Make this your main team'),
+      },
+      execute: async (ctx, args = {}) => {
+        refuseUnknown(args, ['teamUid', 'role', 'mainTeam']);
+        const teamUid = requiredUid(args, 'teamUid');
+        const role = optionalText('role', args.role) ?? null;
+        if (args.mainTeam !== undefined && typeof args.mainTeam !== 'boolean') {
+          throw new BadRequestException('mainTeam must be true or false');
+        }
+        const team = await prisma.team.findFirst({
+          where: { uid: teamUid },
+          select: { uid: true, name: true, status: true },
+        });
+        // The profile page offers active teams only.
+        if (!team || team.status === 'INACTIVE') throw new NotFoundException(`Team not found: ${teamUid}`);
+
+        const current = await myTeams(prisma, ctx.memberUid);
+        if (current.some((row) => row.teamUid === teamUid)) {
+          return { joined: false, alreadyOnTeam: true, team: { uid: team.uid, name: team.name }, teams: current };
+        }
+        const mainTeam = args.mainTeam === true || current.length === 0;
+        await saveTeams(ctx, (rows) => [
+          ...rows.map((row) => ({ ...row, mainTeam: mainTeam ? false : row.mainTeam })),
+          { teamUid, role, mainTeam, teamLead: false },
+        ]);
+        return {
+          joined: true,
+          alreadyOnTeam: false,
+          team: { uid: team.uid, name: team.name },
+          teams: await myTeams(prisma, ctx.memberUid),
+        };
+      },
+    },
+    {
+      name: 'leave_team',
+      description:
+        'Remove yourself from one of your LabOS teams, as on your profile page. You no longer show on the team page. ' +
+        'If it was your main team, your first other team becomes main. If you are its only lead, the team is left ' +
+        'without a lead, as in LabOS. Calling it when you are not on the team changes nothing.',
+      visibility: 'always',
+      keepUnknownArgs: true,
+      inputSchema: { teamUid: z.string().describe('One of your teams (see get_member or join_team results)') },
+      execute: async (ctx, args = {}) => {
+        refuseUnknown(args, ['teamUid']);
+        const teamUid = requiredUid(args, 'teamUid');
+        const current = await myTeams(prisma, ctx.memberUid);
+        const leaving = current.find((row) => row.teamUid === teamUid);
+        if (!leaving) return { left: false, wasOnTeam: false, teams: current };
+        await saveTeams(ctx, (rows) => rows.filter((row) => row.teamUid !== teamUid));
+        return {
+          left: true,
+          wasOnTeam: true,
+          team: { uid: teamUid, name: leaving.teamName },
+          teams: await myTeams(prisma, ctx.memberUid),
+        };
+      },
+    },
+    {
+      name: 'join_project',
+      description:
+        'Add a LabOS project to your contributions, as on your profile page. The project shows on your profile and ' +
+        'you show as a contributor on the project page. Leave endDate out for a project you still work on. Calling it ' +
+        'when you already have a current contribution to the project changes nothing. Get the project uid from ' +
+        'search_projects.',
+      visibility: 'always',
+      keepUnknownArgs: true,
+      inputSchema: {
+        projectUid: z.string().describe('Project uid from search_projects'),
+        role: z.string().optional().describe('Your role on the project'),
+        description: z.string().optional().describe('What you did, a sentence or two'),
+        startDate: z.string().optional().describe('ISO date; default today'),
+        endDate: z.string().optional().describe('ISO date; leave out if you still work on it'),
+      },
+      execute: async (ctx, args = {}) => {
+        refuseUnknown(args, ['projectUid', 'role', 'description', 'startDate', 'endDate']);
+        const projectUid = requiredUid(args, 'projectUid');
+        const role = optionalText('role', args.role);
+        const description = optionalText('description', args.description, 1000);
+        const startDate = optionalDate('startDate', args.startDate) ?? new Date();
+        const endDate = optionalDate('endDate', args.endDate);
+        if (endDate && endDate.getTime() < startDate.getTime()) {
+          throw new BadRequestException('endDate must be after startDate');
+        }
+        const project = await prisma.project.findFirst({
+          where: { uid: projectUid, isDeleted: false },
+          select: { uid: true, name: true },
+        });
+        if (!project) throw new NotFoundException(`Project not found: ${projectUid}`);
+
+        const current = await myProjects(prisma, ctx.memberUid);
+        if (current.some((row) => row.projectUid === projectUid && row.currentProject)) {
+          return { joined: false, alreadyContributing: true, project, projects: current };
+        }
+        await saveContributions(ctx, (rows) => [
+          ...rows,
+          {
+            projectUid,
+            role: role ?? null,
+            description: description ?? null,
+            startDate,
+            endDate: endDate ?? null,
+            currentProject: !endDate,
+          },
+        ]);
+        return {
+          joined: true,
+          alreadyContributing: false,
+          project,
+          projects: await myProjects(prisma, ctx.memberUid),
+        };
+      },
+    },
+    {
+      name: 'leave_project',
+      description:
+        'Remove a project from your contributions, as on your profile page: every contribution you listed for it ' +
+        'goes, and you no longer show as a contributor. Calling it when you have none changes nothing.',
+      visibility: 'always',
+      keepUnknownArgs: true,
+      inputSchema: { projectUid: z.string().describe('A project you contribute to') },
+      execute: async (ctx, args = {}) => {
+        refuseUnknown(args, ['projectUid']);
+        const projectUid = requiredUid(args, 'projectUid');
+        const current = await myProjects(prisma, ctx.memberUid);
+        const leaving = current.find((row) => row.projectUid === projectUid);
+        if (!leaving) return { left: false, wasContributing: false, projects: current };
+        await saveContributions(ctx, (rows) => rows.filter((row) => row.projectUid !== projectUid));
+        return {
+          left: true,
+          wasContributing: true,
+          project: { uid: projectUid, name: leaving.projectName },
+          projects: await myProjects(prisma, ctx.memberUid),
         };
       },
     },

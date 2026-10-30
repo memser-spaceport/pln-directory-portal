@@ -186,6 +186,25 @@ The `directory` scope SHALL offer `update_team` and `update_project` at `write`,
 - **WHEN** an agent updates only a project's `tagline`
 - **THEN** its contributing teams, contributions and focus areas are unchanged
 
+### Requirement: Agents join and leave the member's teams and projects
+
+The `profile` scope SHALL offer `join_team`, `leave_team`, `join_project` and `leave_project` at `write`. They SHALL change only the calling member's own team roles and project contributions, through the same service steps as the profile page's save, with the current list plus or minus one entry, so the member's other teams, roles and contributions are unchanged. There SHALL be no approval step, as in the UI. `join_team` SHALL accept an active team, an optional role and an optional `mainTeam`; it SHALL make the new role a non-lead and SHALL make it the main team when asked or when it is the member's first team. `join_project` SHALL accept a non-deleted project with optional role, description, startDate (default today) and endDate (none means current). Joining a team the member is already on, or a project with a current contribution, and leaving one the member is not on, SHALL change nothing. `leave_project` SHALL remove all of the member's contributions to that project. Each tool SHALL refuse any other argument without writing, and SHALL run the normal member post-update actions after a change.
+
+#### Scenario: Joining a team
+
+- **WHEN** an agent calls `join_team` for an active team the member is not on
+- **THEN** the member is on the team as a non-lead, and their other teams and main team are unchanged
+
+#### Scenario: Leaving a project
+
+- **WHEN** an agent calls `leave_project` for one of the member's projects
+- **THEN** the member's contributions to that project are removed and their other contributions are unchanged
+
+#### Scenario: Making yourself a lead
+
+- **WHEN** an agent calls `join_team` with `teamLead: true`
+- **THEN** the call fails naming `teamLead`, and nothing changes
+
 ### Requirement: Agent writes are rate limited per member
 
 Each write tool SHALL allow at most 10 calls per member per tool per hour. A call over the limit SHALL be refused with an error that names the limit, SHALL NOT run, SHALL NOT create an access request, and SHALL emit `mcp-tool-refused` with reason `rate_limited`. If the limit store is unavailable the call SHALL be allowed.
