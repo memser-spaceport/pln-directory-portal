@@ -17,6 +17,10 @@ import { MemberExperiencesModule } from '../member-experiences/member-experience
 import { FollowsModule } from '../follows/follows.module';
 import { JobOpeningsModule } from '../job-openings/job-openings.module';
 import { JobAlertsModule } from '../job-alerts/job-alerts.module';
+import { NotificationSettingsModule } from '../notification-settings/notification-settings.module';
+import { SuggestedCandidatesEmailPreferenceModule } from '../notification-settings/suggested-candidates-email-preference.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { DemoDaysModule } from '../demo-days/demo-days.module';
 import { McpAdminScopesController } from './mcp-admin-scopes.controller';
 import { McpAppSessionService } from './mcp-app-session.service';
 import { McpAppSessionsController } from './mcp-app-sessions.controller';
@@ -51,6 +55,10 @@ import { JwtService } from '../utils/jwt/jwt.service';
     FollowsModule,
     JobOpeningsModule,
     JobAlertsModule,
+    NotificationSettingsModule,
+    SuggestedCandidatesEmailPreferenceModule,
+    NotificationsModule,
+    DemoDaysModule,
   ],
   controllers: [
     McpOAuthController,

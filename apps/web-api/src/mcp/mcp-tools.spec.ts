@@ -24,7 +24,14 @@ import { directoryTools } from './mcp-directory-tools';
 import { portfolioTools } from './mcp-portfolio-tools';
 import { newsTools } from './mcp-news-tools';
 import { directoryWriteTools, eventWriteTools, membershipTools, newsWriteTools, profileTools } from './mcp-write-tools';
-import { experienceTools, followTools, jobAlertTools, savedJobTools } from './mcp-member-action-tools';
+import {
+  demoDaySaveTools,
+  emailPreferenceTools,
+  experienceTools,
+  followTools,
+  jobAlertTools,
+  savedJobTools,
+} from './mcp-member-action-tools';
 import { isWriteTool, MCP_TOOL_SCOPES, MCP_UNSCOPED_TOOLS, registryMaxLevel } from './mcp-scopes.registry';
 
 describe('mcp-redirect', () => {
@@ -149,6 +156,8 @@ describe('scope registry', () => {
     ...followTools(stub),
     ...savedJobTools(stub),
     ...jobAlertTools(stub, stub),
+    ...emailPreferenceTools(stub, stub, stub, stub, stub),
+    ...demoDaySaveTools(stub, stub, stub),
     ...eventWriteTools(stub, stub, stub, stub),
     ...directoryWriteTools(stub, stub, stub, stub),
   ];

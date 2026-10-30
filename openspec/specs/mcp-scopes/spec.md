@@ -219,6 +219,20 @@ The `profile` scope SHALL also offer `list_my_experiences` and `get_my_job_alert
 - **WHEN** an agent calls `set_job_alert` with a role category the board does not offer
 - **THEN** the call fails naming the value and the accepted values, and no alert is saved
 
+### Requirement: Agents change the member's email preferences and Demo Day saves
+
+The `profile` scope SHALL also offer `get_my_email_preferences` at `read` and `update_email_preferences`, `save_demo_day_team` and `unsave_demo_day_team` at `write`. `update_email_preferences` SHALL change only the switches on Settings → Email Preferences (forum digest off/daily/weekly and its forum-activity and network-news content, the newsletter, Demo Day updates, investor invites and dealflow, the suggested candidates email), through the same services as the page, and SHALL leave every switch it is not given unchanged. It SHALL refuse investor switches without investor access, forum activity in the digest without forum access, and the suggested candidates email for a member who leads no team, and SHALL check all of these before writing anything. Turning Demo Day updates on or off SHALL add or remove the member's Demo Day event subscriber, as the page does. The Demo Day save tools SHALL take a Demo Day (slug or uid) and a team, SHALL save that team's fundraising profile in that Demo Day through the Demo Day page's engagement service, and SHALL be refused for a member who is not an enabled participant of that Demo Day.
+
+#### Scenario: Investor switch without investor access
+
+- **WHEN** an agent of a member without investor access calls `update_email_preferences` with `investorInvites` and `demoDayUpdates`
+- **THEN** the call fails and neither setting changes
+
+#### Scenario: Digest frequency only
+
+- **WHEN** an agent sets `forumDigest` to `daily`
+- **THEN** the digest becomes daily and its forum-activity and network-news choices are unchanged
+
 ### Requirement: Agent writes are rate limited per member
 
 Each write tool SHALL allow at most 10 calls per member per tool per hour. A call over the limit SHALL be refused with an error that names the limit, SHALL NOT run, SHALL NOT create an access request, and SHALL emit `mcp-tool-refused` with reason `rate_limited`. If the limit store is unavailable the call SHALL be allowed.
