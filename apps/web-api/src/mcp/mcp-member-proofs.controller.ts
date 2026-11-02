@@ -44,7 +44,7 @@ export class McpMemberProofsController {
     if (!token) {
       throw new UnauthorizedException('MCP OAuth token required');
     }
-    return this.proofs.issue(token, body.audience);
+    return this.proofs.issue(token, body.audience, body.scope);
   }
 }
 

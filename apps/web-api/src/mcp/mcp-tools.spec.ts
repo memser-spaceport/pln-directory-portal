@@ -227,13 +227,13 @@ describe('scope registry', () => {
     ).toEqual(writesByName.sort());
   });
 
-  it('allows write only on scopes that have write tools', () => {
+  it('allows write only on scopes that have write tools, or that a member proof writes with', () => {
     for (const scope of ['investors', 'ai_apps', 'news', 'profile', 'events', 'directory'] as const) {
       expect(registryMaxLevel(scope)).toBe('write');
     }
-    for (const scope of ['search', 'forum'] as const) {
-      expect(registryMaxLevel(scope)).toBe('read');
-    }
+    // Forum's tools only read; write is for NodeBB acting through a member proof (LAB-3075)
+    expect(registryMaxLevel('forum')).toBe('write');
+    expect(registryMaxLevel('search')).toBe('read');
   });
 
   it('keeps RBAC visibility independent of scopes', () => {
