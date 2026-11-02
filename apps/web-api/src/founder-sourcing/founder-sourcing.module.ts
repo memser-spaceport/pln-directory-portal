@@ -12,6 +12,6 @@ import { FounderSourcingService } from './founder-sourcing.service';
   imports: [SharedModule, RbacModule, AccessControlV2Module],
   controllers: [FounderSourcingServiceController, FounderSourcingController],
   providers: [FounderSourcingService, FounderSourcingQueryService, FounderSourcingReviewService],
-  exports: [FounderSourcingService],
+  exports: [FounderSourcingService, FounderSourcingReviewService],
 })
 export class FounderSourcingModule {}

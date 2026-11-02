@@ -365,6 +365,31 @@ export class TeamsService {
     }
   }
 
+  /**
+   * Updates only the team's own text fields (LAB-3030, MCP agents). Unlike `updateTeamFromParticipantsRequest` it never
+   * touches the logo, tags, focus areas, member roles or investor profile, so a partial payload is safe.
+   */
+  async updateTeamProfileFields(
+    teamUid: string,
+    data: Prisma.TeamUncheckedUpdateInput,
+    requestorEmail: string
+  ): Promise<Team> {
+    const fields = { ...data };
+    if (typeof fields.blueskyHandler === 'string') {
+      fields.blueskyHandler = normalizeBlueskyHandler(fields.blueskyHandler) ?? null;
+    }
+    return this.prisma.$transaction(async (tx) => {
+      const team = await this.updateTeamByUid(teamUid, fields, tx, requestorEmail);
+      const enrichable = Object.fromEntries(
+        Object.entries(fields).filter(([key]) => ENRICHABLE_TEAM_FIELDS.includes(key as any))
+      );
+      if (Object.keys(enrichable).length > 0) {
+        await this.teamEnrichmentService.handleUserFieldChange(teamUid, enrichable, tx);
+      }
+      return team;
+    });
+  }
+
   async findTeamByNameSafe(name: string): Promise<Team | null> {
     const normalized = String(name || '').trim();
     if (!normalized) {

@@ -42,6 +42,6 @@ import { FollowsModule } from '../follows/follows.module';
     DemoDayEngagementAnalyticsService,
     DemoDayNotificationsJob,
   ],
-  exports: [DemoDaysService, DemoDayParticipantsService, DemoDayFundraisingProfilesService],
+  exports: [DemoDaysService, DemoDayParticipantsService, DemoDayFundraisingProfilesService, DemoDayEngagementService],
 })
 export class DemoDaysModule {}

@@ -4610,14 +4610,43 @@ model McpAuthorization {
   accessTokenHash  String?       @unique
   refreshTokenHash String?       @unique
   accessExpiresAt  DateTime?
-  /// False = read-only grant: write tools are hidden (LAB-2902). Grants approved before that keep true.
+  /// Legacy read-only flag (LAB-2902). Not read since LAB-2995 (`scopeLevels` decides); dropped in a follow-up.
   canWrite         Boolean       @default(true)
+  /// `{ [scope]: 'none' | 'read' | 'write' }` (LAB-2995). A scope with no key is `read`, capped by `McpScopeSetting`.
+  scopeLevels      Json          @default("{}")
+  /// When the member acknowledged, at consent, that read access shows other members' contact details.
+  contactAckAt     DateTime?
   member           Member        @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
   authCodes        McpAuthCode[]
   usedRefreshTokens McpUsedRefreshToken[]
+  accessRequests   McpAccessRequest[]
 
   @@unique([memberUid, clientId])
   @@index([memberUid, revokedAt])
+}
+
+/// Admin maximum level for one MCP scope, for every connection (LAB-2995). No row = the registry maximum.
+model McpScopeSetting {
+  scope        String   @id
+  /// 'none' | 'read' | 'write'
+  maxLevel     String
+  updatedByUid String?
+  updatedAt    DateTime @updatedAt
+}
+
+/// A refused MCP call the member can fix in Settings (LAB-2995). The refusal links to /settings/mcp?request=<uid>.
+model McpAccessRequest {
+  uid              String           @id @default(cuid())
+  authorizationUid String
+  scope            String
+  /// 'read' | 'write'
+  level            String
+  toolName         String
+  createdAt        DateTime         @default(now())
+  resolvedAt       DateTime?
+  authorization    McpAuthorization @relation(fields: [authorizationUid], references: [uid], onDelete: Cascade)
+
+  @@index([authorizationUid, scope, createdAt])
 }
 
 /// Hash of a refresh token this grant already rotated (LAB-2895). Presenting one again revokes the grant.

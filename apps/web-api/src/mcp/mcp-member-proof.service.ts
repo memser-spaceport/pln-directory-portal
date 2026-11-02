@@ -8,6 +8,7 @@ import { ANALYTICS_EVENTS } from '../utils/constants';
 import { MCP_CONNECT_PERMISSION, MCP_MEMBER_PROOF_TTL_SECONDS, MCP_TOKEN_PREFIX } from './mcp.constants';
 import { generateSecret, hashSecret } from './mcp.crypto';
 import { McpOAuthService } from './mcp-oauth.service';
+import { McpScopesService } from './mcp-scopes.service';
 
 const MEMBER_SIGN_IN_SCOPE = 'members:sign-in';
 const INVALID_PROOF = 'Invalid or expired member proof';
@@ -42,7 +43,8 @@ export class McpMemberProofService {
     private readonly accessControl: AccessControlV2Service,
     private readonly signIn: MemberSignInService,
     private readonly analytics: AnalyticsService,
-    @Inject(CACHE_MANAGER) private readonly cache: Cache
+    @Inject(CACHE_MANAGER) private readonly cache: Cache,
+    private readonly scopes: McpScopesService
   ) {}
 
   async issue(accessToken: string, audience: string): Promise<{ proof: string; expiresAt: Date }> {
@@ -61,7 +63,7 @@ export class McpMemberProofService {
       memberUid: actor.memberUid,
       authorizationUid: actor.authorizationUid,
       clientName: actor.clientName,
-      access: actor.canWrite ? 'write' : 'read',
+      access: await this.scopes.aiAppsAccess(actor.scopeLevels),
       audience,
     };
     await this.cache.set(proofKey(proof), stored, { ttl: MCP_MEMBER_PROOF_TTL_SECONDS });

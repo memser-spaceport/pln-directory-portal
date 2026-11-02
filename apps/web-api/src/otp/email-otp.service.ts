@@ -44,7 +44,7 @@ export class EmailOtpService {
             this.handleAuthErrors(error)
         }
 
-        this.logger.info(`Successfully resent email otp for otptoken - ${otpToken}`)
+        this.logger.info(`Successfully resent email otp`)
         return sendOtpResult.data;
     }
 
@@ -59,7 +59,7 @@ export class EmailOtpService {
             this.handleAuthErrors(error)
         }
 
-        this.logger.info(`Successfully validated email otp for otptoken - ${otpToken}`)
+        this.logger.info(`Successfully validated email otp`)
         return verifyOtpResult?.data
     }
 

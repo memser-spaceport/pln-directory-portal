@@ -5,7 +5,7 @@ import { ManualFieldActor } from '../manual-field-lock/manual-field-lock.service
 import { MasterProfileService } from '../master-profile/master-profile.service';
 import { relationKindFromHopChain } from '../warm-intros-v2/warm-intros-v2-enrich.util';
 import { WarmIntrosV2Service } from '../warm-intros-v2/warm-intros-v2.service';
-import { INVESTOR_DB_EDIT_PERMISSION, INVESTOR_DB_VIEW_PERMISSION, MCP_WRITE_TOOLS } from './mcp.constants';
+import { INVESTOR_DB_EDIT_PERMISSION, INVESTOR_DB_VIEW_PERMISSION } from './mcp.constants';
 
 export type McpActorContext = {
   memberUid: string;
@@ -14,7 +14,7 @@ export type McpActorContext = {
   permissions: Set<string>;
   authorizationUid: string;
   clientName: string;
-  /** What the member let this agent do at consent (LAB-2902). */
+  /** `write` when the connection's AI Apps scope is at write (LAB-2995); AI-app sessions and member proofs use it. */
   agentAccess: 'read' | 'write';
 };
 
@@ -23,8 +23,19 @@ export type McpToolDef = {
   description: string;
   visibility: 'always' | 'investor_db' | 'investor_db_edit' | 'forum';
   inputSchema?: Record<string, z.ZodTypeAny>;
+  /**
+   * Keep arguments the schema doesn't name. The MCP SDK strips unknown keys before `execute` runs, so a tool that
+   * must refuse fields it doesn't allow (update_my_profile) would otherwise never see them (LAB-3020).
+   */
+  keepUnknownArgs?: true;
   execute: (ctx: McpActorContext, args?: Record<string, unknown>) => Promise<Record<string, unknown>>;
 };
+
+/** The schema the SDK validates arguments against: the raw shape, or an object keeping unknown keys. */
+export function toolInputSchema(tool: McpToolDef): Record<string, z.ZodTypeAny> | z.ZodTypeAny | undefined {
+  if (!tool.inputSchema) return undefined;
+  return tool.keepUnknownArgs ? z.object(tool.inputSchema).passthrough() : tool.inputSchema;
+}
 
 const MASTER_PROFILE_TYPES = ['pl_internal', 'investor', 'co_investor', 'founder'] as const;
 const WARM_INTRO_TARGET_SETS = ['neuro-fund-i', 'gold-co-investors'] as const;
@@ -35,7 +46,7 @@ const FEEDBACK_NOTE_MAX = 600;
 export const WHOAMI_TOOL: McpToolDef = {
   name: 'whoami',
   description:
-    'Return the Directory member this agent is acting as, and agentAccess: "read" (read-only grant) or "write" (the member allowed changes).',
+    'Return the Directory member this agent is acting as, and agentAccess: "write" when the member allowed AI Apps changes for this connection, otherwise "read".',
   visibility: 'always',
   execute: async (ctx) => ({
     memberUid: ctx.memberUid,
@@ -435,11 +446,7 @@ export function isToolVisible(tool: McpToolDef, permissions: Set<string>): boole
   return permissions.has(INVESTOR_DB_VIEW_PERMISSION) || permissions.has(ADMIN_PERMISSIONS.DIRECTORY_FULL);
 }
 
-/** Tools the member's permissions allow; a read-only grant (`canWrite: false`) also drops every write tool. */
-export function toolsForPermissions(
-  permissions: Set<string>,
-  catalog: McpToolDef[] = [WHOAMI_TOOL],
-  canWrite = true
-): McpToolDef[] {
-  return catalog.filter((tool) => isToolVisible(tool, permissions) && (canWrite || !MCP_WRITE_TOOLS.has(tool.name)));
+/** Tools the member's RBAC permissions allow. Scope levels are applied on top by `planTools` (mcp-tool-plan.ts). */
+export function toolsForPermissions(permissions: Set<string>, catalog: McpToolDef[] = [WHOAMI_TOOL]): McpToolDef[] {
+  return catalog.filter((tool) => isToolVisible(tool, permissions));
 }

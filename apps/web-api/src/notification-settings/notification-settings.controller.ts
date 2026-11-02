@@ -249,34 +249,12 @@ export class NotificationSettingsController {
 
     const targetMember =
       authenticatedUser.uid === memberUid ? authenticatedUser : await this.memberService.findOne(memberUid);
-    const targetEmail = targetMember.email;
 
-    if (!targetEmail) {
-      throw new BadRequestException('Member email is required for demo day subscription');
-    }
-
-    const existingSubscriber = await this.notificationServiceClient.getEventSubscriberByEmailAndType(
-      targetEmail,
-      'DEMO_DAY'
+    return this.notificationSettingsService.setDemoDaySubscription(
+      { uid: memberUid, name: targetMember.name, email: targetMember.email },
+      body.demoDaySubscriptionEnabled,
+      authenticatedUser.externalId
     );
-    if (body.demoDaySubscriptionEnabled) {
-      if (!existingSubscriber) {
-        await this.notificationServiceClient.createEventSubscriber({
-          email: targetEmail,
-          eventType: 'DEMO_DAY',
-          name: targetMember.name,
-          memberId: memberUid,
-        });
-      }
-    } else if (existingSubscriber) {
-      await this.notificationServiceClient.deleteEventSubscriberByEmailAndType(targetEmail, 'DEMO_DAY');
-    }
-
-    return this.notificationServiceClient.upsertNotificationSetting(memberUid, {
-      ...body,
-      memberUid,
-      memberExternalId: authenticatedUser.externalId,
-    });
   }
 
   /** The weekly suggested-candidates email preference (LAB-2850), stored in the Directory database. */

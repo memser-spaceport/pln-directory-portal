@@ -380,6 +380,9 @@ export const ANALYTICS_EVENTS = {
     APP_SESSION_OPEN: 'mcp-app-session-open',
     APP_SESSION_REVOKED: 'mcp-app-session-revoked',
     REFRESH_TOKEN_REUSE: 'mcp-refresh-token-reuse',
+    TOOL_REFUSED: 'mcp-tool-refused',
+    SCOPE_LEVELS_UPDATED: 'mcp-scope-levels-updated',
+    ADMIN_SCOPE_UPDATED: 'mcp-admin-scope-updated',
   },
   INVESTOR_DB: {
     MANUAL_FIELDS_PATCHED: 'investor-db-manual-fields-patched',

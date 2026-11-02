@@ -39,6 +39,6 @@ import { NewsTagVocabularyService } from '../team-news/news-tag-vocabulary.servi
     NewsTagVocabularyService,
   ],
   controllers: [MemberController],
-  exports: [MembersService, MembersHooksService, OnboardingRemindersJob],
+  exports: [MembersService, MembersHooksService, InvestorProfileService, OnboardingRemindersJob],
 })
 export class MembersModule {}

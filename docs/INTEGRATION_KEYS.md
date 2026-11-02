@@ -116,7 +116,7 @@ A PL app outside LabOS can check which member an AI agent is acting for, without
    { "proof": "mcp_mp_…" }
    ```
 
-   200: `{ memberUid, name, email, image, permissions, agent: { clientName, access } }`. `access` is `read` when the member gave their agent read-only access at MCP consent, `write` when they allowed changes. 400 `Invalid or expired member proof`: the proof is unknown, already redeemed, older than 5 minutes, issued for another key, or its agent was revoked or lost `mcp.connect` since.
+   200: `{ memberUid, name, email, image, permissions, agent: { clientName, access } }`. `access` is `write` when the connection's AI Apps scope is at write, otherwise `read` (see `docs/MCP_SCOPES.md`). 400 `Invalid or expired member proof`: the proof is unknown, already redeemed, older than 5 minutes, issued for another key, or its agent was revoked or lost `mcp.connect` since.
 
 A proof is single-use and bound to one key: a different key gets the 400 and the proof stays redeemable by its own key until it expires. The proof lives only in the cache, as a sha256 hash, for 5 minutes. The redeem route is bound to the key, not to a team, so it does not call `assertKeyOwnsTeam`. Code: `apps/web-api/src/mcp/mcp-member-proof.service.ts`, `mcp-member-proofs.controller.ts`.
 

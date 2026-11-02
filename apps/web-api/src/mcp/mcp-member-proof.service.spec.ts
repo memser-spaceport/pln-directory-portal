@@ -3,6 +3,7 @@ jest.mock('../integration-keys/member-sign-in.service', () => ({ MemberSignInSer
 
 import { BadRequestException, ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { McpMemberProofService } from './mcp-member-proof.service';
+import { McpScopesService } from './mcp-scopes.service';
 import { MCP_MEMBER_PROOF_TTL_SECONDS } from './mcp.constants';
 
 const ACTOR = {
@@ -11,7 +12,7 @@ const ACTOR = {
   email: 'ada@example.com',
   name: 'Ada',
   clientName: 'Claude Code',
-  canWrite: false,
+  scopeLevels: {},
 };
 const MEMBER = {
   memberUid: 'member-1',
@@ -49,6 +50,7 @@ function build() {
   const prisma = {
     integrationKey: { findUnique: jest.fn(async ({ where }) => KEYS[where.uid] ?? null) },
     mcpAuthorization: { findUnique: jest.fn(async () => ({ revokedAt: null as Date | null })) },
+    mcpScopeSetting: { findMany: jest.fn(async () => []) },
   };
   const oauth = { authenticateAccessToken: jest.fn().mockResolvedValue(ACTOR) };
   const accessControl = { hasPermission: jest.fn().mockResolvedValue({ allowed: true }) };
@@ -61,7 +63,8 @@ function build() {
     accessControl as any,
     signIn as any,
     analytics as any,
-    cache as any
+    cache as any,
+    new McpScopesService(prisma as any, analytics as any, {} as any)
   );
   return { service, prisma, oauth, accessControl, signIn, analytics, cache };
 }
@@ -123,9 +126,9 @@ describe('McpMemberProofService', () => {
     );
   });
 
-  it('carries the write level of a make-changes grant', async () => {
+  it('carries the write level when the AI Apps scope is at write', async () => {
     const { service, oauth } = build();
-    oauth.authenticateAccessToken.mockResolvedValue({ ...ACTOR, canWrite: true });
+    oauth.authenticateAccessToken.mockResolvedValue({ ...ACTOR, scopeLevels: { ai_apps: 'write' } });
     const { proof } = await service.issue('mcp_at_live', 'key-infralfg');
     await expect(service.redeem(proof, 'key-infralfg')).resolves.toMatchObject({ agent: { access: 'write' } });
   });

@@ -2,6 +2,7 @@ import {
   All,
   BadRequestException,
   Controller,
+  Logger,
   NotFoundException,
   Req,
   Res,
@@ -14,22 +15,100 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { NoCache } from '../decorators/no-cache.decorator';
 import { SkipEmptyStringToNull } from '../decorators/skip-empty-string-to-null.decorator';
 import { AnalyticsService } from '../analytics/service/analytics.service';
+import { ANALYTICS_EVENTS } from '../utils/constants';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
 import { MasterProfileService } from '../master-profile/master-profile.service';
 import { WarmIntrosV2Service } from '../warm-intros-v2/warm-intros-v2.service';
 import { MembersService } from '../members/members.service';
 import { TeamsService } from '../teams/teams.service';
 import { ProjectsService } from '../projects/projects.service';
+import { PLEventGuestsService } from '../pl-events/pl-event-guests.service';
+import { PLEventLocationsService } from '../pl-events/pl-event-locations.service';
 import { PLEventsService } from '../pl-events/pl-events.service';
 import { SearchService } from '../search/search.service';
 import { AiAppsService } from '../ai-apps/ai-apps.service';
 import { PlNetworkPortfolioService } from '../spv-spotlights/pl-network-portfolio.service';
-import { aiAppFeedbackTools } from './mcp-ai-app-feedback-tools';
-import { trackMcpToolInvocation } from './mcp-analytics';
+import { aiAppFeedbackTools, aiAppWriteTools } from './mcp-ai-app-feedback-tools';
+import { trackMcpToolCalled, trackMcpToolInvocation } from './mcp-analytics';
 import { directoryTools } from './mcp-directory-tools';
 import { McpOAuthService } from './mcp-oauth.service';
 import { portfolioTools } from './mcp-portfolio-tools';
-import { toolsForPermissions, WHOAMI_TOOL, warmIntroTools } from './mcp-tools';
+import { newsTools } from './mcp-news-tools';
+import { directoryWriteTools, eventWriteTools, membershipTools, newsWriteTools, profileTools } from './mcp-write-tools';
+import { profileCoverageTools } from './mcp-profile-coverage-tools';
+import { directoryCoverageTools } from './mcp-directory-coverage-tools';
+import { actionCoverageTools } from './mcp-action-coverage-tools';
+import { platformCoverageTools } from './mcp-platform-coverage-tools';
+import {
+  demoDaySaveTools,
+  emailPreferenceTools,
+  experienceTools,
+  followTools,
+  jobAlertTools,
+  savedJobTools,
+} from './mcp-member-action-tools';
+import { pitchProfileTools } from './mcp-pitch-profile-tools';
+import { DemoDayFundraisingProfilesService } from '../demo-days/demo-day-fundraising-profiles.service';
+import { TeamPitchProfilesService } from '../team-pitches/team-pitch-profiles.service';
+import { TeamPitchEngagementService } from '../team-pitches/team-pitch-engagement.service';
+import { TeamPitchesService } from '../team-pitches/team-pitches.service';
+import { InvestorProfileService } from '../members/investor-profile.service';
+import { ParticipantsRequestService } from '../participants-request/participants-request.service';
+import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
+import { AskService } from '../asks/asks.service';
+import { EventsService } from '../events/events.service';
+import { ArticleCommentsService } from '../articles/article-comments.service';
+import { ArticleRequestsService } from '../article-requests/article-requests.service';
+import { DealRequestsService } from '../deal-requests/deal-requests.service';
+import { ContactSupportService } from '../contact-support/contact-support.service';
+import { SpvSpotlightsService } from '../spv-spotlights/spv-spotlights.service';
+import { JobOpeningsApplicationService } from '../job-openings/job-openings-application.service';
+import { JobOpeningsInterestService } from '../job-openings/job-openings-interest.service';
+import { JobOpeningsReferralService } from '../job-openings/job-openings-referral.service';
+import { JobMatchService } from '../job-match/job-match.service';
+import { TeamHiringService } from '../team-hiring/team-hiring.service';
+import { TeamNewsUpvotesService } from '../team-news/team-news-upvotes.service';
+import { PathfinderService } from '../pathfinder/pathfinder.service';
+import { InvestorListsService } from '../investor-lists/investor-lists.service';
+import { FounderSourcingReviewService } from '../founder-sourcing/founder-sourcing-review.service';
+import { RoadmapService } from '../roadmap/roadmap.service';
+import { RoadmapPinsService } from '../roadmap/roadmap-pins.service';
+import { WarmIntrosV2RegenerateService } from '../warm-intros-v2/warm-intros-v2-regenerate.service';
+import { AiAppsAccessService } from '../ai-apps/ai-apps-access.service';
+import {
+  dealTools,
+  demoDayFeedbackTools,
+  guideLikeTools,
+  notificationTools,
+  officeHoursFeedbackTools,
+} from './mcp-self-service-tools';
+import { PushNotificationsService } from '../push-notifications/push-notifications.service';
+import { DealsService } from '../deals/deals.service';
+import { ArticlesService } from '../articles/articles.service';
+import { MemberFollowUpsService } from '../member-follow-ups/member-follow-ups.service';
+import { OfficeHoursService } from '../office-hours/office-hours.service';
+import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
+import { SuggestedCandidatesEmailPreferenceService } from '../notification-settings/suggested-candidates-email-preference.service';
+import { NotificationServiceClient } from '../notifications/notification-service.client';
+import { DemoDaysService } from '../demo-days/demo-days.service';
+import { DemoDayEngagementService } from '../demo-days/demo-day-engagement.service';
+import { MemberExperiencesService } from '../member-experiences/member-experiences.service';
+import { FollowsService } from '../follows/follows.service';
+import { JobOpeningsSavedService } from '../job-openings/job-openings-saved.service';
+import { JobOpeningsQueryService } from '../job-openings/job-openings-query.service';
+import { JobAlertsService } from '../job-alerts/job-alerts.service';
+import { McpWriteLimitService } from './mcp-write-limit.service';
+import { TeamNewsService } from '../team-news/team-news.service';
+import { MembersHooksService } from '../members/members.hooks.service';
+import { PrismaService } from '../shared/prisma.service';
+import { TeamNewsQueryService } from '../team-news/team-news-query.service';
+import { TeamNewsSuggestionsService } from '../team-news/team-news-suggestions.service';
+import { McpToolDef, toolInputSchema, toolsForPermissions, WHOAMI_TOOL, warmIntroTools } from './mcp-tools';
+import { McpAdminCaps, McpScopesService, resolveScope } from './mcp-scopes.service';
+import { McpAccessRequestsService } from './mcp-access-requests.service';
+import { calledToolNames, MCP_NEEDS_WRITE_NOTE, McpRefusalReason, planTools, refusalText } from './mcp-tool-plan';
+import { isWriteTool, toolScope } from './mcp-scopes.registry';
+import { mcpSettingsUrl } from './mcp.constants';
 
 @ApiTags('MCP')
 @Controller('mcp')
@@ -47,8 +126,62 @@ export class McpController {
     private readonly search: SearchService,
     private readonly aiApps: AiAppsService,
     private readonly portfolio: PlNetworkPortfolioService,
-    private readonly analytics: AnalyticsService
+    private readonly analytics: AnalyticsService,
+    private readonly scopes: McpScopesService,
+    private readonly accessRequests: McpAccessRequestsService,
+    private readonly newsQuery: TeamNewsQueryService,
+    private readonly newsSuggestions: TeamNewsSuggestionsService,
+    private readonly teamNews: TeamNewsService,
+    private readonly memberHooks: MembersHooksService,
+    private readonly prisma: PrismaService,
+    private readonly writeLimit: McpWriteLimitService,
+    private readonly eventGuests: PLEventGuestsService,
+    private readonly eventLocations: PLEventLocationsService,
+    private readonly experiences: MemberExperiencesService,
+    private readonly follows: FollowsService,
+    private readonly savedJobs: JobOpeningsSavedService,
+    private readonly jobAlerts: JobAlertsService,
+    private readonly jobQuery: JobOpeningsQueryService,
+    private readonly notificationSettings: NotificationSettingsService,
+    private readonly notificationClient: NotificationServiceClient,
+    private readonly suggestedCandidatesEmail: SuggestedCandidatesEmailPreferenceService,
+    private readonly demoDays: DemoDaysService,
+    private readonly demoDayEngagement: DemoDayEngagementService,
+    private readonly pushNotifications: PushNotificationsService,
+    private readonly deals: DealsService,
+    private readonly articles: ArticlesService,
+    private readonly followUps: MemberFollowUpsService,
+    private readonly officeHours: OfficeHoursService,
+    private readonly fundraisingProfiles: DemoDayFundraisingProfilesService,
+    private readonly teamPitchProfiles: TeamPitchProfilesService,
+    private readonly investorProfiles: InvestorProfileService,
+    private readonly participants: ParticipantsRequestService,
+    private readonly enrichment: TeamEnrichmentService,
+    private readonly asks: AskService,
+    private readonly events: EventsService,
+    private readonly articleComments: ArticleCommentsService,
+    private readonly articleRequests: ArticleRequestsService,
+    private readonly dealRequests: DealRequestsService,
+    private readonly support: ContactSupportService,
+    private readonly spotlights: SpvSpotlightsService,
+    private readonly jobApplications: JobOpeningsApplicationService,
+    private readonly jobInterests: JobOpeningsInterestService,
+    private readonly jobReferrals: JobOpeningsReferralService,
+    private readonly jobMatch: JobMatchService,
+    private readonly hiring: TeamHiringService,
+    private readonly newsUpvotes: TeamNewsUpvotesService,
+    private readonly pathfinder: PathfinderService,
+    private readonly investorLists: InvestorListsService,
+    private readonly founderReviews: FounderSourcingReviewService,
+    private readonly roadmap: RoadmapService,
+    private readonly roadmapPins: RoadmapPinsService,
+    private readonly warmIntroRegenerate: WarmIntrosV2RegenerateService,
+    private readonly aiAccess: AiAppsAccessService,
+    private readonly pitches: TeamPitchesService,
+    private readonly pitchEngagement: TeamPitchEngagementService
   ) {}
+
+  private readonly logger = new Logger(McpController.name);
 
   @NoCache()
   @All()
@@ -72,15 +205,102 @@ export class McpController {
 
     const access = await this.accessControl.getMemberAccess(actor.memberUid);
     const permissions = new Set(access.effectivePermissions ?? []);
-    const tools = toolsForPermissions(permissions, [
-      WHOAMI_TOOL,
-      ...warmIntroTools(this.masterProfiles, this.warmIntros),
-      ...directoryTools(this.members, this.teams, this.projects, this.plEvents, this.search),
-      ...aiAppFeedbackTools(this.aiApps),
-      ...portfolioTools(this.portfolio),
-    ], actor.canWrite);
+    let caps: McpAdminCaps | null = null;
+    try {
+      caps = await this.scopes.adminCaps();
+    } catch (error) {
+      // Fail closed (LAB-2995): without admin caps only `whoami` runs.
+      this.logger.error(`MCP scope settings unavailable: ${String(error)}`);
+    }
+    const plan = planTools(
+      toolsForPermissions(permissions, [
+        WHOAMI_TOOL,
+        ...warmIntroTools(this.masterProfiles, this.warmIntros),
+        ...directoryTools(this.members, this.teams, this.projects, this.plEvents, this.search),
+        ...aiAppFeedbackTools(this.aiApps),
+        ...aiAppWriteTools(this.aiApps),
+        ...portfolioTools(this.portfolio),
+        ...newsTools(this.newsQuery, this.newsSuggestions),
+        ...newsWriteTools(this.teamNews, this.newsQuery, this.members),
+        ...profileTools(this.members, this.memberHooks, this.prisma),
+        ...membershipTools(this.members, this.memberHooks, this.prisma),
+        ...experienceTools(this.experiences, this.prisma),
+        ...followTools(this.follows),
+        ...savedJobTools(this.savedJobs),
+        ...jobAlertTools(this.jobAlerts, this.jobQuery),
+        ...emailPreferenceTools(
+          this.notificationSettings,
+          this.notificationClient,
+          this.suggestedCandidatesEmail,
+          this.members,
+          this.prisma
+        ),
+        ...demoDaySaveTools(this.demoDays, this.demoDayEngagement, this.prisma),
+        ...notificationTools(this.pushNotifications),
+        ...dealTools(this.deals),
+        ...guideLikeTools(this.articles),
+        ...demoDayFeedbackTools(this.demoDays),
+        ...officeHoursFeedbackTools(this.followUps, this.officeHours),
+        ...eventWriteTools(this.eventGuests, this.eventLocations, this.members, this.prisma),
+        ...directoryWriteTools(this.teams, this.projects, this.members, this.prisma, this.enrichment),
+        ...pitchProfileTools(this.fundraisingProfiles, this.teamPitchProfiles, this.prisma),
+        ...profileCoverageTools({
+          members: this.members,
+          investorProfiles: this.investorProfiles,
+          notificationSettings: this.notificationSettings,
+        }),
+        ...directoryCoverageTools({
+          teams: this.teams,
+          members: this.members,
+          projects: this.projects,
+          prisma: this.prisma,
+          participants: this.participants,
+          enrichment: this.enrichment,
+        }),
+        ...actionCoverageTools({
+          events: this.events,
+          guests: this.eventGuests,
+          prisma: this.prisma,
+          applications: this.jobApplications,
+          interests: this.jobInterests,
+          referrals: this.jobReferrals,
+          jobMatch: this.jobMatch,
+          hiring: this.hiring,
+          asks: this.asks,
+          projects: this.projects,
+          upvotes: this.newsUpvotes,
+          comments: this.articleComments,
+          articleRequests: this.articleRequests,
+          officeHours: this.officeHours,
+          demoDays: this.demoDays,
+          demoDayEngagement: this.demoDayEngagement,
+          pitches: this.pitches,
+          pitchEngagement: this.pitchEngagement,
+          deals: this.deals,
+          dealRequests: this.dealRequests,
+          spotlights: this.spotlights,
+          support: this.support,
+          notifications: this.pushNotifications,
+        }),
+        ...platformCoverageTools({
+          aiApps: this.aiApps,
+          aiAccess: this.aiAccess,
+          regenerate: this.warmIntroRegenerate,
+          warmIntros: this.warmIntros,
+          lists: this.investorLists,
+          pathfinder: this.pathfinder,
+          founders: this.founderReviews,
+          roadmap: this.roadmap,
+          pins: this.roadmapPins,
+        }),
+      ]),
+      actor.scopeLevels,
+      caps
+    );
+    const calledTools = calledToolNames(req.body);
 
     const server = new McpServer({ name: 'LabOS', version: '1.0.0' });
+    const aiAppsWrite = caps !== null && resolveScope(actor.scopeLevels, caps, 'ai_apps').level === 'write';
     const ctx = {
       memberUid: actor.memberUid,
       name: actor.name,
@@ -88,14 +308,17 @@ export class McpController {
       permissions,
       authorizationUid: actor.authorizationUid,
       clientName: actor.clientName,
-      agentAccess: actor.canWrite ? ('write' as const) : ('read' as const),
+      agentAccess: aiAppsWrite ? ('write' as const) : ('read' as const),
     };
-    for (const tool of tools) {
-      const config: { description: string; inputSchema?: Record<string, unknown> } = {
-        description: tool.description,
-      };
-      if (tool.inputSchema) {
-        config.inputSchema = tool.inputSchema;
+    const register = (
+      tool: McpToolDef,
+      description: string,
+      cb: (args?: Record<string, unknown>) => unknown,
+      withSchema = true
+    ) => {
+      const config: { description: string; inputSchema?: unknown } = { description };
+      if (withSchema && tool.inputSchema) {
+        config.inputSchema = toolInputSchema(tool);
       }
       // MCP SDK registerTool generics blow up TS2589 when passed a union config.
       (
@@ -104,8 +327,71 @@ export class McpController {
           cfg: typeof config,
           cb: (args?: Record<string, unknown>) => unknown
         ) => void
-      )(tool.name, config, async (args) => {
+      )(tool.name, config, cb);
+    };
+    const refuse = (tool: McpToolDef, reason: McpRefusalReason) => async () => {
+      const entry = toolScope(tool.name);
+      if (!entry) {
+        return { isError: true, content: [{ type: 'text' as const, text: `Tool ${tool.name} not found` }] };
+      }
+      trackMcpToolCalled(this.analytics, actor, { toolName: tool.name, result: 'refused', reason });
+      if (reason !== 'unavailable') {
+        void this.analytics.trackEvent({
+          name: ANALYTICS_EVENTS.MCP.TOOL_REFUSED,
+          distinctId: actor.memberUid,
+          properties: {
+            toolName: tool.name,
+            scope: entry.scope,
+            reason,
+            memberUid: actor.memberUid,
+            clientName: actor.clientName,
+            authorizationUid: actor.authorizationUid,
+          },
+        });
+      }
+      let settingsUrl = mcpSettingsUrl();
+      if (reason === 'needs_write' || reason === 'scope_none') {
+        try {
+          const requestUid = await this.accessRequests.createOrReuse(
+            actor.authorizationUid,
+            entry.scope,
+            entry.level,
+            tool.name
+          );
+          settingsUrl = `${settingsUrl}?request=${encodeURIComponent(requestUid)}`;
+        } catch (error) {
+          // The refusal still goes out, with the plain Settings link.
+          this.logger.error(`MCP access request not stored: ${String(error)}`);
+        }
+      }
+      return {
+        isError: true,
+        content: [
+          { type: 'text' as const, text: refusalText(reason, entry.scope, entry.level, settingsUrl, tool.name) },
+        ],
+      };
+    };
+
+    for (const entry of plan) {
+      const { tool } = entry;
+      if (entry.mode === 'listed_refused') {
+        register(tool, `${MCP_NEEDS_WRITE_NOTE} ${tool.description}`, refuse(tool, entry.reason));
+        continue;
+      }
+      if (entry.mode === 'hidden') {
+        // Registered only to answer a call that names it, so `tools/list` never shows it. No input schema, so any
+        // arguments reach the refusal instead of a validation error.
+        if (calledTools.has(tool.name)) {
+          register(tool, tool.description, refuse(tool, entry.reason), false);
+        }
+        continue;
+      }
+      register(tool, tool.description, async (args) => {
         const toolArgs = args ?? {};
+        // Per-member hourly allowance for agent writes (LAB-3020).
+        if (isWriteTool(tool.name) && !(await this.writeLimit.tryConsume(actor.memberUid, tool.name))) {
+          return refuse(tool, 'rate_limited')();
+        }
         try {
           const result = await tool.execute(ctx, toolArgs);
           trackMcpToolInvocation(this.analytics, actor, {
@@ -114,6 +400,12 @@ export class McpController {
             result,
             success: true,
             isError: false,
+          });
+          trackMcpToolCalled(this.analytics, actor, {
+            toolName: tool.name,
+            result: 'ok',
+            args: toolArgs,
+            output: result,
           });
           return {
             content: [{ type: 'text' as const, text: JSON.stringify(result) }],
@@ -127,6 +419,7 @@ export class McpController {
             isError: isSoftError,
             error,
           });
+          trackMcpToolCalled(this.analytics, actor, { toolName: tool.name, result: 'error', args: toolArgs, error });
           if (isSoftError) {
             return {
               isError: true,

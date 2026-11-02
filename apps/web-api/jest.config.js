@@ -18,5 +18,7 @@ module.exports = {
   // nodemailer exposes lib/* only through package.json "exports", which Jest 27 does not read.
   moduleNameMapper: {
     '^nodemailer/lib/mail-composer$': require.resolve('nodemailer/lib/mail-composer'),
+    // The Nx resolver picks the "import" condition of nestjs-zod's exports (an ES module Jest cannot run).
+    '^nestjs-zod/z$': require.resolve('nestjs-zod/z'),
   },
 };
