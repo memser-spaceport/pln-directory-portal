@@ -1,8 +1,9 @@
 import React, { ReactNode } from 'react';
-import Modal from '../modal/modal';
 import clsx from 'clsx';
 
-type TeamPitchConfirmModalProps = {
+import Modal from '../../modal/modal';
+
+interface ConfirmModalProps {
   isOpen: boolean;
   title: string;
   message: string;
@@ -12,23 +13,30 @@ type TeamPitchConfirmModalProps = {
   confirmLabel?: string;
   confirmDisabled?: boolean;
   isPending?: boolean;
+  classes?: { confirmBtn?: string };
   onClose: () => void;
   onConfirm: () => void;
-};
+}
 
-export const TeamPitchConfirmModal: React.FC<TeamPitchConfirmModalProps> = ({
-  isOpen,
-  title,
-  message,
-  participantName,
-  participantEmail,
-  details,
-  confirmLabel = 'Confirm',
-  confirmDisabled = false,
-  isPending = false,
-  onClose,
-  onConfirm,
-}) => {
+export const ConfirmModal: React.FC<ConfirmModalProps> = (props) => {
+  const {
+    isOpen,
+    title,
+    message,
+    participantName,
+    participantEmail,
+    details,
+    confirmLabel = 'Confirm',
+    confirmDisabled = false,
+    isPending = false,
+    classes,
+    onClose,
+    onConfirm,
+  } = props;
+
+  const isConfirmBlocked = isPending || confirmDisabled;
+  const confirmBtnClass = classes?.confirmBtn ?? 'bg-blue-600 hover:bg-blue-700';
+
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
       <div className="w-full max-w-lg rounded-lg bg-white shadow-xl">
@@ -68,10 +76,13 @@ export const TeamPitchConfirmModal: React.FC<TeamPitchConfirmModalProps> = ({
             <button
               type="button"
               onClick={onConfirm}
-              disabled={isPending || confirmDisabled}
+              disabled={isConfirmBlocked}
               className={clsx(
                 'inline-flex items-center rounded-lg border border-transparent px-4 py-2 text-sm font-medium text-white shadow-sm',
-                isPending || confirmDisabled ? 'cursor-not-allowed bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'
+                {
+                  'cursor-not-allowed bg-gray-400': isConfirmBlocked,
+                  [confirmBtnClass]: !isConfirmBlocked,
+                }
               )}
             >
               {isPending ? 'Please wait...' : confirmLabel}

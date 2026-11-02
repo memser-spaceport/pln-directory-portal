@@ -11,9 +11,11 @@ import { RichText } from '../../components/common/rich-text';
 import { AddSpvParticipantModal } from '../../components/spv-spotlights/AddSpvParticipantModal';
 import { EditSpvTemplateVariablesModal } from '../../components/spv-spotlights/EditSpvTemplateVariablesModal';
 import { UploadSpvInvestorsModal } from '../../components/spv-spotlights/UploadSpvInvestorsModal';
-import { SelectSpvInvestorsModal } from '../../components/spv-spotlights/SelectSpvInvestorsModal';
+import { InvestorListControls } from '../../components/spv-spotlights/InvestorListControls';
+import { SaveInvestorList } from '../../components/spv-spotlights/SaveInvestorList';
+import { SavedInvestorLists } from '../../components/spv-spotlights/SavedInvestorLists';
 import { PreviewSpvEmailModal } from '../../components/spv-spotlights/PreviewSpvEmailModal';
-import { TeamPitchConfirmModal } from '../../components/team-pitches/TeamPitchConfirmModal';
+import { ConfirmModal } from '../../components/common/ConfirmModal';
 import api from '../../utils/api';
 import { API_ROUTE, WEB_UI_BASE_URL } from '../../utils/constants';
 
@@ -223,7 +225,6 @@ const SpvSpotlightDetailPage = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [showAddParticipant, setShowAddParticipant] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
-  const [showCsvSelect, setShowCsvSelect] = useState(false);
   const [listSearch, setListSearch] = useState('');
   const [spotlight, setSpotlight] = useState<Record<string, unknown> | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
@@ -1174,13 +1175,11 @@ const SpvSpotlightDetailPage = () => {
                     />
 
                     {canMutateTeamPitches && tab === 'investors' && (
-                      <button
-                        type="button"
-                        onClick={() => setShowCsvSelect(true)}
-                        className="rounded-lg bg-green-600 px-4 py-2 text-white hover:bg-green-700"
-                      >
-                        Select Members via CSV
-                      </button>
+                      <InvestorListControls
+                        spotlightUid={uid}
+                        investors={investors}
+                        onSelect={(investorUids) => setSelectedUids((prev) => [...new Set([...prev, ...investorUids])])}
+                      />
                     )}
                   </div>
                   {tab === 'applications' && (
@@ -1196,6 +1195,10 @@ const SpvSpotlightDetailPage = () => {
                     </select>
                   )}
                 </div>
+              )}
+
+              {canMutateTeamPitches && tab === 'investors' && (
+                <SavedInvestorLists spotlightUid={uid} onApply={setSelectedUids} />
               )}
 
               {canMutateTeamPitches && (tab === 'investors' || tab === 'outreach') && selectedUids.length > 0 && (
@@ -1222,6 +1225,7 @@ const SpvSpotlightDetailPage = () => {
                   >
                     Send Follow-up to Selected
                   </button>
+                  {tab === 'investors' && <SaveInvestorList spotlightUid={uid} participantUids={selectedUids} />}
                   <button
                     type="button"
                     onClick={removeSelected}
@@ -1623,14 +1627,7 @@ const SpvSpotlightDetailPage = () => {
         variableColumns={csvVariableColumns}
         onUploaded={() => loadParticipants()}
       />
-      <SelectSpvInvestorsModal
-        isOpen={showCsvSelect}
-        spotlightUid={uid}
-        investors={investors}
-        onSelect={(investorUids) => setSelectedUids((prev) => [...new Set([...prev, ...investorUids])])}
-        onClose={() => setShowCsvSelect(false)}
-      />
-      <TeamPitchConfirmModal
+      <ConfirmModal
         isOpen={!!bulkSend}
         title={
           bulkSend?.kind === 'open-notice'
@@ -1827,7 +1824,7 @@ const SpvSpotlightDetailPage = () => {
         body={previewTemplate && templates ? templates[previewTemplate].body : ''}
         defaults={previewDefaults}
       />
-      <TeamPitchConfirmModal
+      <ConfirmModal
         isOpen={!!pendingConfirm}
         title={pendingConfirm?.title ?? ''}
         message={pendingConfirm?.message ?? ''}
