@@ -475,11 +475,16 @@ export class JobOpeningsQueryService {
         status: { notIn: HIDDEN_JOB_OPENING_STATUSES },
         teamUid: { not: null },
       },
-      select: { uid: true, updatedAt: true },
+      select: { uid: true, updatedAt: true, publishedAt: true, postedDate: true, detectionDate: true },
       orderBy: { updatedAt: 'desc' },
     });
     return {
-      jobs: rows.map((row) => ({ uid: row.uid, updatedAt: row.updatedAt.toISOString() })),
+      jobs: rows.map((row) => ({
+        uid: row.uid,
+        updatedAt: row.updatedAt.toISOString(),
+        // The sitemap's lastmod (LAB-3094). The nightly sync rewrites every row, so `updatedAt` is the sync time.
+        lastModified: (row.publishedAt ?? row.postedDate ?? row.detectionDate).toISOString(),
+      })),
     };
   }
 
