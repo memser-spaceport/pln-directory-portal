@@ -2,6 +2,8 @@ import React, { FormEvent, useState } from 'react';
 import clsx from 'clsx';
 import { toast } from 'react-toastify';
 
+import { readApiErrorMessage } from '../../../utils/readApiErrorMessage';
+
 import { useCreateSpvInvestorList } from '../../../../../hooks/spv-spotlights/useCreateSpvInvestorList';
 
 import Modal from '../../../../modal/modal';
@@ -15,11 +17,6 @@ interface SaveInvestorListModalProps {
   participantUids: string[];
   onClose: () => void;
 }
-
-const readErrorMessage = (error: unknown) => {
-  const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-  return typeof message === 'string' ? message : 'Failed to save the list. Please try again.';
-};
 
 export const SaveInvestorListModal: React.FC<SaveInvestorListModalProps> = (props) => {
   const { isOpen, spotlightUid, participantUids, onClose } = props;
@@ -42,10 +39,17 @@ export const SaveInvestorListModal: React.FC<SaveInvestorListModalProps> = (prop
     if (isSubmitDisabled) return;
     try {
       const list = await createList({ spotlightUid, name: name.trim(), participantUids });
-      toast.success(`List "${list.name}" saved`);
+      const skippedCount = participantUids.length - list.emails.length;
+      toast.success(
+        skippedCount
+          ? `List "${list.name}" saved. ${skippedCount} selected participant${
+              skippedCount === 1 ? ' was' : 's were'
+            } skipped: not an investor on this spotlight or no email`
+          : `List "${list.name}" saved`
+      );
       handleClose();
     } catch (err) {
-      setError(readErrorMessage(err));
+      setError(readApiErrorMessage(err, 'Failed to save the list. Please try again.'));
     }
   };
 

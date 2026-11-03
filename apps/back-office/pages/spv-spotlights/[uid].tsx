@@ -1198,7 +1198,7 @@ const SpvSpotlightDetailPage = () => {
               )}
 
               {canMutateTeamPitches && tab === 'investors' && (
-                <SavedInvestorLists spotlightUid={uid} onApply={setSelectedUids} />
+                <SavedInvestorLists spotlightUid={uid} investors={investors} onApply={setSelectedUids} />
               )}
 
               {canMutateTeamPitches && (tab === 'investors' || tab === 'outreach') && selectedUids.length > 0 && (

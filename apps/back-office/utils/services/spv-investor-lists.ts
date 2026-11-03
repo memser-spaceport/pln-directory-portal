@@ -4,7 +4,7 @@ import { API_ROUTE } from '../constants';
 export interface SpvInvestorList {
   uid: string;
   name: string;
-  participantUids: string[];
+  emails: string[];
 }
 
 const investorListsRoute = (spotlightUid: string) => `${API_ROUTE.ADMIN_SPV_SPOTLIGHTS}/${spotlightUid}/investor-lists`;
@@ -21,6 +21,20 @@ export async function createSpvInvestorList(params: {
 }): Promise<SpvInvestorList> {
   const { spotlightUid, name, participantUids } = params;
   const response = await api.post<SpvInvestorList>(investorListsRoute(spotlightUid), { name, participantUids });
+  return response.data;
+}
+
+export async function updateSpvInvestorList(params: {
+  spotlightUid: string;
+  listUid: string;
+  name: string;
+  emails: string[];
+}): Promise<SpvInvestorList> {
+  const { spotlightUid, listUid, name, emails } = params;
+  const response = await api.patch<SpvInvestorList>(`${investorListsRoute(spotlightUid)}/${listUid}`, {
+    name,
+    emails,
+  });
   return response.data;
 }
 
