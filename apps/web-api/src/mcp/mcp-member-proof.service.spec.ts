@@ -40,9 +40,8 @@ function fakeCache() {
       const entry = entries.get(key);
       return entry && entry.expiresAt > Date.now() ? entry.value : undefined;
     }),
-    del: jest.fn(async (key: string) => {
-      entries.delete(key);
-    }),
+    // Like Redis DEL: the number of keys removed
+    del: jest.fn(async (key: string) => (entries.delete(key) ? 1 : 0)),
   };
 }
 
@@ -88,7 +87,7 @@ describe('McpMemberProofService', () => {
     expect(analytics.trackEvent).toHaveBeenCalledWith({
       name: 'mcp-member-proof-issued',
       distinctId: 'member-1',
-      properties: { memberUid: 'member-1', audience: 'key-infralfg' },
+      properties: { memberUid: 'member-1', audience: 'key-infralfg', scope: 'ai_apps' },
     });
   });
 
@@ -114,7 +113,8 @@ describe('McpMemberProofService', () => {
 
     await expect(service.redeem(proof, 'key-infralfg')).resolves.toEqual({
       ...MEMBER,
-      agent: { clientName: 'Claude Code', access: 'read' },
+      authorizationUid: 'auth-1',
+      agent: { clientName: 'Claude Code', access: 'read', scope: 'ai_apps' },
     });
     expect(signIn.member).toHaveBeenCalledWith('member-1');
     expect(analytics.trackEvent).toHaveBeenCalledWith(
@@ -167,6 +167,70 @@ describe('McpMemberProofService', () => {
     const { proof } = await service.issue('mcp_at_live', 'key-infralfg');
     accessControl.hasPermission.mockResolvedValue({ allowed: false });
     await expect(service.redeem(proof, 'key-infralfg')).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  describe('forum scope (LAB-3075)', () => {
+    it('carries the Forum level, not the AI Apps level', async () => {
+      const { service, oauth } = build();
+      oauth.authenticateAccessToken.mockResolvedValue({ ...ACTOR, scopeLevels: { forum: 'write', ai_apps: 'read' } });
+      const { proof } = await service.issue('mcp_at_live', 'key-infralfg', 'forum');
+      await expect(service.redeem(proof, 'key-infralfg')).resolves.toMatchObject({
+        authorizationUid: 'auth-1',
+        agent: { access: 'write', scope: 'forum' },
+      });
+    });
+
+    it('reads Forum as read when the connection never set it', async () => {
+      const { service } = build();
+      const { proof } = await service.issue('mcp_at_live', 'key-infralfg', 'forum');
+      await expect(service.redeem(proof, 'key-infralfg')).resolves.toMatchObject({ agent: { access: 'read' } });
+    });
+
+    it('issues nothing when the connection has no Forum access', async () => {
+      const { service, oauth, cache } = build();
+      oauth.authenticateAccessToken.mockResolvedValue({ ...ACTOR, scopeLevels: { forum: 'none', ai_apps: 'write' } });
+      await expect(service.issue('mcp_at_live', 'key-infralfg', 'forum')).rejects.toThrow(
+        new ForbiddenException('This connection has no Forum access')
+      );
+      expect(cache.set).not.toHaveBeenCalled();
+    });
+
+    it('caps Forum at the admin setting', async () => {
+      const { service, oauth, prisma } = build();
+      prisma.mcpScopeSetting.findMany.mockResolvedValue([{ scope: 'forum', maxLevel: 'read' }] as any);
+      oauth.authenticateAccessToken.mockResolvedValue({ ...ACTOR, scopeLevels: { forum: 'write' } });
+      const { proof } = await service.issue('mcp_at_live', 'key-infralfg', 'forum');
+      await expect(service.redeem(proof, 'key-infralfg')).resolves.toMatchObject({ agent: { access: 'read' } });
+    });
+
+    it('fails closed when admin settings cannot be read', async () => {
+      const { service, prisma, cache } = build();
+      prisma.mcpScopeSetting.findMany.mockRejectedValue(new Error('db down'));
+      await expect(service.issue('mcp_at_live', 'key-infralfg', 'forum')).rejects.toThrow('db down');
+      expect(cache.set).not.toHaveBeenCalled();
+    });
+  });
+
+  it('redeems a proof once when two redeems race', async () => {
+    const { service } = build();
+    const { proof } = await service.issue('mcp_at_live', 'key-infralfg');
+
+    const results = await Promise.allSettled([
+      service.redeem(proof, 'key-infralfg'),
+      service.redeem(proof, 'key-infralfg'),
+    ]);
+    expect(results.map((r) => r.status).sort()).toEqual(['fulfilled', 'rejected']);
+  });
+
+  it('redeems a proof issued before LAB-3075 as an AI Apps proof', async () => {
+    const { service, cache } = build();
+    const { proof } = await service.issue('mcp_at_live', 'key-infralfg');
+    const [key, entry] = [...cache.entries.entries()][0];
+    const legacy = { ...(entry.value as Record<string, unknown>) };
+    delete legacy.scope;
+    cache.entries.set(key, { ...entry, value: legacy });
+
+    await expect(service.redeem(proof, 'key-infralfg')).resolves.toMatchObject({ agent: { scope: 'ai_apps' } });
   });
 
   it('refuses an unknown proof', async () => {

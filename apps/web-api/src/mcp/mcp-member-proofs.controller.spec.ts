@@ -33,7 +33,10 @@ describe('McpMemberProofsController', () => {
       proof: 'mcp_mp_x',
       expiresAt: new Date(0),
     });
-    expect(proofs.issue).toHaveBeenCalledWith('mcp_at_live', 'key-1');
+    expect(proofs.issue).toHaveBeenCalledWith('mcp_at_live', 'key-1', undefined);
+
+    await controller.issue({ audience: 'key-1', scope: 'forum' }, req);
+    expect(proofs.issue).toHaveBeenLastCalledWith('mcp_at_live', 'key-1', 'forum');
   });
 
   it('refuses a request with no bearer token', async () => {
@@ -49,6 +52,12 @@ describe('McpMemberProofsController', () => {
     expect(IssueMemberProofSchema.safeParse({ audience: 'key-1' }).success).toBe(true);
     expect(IssueMemberProofSchema.safeParse({ audience: ' ' }).success).toBe(false);
     expect(IssueMemberProofSchema.safeParse({}).success).toBe(false);
+  });
+
+  it('takes an optional scope of ai_apps or forum', () => {
+    expect(IssueMemberProofSchema.safeParse({ audience: 'key-1', scope: 'forum' }).success).toBe(true);
+    expect(IssueMemberProofSchema.safeParse({ audience: 'key-1', scope: 'ai_apps' }).success).toBe(true);
+    expect(IssueMemberProofSchema.safeParse({ audience: 'key-1', scope: 'news' }).success).toBe(false);
   });
 });
 
