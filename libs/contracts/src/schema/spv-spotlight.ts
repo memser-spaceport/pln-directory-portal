@@ -205,3 +205,7 @@ export const CreateSpvInvestorListSchema = z.object({
 });
 
 export class CreateSpvInvestorListDto extends createZodDto(CreateSpvInvestorListSchema) {}
+
+export const UpdateSpvInvestorListSchema = CreateSpvInvestorListSchema.partial();
+
+export class UpdateSpvInvestorListDto extends createZodDto(UpdateSpvInvestorListSchema) {}

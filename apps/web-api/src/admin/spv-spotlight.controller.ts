@@ -17,6 +17,7 @@ import {
   SendSpvBulkDto,
   SendSpvOpenNoticeDto,
   UpdateSpvEmailTemplatesDto,
+  UpdateSpvInvestorListDto,
   UpdateSpvParticipantDto,
   UpdateSpvSpotlightDto,
 } from 'libs/contracts/src/schema/spv-spotlight';
@@ -171,6 +172,17 @@ export class AdminSpvSpotlightController {
   @NoCache()
   async createInvestorList(@Param('uid') uid: string, @Body() body: CreateSpvInvestorListDto) {
     return this.investorListsService.create(uid, body);
+  }
+
+  @Patch(':uid/investor-lists/:listUid')
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async updateInvestorList(
+    @Param('uid') uid: string,
+    @Param('listUid') listUid: string,
+    @Body() body: UpdateSpvInvestorListDto
+  ) {
+    return this.investorListsService.update(uid, listUid, body);
   }
 
   @Delete(':uid/investor-lists/:listUid')
