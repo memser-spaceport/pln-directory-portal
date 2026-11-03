@@ -115,6 +115,16 @@ export const MCP_TOOL_PROPERTY_BUILDERS: Readonly<Record<string, McpToolProperty
 
   search_forum_threads: directorySearch,
   get_forum_thread: getByUid,
+  list_forum_categories: (_args, result) => ({ resultCount: countOf(result?.categories) }),
+  // Ids only, never the title or the post (LAB-3050).
+  start_forum_thread: (args, result) => {
+    const posted = result?.posted as Record<string, unknown> | undefined;
+    return { cid: numberProp(args.cid), tid: numberProp(posted?.tid), tagCount: countOf(args.tags) };
+  },
+  reply_to_forum_thread: (args, result) => {
+    const posted = result?.posted as Record<string, unknown> | undefined;
+    return { tid: numberProp(args.tid), pid: numberProp(posted?.pid), toPid: numberProp(args.toPid) };
+  },
 
   list_news: (args, result) => ({
     feed: stringProp(result?.feed) ?? stringProp(args.feed) ?? 'latest',

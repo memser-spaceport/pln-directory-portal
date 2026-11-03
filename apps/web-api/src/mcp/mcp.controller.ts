@@ -30,6 +30,8 @@ import { AiAppsService } from '../ai-apps/ai-apps.service';
 import { PlNetworkPortfolioService } from '../spv-spotlights/pl-network-portfolio.service';
 import { aiAppFeedbackTools, aiAppWriteTools } from './mcp-ai-app-feedback-tools';
 import { trackMcpToolCalled, trackMcpToolInvocation } from './mcp-analytics';
+import { forumTools } from './mcp-forum-tools';
+import { McpMemberProofService } from './mcp-member-proof.service';
 import { directoryTools } from './mcp-directory-tools';
 import { McpOAuthService } from './mcp-oauth.service';
 import { portfolioTools } from './mcp-portfolio-tools';
@@ -178,7 +180,8 @@ export class McpController {
     private readonly warmIntroRegenerate: WarmIntrosV2RegenerateService,
     private readonly aiAccess: AiAppsAccessService,
     private readonly pitches: TeamPitchesService,
-    private readonly pitchEngagement: TeamPitchEngagementService
+    private readonly pitchEngagement: TeamPitchEngagementService,
+    private readonly memberProofs: McpMemberProofService
   ) {}
 
   private readonly logger = new Logger(McpController.name);
@@ -217,6 +220,7 @@ export class McpController {
         WHOAMI_TOOL,
         ...warmIntroTools(this.masterProfiles, this.warmIntros),
         ...directoryTools(this.members, this.teams, this.projects, this.plEvents, this.search),
+        ...forumTools(this.memberProofs),
         ...aiAppFeedbackTools(this.aiApps),
         ...aiAppWriteTools(this.aiApps),
         ...portfolioTools(this.portfolio),

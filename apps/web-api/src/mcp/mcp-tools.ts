@@ -21,7 +21,7 @@ export type McpActorContext = {
 export type McpToolDef = {
   name: string;
   description: string;
-  visibility: 'always' | 'investor_db' | 'investor_db_edit' | 'forum';
+  visibility: 'always' | 'investor_db' | 'investor_db_edit' | 'forum' | 'forum_write';
   inputSchema?: Record<string, z.ZodTypeAny>;
   /**
    * Keep arguments the schema doesn't name. The MCP SDK strips unknown keys before `execute` runs, so a tool that
@@ -439,6 +439,10 @@ export function isToolVisible(tool: McpToolDef, permissions: Set<string>): boole
   }
   if (tool.visibility === 'forum') {
     return permissions.has(FORUM_PERMISSIONS.READ);
+  }
+  // Posting needs the same RBAC permission as posting in the forum UI (LAB-3031); NodeBB privileges apply on top.
+  if (tool.visibility === 'forum_write') {
+    return permissions.has(FORUM_PERMISSIONS.WRITE);
   }
   if (tool.visibility === 'investor_db_edit') {
     return permissions.has(INVESTOR_DB_EDIT_PERMISSION) || permissions.has(ADMIN_PERMISSIONS.DIRECTORY_FULL);
