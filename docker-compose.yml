@@ -9,7 +9,6 @@ services:
        - .env
      depends_on:
        - postgres
-       - oso_postgres
        - redis
        - redis-cache
        - redis-queue
@@ -28,21 +27,6 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - db_data:/var/lib/postgresql/data
-    networks:
-      - pl-directory-backend
-
-  #OSO Postgres database
-  oso_postgres:
-    image: postgres:13.8
-    ports:
-      - '${OSO_DB_HOST_PORT}:5432'
-    restart: always
-    environment:
-      POSTGRES_DB: ${OSO_DB_NAME}
-      POSTGRES_USER: ${OSO_DB_USER}
-      POSTGRES_PASSWORD: ${OSO_DB_PASSWORD}
-    volumes:
-      - oso_db_data:/var/lib/postgresql/data
     networks:
       - pl-directory-backend
 
@@ -95,7 +79,6 @@ services:
 
 volumes:
   db_data:
-  oso_db_data:
   redis:
     driver: local
   redis_cache_data:
