@@ -166,9 +166,21 @@ export const MEMBERSHIP_PERMISSIONS = TEAM_MEMBERSHIP_PERMISSIONS;
 // ── PLAA ─────────────────────────────────────────────────────────────────
 
 export const PLAA_PERMISSIONS = {
-  /** Access to PLAA */
+  /** Access to PLAA (legacy, kept as is until the PLAA team decides on deprecation) */
   ACCESS: 'plaa.access',
+  /** PLAA guest access */
+  GUEST: 'plaa.guest',
+  /** PLAA member access */
+  MEMBER: 'plaa.member',
 } as const;
+
+/** PLAA permissions a PLAA integration key may grant and revoke. Add new PLAA permissions here. */
+export const PLAA_MANAGEABLE_PERMISSIONS = [
+  PLAA_PERMISSIONS.ACCESS,
+  PLAA_PERMISSIONS.GUEST,
+  PLAA_PERMISSIONS.MEMBER,
+] as const;
+export type PlaaManageablePermission = typeof PLAA_MANAGEABLE_PERMISSIONS[number];
 
 // ── PL Advisors ───────────────────────────────────────────────────────────
 
@@ -315,6 +327,8 @@ export const ALL_PERMISSION_CODES = [
 
   // PLAA
   PLAA_PERMISSIONS.ACCESS,
+  PLAA_PERMISSIONS.GUEST,
+  PLAA_PERMISSIONS.MEMBER,
 
   // PL Advisors
   PL_ADVISORS_PERMISSIONS.ACCESS,
