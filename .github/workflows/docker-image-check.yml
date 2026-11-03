@@ -15,7 +15,6 @@ on:
       - patches/**
       - tools/docker/**
       - apps/web-api/prisma/schema.prisma
-      - apps/web-api/prisma/oso-schema.prisma
       - .github/workflows/docker-image-check.yml
   workflow_dispatch:
 
@@ -57,4 +56,4 @@ jobs:
           # The bundle and every external package it requires must load without
           # a database: the Prisma CLI must run, and the app entry must resolve.
           docker run --rm directory-service:pr ./node_modules/.bin/prisma --version
-          docker run --rm directory-service:pr node -e "require('@prisma/client'); require('.prisma/oso-client'); console.log('prisma clients OK')"
+          docker run --rm directory-service:pr node -e "require('@prisma/client'); console.log('prisma client OK')"

@@ -18,7 +18,7 @@ if (!bundle) {
 const source = fs.readFileSync(bundle, 'utf8');
 const specifiers = new Set();
 // Relative and absolute paths are bundled; everything else is an external
-// package (including `.prisma/oso-client`, which lives in node_modules).
+// package.
 for (const match of source.matchAll(/\brequire\(\s*["']((?!\.{0,2}\/)[^"']+)["']\s*\)/g)) {
   specifiers.add(match[1]);
 }

@@ -36,8 +36,8 @@ RUN --mount=type=cache,target=/usr/local/share/.cache/yarn,sharing=locked \
 
 COPY . .
 
-RUN npx prisma generate --schema=apps/web-api/prisma/schema.prisma \
- && npx prisma generate --schema=apps/web-api/prisma/oso-schema.prisma
+RUN npx prisma generate --schema=apps/web-api/prisma/schema.prisma
+
 
 RUN yarn build
 
@@ -61,8 +61,8 @@ RUN --mount=type=cache,target=/usr/local/share/.cache/yarn,sharing=locked \
 # Prisma clients are generated into node_modules, so they must be generated
 # against the node_modules that ship in the image.
 COPY apps/web-api/prisma ./apps/web-api/prisma
-RUN npx prisma generate --schema=apps/web-api/prisma/schema.prisma \
- && npx prisma generate --schema=apps/web-api/prisma/oso-schema.prisma
+RUN npx prisma generate --schema=apps/web-api/prisma/schema.prisma
+
 
 # ============================
 # Stage 3: runtime
