@@ -8,12 +8,12 @@ SPV spotlights let admins present a team's SPV to investors and email them from 
 
 ### Requirement: Admins save investors as a named list per SPV spotlight
 
-`POST /v1/admin/spv-spotlights/:uid/investor-lists` SHALL create an investor list on that spotlight from `name` and `participantUids`. The system SHALL trim `name`. The system SHALL refuse an empty `name`, a `name` longer than 100 characters and an empty `participantUids` with HTTP 422. The system SHALL store each participant once. Every participant SHALL be an investor participant of that spotlight; otherwise the system SHALL return HTTP 400 and store nothing. A list name SHALL be unique within a spotlight; a second list with the same name SHALL return HTTP 409. The response SHALL be the list as `{ uid, name, participantUids, createdAt, updatedAt }`.
+`POST /v1/admin/spv-spotlights/:uid/investor-lists` SHALL create an investor list on that spotlight from `name` and `participantUids`. The system SHALL trim `name`. The system SHALL refuse an empty `name`, a `name` longer than 100 characters and an empty `participantUids` with HTTP 422. The system SHALL store each participant once. Every participant SHALL be an investor participant of that spotlight; otherwise the system SHALL return HTTP 400 and store nothing. A list name SHALL be unique within a spotlight; a second list with the same name SHALL return HTTP 409. The response SHALL be the list as `{ uid, name, participants, createdAt, updatedAt }`, where `participants` holds `{ uid, email }` for each investor in list order.
 
 #### Scenario: Save the selected investors
 
 - **WHEN** an admin posts `name: " Top angels "` and three investor participant uids of the spotlight, one of them twice
-- **THEN** the response is HTTP 201 with `name: "Top angels"` and the two distinct uids in `participantUids`
+- **THEN** the response is HTTP 201 with `name: "Top angels"` and the two distinct uids in `participants`
 
 #### Scenario: A participant is not an investor on this spotlight
 
@@ -27,12 +27,31 @@ SPV spotlights let admins present a team's SPV to investors and email them from 
 
 ### Requirement: Admins read the investor lists of an SPV spotlight
 
-`GET /v1/admin/spv-spotlights/:uid/investor-lists` SHALL return every investor list of that spotlight, oldest first, each as `{ uid, name, participantUids, createdAt, updatedAt }`. An unknown spotlight SHALL return HTTP 404.
+`GET /v1/admin/spv-spotlights/:uid/investor-lists` SHALL return every investor list of that spotlight, oldest first, each as `{ uid, name, participants, createdAt, updatedAt }`, where `participants` holds `{ uid, email }` for each investor in list order. An unknown spotlight SHALL return HTTP 404.
 
 #### Scenario: A spotlight with no lists
 
 - **WHEN** an admin reads the lists of a spotlight that has none
 - **THEN** the response is HTTP 200 with `[]`
+
+### Requirement: Admins edit an investor list
+
+`PATCH /v1/admin/spv-spotlights/:uid/investor-lists/:listUid` SHALL update the `name`, the `participantUids` or both. A field left out SHALL stay unchanged. `name` and `participantUids` SHALL follow the same rules as on create: the system SHALL trim `name`, refuse an empty or longer than 100 characters `name` and an empty `participantUids` with HTTP 422, and store each participant once. `participantUids` SHALL replace the list's investors. Every participant SHALL be an investor participant of that spotlight; otherwise the system SHALL return HTTP 400 and change nothing. A name used by another list of the spotlight SHALL return HTTP 409. A list that is not on that spotlight SHALL return HTTP 404. The response SHALL be the updated list as `{ uid, name, participants, createdAt, updatedAt }`, where `participants` holds `{ uid, email }` for each investor in list order.
+
+#### Scenario: Rename a list and remove an investor
+
+- **WHEN** an admin patches a list of three investors with `name: "Lead angels"` and two of those investors' uids
+- **THEN** the response is HTTP 200 with `name: "Lead angels"` and only those two investors in `participants`
+
+#### Scenario: Rename only
+
+- **WHEN** an admin patches a list with only `name`
+- **THEN** the list keeps its investors
+
+#### Scenario: Edit through another spotlight
+
+- **WHEN** an admin patches a list with the uid of a different spotlight in the path
+- **THEN** the response is HTTP 404 and the list stays unchanged
 
 ### Requirement: Admins delete an investor list
 
@@ -50,4 +69,4 @@ Removing a participant from a spotlight SHALL remove that participant from every
 #### Scenario: An investor leaves the spotlight
 
 - **WHEN** an admin removes an investor that is in a saved list
-- **THEN** the list no longer contains that investor's participant uid
+- **THEN** the list no longer contains that investor
