@@ -8,10 +8,7 @@ describe('SpvSpotlightInvestorListsService', () => {
     name: 'Top angels',
     createdAt: new Date('2026-10-30T10:00:00Z'),
     updatedAt: new Date('2026-10-30T10:00:00Z'),
-    participants: [
-      { participantUid: 'part_1', participant: { member: { email: 'ann@example.com' } } },
-      { participantUid: 'part_2', participant: { member: { email: null } } },
-    ],
+    entries: [{ email: 'ann@example.com' }, { email: 'bob@example.com' }],
   };
 
   function serviceWith(prisma: Record<string, unknown>) {
@@ -21,7 +18,11 @@ describe('SpvSpotlightInvestorListsService', () => {
     } as never);
   }
 
-  it('lists the spotlight lists with their participants and emails', async () => {
+  function investor(uid: string, email: string | null) {
+    return { uid, member: { email } };
+  }
+
+  it('lists the spotlight lists with their emails', async () => {
     const findMany = jest.fn().mockResolvedValue([storedList]);
     const service = serviceWith({ spvSpotlightInvestorList: { findMany } });
 
@@ -34,10 +35,7 @@ describe('SpvSpotlightInvestorListsService', () => {
         name: 'Top angels',
         createdAt: storedList.createdAt,
         updatedAt: storedList.updatedAt,
-        participants: [
-          { uid: 'part_1', email: 'ann@example.com' },
-          { uid: 'part_2', email: null },
-        ],
+        emails: ['ann@example.com', 'bob@example.com'],
       },
     ]);
   });
@@ -48,11 +46,13 @@ describe('SpvSpotlightInvestorListsService', () => {
     await expect(service.list('missing')).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('creates a list from deduplicated investor uids', async () => {
-    const count = jest.fn().mockResolvedValue(2);
+  it('creates a list from the emails of the selected investors in selection order', async () => {
+    const findMany = jest
+      .fn()
+      .mockResolvedValue([investor('part_2', 'bob@example.com'), investor('part_1', ' Ann@Example.com ')]);
     const create = jest.fn().mockResolvedValue(storedList);
     const service = serviceWith({
-      spvSpotlightParticipant: { count },
+      spvSpotlightParticipant: { findMany },
       spvSpotlightInvestorList: { create },
     });
 
@@ -61,38 +61,58 @@ describe('SpvSpotlightInvestorListsService', () => {
       participantUids: ['part_1', 'part_2', 'part_1'],
     });
 
-    expect(count).toHaveBeenCalledWith({
-      where: { spvSpotlightUid: 'spv_1', type: 'INVESTOR', uid: { in: ['part_1', 'part_2'] } },
-    });
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { spvSpotlightUid: 'spv_1', type: 'INVESTOR', uid: { in: ['part_1', 'part_2', 'part_1'] } },
+      })
+    );
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: {
           spvSpotlightUid: 'spv_1',
           name: 'Top angels',
-          participants: { create: [{ participantUid: 'part_1' }, { participantUid: 'part_2' }] },
+          entries: { create: [{ email: 'ann@example.com' }, { email: 'bob@example.com' }] },
         },
       })
     );
-    expect(list.participants.map((participant) => participant.uid)).toEqual(['part_1', 'part_2']);
+    expect(list.emails).toEqual(['ann@example.com', 'bob@example.com']);
   });
 
-  it('rejects participants that are not investors on the spotlight', async () => {
-    const create = jest.fn();
+  it('skips participants that are not investors on the spotlight or have no email', async () => {
+    const create = jest.fn().mockResolvedValue(storedList);
     const service = serviceWith({
-      spvSpotlightParticipant: { count: jest.fn().mockResolvedValue(1) },
+      spvSpotlightParticipant: {
+        findMany: jest.fn().mockResolvedValue([investor('part_1', 'ann@example.com'), investor('part_2', null)]),
+      },
       spvSpotlightInvestorList: { create },
     });
 
-    await expect(
-      service.create('spv_1', { name: 'Mixed', participantUids: ['part_1', 'founder_1'] })
-    ).rejects.toBeInstanceOf(BadRequestException);
+    await service.create('spv_1', { name: 'Mixed', participantUids: ['founder_1', 'part_1', 'part_2'] });
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ entries: { create: [{ email: 'ann@example.com' }] } }),
+      })
+    );
+  });
+
+  it('rejects a list without any investor email of the spotlight', async () => {
+    const create = jest.fn();
+    const service = serviceWith({
+      spvSpotlightParticipant: { findMany: jest.fn().mockResolvedValue([]) },
+      spvSpotlightInvestorList: { create },
+    });
+
+    await expect(service.create('spv_1', { name: 'Founders', participantUids: ['founder_1'] })).rejects.toBeInstanceOf(
+      BadRequestException
+    );
     expect(create).not.toHaveBeenCalled();
   });
 
   it('returns Conflict when the name is already used on the spotlight', async () => {
     const duplicate = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', 'P2002', 'test');
     const service = serviceWith({
-      spvSpotlightParticipant: { count: jest.fn().mockResolvedValue(1) },
+      spvSpotlightParticipant: { findMany: jest.fn().mockResolvedValue([investor('part_1', 'ann@example.com')]) },
       spvSpotlightInvestorList: { create: jest.fn().mockRejectedValue(duplicate) },
     });
 
@@ -101,17 +121,14 @@ describe('SpvSpotlightInvestorListsService', () => {
     );
   });
 
-  it('renames a list and replaces its investors', async () => {
+  it('renames a list and keeps exactly the given emails, investors on the spotlight or not', async () => {
     const findFirst = jest.fn().mockResolvedValue({ uid: 'list_1' });
     const update = jest.fn().mockResolvedValue({ ...storedList, name: 'Lead angels' });
-    const service = serviceWith({
-      spvSpotlightParticipant: { count: jest.fn().mockResolvedValue(2) },
-      spvSpotlightInvestorList: { findFirst, update },
-    });
+    const service = serviceWith({ spvSpotlightInvestorList: { findFirst, update } });
 
     const list = await service.update('spv_1', 'list_1', {
       name: 'Lead angels',
-      participantUids: ['part_1', 'part_2', 'part_2'],
+      emails: ['gone@example.com', 'Ann@example.com', 'ann@example.com'],
     });
 
     expect(findFirst).toHaveBeenCalledWith(
@@ -122,10 +139,10 @@ describe('SpvSpotlightInvestorListsService', () => {
         where: { uid: 'list_1' },
         data: {
           name: 'Lead angels',
-          participants: {
-            deleteMany: { participantUid: { notIn: ['part_1', 'part_2'] } },
+          entries: {
+            deleteMany: { email: { notIn: ['gone@example.com', 'ann@example.com'] } },
             createMany: {
-              data: [{ participantUid: 'part_1' }, { participantUid: 'part_2' }],
+              data: [{ email: 'gone@example.com' }, { email: 'ann@example.com' }],
               skipDuplicates: true,
             },
           },
@@ -135,7 +152,7 @@ describe('SpvSpotlightInvestorListsService', () => {
     expect(list.name).toBe('Lead angels');
   });
 
-  it('renames a list without touching its investors', async () => {
+  it('renames a list without touching its emails', async () => {
     const update = jest.fn().mockResolvedValue(storedList);
     const service = serviceWith({
       spvSpotlightInvestorList: { findFirst: jest.fn().mockResolvedValue({ uid: 'list_1' }), update },
@@ -143,9 +160,7 @@ describe('SpvSpotlightInvestorListsService', () => {
 
     await service.update('spv_1', 'list_1', { name: 'Top angels' });
 
-    expect(update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { name: 'Top angels', participants: undefined } })
-    );
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ data: { name: 'Top angels', entries: undefined } }));
   });
 
   it('throws NotFound when updating a list of another spotlight', async () => {
@@ -155,19 +170,6 @@ describe('SpvSpotlightInvestorListsService', () => {
     });
 
     await expect(service.update('spv_1', 'list_other', { name: 'X' })).rejects.toBeInstanceOf(NotFoundException);
-    expect(update).not.toHaveBeenCalled();
-  });
-
-  it('rejects an update with participants that are not investors on the spotlight', async () => {
-    const update = jest.fn();
-    const service = serviceWith({
-      spvSpotlightParticipant: { count: jest.fn().mockResolvedValue(1) },
-      spvSpotlightInvestorList: { findFirst: jest.fn().mockResolvedValue({ uid: 'list_1' }), update },
-    });
-
-    await expect(
-      service.update('spv_1', 'list_1', { participantUids: ['part_1', 'founder_1'] })
-    ).rejects.toBeInstanceOf(BadRequestException);
     expect(update).not.toHaveBeenCalled();
   });
 

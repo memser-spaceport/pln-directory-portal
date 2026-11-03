@@ -7,23 +7,18 @@ const LIST_SELECT = Prisma.validator<Prisma.SpvSpotlightInvestorListSelect>()({
   name: true,
   createdAt: true,
   updatedAt: true,
-  participants: {
-    select: { participantUid: true, participant: { select: { member: { select: { email: true } } } } },
-    orderBy: { id: 'asc' },
-  },
+  entries: { select: { email: true }, orderBy: { id: 'asc' } },
 });
 
 type ListRecord = Prisma.SpvSpotlightInvestorListGetPayload<{ select: typeof LIST_SELECT }>;
 
 function toListResponse(list: ListRecord) {
-  const { participants, ...rest } = list;
-  return {
-    ...rest,
-    participants: participants.map(({ participantUid, participant }) => ({
-      uid: participantUid,
-      email: participant.member.email,
-    })),
-  };
+  const { entries, ...rest } = list;
+  return { ...rest, emails: entries.map((entry) => entry.email) };
+}
+
+function normalizeEmails(emails: string[]) {
+  return [...new Set(emails.map((email) => email.trim().toLowerCase()))];
 }
 
 @Injectable()
@@ -42,13 +37,13 @@ export class SpvSpotlightInvestorListsService {
 
   async create(spotlightUid: string, input: { name: string; participantUids: string[] }) {
     await this.requireSpotlight(spotlightUid);
-    const participantUids = await this.requireInvestors(spotlightUid, input.participantUids);
+    const emails = await this.readInvestorEmails(spotlightUid, input.participantUids);
     const list = await this.withUniqueName(() =>
       this.prisma.spvSpotlightInvestorList.create({
         data: {
           spvSpotlightUid: spotlightUid,
           name: input.name,
-          participants: { create: participantUids.map((participantUid) => ({ participantUid })) },
+          entries: { create: emails.map((email) => ({ email })) },
         },
         select: LIST_SELECT,
       })
@@ -56,20 +51,17 @@ export class SpvSpotlightInvestorListsService {
     return toListResponse(list);
   }
 
-  async update(spotlightUid: string, listUid: string, input: { name?: string; participantUids?: string[] }) {
+  async update(spotlightUid: string, listUid: string, input: { name?: string; emails?: string[] }) {
     await this.requireList(spotlightUid, listUid);
-    const participantUids = input.participantUids && (await this.requireInvestors(spotlightUid, input.participantUids));
+    const emails = input.emails && normalizeEmails(input.emails);
     const list = await this.withUniqueName(() =>
       this.prisma.spvSpotlightInvestorList.update({
         where: { uid: listUid },
         data: {
           name: input.name,
-          participants: participantUids && {
-            deleteMany: { participantUid: { notIn: participantUids } },
-            createMany: {
-              data: participantUids.map((participantUid) => ({ participantUid })),
-              skipDuplicates: true,
-            },
+          entries: emails && {
+            deleteMany: { email: { notIn: emails } },
+            createMany: { data: emails.map((email) => ({ email })), skipDuplicates: true },
           },
         },
         select: LIST_SELECT,
@@ -105,19 +97,23 @@ export class SpvSpotlightInvestorListsService {
     }
   }
 
-  private async requireInvestors(spotlightUid: string, uids: string[]) {
-    const participantUids = [...new Set(uids)];
-    const investorCount = await this.prisma.spvSpotlightParticipant.count({
+  private async readInvestorEmails(spotlightUid: string, participantUids: string[]) {
+    const investors = await this.prisma.spvSpotlightParticipant.findMany({
       where: {
         spvSpotlightUid: spotlightUid,
         type: TeamPitchParticipantType.INVESTOR,
         uid: { in: participantUids },
       },
+      select: { uid: true, member: { select: { email: true } } },
     });
-    if (investorCount !== participantUids.length) {
-      throw new BadRequestException('Every participant must be an investor on this SPV spotlight');
+    const emailByUid = new Map(investors.map((investor) => [investor.uid, investor.member.email]));
+    const emails = normalizeEmails(
+      participantUids.map((uid) => emailByUid.get(uid)).filter((email): email is string => !!email)
+    );
+    if (!emails.length) {
+      throw new BadRequestException('None of the participants is an investor with an email on this SPV spotlight');
     }
-    return participantUids;
+    return emails;
   }
 
   private async withUniqueName<T>(write: () => Promise<T>) {
