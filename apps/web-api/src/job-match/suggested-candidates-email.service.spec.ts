@@ -28,7 +28,7 @@ type Row = {
   createdAt: Date;
 };
 
-type SentEmail = { from: string; to: string[]; subject: string; html: string; text: string };
+type SentEmail = { from: string; to: string[]; bcc?: string[]; subject: string; html: string; text: string };
 
 const day = (n: number) => new Date(Date.UTC(2026, 9, n));
 const LIVE = { status: 'CONFIRMED', publishedAt: day(1) };
@@ -326,6 +326,7 @@ describe('SuggestedCandidatesEmailService', () => {
     process.env.SUGGESTED_CANDIDATES_TOKEN_SECRET = 'test-secret';
     process.env.WEB_UI_BASE_URL = 'https://directory.example/';
     process.env.SES_SOURCE_EMAIL = 'directory@example.com';
+    delete process.env.LABOS_EMAIL;
     log = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     errorLog = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
     writeFile.mockClear();
@@ -388,7 +389,19 @@ describe('SuggestedCandidatesEmailService', () => {
         .sort()
     ).toEqual(['role-1:L1:NEW:B:1', 'role-4:L1:REMINDER:B:1', 'role-5:L1:FIRST:G,H:2']);
     expect(emails(aws)[0].from).toBe('directory@example.com');
+    expect(emails(aws).every((sent) => sent.bcc?.length === 0)).toBe(true);
     expect(log).toHaveBeenCalledWith(expect.stringContaining('suggested-candidates email done: run run-1'));
+  });
+
+  it('BCCs LABOS_EMAIL on each team-lead email', async () => {
+    process.env.LABOS_EMAIL = 'labos@example.com';
+    const { service, aws } = world();
+    await service.sendForRun('run-1');
+    expect(emails(aws).map((sent) => sent.bcc)).toEqual([
+      ['labos@example.com'],
+      ['labos@example.com'],
+      ['labos@example.com'],
+    ]);
   });
 
   it('emails leads of every team when the allowlist is *', async () => {
