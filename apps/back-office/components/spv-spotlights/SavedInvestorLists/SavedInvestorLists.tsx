@@ -6,19 +6,28 @@ import { useSpvInvestorLists } from '../../../hooks/spv-spotlights/useSpvInvesto
 import { useDeleteSpvInvestorList } from '../../../hooks/spv-spotlights/useDeleteSpvInvestorList';
 
 import { ConfirmModal } from '../../common/ConfirmModal';
+import { EditInvestorListModal } from './components/EditInvestorListModal';
 
 interface SavedInvestorListsProps {
   spotlightUid: string;
+  investors: { uid: string; member: { email: string | null } }[];
   onApply: (participantUids: string[]) => void;
 }
 
 export const SavedInvestorLists: React.FC<SavedInvestorListsProps> = (props) => {
-  const { spotlightUid, onApply } = props;
+  const { spotlightUid, investors, onApply } = props;
 
   const { data: lists, isError } = useSpvInvestorLists(spotlightUid);
   const { mutate: deleteList, isLoading: isDeleting } = useDeleteSpvInvestorList();
 
+  const [listToEdit, setListToEdit] = useState<SpvInvestorList | null>(null);
   const [listToDelete, setListToDelete] = useState<SpvInvestorList | null>(null);
+
+  const investorUidByEmail = new Map(
+    investors.flatMap((investor) =>
+      investor.member.email ? [[investor.member.email.trim().toLowerCase(), investor.uid] as const] : []
+    )
+  );
 
   const handleDelete = () => {
     if (!listToDelete) return;
@@ -37,7 +46,7 @@ export const SavedInvestorLists: React.FC<SavedInvestorListsProps> = (props) => 
         <thead className="bg-gray-50">
           <tr>
             <th className="px-4 py-3 text-left font-medium text-gray-500">Name</th>
-            <th className="w-48 px-4 py-3 text-left font-medium text-gray-500">Actions</th>
+            <th className="w-64 px-4 py-3 text-left font-medium text-gray-500">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200 bg-white">
@@ -48,10 +57,17 @@ export const SavedInvestorLists: React.FC<SavedInvestorListsProps> = (props) => 
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => onApply(list.participantUids)}
+                    onClick={() => onApply(list.emails.flatMap((email) => investorUidByEmail.get(email) ?? []))}
                     className="rounded-lg bg-indigo-600 px-3 py-1.5 text-white hover:bg-indigo-700"
                   >
                     Apply
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setListToEdit(list)}
+                    className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-gray-700 hover:bg-gray-50"
+                  >
+                    Edit
                   </button>
                   <button
                     type="button"
@@ -66,6 +82,18 @@ export const SavedInvestorLists: React.FC<SavedInvestorListsProps> = (props) => 
           ))}
         </tbody>
       </table>
+      {listToEdit && (
+        <EditInvestorListModal
+          spotlightUid={spotlightUid}
+          list={listToEdit}
+          availableEmails={new Set(investorUidByEmail.keys())}
+          onDelete={() => {
+            setListToDelete(listToEdit);
+            setListToEdit(null);
+          }}
+          onClose={() => setListToEdit(null)}
+        />
+      )}
       <ConfirmModal
         isOpen={!!listToDelete}
         title="Delete list"
