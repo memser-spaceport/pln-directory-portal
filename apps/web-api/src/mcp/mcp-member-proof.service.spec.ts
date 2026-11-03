@@ -211,6 +211,56 @@ describe('McpMemberProofService', () => {
     });
   });
 
+  describe('proof for a connection inside an MCP request (LAB-3031)', () => {
+    const CONNECTION = {
+      memberUid: 'member-1',
+      clientName: 'Claude Code',
+      scopeLevels: { forum: 'write' },
+      revokedAt: null,
+    };
+
+    it('issues from the stored connection, without an access token', async () => {
+      const { service, prisma, oauth } = build();
+      prisma.mcpAuthorization.findUnique.mockResolvedValue(CONNECTION as any);
+      const { proof } = await service.issueForAuthorization('auth-1', 'key-infralfg', 'forum');
+
+      expect(oauth.authenticateAccessToken).not.toHaveBeenCalled();
+      expect(prisma.mcpAuthorization.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { uid: 'auth-1' } })
+      );
+      await expect(service.redeem(proof, 'key-infralfg')).resolves.toMatchObject({
+        memberUid: 'member-1',
+        authorizationUid: 'auth-1',
+        agent: { clientName: 'Claude Code', access: 'write', scope: 'forum' },
+      });
+    });
+
+    it('issues nothing for a connection disconnected since the request began', async () => {
+      const { service, prisma, cache } = build();
+      prisma.mcpAuthorization.findUnique.mockResolvedValue({ ...CONNECTION, revokedAt: new Date() } as any);
+      await expect(service.issueForAuthorization('auth-1', 'key-infralfg', 'forum')).rejects.toBeInstanceOf(
+        ForbiddenException
+      );
+      prisma.mcpAuthorization.findUnique.mockResolvedValue(null as any);
+      await expect(service.issueForAuthorization('auth-gone', 'key-infralfg', 'forum')).rejects.toBeInstanceOf(
+        ForbiddenException
+      );
+      expect(cache.set).not.toHaveBeenCalled();
+    });
+
+    it('applies the same Forum level and key checks as an agent request', async () => {
+      const { service, prisma } = build();
+      prisma.mcpAuthorization.findUnique.mockResolvedValue({ ...CONNECTION, scopeLevels: { forum: 'none' } } as any);
+      await expect(service.issueForAuthorization('auth-1', 'key-infralfg', 'forum')).rejects.toThrow(
+        new ForbiddenException('This connection has no Forum access')
+      );
+      prisma.mcpAuthorization.findUnique.mockResolvedValue(CONNECTION as any);
+      await expect(service.issueForAuthorization('auth-1', 'key-jobs-only', 'forum')).rejects.toBeInstanceOf(
+        NotFoundException
+      );
+    });
+  });
+
   it('redeems a proof once when two redeems race', async () => {
     const { service } = build();
     const { proof } = await service.issue('mcp_at_live', 'key-infralfg');

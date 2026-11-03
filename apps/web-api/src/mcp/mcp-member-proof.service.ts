@@ -16,9 +16,9 @@ import { ANALYTICS_EVENTS } from '../utils/constants';
 import { MemberProofScope } from './dto/member-proof.dto';
 import { MCP_CONNECT_PERMISSION, MCP_MEMBER_PROOF_TTL_SECONDS, MCP_TOKEN_PREFIX } from './mcp.constants';
 import { generateSecret, hashSecret } from './mcp.crypto';
-import { McpOAuthService } from './mcp-oauth.service';
+import { McpOAuthService, McpTokenActor } from './mcp-oauth.service';
 import { scopeLabel } from './mcp-scopes.registry';
-import { McpScopesService } from './mcp-scopes.service';
+import { McpScopesService, parseStoredLevels } from './mcp-scopes.service';
 
 const MEMBER_SIGN_IN_SCOPE = 'members:sign-in';
 const INVALID_PROOF = 'Invalid or expired member proof';
@@ -72,6 +72,42 @@ export class McpMemberProofService {
     scope: MemberProofScope = 'ai_apps'
   ): Promise<{ proof: string; expiresAt: Date }> {
     const actor = await this.oauth.authenticateAccessToken(accessToken);
+    return this.issueForConnection(actor, audience, scope);
+  }
+
+  /**
+   * A proof for a connection the caller already authenticated: the MCP forum tools (LAB-3031) post to NodeBB as the
+   * member from inside an MCP request. Re-reads the connection, so one disconnected since gets no proof.
+   */
+  async issueForAuthorization(
+    authorizationUid: string,
+    audience: string,
+    scope: MemberProofScope
+  ): Promise<{ proof: string; expiresAt: Date }> {
+    const authorization = await this.prisma.mcpAuthorization.findUnique({
+      where: { uid: authorizationUid },
+      select: { memberUid: true, clientName: true, scopeLevels: true, revokedAt: true },
+    });
+    if (!authorization || authorization.revokedAt) {
+      throw new ForbiddenException('This connection is no longer allowed');
+    }
+    return this.issueForConnection(
+      {
+        authorizationUid,
+        memberUid: authorization.memberUid,
+        clientName: authorization.clientName,
+        scopeLevels: parseStoredLevels(authorization.scopeLevels),
+      },
+      audience,
+      scope
+    );
+  }
+
+  private async issueForConnection(
+    actor: Pick<McpTokenActor, 'authorizationUid' | 'memberUid' | 'clientName' | 'scopeLevels'>,
+    audience: string,
+    scope: MemberProofScope
+  ): Promise<{ proof: string; expiresAt: Date }> {
     const key = await this.prisma.integrationKey.findUnique({
       where: { uid: audience },
       select: { revokedAt: true, scopes: true },

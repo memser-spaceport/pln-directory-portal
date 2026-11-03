@@ -208,6 +208,7 @@ function build(
     stub,
     stub,
     stub,
+    stub,
     stub
   );
   /** One MCP request: returns what `tools/list` would show and a way to call a tool by name. */

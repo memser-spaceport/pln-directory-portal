@@ -7,7 +7,7 @@ MCP agents reach LabOS only through a reviewed allowlist. Every tool belongs to 
 ## Requirements
 
 ### Requirement: Every MCP tool belongs to one scope
-The MCP server SHALL define, in one code registry, each scope (key, label, priority order, default admin maximum level) and, for each tool, its scope and level (`read` or `write`). `whoami` SHALL be the only tool outside the registry's scopes, and it SHALL always be listed. A tool not in the registry SHALL NOT be listed or callable. Member RBAC visibility (investor DB, forum read) SHALL still apply on top of scopes.
+The MCP server SHALL define, in one code registry, each scope (key, label, priority order, default admin maximum level) and, for each tool, its scope and level (`read` or `write`). `whoami` SHALL be the only tool outside the registry's scopes, and it SHALL always be listed. A tool not in the registry SHALL NOT be listed or callable. Member RBAC visibility (investor DB, forum read, forum write) SHALL still apply on top of scopes.
 
 #### Scenario: Unregistered tool is never exposed
 - **WHEN** a tool definition exists in code but has no registry entry
@@ -261,6 +261,25 @@ The `ai_apps` scope SHALL also offer `redeploy_ai_app`, `rename_ai_app` and `upd
 - **WHEN** an agent of a member who did not create the app, and is not a directory admin, calls `redeploy_ai_app`
 - **THEN** the call fails as not allowed and no deploy starts
 
+### Requirement: Agents start forum threads and reply as the member
+
+The `forum` scope SHALL offer `list_forum_categories` at `read` and `start_forum_thread` and `reply_to_forum_thread` at `write`. The posting tools SHALL be listed only to members with `forum.write`. Each call SHALL get a new one-time member proof with scope `forum` for the calling connection, audience `FORUM_MEMBER_PROOF_AUDIENCE`, and SHALL send it to NodeBB at `FORUM_API_URL` in `X-PL-Member-Proof` as the only credential, so NodeBB posts under the member's own account and forum privileges. A revoked connection, or one whose `forum` level does not allow the call, SHALL get no proof and SHALL NOT reach NodeBB. When either variable is unset, or the audience is not a live key, the tools SHALL refuse with "Agents cannot post to the forum on this LabOS environment yet." without calling NodeBB. A NodeBB refusal SHALL reach the agent in NodeBB's words; a NodeBB 5xx, timeout or network failure SHALL tell the agent to try again later. `list_forum_categories` SHALL return only real, enabled categories (no links, no `uncategorized`). A post SHALL return its ids and its LabOS forum URL. Agents SHALL NOT edit or delete forum posts.
+
+#### Scenario: Reply in a thread
+
+- **WHEN** an agent with `forum: write` calls `reply_to_forum_thread` with a `tid` and content
+- **THEN** LabOS issues a forum proof for that connection, NodeBB posts the reply as the member, and the agent gets the reply's `pid` and thread URL
+
+#### Scenario: Member has no forum account
+
+- **WHEN** NodeBB answers 403 "No forum account for this member; sign in to the forum once first"
+- **THEN** the agent gets that message and nothing is posted
+
+#### Scenario: Environment not set up
+
+- **WHEN** `FORUM_MEMBER_PROOF_AUDIENCE` is unset
+- **THEN** `start_forum_thread` refuses with "Agents cannot post to the forum on this LabOS environment yet." and no proof is issued
+
 ### Requirement: Agent writes are rate limited per member
 
 Each write tool SHALL allow at most 10 calls per member per tool per hour. A call over the limit SHALL be refused with an error that names the limit, SHALL NOT run, SHALL NOT create an access request, and SHALL emit `mcp-tool-refused` with reason `rate_limited`. If the limit store is unavailable the call SHALL be allowed.
@@ -292,7 +311,7 @@ Each MCP tool call SHALL send a PostHog event named `mcp-<tool name with dashes>
 
 ### Requirement: Agents can do the remaining member actions
 
-The connected agent SHALL be able to do the member actions LabOS allows by hand, except sign-in, email change, forum writes, file uploads, deal redeem codes, and AI-app deploy keys. Each action SHALL be its own tool, SHALL call the same service as the page, and SHALL use that page's permission check. A call that names a field the tool does not accept SHALL change nothing.
+The connected agent SHALL be able to do the member actions LabOS allows by hand, except sign-in, email change, forum edits and deletes, file uploads, deal redeem codes, and AI-app deploy keys. Each action SHALL be its own tool, SHALL call the same service as the page, and SHALL use that page's permission check. A call that names a field the tool does not accept SHALL change nothing.
 
 The `profile` scope SHALL offer investor profile, privacy, role on a team the member already belongs to, an existing project contribution, the profile role label, photo delete, recommendation notification settings, job apply and interest, guide comments, office hours, Demo Day and pitch actions that are not file uploads, deal submit and request, support, notification delete, and roadmap create, edit, pin and unpin when the member has that roadmap permission.
 
