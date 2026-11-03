@@ -151,6 +151,11 @@ export const JobsFiltersResponseSchema = z.object({
 export const JobCrawlIndexItemSchema = z.object({
   uid: z.string(),
   updatedAt: z.string(),
+  /**
+   * When the posting itself last changed, as far as the board knows (LAB-3094): when it went live on the board,
+   * else its own posted date, else when it was first detected. `updatedAt` moves on every nightly sync, so it is not.
+   */
+  lastModified: z.string(),
 });
 
 export const JobCrawlIndexResponseSchema = z.object({

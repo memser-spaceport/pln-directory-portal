@@ -18,7 +18,7 @@ import { useRemoveTeamPitchParticipant } from '../../../hooks/team-pitches/useRe
 import { useRemoveTeamPitchParticipantsBulk } from '../../../hooks/team-pitches/useRemoveTeamPitchParticipantsBulk';
 import { AddTeamPitchParticipantModal } from '../../../components/team-pitches/AddTeamPitchParticipantModal';
 import { UploadTeamPitchInvestorsModal } from '../../../components/team-pitches/UploadTeamPitchInvestorsModal';
-import { TeamPitchConfirmModal } from '../../../components/team-pitches/TeamPitchConfirmModal';
+import { ConfirmModal } from '../../../components/common/ConfirmModal';
 import { EditEmailTemplateVariablesModal } from '../../../components/team-pitches/EditEmailTemplateVariablesModal';
 import { RichText } from '../../../components/common/rich-text';
 import { WEB_UI_BASE_URL } from '../../../utils/constants';
@@ -1144,7 +1144,7 @@ const TeamPitchDetailPage = () => {
           canEdit={canMutateTeamPitches}
         />
 
-        <TeamPitchConfirmModal
+        <ConfirmModal
           isOpen={!!pendingTypeChange}
           title="Change participant type"
           message={
@@ -1174,7 +1174,7 @@ const TeamPitchDetailPage = () => {
           }}
         />
 
-        <TeamPitchConfirmModal
+        <ConfirmModal
           isOpen={!!pendingAccessChange}
           title="Change participant access"
           message={
@@ -1204,7 +1204,7 @@ const TeamPitchDetailPage = () => {
           }}
         />
 
-        <TeamPitchConfirmModal
+        <ConfirmModal
           isOpen={!!pendingInvite}
           title={pendingInvite?.isResend ? 'Resend investor invite' : 'Send investor invite'}
           message={
@@ -1258,7 +1258,7 @@ const TeamPitchDetailPage = () => {
           }}
         />
 
-        <TeamPitchConfirmModal
+        <ConfirmModal
           isOpen={!!pendingFollowUp}
           title={pendingFollowUp?.isResend ? 'Resend investor follow-up' : 'Send investor follow-up'}
           message={
@@ -1312,7 +1312,7 @@ const TeamPitchDetailPage = () => {
           }}
         />
 
-        <TeamPitchConfirmModal
+        <ConfirmModal
           isOpen={!!pendingRemove}
           title="Remove participant"
           message="Remove this participant from the team spotlight? They will lose access. Their member profile will not be deleted."
@@ -1338,7 +1338,7 @@ const TeamPitchDetailPage = () => {
           }}
         />
 
-        <TeamPitchConfirmModal
+        <ConfirmModal
           isOpen={bulkInviteMode !== null}
           title={bulkInviteMode === 'selected' ? 'Send invites to selected investors' : 'Send invites to all investors'}
           message={
@@ -1444,7 +1444,7 @@ const TeamPitchDetailPage = () => {
           }}
         />
 
-        <TeamPitchConfirmModal
+        <ConfirmModal
           isOpen={bulkFollowUpMode !== null}
           title={
             bulkFollowUpMode === 'selected'
@@ -1558,7 +1558,7 @@ const TeamPitchDetailPage = () => {
           }}
         />
 
-        <TeamPitchConfirmModal
+        <ConfirmModal
           isOpen={pendingSelectedRemove}
           title="Remove selected participants"
           message={`Remove ${selectedUids.length} selected participant${

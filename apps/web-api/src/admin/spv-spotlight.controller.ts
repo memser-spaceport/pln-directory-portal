@@ -5,9 +5,11 @@ import { TeamPitchStatus } from '@prisma/client';
 import { TeamPitchAdminAuthGuard } from '../guards/admin-auth.guard';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { SpvSpotlightAdminService } from '../spv-spotlights/spv-spotlight-admin.service';
+import { SpvSpotlightInvestorListsService } from '../spv-spotlights/spv-spotlight-investor-lists.service';
 import {
   AddSpvParticipantDto,
   AddSpvParticipantsBulkDto,
+  CreateSpvInvestorListDto,
   CreateSpvSpotlightDto,
   GetSpvParticipantsQueryDto,
   GetSpvSpotlightsQueryDto,
@@ -15,6 +17,7 @@ import {
   SendSpvBulkDto,
   SendSpvOpenNoticeDto,
   UpdateSpvEmailTemplatesDto,
+  UpdateSpvInvestorListDto,
   UpdateSpvParticipantDto,
   UpdateSpvSpotlightDto,
 } from 'libs/contracts/src/schema/spv-spotlight';
@@ -23,7 +26,10 @@ import {
 @Controller('v1/admin/spv-spotlights')
 @UseGuards(TeamPitchAdminAuthGuard)
 export class AdminSpvSpotlightController {
-  constructor(private readonly adminService: SpvSpotlightAdminService) {}
+  constructor(
+    private readonly adminService: SpvSpotlightAdminService,
+    private readonly investorListsService: SpvSpotlightInvestorListsService
+  ) {}
 
   @Get()
   @NoCache()
@@ -153,6 +159,36 @@ export class AdminSpvSpotlightController {
   @NoCache()
   async removeParticipant(@Param('uid') uid: string, @Param('participantUid') participantUid: string) {
     return this.adminService.removeParticipant(uid, participantUid);
+  }
+
+  @Get(':uid/investor-lists')
+  @NoCache()
+  async listInvestorLists(@Param('uid') uid: string) {
+    return this.investorListsService.list(uid);
+  }
+
+  @Post(':uid/investor-lists')
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async createInvestorList(@Param('uid') uid: string, @Body() body: CreateSpvInvestorListDto) {
+    return this.investorListsService.create(uid, body);
+  }
+
+  @Patch(':uid/investor-lists/:listUid')
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async updateInvestorList(
+    @Param('uid') uid: string,
+    @Param('listUid') listUid: string,
+    @Body() body: UpdateSpvInvestorListDto
+  ) {
+    return this.investorListsService.update(uid, listUid, body);
+  }
+
+  @Delete(':uid/investor-lists/:listUid')
+  @NoCache()
+  async deleteInvestorList(@Param('uid') uid: string, @Param('listUid') listUid: string) {
+    return this.investorListsService.delete(uid, listUid);
   }
 
   @Get(':uid')

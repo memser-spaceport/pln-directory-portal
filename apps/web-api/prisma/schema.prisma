@@ -1619,6 +1619,7 @@ model SpvSpotlight {
   media         SpvSpotlightMedia[]
   participants  SpvSpotlightParticipant[]
   accessRequests SpvAccessRequest[]
+  investorLists SpvSpotlightInvestorList[]
 
   @@index([status])
 }
@@ -1660,9 +1661,35 @@ model SpvSpotlightParticipant {
   emailTemplateVariables Json?
   createdAt              DateTime                   @default(now())
   updatedAt              DateTime                   @updatedAt
+  investorLists          SpvSpotlightInvestorListParticipant[]
 
   @@unique([spvSpotlightUid, memberUid])
   @@index([spvSpotlightUid, type])
+}
+
+model SpvSpotlightInvestorList {
+  id              Int                                   @id @default(autoincrement())
+  uid             String                                @unique @default(cuid())
+  spvSpotlightUid String
+  spvSpotlight    SpvSpotlight                          @relation(fields: [spvSpotlightUid], references: [uid], onDelete: Cascade)
+  name            String
+  participants    SpvSpotlightInvestorListParticipant[]
+  createdAt       DateTime                              @default(now())
+  updatedAt       DateTime                              @updatedAt
+
+  @@unique([spvSpotlightUid, name])
+}
+
+model SpvSpotlightInvestorListParticipant {
+  id             Int                      @id @default(autoincrement())
+  listUid        String
+  list           SpvSpotlightInvestorList @relation(fields: [listUid], references: [uid], onDelete: Cascade)
+  participantUid String
+  participant    SpvSpotlightParticipant  @relation(fields: [participantUid], references: [uid], onDelete: Cascade)
+  createdAt      DateTime                 @default(now())
+
+  @@unique([listUid, participantUid])
+  @@index([participantUid])
 }
 
 model SpvAccessRequest {

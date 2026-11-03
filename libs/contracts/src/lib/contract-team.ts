@@ -2,6 +2,7 @@ import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 import {
   ResponseTeamWithRelationsSchema,
+  TeamCrawlIndexResponseSchema,
   TeamDetailQueryParams,
   TeamQueryParams,
   TeamFilterQueryParams,
@@ -19,6 +20,14 @@ export const apiTeam = contract.router({
       200: contract.response<any>(),
     },
     summary: 'filter teams',
+  },
+  getTeamCrawlIndex: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/teams/crawl-index`,
+    responses: {
+      200: TeamCrawlIndexResponseSchema,
+    },
+    summary: 'Flat uid/updatedAt list of publicly visible teams for sitemaps',
   },
   getTeams: {
     method: 'GET',

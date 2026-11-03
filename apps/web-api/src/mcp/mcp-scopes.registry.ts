@@ -196,9 +196,18 @@ export function isWriteTool(toolName: string): boolean {
   return MCP_TOOL_SCOPES[toolName]?.level === 'write';
 }
 
-/** What a scope's tools allow: `write` if any writes, `read` if it has tools, `none` if it has none yet. */
+/**
+ * Levels a scope allows outside MCP tools, through a member proof (LAB-3075): NodeBB lets an agent post and reply as
+ * the member when the connection's Forum level is write. Counted by `registryMaxLevel` so members can choose it.
+ */
+export const MCP_PROOF_SCOPE_LEVELS: Readonly<Partial<Record<McpScopeKey, 'read' | 'write'>>> = { forum: 'write' };
+
+/**
+ * What a scope allows: `write` if any of its tools writes (or a member proof can), `read` if it has tools, `none` if
+ * it has none yet.
+ */
 export function registryMaxLevel(scope: McpScopeKey): McpLevel {
-  let max: McpLevel = 'none';
+  let max: McpLevel = MCP_PROOF_SCOPE_LEVELS[scope] ?? 'none';
   for (const entry of Object.values(MCP_TOOL_SCOPES)) {
     if (entry.scope === scope && RANK[entry.level] > RANK[max]) {
       max = entry.level;

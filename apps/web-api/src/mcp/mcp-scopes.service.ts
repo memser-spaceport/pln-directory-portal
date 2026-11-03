@@ -100,6 +100,11 @@ export class McpScopesService {
     }
   }
 
+  /** A connection's effective level for one scope. Throws when admin settings can't be read, so callers fail closed. */
+  async scopeLevel(stored: McpStoredLevels, scope: McpScopeKey): Promise<McpLevel> {
+    return resolveScope(stored, await this.adminCaps(), scope).level;
+  }
+
   toConnection(row: ConnectionRow, caps: McpAdminCaps, now = Date.now()): McpConnection {
     const stored = parseStoredLevels(row.scopeLevels);
     const scopes: McpConnectionScope[] = scopesWithTools().map(({ key, label }) => {

@@ -81,6 +81,8 @@ one entry per tool; a spec fails when a registry tool has none, so a new tool ne
 | `mcp-list-portfolio-teams-called` | an agent calls `list_portfolio_teams` | `query`, `hasQuery`, `island`, `limit`, `offset`, `resultCount`, `total` |
 | `mcp-update-team-called` | an agent calls `update_team` | `teamUid`, `fields`, `fieldCount` |
 | `mcp-update-project-called` | an agent calls `update_project` | `projectUid`, `fields`, `fieldCount` |
+| `mcp-update-fundraising-profile-called` | an agent calls `update_fundraising_profile` | `demoDay`, `teamUid`, `fields`, `fieldCount` |
+| `mcp-update-team-pitch-profile-called` | an agent calls `update_team_pitch_profile` | `pitch`, `fields`, `fieldCount` |
 | `mcp-get-event-called` | an agent calls `get_event` | `uid` |
 | `mcp-rsvp-event-called` | an agent calls `rsvp_event` | `eventUid`, `teamUid`, `alreadyGoing` |
 | `mcp-cancel-event-rsvp-called` | an agent calls `cancel_event_rsvp` | `eventUid`, `wasGoing` |
@@ -116,9 +118,97 @@ one entry per tool; a spec fails when a registry tool has none, so a new tool ne
 | `mcp-update-email-preferences-called` | an agent calls `update_email_preferences` | `fields`, `fieldCount` |
 | `mcp-save-demo-day-team-called` | an agent calls `save_demo_day_team` | `demoDay`, `teamUid` |
 | `mcp-unsave-demo-day-team-called` | an agent calls `unsave_demo_day_team` | `demoDay`, `teamUid` |
+| `mcp-list-my-notifications-called` | an agent calls `list_my_notifications` | `unreadOnly`, `resultCount`, `unreadCount` |
+| `mcp-mark-notification-read-called` | an agent calls `mark_notification_read` | `notificationUid` |
+| `mcp-mark-all-notifications-read-called` | an agent calls `mark_all_notifications_read` | none |
+| `mcp-list-deals-called` | an agent calls `list_deals` | `category`, `resultCount` |
+| `mcp-mark-deal-used-called` | an agent calls `mark_deal_used` | `dealUid` |
+| `mcp-unmark-deal-used-called` | an agent calls `unmark_deal_used` | `dealUid` |
+| `mcp-report-deal-issue-called` | an agent calls `report_deal_issue` | `dealUid`, `issueUid` |
+| `mcp-like-guide-called` | an agent calls `like_guide` | `guide` |
+| `mcp-unlike-guide-called` | an agent calls `unlike_guide` | `guide` |
+| `mcp-submit-demo-day-feedback-called` | an agent calls `submit_demo_day_feedback` | `demoDay`, `rating`, `issueCount`, `fields`, `fieldCount` |
+| `mcp-list-my-office-hours-followups-called` | an agent calls `list_my_office_hours_followups` | `resultCount` |
+| `mcp-submit-office-hours-feedback-called` | an agent calls `submit_office_hours_feedback` | `followUpUid`, `happened`, `rating`, `reasonCount`, `hasOtherReasons` |
+| `mcp-update-my-investor-profile-called` | an agent calls `update_my_investor_profile` | `fields`, `fieldCount` |
+| `mcp-update-my-privacy-called` | an agent calls `update_my_privacy` | `fields`, `fieldCount` |
+| `mcp-update-my-team-membership-called` | an agent calls `update_my_team_membership` | `teamUid`, `fields`, `fieldCount` |
+| `mcp-update-my-project-contribution-called` | an agent calls `update_my_project_contribution` | `projectUid`, `fields`, `fieldCount` |
+| `mcp-update-my-self-role-called` | an agent calls `update_my_self_role` | none |
+| `mcp-delete-my-image-called` | an agent calls `delete_my_image` | none |
+| `mcp-update-notification-settings-called` | an agent calls `update_notification_settings` | `fields`, `fieldCount` |
+| `mcp-list-my-job-applications-called` | an agent calls `list_my_job_applications` | `resultCount` |
+| `mcp-list-my-job-interests-called` | an agent calls `list_my_job_interests` | `resultCount` |
+| `mcp-apply-to-job-called` | an agent calls `apply_to_job` | `jobUid` |
+| `mcp-mark-job-interest-called` | an agent calls `mark_job_interest` | `jobUid` |
+| `mcp-remove-job-interest-called` | an agent calls `remove_job_interest` | `jobUid` |
+| `mcp-mark-team-hiring-interest-called` | an agent calls `mark_team_hiring_interest` | `teamUid` |
+| `mcp-refer-job-called` | an agent calls `refer_job` | `jobUid` |
+| `mcp-create-guide-comment-called` | an agent calls `create_guide_comment` | `guideUid` |
+| `mcp-reply-guide-comment-called` | an agent calls `reply_guide_comment` | `guideUid`, `parentUid` |
+| `mcp-update-guide-comment-called` | an agent calls `update_guide_comment` | `commentUid` |
+| `mcp-delete-guide-comment-called` | an agent calls `delete_guide_comment` | `commentUid` |
+| `mcp-like-guide-comment-called` | an agent calls `like_guide_comment` | `commentUid` |
+| `mcp-unlike-guide-comment-called` | an agent calls `unlike_guide_comment` | `commentUid` |
+| `mcp-request-guide-called` | an agent calls `request_guide` | `guideUid` |
+| `mcp-request-office-hours-called` | an agent calls `request_office_hours` | `memberUid` |
+| `mcp-close-office-hours-followup-called` | an agent calls `close_office_hours_followup` | `followUpUid` |
+| `mcp-report-broken-office-hours-called` | an agent calls `report_broken_office_hours` | `memberUid` |
+| `mcp-accept-demo-day-confidentiality-called` | an agent calls `accept_demo_day_confidentiality` | `demoDay` |
+| `mcp-apply-to-demo-day-called` | an agent calls `apply_to_demo_day` | `demoDay` |
+| `mcp-express-demo-day-interest-called` | an agent calls `express_demo_day_interest` | `demoDay`, `teamFundraisingProfileUid` |
+| `mcp-accept-pitch-confidentiality-called` | an agent calls `accept_pitch_confidentiality` | `pitch` |
+| `mcp-express-pitch-interest-called` | an agent calls `express_pitch_interest` | `pitch` |
+| `mcp-submit-deal-called` | an agent calls `submit_deal` | none |
+| `mcp-request-deal-called` | an agent calls `request_deal` | `dealUid` |
+| `mcp-request-spv-access-called` | an agent calls `request_spv_access` | `slug` |
+| `mcp-contact-support-called` | an agent calls `contact_support` | none |
+| `mcp-delete-notification-called` | an agent calls `delete_notification` | `notificationUid` |
+| `mcp-create-roadmap-item-called` | an agent calls `create_roadmap_item` | none |
+| `mcp-update-roadmap-item-called` | an agent calls `update_roadmap_item` | `itemUid` |
+| `mcp-pin-roadmap-item-called` | an agent calls `pin_roadmap_item` | `itemUid` |
+| `mcp-unpin-roadmap-item-called` | an agent calls `unpin_roadmap_item` | `itemUid` |
+| `mcp-update-team-fund-profile-called` | an agent calls `update_team_fund_profile` | `teamUid`, `fields`, `fieldCount` |
+| `mcp-update-team-membership-sources-called` | an agent calls `update_team_membership_sources` | `teamUid` |
+| `mcp-update-team-communities-called` | an agent calls `update_team_communities` | `teamUid` |
+| `mcp-update-team-roster-called` | an agent calls `update_team_roster` | `teamUid`, `memberUid` |
+| `mcp-create-team-called` | an agent calls `create_team` | none |
+| `mcp-delete-team-called` | an agent calls `delete_team` | `teamUid` |
+| `mcp-review-team-enrichment-called` | an agent calls `review_team_enrichment` | `teamUid` |
+| `mcp-create-project-called` | an agent calls `create_project` | `maintainingTeamUid` |
+| `mcp-delete-project-called` | an agent calls `delete_project` | `projectUid` |
+| `mcp-create-team-ask-called` | an agent calls `create_team_ask` | `teamUid` |
+| `mcp-update-ask-called` | an agent calls `update_ask` | `askUid` |
+| `mcp-close-ask-called` | an agent calls `close_ask` | `askUid` |
+| `mcp-delete-ask-called` | an agent calls `delete_ask` | `askUid` |
+| `mcp-update-project-ask-called` | an agent calls `update_project_ask` | `projectUid` |
+| `mcp-set-job-match-criteria-called` | an agent calls `set_job_match_criteria` | `roleUid` |
+| `mcp-contact-suggested-candidate-called` | an agent calls `contact_suggested_candidate` | `roleUid`, `memberUid` |
+| `mcp-mark-applicant-reviewed-called` | an agent calls `mark_applicant_reviewed` | `uid` |
+| `mcp-mark-applicant-seen-called` | an agent calls `mark_applicant_seen` | `uid` |
+| `mcp-submit-event-called` | an agent calls `submit_event` | none |
+| `mcp-update-my-event-rsvp-called` | an agent calls `update_my_event_rsvp` | `eventUid`, `fields`, `fieldCount` |
+| `mcp-request-event-presence-called` | an agent calls `request_event_presence` | none |
+| `mcp-upvote-team-news-called` | an agent calls `upvote_team_news` | `newsUid` |
+| `mcp-remove-team-news-upvote-called` | an agent calls `remove_team_news_upvote` | `newsUid` |
 | `mcp-list-my-ai-apps-called` | an agent calls `list_my_ai_apps` | `resultCount` |
 | `mcp-list-ai-app-feedback-called` | an agent calls `list_ai_app_feedback` | `appUid`, `status`, `limit`, `offset`, `resultCount`, `total` |
 | `mcp-update-ai-app-feedback-status-called` | an agent calls `update_ai_app_feedback_status` | `appUid`, `feedbackUid`, `status`, `hasNote` |
+| `mcp-redeploy-ai-app-called` | an agent calls `redeploy_ai_app` | `appUid`, `deploymentId` |
+| `mcp-rename-ai-app-called` | an agent calls `rename_ai_app` | `appUid`, `fields`, `fieldCount` |
+| `mcp-update-ai-app-description-called` | an agent calls `update_ai_app_description` | `appUid`, `fields`, `fieldCount` |
+| `mcp-delete-ai-app-called` | an agent calls `delete_ai_app` | `appUid` |
+| `mcp-delete-ai-app-deployment-called` | an agent calls `delete_ai_app_deployment` | `appUid` |
+| `mcp-update-ai-app-access-called` | an agent calls `update_ai_app_access` | `appUid`, `fields`, `fieldCount` |
+| `mcp-update-ai-app-public-paths-called` | an agent calls `update_ai_app_public_paths` | `appUid` |
+| `mcp-submit-ai-app-feedback-called` | an agent calls `submit_ai_app_feedback` | `appUid` |
+| `mcp-regenerate-warm-intro-called` | an agent calls `regenerate_warm_intro` | `profileUid` |
+| `mcp-add-investor-to-list-called` | an agent calls `add_investor_to_list` | `investorId` |
+| `mcp-remove-investor-from-list-called` | an agent calls `remove_investor_from_list` | `investorId` |
+| `mcp-submit-pathfinder-correction-called` | an agent calls `submit_pathfinder_correction` | none |
+| `mcp-resolve-pathfinder-crosswalk-called` | an agent calls `resolve_pathfinder_crosswalk` | none |
+| `mcp-clear-warm-path-refer-called` | an agent calls `clear_warm_path_refer` | `warmPathUid`, `connectorProfileUid` |
+| `mcp-review-sourced-founder-called` | an agent calls `review_sourced_founder` | `founderId` |
 
 ## Access requests
 

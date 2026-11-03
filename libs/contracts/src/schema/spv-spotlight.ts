@@ -28,7 +28,12 @@ const templateSchema = z.object({
   body: z.string().trim().min(1),
 });
 
-const optionalText = z.string().trim().max(120).nullish().transform((value) => value ?? '');
+const optionalText = z
+  .string()
+  .trim()
+  .max(120)
+  .nullish()
+  .transform((value) => value ?? '');
 const optionalReplyTo = z
   .string()
   .trim()
@@ -193,3 +198,14 @@ export const GetSpvParticipantsQuerySchema = z.object({
 });
 
 export class GetSpvParticipantsQueryDto extends createZodDto(GetSpvParticipantsQuerySchema) {}
+
+export const CreateSpvInvestorListSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  participantUids: z.array(z.string().min(1)).min(1),
+});
+
+export class CreateSpvInvestorListDto extends createZodDto(CreateSpvInvestorListSchema) {}
+
+export const UpdateSpvInvestorListSchema = CreateSpvInvestorListSchema.partial();
+
+export class UpdateSpvInvestorListDto extends createZodDto(UpdateSpvInvestorListSchema) {}
