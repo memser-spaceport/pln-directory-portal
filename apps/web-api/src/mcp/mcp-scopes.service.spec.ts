@@ -64,13 +64,15 @@ function build(settings: Array<{ scope: string; maxLevel: string }> = []) {
 
 describe('scope resolution', () => {
   it('treats a missing level as read, capped by the registry', () => {
-    expect(resolveScope({}, NO_CAPS, 'forum')).toEqual({
+    expect(resolveScope({}, NO_CAPS, 'search')).toEqual({
       level: 'read',
       maxLevel: 'read',
       adminMax: 'write',
       lock: null,
     });
-    expect(resolveScope({ forum: 'write' }, NO_CAPS, 'forum').level).toBe('read');
+    expect(resolveScope({ search: 'write' }, NO_CAPS, 'search').level).toBe('read');
+    // Forum write is for NodeBB through a member proof (LAB-3075)
+    expect(resolveScope({ forum: 'write' }, NO_CAPS, 'forum')).toMatchObject({ level: 'write', maxLevel: 'write' });
     expect(resolveScope({ ai_apps: 'write' }, NO_CAPS, 'ai_apps')).toMatchObject({ level: 'write', maxLevel: 'write' });
   });
 
@@ -140,7 +142,7 @@ describe('McpScopesService', () => {
       label: 'Forum',
       level: 'none',
       maxLevel: 'none',
-      registryMax: 'read',
+      registryMax: 'write',
       lock: 'admin',
     });
     expect(items[0].scopes.find((s) => s.key === 'ai_apps')).toMatchObject({ level: 'write', maxLevel: 'write' });
@@ -231,7 +233,7 @@ describe('McpScopesService', () => {
     expect(res.scopes.find((s) => s.key === 'forum')).toEqual({
       key: 'forum',
       label: 'Forum',
-      registryMax: 'read',
+      registryMax: 'write',
       adminMax: 'none',
     });
     expect(res.scopes.find((s) => s.key === 'news')).toMatchObject({ registryMax: 'write', adminMax: 'write' });
