@@ -16,7 +16,9 @@ describe('PLAA integration authorization', () => {
     method: 'POST',
     originalUrl: '/v1/integrations/plaa/members/member-1/access',
   });
-  const context = (handler: 'grant' | 'revoke', req: ReturnType<typeof request>): ExecutionContext => ({
+  type Handler = 'grant' | 'revoke' | 'grantPermission' | 'revokePermission';
+  const handlers: Handler[] = ['grant', 'revoke', 'grantPermission', 'revokePermission'];
+  const context = (handler: Handler, req: ReturnType<typeof request>): ExecutionContext => ({
     switchToHttp: () => ({ getRequest: () => req }),
     getHandler: () => PlaaAccessController.prototype[handler],
     getClass: () => PlaaAccessController,
@@ -24,19 +26,19 @@ describe('PLAA integration authorization', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
-  it.each(['grant', 'revoke'] as const)('%s requires PLAA management scope', (method) => {
+  it.each(handlers)('%s requires PLAA management scope', (method) => {
     const required = reflector.getAllAndOverride<string[]>(INTEGRATION_SCOPES_KEY, [
       PlaaAccessController.prototype[method], PlaaAccessController,
     ]);
     expect(required).toEqual([scope]);
   });
 
-  it.each(['grant', 'revoke'] as const)('%s denies a valid key without PLAA scope', async (method) => {
+  it.each(handlers)('%s denies a valid key without PLAA scope', async (method) => {
     keys.authenticate.mockResolvedValue({ uid: 'key-1', scopes: ['jobs:write'] });
     await expect(guard.canActivate(context(method, request('Bearer valid-key')))).rejects.toThrow(ForbiddenException);
   });
 
-  it.each(['grant', 'revoke'] as const)('%s allows a key with PLAA scope', async (method) => {
+  it.each(handlers)('%s allows a key with PLAA scope', async (method) => {
     keys.authenticate.mockResolvedValue({ uid: 'key-1', scopes: [scope] });
     const req = request('Bearer valid-key');
     await expect(guard.canActivate(context(method, req))).resolves.toBe(true);
