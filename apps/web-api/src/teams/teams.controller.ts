@@ -83,6 +83,13 @@ export class TeamsController {
     return await this.teamsService.getTeamFilters(builtQuery, request?.userEmail || null);
   }
 
+  // Declared before `getTeam` so `crawl-index` isn't taken for a team uid.
+  @Api(server.route.getTeamCrawlIndex)
+  @NoCache()
+  async getTeamCrawlIndex() {
+    return this.teamsService.listCrawlIndex();
+  }
+
   @Api(server.route.getTeams)
   @ApiQueryFromZod(TeamQueryParams)
   @ApiOkResponseFromZod(ResponseTeamWithRelationsSchema.array())

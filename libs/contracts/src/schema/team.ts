@@ -124,6 +124,15 @@ export const TeamQueryParams = QueryParams({
 
 export const TeamDetailQueryParams = TeamQueryParams.unwrap().pick(RETRIEVAL_QUERY_FILTERS).optional();
 
+export const TeamCrawlIndexItemSchema = z.object({
+  uid: z.string(),
+  updatedAt: z.string(),
+});
+
+export const TeamCrawlIndexResponseSchema = z.object({
+  teams: z.array(TeamCrawlIndexItemSchema),
+});
+
 export const TeamFilterQueryParams = z.object({
   searchBy: z.string().optional(),
   membershipSources: z.string().optional(),
