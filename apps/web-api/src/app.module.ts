@@ -44,7 +44,6 @@ import { HuskyModule } from './husky/husky.module';
 import { HuskySearchModule } from './husky/husky-search.module';
 import { HomeModule } from './home/home.module';
 import { InternalsModule } from './internals/internals.module';
-import { OsoMetricsModule } from './oso-metrics/oso-metrics.module';
 import { MemberSubscriptionsModule } from './member-subscriptions/member-subscriptions.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AskModule } from './asks/asks.module';
@@ -161,7 +160,6 @@ import { McpModule } from './mcp/mcp.module';
     HuskySearchModule,
     HomeModule,
     InternalsModule,
-    OsoMetricsModule,
     MemberSubscriptionsModule,
     NotificationsModule,
     AskModule,
