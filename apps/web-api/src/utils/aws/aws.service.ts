@@ -101,10 +101,13 @@ export class AwsService {
     html: string;
     text: string;
     cc?: string[];
+    bcc?: string[];
     replyTo?: string;
   }) {
     if (!this.isEmailServiceEnabled()) return null;
     const cc = args.cc ?? [];
+    const bcc = args.bcc ?? [];
+    // BCC stays off the MIME headers. SES delivers it through Destinations, so To and Cc do not see it.
     const mail = new MailComposer({
       from: args.from,
       to: args.to,
@@ -119,7 +122,7 @@ export class AwsService {
     });
     const AWS_SES = new AWS.SES(CONFIG);
     return await AWS_SES.sendRawEmail({
-      Destinations: [...args.to, ...cc],
+      Destinations: [...args.to, ...cc, ...bcc],
       RawMessage: { Data: rawMessage.toString() },
     }).promise();
   }

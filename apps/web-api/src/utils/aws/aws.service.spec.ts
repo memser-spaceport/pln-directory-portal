@@ -68,6 +68,15 @@ describe('AwsService.sendHtmlEmail', () => {
     expect(normalized).toMatchSnapshot();
   });
 
+  it('delivers BCC through SES Destinations and leaves it off the message headers', async () => {
+    process.env.IS_EMAIL_ENABLED = 'true';
+    await new AwsService().sendHtmlEmail({ ...args, bcc: ['labos@example.com'] });
+    const params = sendRawEmail.mock.calls[0][0];
+    expect(params.Destinations).toEqual(['candidate@example.com', 'labos@example.com']);
+    const raw: string = params.RawMessage.Data;
+    expect(raw).not.toMatch(/^Bcc:/m);
+  });
+
   it('rejects when SES fails', async () => {
     process.env.IS_EMAIL_ENABLED = 'true';
     sendRawEmail.mockReturnValue({ promise: () => Promise.reject(new Error('ses down')) });
