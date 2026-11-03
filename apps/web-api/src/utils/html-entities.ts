@@ -11,13 +11,17 @@
  * double-encoded `&amp;quot;` into `"` instead of the `&quot;` the source
  * actually says.
  *
+ * NodeBB escapes forum text with `validator.escape`, which writes the apostrophe
+ * and slash in hex (`&#x27;`, `&#x2F;`), so both forms are decoded.
+ *
  * Callers should strip tags BEFORE calling this. Decoding first would turn an
  * escaped `&lt;b&gt;` into a real tag that a later strip pass would then eat.
  */
 export const decodeHtmlEntities = (value: string): string =>
   value
     .replace(/&quot;|&#0*34;/g, '"')
-    .replace(/&apos;|&#0*39;/g, "'")
+    .replace(/&apos;|&#0*39;|&#x0*27;/gi, "'")
+    .replace(/&#0*47;|&#x0*2f;/gi, '/')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&nbsp;/gi, ' ')

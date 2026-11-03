@@ -49,7 +49,10 @@ describe('forum tools (LAB-3031)', () => {
   it('starts a thread as the member: a fresh forum proof for this connection, sent as the only credential', async () => {
     const { proofs, tools } = build();
     request.mockResolvedValue(
-      answer(200, { status: { code: 'ok' }, response: { tid: 42, cid: 2, mainPid: 100, title: 'Hello' } })
+      answer(200, {
+        status: { code: 'ok' },
+        response: { tid: 42, cid: 2, mainPid: 100, title: 'Q&amp;A &#x27;hello&#x27;' },
+      })
     );
 
     const result = await tools.start_forum_thread.execute(CTX, {
@@ -68,7 +71,7 @@ describe('forum tools (LAB-3031)', () => {
     });
     expect(request.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
     expect(result).toEqual({
-      posted: { tid: 42, cid: 2, pid: 100, title: 'Hello', url: 'https://labos.example/forum/topics/2/42' },
+      posted: { tid: 42, cid: 2, pid: 100, title: "Q&A 'hello'", url: 'https://labos.example/forum/topics/2/42' },
     });
   });
 
@@ -107,6 +110,7 @@ describe('forum tools (LAB-3031)', () => {
             { cid: 3, name: 'Docs link', link: 'https://docs.example' },
             { cid: 4, name: 'Old', disabled: 1 },
             { cid: 2, name: 'General', children: [{ cid: 5, name: 'Help', parentCid: 2 }] },
+            { cid: 6, name: 'Comments &amp; Feedback', description: 'Got a question? Ask &#x2F; tell us' },
           ],
         },
       })
@@ -125,6 +129,7 @@ describe('forum tools (LAB-3031)', () => {
         { cid: 1, name: 'Announcements', description: 'News' },
         { cid: 2, name: 'General' },
         { cid: 5, name: 'Help', parentCid: 2 },
+        { cid: 6, name: 'Comments & Feedback', description: 'Got a question? Ask / tell us' },
       ],
     });
   });

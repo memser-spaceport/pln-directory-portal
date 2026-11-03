@@ -15,6 +15,12 @@ describe('decodeHtmlEntities', () => {
     expect(decodeHtmlEntities('O&#39;Brien&apos;s &#039;work&apos;')).toBe("O'Brien's 'work'");
   });
 
+  it("decodes NodeBB's hex apostrophe and slash", () => {
+    expect(decodeHtmlEntities('Member&#x27;s Q&amp;A &#x2F; feedback &#47; &#X27;')).toBe(
+      "Member's Q&A / feedback / '"
+    );
+  });
+
   it('decodes angle brackets', () => {
     expect(decodeHtmlEntities('Ships &lt;1s builds &gt;99% of the time')).toBe('Ships <1s builds >99% of the time');
   });
