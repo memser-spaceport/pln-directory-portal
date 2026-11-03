@@ -337,7 +337,7 @@ Then run:
 $ docker-compose up -d
 ```
 
-Once this is done, you will have your Postgres(for both PL Network and OSO) and Redis running through Docker and they will be up and running based on the following configurations:
+Once this is done, you will have your Postgres (PL Network) and Redis running through Docker and they will be up and running based on the following configurations:
 
 #### Sample Values - PL Network database and Redis
 *This database manages most of the core functionalities of the PL Network application.*
@@ -351,20 +351,6 @@ Once this is done, you will have your Postgres(for both PL Network and OSO) and 
   REDIS_HOST=localhost
   REDIS_PORT=6379
   ```
-#### Sample Values - OSO Database
-*Open Source Observer (OSO) provides data-driven insights into open source ecosystems. It analyzes projects, contributors, and communities using public datasets. The platform offers visualizations and analytics to support open source research.*
-*In real time, we periodically update this database with data from the OSO website. The retrieved project statistics are displayed on the project detail page.*
-
-*For **local development**, we set up the OSO Postgres database using the **Docker Compose** file. Make sure it is configured correctly when running locally.*
-
-  ```sh
-  OSO_DB_HOST_PORT=19433
-  OSO_DB_USER=postgres
-  OSO_DB_PASSWORD=postgres
-  OSO_DB_NAME=oso_dev
-  OSO_DATABASE_URL=postgresql://postgres:postgres@localhost:19433/oso_dev
-  ```
-
 ## Add Local Environment Variables
 
 1. Create the environment variables file:
@@ -405,13 +391,6 @@ Once this is done, you will have your Postgres(for both PL Network and OSO) and 
 ```sh
 $ npx prisma generate --schema=./apps/web-api/prisma/schema.prisma
 $ npx prisma db push --schema=./apps/web-api/prisma/schema.prisma
-```
-
-## Generate Prisma Schemas and Update the OSO Database
-
-```sh
-$ npx prisma generate --schema=./apps/web-api/prisma/oso-schema.prisma
-$ npx prisma db push --schema=./apps/web-api/prisma/oso-schema.prisma
 ```
 
 ## DB Migration (local environment only)
