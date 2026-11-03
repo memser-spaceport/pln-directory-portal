@@ -135,6 +135,7 @@ describe('CORS origins', () => {
       useGlobalFilters: jest.fn(),
       use: jest.fn(),
       enableCors: jest.fn(),
+      getHttpAdapter: () => ({ getInstance: () => ({ set: jest.fn() }) }),
     };
     mainConfig(app as any);
     const httpCors = app.enableCors.mock.calls[0][0];

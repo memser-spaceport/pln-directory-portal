@@ -23,6 +23,7 @@ import { LogService } from '../shared/log.service';
 import { buildMultiRelationMapping, buildRelationMapping, copyObj } from '../utils/helper/helper';
 import { normalizeBlueskyHandler, normalizeCrunchbaseHandler } from './team-handle-normalizer';
 import { syncTeamLocations } from './team-locations';
+import { isTeamHiddenFromPublic, PUBLICLY_VISIBLE_TEAM_WHERE, toTeamCrawlIndex } from './team-public-visibility';
 import { CacheService } from '../utils/cache/cache.service';
 import { AskService } from '../asks/asks.service';
 import { TeamsHooksService } from './teams.hooks.service';
@@ -104,6 +105,21 @@ export class TeamsService {
     } catch (err) {
       return this.handleErrors(err);
     }
+  }
+
+  /**
+   * Every team a logged-out visitor can open, as `{ uid, updatedAt }`, for the frontend sitemap (LAB-3085).
+   *
+   * Same set as the public team list (status not INACTIVE), minus L0 teams, whose profile `findTeamByUid`
+   * refuses without a login. Listing those sent crawlers to an error page.
+   */
+  async listCrawlIndex() {
+    const rows = await this.prisma.team.findMany({
+      where: { AND: [PUBLICLY_VISIBLE_TEAM_WHERE, { status: { not: TeamStatus.INACTIVE } }] },
+      select: { uid: true, updatedAt: true },
+      orderBy: { updatedAt: 'desc' },
+    });
+    return toTeamCrawlIndex(rows);
   }
 
   /**
@@ -309,7 +325,7 @@ export class TeamsService {
           investorProfile: true,
         },
       });
-      if (team.accessLevel === 'L0') {
+      if (isTeamHiddenFromPublic(team.accessLevel)) {
         if (!userEmail) {
           throw new ForbiddenException('Team is inactive');
         } else {
