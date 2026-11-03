@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
 import type { McpMemberProofService } from './mcp-member-proof.service';
+import { decodeHtmlEntities } from '../utils/html-entities';
 import { McpActorContext, McpToolDef } from './mcp-tools';
 
 /**
@@ -127,6 +128,11 @@ async function callForum(proofs: ProofIssuer, ctx: McpActorContext, method: 'GET
 
 type ForumCategory = { cid: number; name: string; description?: string; parentCid?: number };
 
+/** NodeBB sends names and titles HTML-escaped ("Comments &amp; Feedback"); the agent gets plain text. */
+function forumText(value: unknown): string {
+  return typeof value === 'string' ? decodeHtmlEntities(value).trim() : '';
+}
+
 /** Categories an agent can post in: real ones (NodeBB lists "uncategorized" as -1), not links or disabled ones. */
 export function forumCategories(payload: Row): ForumCategory[] {
   const out: ForumCategory[] = [];
@@ -137,11 +143,11 @@ export function forumCategories(payload: Row): ForumCategory[] {
       const cid = asNumber(item?.cid);
       if (cid !== undefined && cid > 0 && !seen.has(cid) && !item.disabled && !item.link) {
         seen.add(cid);
-        const description = typeof item.description === 'string' ? item.description.trim() : '';
+        const description = forumText(item.description);
         const parentCid = asNumber(item.parentCid);
         out.push({
           cid,
-          name: String(item.name ?? ''),
+          name: forumText(item.name),
           ...(description ? { description } : {}),
           ...(parentCid ? { parentCid } : {}),
         });
@@ -196,7 +202,7 @@ export function forumTools(proofs: ProofIssuer): McpToolDef[] {
             tid,
             cid: threadCid,
             pid: asNumber(created.mainPid),
-            title: typeof created.title === 'string' ? created.title : args.title,
+            title: forumText(created.title) || args.title,
             url: forumThreadUrl(threadCid, tid),
           },
         };
