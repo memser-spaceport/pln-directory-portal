@@ -1,5 +1,12 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { FORUM_PROOF_HEADER, forumCategories, forumPlainText, forumThreadRows, forumTools } from './mcp-forum-tools';
+import {
+  FORUM_PROOF_HEADER,
+  forumCategories,
+  forumCategoryThreads,
+  forumPlainText,
+  forumThreadRows,
+  forumTools,
+} from './mcp-forum-tools';
 import { McpActorContext } from './mcp-tools';
 
 const request = jest.fn();
@@ -352,6 +359,119 @@ describe('forum tools (LAB-3031)', () => {
       const { tools } = build();
       request.mockResolvedValueOnce(answer(404, {}));
       await expect(tools.get_forum_thread.execute(CTX, { uid: '999' })).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    /** One topic of NodeBB's /api/category/:cid answer (categories.getCategoryById). */
+    const topic = (tid: number, extra: Record<string, unknown> = {}) => ({
+      tid,
+      cid: 2,
+      title: `Topic ${tid} &amp; more`,
+      slug: `${tid}/topic-${tid}`,
+      postcount: 3,
+      timestampISO: '2026-11-03T10:00:00.000Z',
+      lastposttimeISO: '2026-11-04T10:00:00.000Z',
+      upvotes: 2,
+      viewcount: 40,
+      user: { username: 'ada', displayname: 'Ada &amp; Co' },
+      teaser: { pid: 9, content: '<p>Latest <em>reply</em> &quot;here&quot;</p>' },
+      ...extra,
+    });
+    const category = (topics: unknown[], extra: Record<string, unknown> = {}) => ({
+      cid: 2,
+      name: 'General Discussion',
+      topic_count: 41,
+      topics,
+      pagination: { currentPage: 1, pageCount: 3 },
+      ...extra,
+    });
+
+    it('lists a category through NodeBB with a fresh proof: newest first, one page', async () => {
+      const { proofs, tools } = build();
+      request.mockResolvedValue(answer(200, category([topic(4, { pinned: true }), topic(2, { locked: true })])));
+
+      const result = await tools.list_forum_threads.execute(CTX, { cid: 2 });
+
+      expect(proofs.issueForAuthorization).toHaveBeenCalledWith('auth-1', 'key-nodebb', 'forum');
+      const { url, method, headers } = call();
+      expect(method).toBe('GET');
+      expect(headers).toEqual({ [FORUM_PROOF_HEADER]: 'mcp_mp_abc', 'Content-Type': 'application/json' });
+      expect(url).toBe('https://forum.example/api/category/2?page=1&sort=recently_created');
+      expect(result).toEqual({
+        category: { cid: 2, name: 'General Discussion' },
+        threads: [
+          {
+            uid: '4',
+            topicTitle: 'Topic 4 & more',
+            topicSlug: '4/topic-4',
+            topicUrl: 'https://labos.example/forum/topics/2/4',
+            replyCount: 2,
+            cid: 2,
+            author: 'Ada & Co',
+            createdAt: '2026-11-03T10:00:00.000Z',
+            lastActivityAt: '2026-11-04T10:00:00.000Z',
+            pinned: true,
+            locked: false,
+            upvotes: 2,
+            views: 40,
+            snippet: 'Latest reply "here"',
+          },
+          expect.objectContaining({ uid: '2', pinned: false, locked: true }),
+        ],
+        page: 1,
+        pageCount: 3,
+        threadCount: 41,
+        sort: 'recently_created',
+      });
+    });
+
+    it('asks NodeBB for the page and sort the agent chose', async () => {
+      const { tools } = build();
+      request.mockResolvedValue(answer(200, category([])));
+
+      const result = await tools.list_forum_threads.execute(CTX, { cid: 7, page: 3, sort: 'most_votes' });
+
+      expect(call().url).toBe('https://forum.example/api/category/7?page=3&sort=most_votes');
+      expect(result).toEqual(expect.objectContaining({ page: 3, sort: 'most_votes', threads: [] }));
+    });
+
+    it('falls back to the default sort and page 1 for values the schema would refuse', async () => {
+      const { tools } = build();
+      request.mockResolvedValue(answer(200, category([])));
+
+      await tools.list_forum_threads.execute(CTX, { cid: 2, page: 0, sort: 'oldest; drop' });
+
+      expect(call().url).toBe('https://forum.example/api/category/2?page=1&sort=recently_created');
+    });
+
+    it('leaves deleted threads and rows without a tid out of a category page', () => {
+      const listed = forumCategoryThreads(
+        category([topic(1), topic(2, { deleted: 1 }), { title: 'no tid' }, topic(3, { teaser: null, user: null })]),
+        1,
+        'recently_created'
+      );
+
+      expect(listed.threads.map((row) => row.uid)).toEqual(['1', '3']);
+      expect(listed.threads[1]).toEqual(expect.objectContaining({ author: null, snippet: null }));
+    });
+
+    it('refuses a cid that is not a category id without calling the forum', async () => {
+      const { proofs, tools } = build();
+      for (const cid of ['2/../../api/admin', 0, -1, 1.5]) {
+        await expect(tools.list_forum_threads.execute(CTX, { cid })).rejects.toBeInstanceOf(BadRequestException);
+      }
+      expect(proofs.issueForAuthorization).not.toHaveBeenCalled();
+      expect(request).not.toHaveBeenCalled();
+    });
+
+    it('passes NodeBB refusals through: unknown category is not found, a hidden one is refused', async () => {
+      const { tools } = build();
+      request.mockResolvedValueOnce(answer(404, {}));
+      await expect(tools.list_forum_threads.execute(CTX, { cid: 999 })).rejects.toBeInstanceOf(NotFoundException);
+
+      request.mockResolvedValueOnce(answer(403, { status: { message: 'You do not have enough privileges' } }));
+      await expect(tools.list_forum_threads.execute(CTX, { cid: 5 })).rejects.toThrow(
+        'You do not have enough privileges'
+      );
     });
   });
 

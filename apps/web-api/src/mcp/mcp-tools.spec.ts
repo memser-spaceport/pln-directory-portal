@@ -240,7 +240,7 @@ describe('scope registry', () => {
 
   it('shows forum posting tools only with forum.write, like posting in the forum UI', () => {
     const forum = forumTools(stub);
-    const reads = ['search_forum_threads', 'get_forum_thread', 'list_forum_categories'];
+    const reads = ['search_forum_threads', 'get_forum_thread', 'list_forum_threads', 'list_forum_categories'];
     expect(toolsForPermissions(new Set(['forum.read']), forum).map((t) => t.name)).toEqual(reads);
     expect(toolsForPermissions(new Set(['forum.read', 'forum.write']), forum).map((t) => t.name)).toEqual([
       ...reads,
