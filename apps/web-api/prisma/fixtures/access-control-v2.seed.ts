@@ -18,6 +18,8 @@ type PermissionSeed = {
 
 const permissionSeeds: PermissionSeed[] = [
   { code: 'plaa.access', module: 'PLAA' },
+  { code: 'plaa.guest', module: 'PLAA' },
+  { code: 'plaa.member', module: 'PLAA' },
   { code: 'admin.tools.access', module: 'Admin Tool' },
   { code: 'directory.admin.full', module: 'Directory' },
   { code: 'member.search.read', module: 'Directory' },

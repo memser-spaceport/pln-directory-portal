@@ -21,6 +21,8 @@ export const RBAC_PERMISSION_CODES = {
   FOUNDER_DB_EDIT: 'founder_db.edit',
   MCP_CONNECT: 'mcp.connect',
   PLAA_ACCESS: 'plaa.access',
+  PLAA_GUEST: 'plaa.guest',
+  PLAA_MEMBER: 'plaa.member',
 } as const;
 
 /**
