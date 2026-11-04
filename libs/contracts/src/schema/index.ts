@@ -40,6 +40,7 @@ export * from './admin-team-pitch';
 export * from './spv-spotlight';
 export * from './demo-day-engagement-analytics';
 export * from './contact-support';
+export * from './intro-request';
 export * from './community-affiliation';
 export * from './job-opening';
 export * from './job-application';

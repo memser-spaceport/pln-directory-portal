@@ -219,6 +219,7 @@ model Member {
   modifiedQuestions                  DiscoveryQuestion[]               @relation("MemberModifiedDiscoveryQuestions")
   subscriptions                      MemberSubscription[]
   closedAsks                         Ask[]
+  introRequests                      IntroRequest[]
   experiences                        MemberExperience[]
   linkedInDetails                    Json?
   recommendationRunsAsTarget         RecommendationRun[]
@@ -1742,6 +1743,27 @@ model ContactSupportRequest {
   reportKind AiAppFeedbackReportKind?
   priority   AiAppFeedbackPriority?
   createdAt  DateTime                 @default(now())
+}
+
+enum IntroRequestType {
+  MEMBER
+  TEAM
+}
+
+model IntroRequest {
+  id                Int              @id @default(autoincrement())
+  uid               String           @unique @default(cuid())
+  requester         Member           @relation(fields: [requesterUid], references: [uid])
+  requesterUid      String
+  type              IntroRequestType
+  targetUid         String
+  text              String
+  telegramMessageId String?
+  /// Held while one worker posts to Telegram. A second worker skips a fresh claim, so the request is not posted twice.
+  telegramClaimedAt DateTime?
+  createdAt         DateTime         @default(now())
+
+  @@index([telegramMessageId, createdAt])
 }
 
 // Push Notification Categories - for real-time WebSocket notifications
