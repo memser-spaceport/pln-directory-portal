@@ -44,12 +44,15 @@ export class MemberSignalsService {
     }
   }
 
-  /** The active member behind a session email, or 401. */
-  async resolveSessionMemberUid(email: string | undefined): Promise<string> {
+  /**
+   * The active member behind a session email; 401 without one, null when the
+   * session has no active directory member (nothing is recorded). Answering 401
+   * there would make the frontend fetch wrapper sign a valid user out.
+   */
+  async resolveSessionMemberUid(email: string | undefined): Promise<string | null> {
     if (!email) throw new UnauthorizedException('Invalid Session. Please login and try again');
     const member = await this.prisma.member.findUnique({ where: { email }, select: { uid: true, deletedAt: true } });
-    if (!member || member.deletedAt) throw new UnauthorizedException('Invalid Session. Please login and try again');
-    return member.uid;
+    return member && !member.deletedAt ? member.uid : null;
   }
 
   private async write({ memberUid, action, entityType, entityUid }: RecordMemberSignalInput): Promise<boolean> {

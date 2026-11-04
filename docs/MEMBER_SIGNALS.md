@@ -52,7 +52,8 @@ schema `MemberSignalBodySchema` in `libs/contracts/src/schema/member-signal.ts`.
 
 Answers: `204` (also when the member is excluded or the view was already logged today), `400` for an unknown action /
 entity type, a pair not in the table, an empty or > 64 character `entityId`, or extra fields; `401` without a valid
-session or member. `view` is kept to one row per member, entity and UTC day; clicks and copies are never deduplicated.
+session. A valid session with no active directory member gets `204` and records nothing: a `401` would make the
+frontend fetch wrapper sign that user out. `view` is kept to one row per member, entity and UTC day; clicks and copies are never deduplicated.
 
 ## Exclusions
 

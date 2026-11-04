@@ -29,6 +29,7 @@ export class MemberSignalsController {
   async recordMemberSignal(@Body() body: unknown, @Req() req: Request & { userEmail?: string }): Promise<void> {
     const signal = parseBody(body);
     const memberUid = await this.memberSignals.resolveSessionMemberUid(req.userEmail);
+    if (!memberUid) return;
     await this.memberSignals.record({
       memberUid,
       action: signal.action,

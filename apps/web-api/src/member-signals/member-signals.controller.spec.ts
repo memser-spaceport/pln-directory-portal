@@ -56,16 +56,24 @@ describe('MemberSignalsController (LAB-3123)', () => {
     );
   });
 
+  it('answers 401 without a session email', async () => {
+    await expect(
+      controller.recordMemberSignal({ action: 'view', entityType: 'member', entityId: 'm9' }, {} as never)
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(record).not.toHaveBeenCalled();
+  });
+
   it.each([
-    ['no session email', undefined, undefined],
-    ['no member for the email', 'ghost@x.io', null],
-    ['a deleted member', 'gone@x.io', { uid: 'm2', deletedAt: new Date() }],
-  ])('answers 401 for %s', async (_label, userEmail, member) => {
+    ['no member for the email', null],
+    ['a deleted member', { uid: 'm2', deletedAt: new Date() }],
+  ])('answers 204 and records nothing for %s, so the frontend never signs a valid user out', async (_label, member) => {
     memberFindUnique.mockResolvedValue(member);
 
     await expect(
-      controller.recordMemberSignal({ action: 'view', entityType: 'member', entityId: 'm9' }, { userEmail } as never)
-    ).rejects.toBeInstanceOf(UnauthorizedException);
+      controller.recordMemberSignal({ action: 'view', entityType: 'member', entityId: 'm9' }, {
+        userEmail: 'pending@x.io',
+      } as never)
+    ).resolves.toBeUndefined();
     expect(record).not.toHaveBeenCalled();
   });
 });
