@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
+import pLimit from 'p-limit';
 import { isExcludedMember } from './member-exclusion';
 import { MemberSignalOwnershipResolver } from './member-signal-ownership';
 import {
@@ -154,11 +155,15 @@ export type BackfillSourceResult = { table: string; scanned: number; skipped: nu
 
 export type BackfillOptions = { apply: boolean; batchSize?: number; log?: (line: string) => void };
 
+const OWNERSHIP_LOOKUP_CONCURRENCY = 10;
+
 export async function runMemberSignalBackfill(
   prisma: PrismaClient,
   { apply, batchSize = 1000, log = () => undefined }: BackfillOptions
 ): Promise<BackfillSourceResult[]> {
   const ownership = new MemberSignalOwnershipResolver(prisma);
+  // Bounded, so a batch never asks for more connections than the Prisma pool has.
+  const limit = pLimit(OWNERSHIP_LOOKUP_CONCURRENCY);
   const excluded = new Map<string, boolean>();
   const results: BackfillSourceResult[] = [];
 
@@ -195,7 +200,9 @@ export async function runMemberSignalBackfill(
       if (kept.length === 0) continue;
 
       const data = await Promise.all(
-        kept.map(async (r) => ({ ...r, own: await ownership.isOwn(r.memberUid, r.entityType, r.entityUid) }))
+        kept.map((r) =>
+          limit(async () => ({ ...r, own: await ownership.isOwn(r.memberUid, r.entityType, r.entityUid) }))
+        )
       );
       if (apply) {
         const { count } = await prisma.memberSignal.createMany({ data, skipDuplicates: true });

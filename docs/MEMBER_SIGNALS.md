@@ -79,3 +79,8 @@ yarn api:backfill-member-signals --apply --batch=500
 
 Re-runnable: rows are keyed by `sourceKey` and inserted with `skipDuplicates`. Records created at or after the first
 live row of the same action are skipped, because the live writer already logged them.
+
+Where to run it: from a repo checkout, with `DATABASE_URL` pointing at the target database through its tunnel. The
+deployed API image holds only the compiled bundle, so the script cannot run inside the pod. Check the database name in
+`DATABASE_URL` before `--apply`: dev, feature envs (`dev_directory_service_lab_<n>`) and prod differ only by name or
+host. Ownership lookups run at most 10 at a time, so a batch stays within the Prisma connection pool over a slow tunnel.
