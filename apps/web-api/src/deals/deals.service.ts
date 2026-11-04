@@ -3,6 +3,7 @@ import { DealIssueStatus, DealStatus, DealSubmissionStatus, Prisma } from '@pris
 import { PrismaService } from '../shared/prisma.service';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
 import { resolveDateWindowCutoff } from '../shared/date-window';
+import { normalizeOfferValue } from './deal-offer-value';
 import {
   ListDealIssuesQueryDto,
   ListDealsQueryDto,
@@ -633,6 +634,7 @@ export class DealsService {
         contact: body.contact,
         status: body.status ?? DealStatus.DRAFT,
         isHighValue: body.isHighValue ?? false,
+        offerValue: normalizeOfferValue(body.offerValue) ?? null,
       },
       include: { logo: { select: { url: true } } },
     });
@@ -657,6 +659,8 @@ export class DealsService {
       throw new NotFoundException('Deal not found');
     }
 
+    const offerValue = normalizeOfferValue(body.offerValue);
+
     const deal = await this.prisma.deal.update({
       where: { uid },
       data: {
@@ -671,6 +675,7 @@ export class DealsService {
         ...(body.contact !== undefined ? { contact: body.contact } : {}),
         ...(body.status !== undefined ? { status: body.status } : {}),
         ...(body.isHighValue !== undefined ? { isHighValue: body.isHighValue } : {}),
+        ...(offerValue !== undefined ? { offerValue } : {}),
       },
       include: { logo: { select: { url: true } } },
     });

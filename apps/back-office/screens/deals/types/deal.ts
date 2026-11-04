@@ -12,6 +12,8 @@ export type Deal = {
   fullDescription: string;
   redemptionInstructions: string;
   isHighValue: boolean;
+  /** Short value shown as a pill on the directory's Home deals rail ("12 mo free"). */
+  offerValue?: string | null;
   status: DealStatus;
   createdAt: string;
   updatedAt: string;
@@ -30,6 +32,7 @@ export type TDealForm = {
   fullDescription: string;
   redemptionInstructions: string;
   isHighValue: boolean;
+  offerValue?: string;
   status: DealStatus;
   /** Set when creating a catalog deal from a submission (Review Deal). */
   submissionUid?: string;
