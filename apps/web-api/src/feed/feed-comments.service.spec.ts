@@ -17,6 +17,7 @@ describe('FeedCommentsService', () => {
   const feedCommentDelete = jest.fn();
   const feedCommentGroupBy = jest.fn();
   const pushCreate = jest.fn();
+  const recordSignal = jest.fn();
 
   const prismaMock = {
     teamNewsItem: { findUnique: teamNewsItemFindUnique },
@@ -36,7 +37,7 @@ describe('FeedCommentsService', () => {
     jest.clearAllMocks();
     teamNewsItemFindUnique.mockResolvedValue({ uid: 'news-1', title: 'Protocol Labs ships X' });
     pushCreate.mockResolvedValue({});
-    service = new FeedCommentsService(prismaMock, { create: pushCreate } as never);
+    service = new FeedCommentsService(prismaMock, { create: pushCreate } as never, { record: recordSignal } as never);
   });
 
   describe('createComment', () => {
@@ -288,6 +289,41 @@ describe('FeedCommentsService', () => {
       });
 
       expect(result.uid).toBe('c1');
+    });
+  });
+
+  describe('member signals (LAB-3121)', () => {
+    it('records news-comment for every comment, replies included', async () => {
+      feedCommentFindFirst.mockResolvedValue({ uid: 'c1', authorUid: 'author-2' });
+      feedCommentCreate.mockResolvedValue({
+        uid: 'c2',
+        newsItemUid: 'news-1',
+        parentUid: null,
+        text: 'hi',
+        authorUid: 'author-1',
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        author: authorInclude,
+      });
+
+      await service.createComment('author-1', { newsItemUid: 'news-1', text: 'hi' });
+      await service.createComment('author-1', { newsItemUid: 'news-1', parentUid: 'c1', text: 'again' });
+
+      expect(recordSignal).toHaveBeenCalledTimes(2);
+      expect(recordSignal).toHaveBeenCalledWith({
+        memberUid: 'author-1',
+        action: 'news-comment',
+        entityType: 'NEWS_ITEM',
+        entityUid: 'news-1',
+      });
+    });
+
+    it('records nothing when a comment is deleted', async () => {
+      feedCommentFindUnique.mockResolvedValue({ uid: 'c1', authorUid: 'author-1' });
+      feedCommentDelete.mockResolvedValue({});
+
+      await service.deleteComment('author-1', 'c1');
+
+      expect(recordSignal).not.toHaveBeenCalled();
     });
   });
 

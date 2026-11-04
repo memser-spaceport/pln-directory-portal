@@ -51,6 +51,8 @@ export * from './team-news';
 export * from './network-overview';
 export * from './roadmap';
 export * from './follow';
+export * from './member-signal';
+export * from './member-interest-profile';
 export * from './feed';
 export * from './pl-infra-members';
 export * from './job-match';

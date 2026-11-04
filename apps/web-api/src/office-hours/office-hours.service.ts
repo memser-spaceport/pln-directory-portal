@@ -26,6 +26,7 @@ import { isAllowedOgPageUrl, resolvePublicAddresses } from '../utils/og-image';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { MembersService } from '../members/members.service';
 import { MemberInteractionAdjustmentsService } from '../member-interaction-adjustments/member-interaction-adjustments.service';
+import { MemberSignalsService } from '../member-signals/member-signals.service';
 
 const OH_LINK_MAX_REDIRECTS = 5;
 const OH_LINK_TIMEOUT_MS = 8000;
@@ -58,12 +59,13 @@ export class OfficeHoursService {
     private readonly notificationClient: NotificationServiceClient,
     @Inject(forwardRef(() => MembersService))
     private readonly membersService: MembersService,
-    private readonly adjustmentsService: MemberInteractionAdjustmentsService
+    private readonly adjustmentsService: MemberInteractionAdjustmentsService,
+    private readonly memberSignals: MemberSignalsService
   ) {}
 
   async createInteraction(interaction: Prisma.MemberInteractionUncheckedCreateInput, loggedInMember) {
     try {
-      return this.prisma.$transaction(async (tx) => {
+      const booking = this.prisma.$transaction(async (tx) => {
         const result = await tx.memberInteraction.create({
           data: {
             ...interaction,
@@ -85,9 +87,25 @@ export class OfficeHoursService {
         }
         return result;
       });
+      return booking.then((result) => this.recordBookingIntent(result));
     } catch (exception) {
       this.handleErrors(exception);
     }
+  }
+
+  /** After the booking committed: a SCHEDULE_MEETING with a target member is an office hours booking intent. */
+  private recordBookingIntent<T extends { type: string; sourceMemberUid: string; targetMemberUid: string | null }>(
+    result: T
+  ): T {
+    if (result?.type === 'SCHEDULE_MEETING' && result.targetMemberUid && result.sourceMemberUid) {
+      void this.memberSignals.record({
+        memberUid: result.sourceMemberUid,
+        action: 'office-hours-booking-intent',
+        entityType: 'MEMBER',
+        entityUid: result.targetMemberUid,
+      });
+    }
+    return result;
   }
 
   async findInteractions(queryOptions: Prisma.MemberInteractionFindManyArgs) {

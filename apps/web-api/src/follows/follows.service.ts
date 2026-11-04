@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { FollowEntityType, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
+import { MemberSignalsService } from '../member-signals/member-signals.service';
 import type {
   FollowStatusResponse,
   FollowedTeamsQuery,
@@ -19,23 +20,25 @@ import type {
 export class FollowsService {
   private readonly logger = new Logger(FollowsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly memberSignals: MemberSignalsService) {}
 
   /** Follow a team. Idempotent: re-following an already-followed team succeeds. */
   async followTeam(memberUid: string, teamUid: string): Promise<FollowStatusResponse> {
     await this.assertTeamExists(teamUid);
 
+    const key = { memberUid, entityType: FollowEntityType.TEAM, entityUid: teamUid };
+    const existing = await this.prisma.follow.findUnique({
+      where: { memberUid_entityType_entityUid: key },
+      select: { id: true },
+    });
     await this.prisma.follow.upsert({
-      where: {
-        memberUid_entityType_entityUid: {
-          memberUid,
-          entityType: FollowEntityType.TEAM,
-          entityUid: teamUid,
-        },
-      },
-      create: { memberUid, entityType: FollowEntityType.TEAM, entityUid: teamUid },
+      where: { memberUid_entityType_entityUid: key },
+      create: key,
       update: {},
     });
+    if (!existing) {
+      void this.memberSignals.record({ memberUid, action: 'follow', entityType: 'TEAM', entityUid: teamUid });
+    }
 
     return this.buildStatus(teamUid, true);
   }
@@ -44,9 +47,12 @@ export class FollowsService {
   async unfollowTeam(memberUid: string, teamUid: string): Promise<FollowStatusResponse> {
     await this.assertTeamExists(teamUid);
 
-    await this.prisma.follow.deleteMany({
+    const { count } = await this.prisma.follow.deleteMany({
       where: { memberUid, entityType: FollowEntityType.TEAM, entityUid: teamUid },
     });
+    if (count > 0) {
+      void this.memberSignals.record({ memberUid, action: 'unfollow', entityType: 'TEAM', entityUid: teamUid });
+    }
 
     return this.buildStatus(teamUid, false);
   }

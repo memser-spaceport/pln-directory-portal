@@ -82,6 +82,8 @@ import { NetworkOverviewModule } from './network-overview/network-overview.modul
 import { PlInfraMembersModule } from './pl-infra-members/pl-infra-members.module';
 import { FeedModule } from './feed/feed.module';
 import { FollowsModule } from './follows/follows.module';
+import { MemberSignalsModule } from './member-signals/member-signals.module';
+import { MemberInterestProfileModule } from './member-interest-profile/member-interest-profile.module';
 import { InvestorOutreachModule } from './investor-outreach/investor-outreach.module';
 import { PathfinderModule } from './pathfinder/pathfinder.module';
 import { MasterProfileModule } from './master-profile/master-profile.module';
@@ -195,6 +197,8 @@ import { McpModule } from './mcp/mcp.module';
     PlInfraMembersModule,
     FeedModule,
     FollowsModule,
+    MemberSignalsModule,
+    MemberInterestProfileModule,
     InvestorOutreachModule,
     PathfinderModule,
     MasterProfileModule,

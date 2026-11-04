@@ -410,6 +410,12 @@ export const ANALYTICS_EVENTS = {
     /** A lead turned the suggested-candidates email off through the email's unsubscribe link (LAB-2853). */
     SUGGESTED_CANDIDATES_EMAIL_UNSUBSCRIBED: 'suggested-candidates-email-unsubscribed',
   },
+  PERSONALIZATION: {
+    /** One row added to the member signal log (LAB-3121, LAB-3123). */
+    MEMBER_SIGNAL_RECORDED: 'member-signal-recorded',
+    /** One member interest profile rebuild finished (LAB-3122). */
+    MEMBER_INTEREST_PROFILE_COMPUTED: 'member-interest-profile-computed',
+  },
 };
 
 export const ANALYTICS_SOURCE = 'directory-backend';

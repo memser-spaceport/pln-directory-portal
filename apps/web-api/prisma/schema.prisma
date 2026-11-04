@@ -310,6 +310,8 @@ model Member {
   memberEnrichment  MemberEnrichment?
   mcpAuthorizations McpAuthorization[]
   cvImport          MemberCvImport?
+  memberSignals     MemberSignal[]
+  interestProfile   MemberInterestProfileEntry[]
 }
 
 model MemberApproval {
@@ -4868,4 +4870,62 @@ model WarmIntrosV2Run {
   @@index([status, lockedUntil])
   @@index([startedAt])
   @@index([investorProfileUid])
+}
+
+/// Append-only log of a logged-in member's actions (LAB-3121, LAB-3123). Rows are
+/// never updated or deleted, except by the member cascade. `action` and
+/// `entityType` are text checked against constants in `member-signals.constants.ts`.
+model MemberSignal {
+  id         Int      @id @default(autoincrement())
+  uid        String   @unique @default(cuid())
+  memberUid  String
+  member     Member   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  action     String
+  /// TEAM | MEMBER | PROJECT | NEWS_ITEM | JOB_OPENING
+  entityType String
+  entityUid  String
+  /// The entity is the member, one of the member's teams, or something they own.
+  own        Boolean  @default(false)
+  /// `backfill:<table>:<record uid>` for backfilled rows; null for live rows.
+  sourceKey  String?  @unique
+  createdAt  DateTime @default(now())
+
+  @@index([memberUid, createdAt])
+  @@index([entityType, entityUid])
+  @@index([memberUid, action, entityType, entityUid, createdAt])
+}
+
+/// One scored key of a member's interest profile (LAB-3122). Rebuilt by the
+/// daily job from the member signal log and declared interests; read by admins
+/// only until the LAB-3124 pilot passes.
+model MemberInterestProfileEntry {
+  id        Int      @id @default(autoincrement())
+  memberUid String
+  member    Member   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  /// TOPIC | ENTITY | EXPERTISE
+  kind      String
+  /// Focus-area slug (TOPIC, EXPERTISE) or `<TEAM|MEMBER|PROJECT>:<uid>` (ENTITY).
+  key       String
+  score     Float
+  updatedAt DateTime @updatedAt
+
+  @@unique([memberUid, kind, key])
+  @@index([kind, key])
+}
+
+/// One member interest profile rebuild (LAB-3122). Also serializes rebuilds
+/// across API instances: a RUNNING row blocks a second one.
+model MemberInterestProfileRun {
+  id            Int       @id @default(autoincrement())
+  /// CRON | ADMIN
+  trigger       String
+  /// RUNNING | DONE | FAILED
+  status        String
+  startedAt     DateTime  @default(now())
+  finishedAt    DateTime?
+  membersCount  Int?
+  nonEmptyCount Int?
+  error         String?
+
+  @@index([status, startedAt])
 }
