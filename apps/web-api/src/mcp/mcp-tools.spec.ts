@@ -213,7 +213,7 @@ describe('scope registry', () => {
     const writesByName = fullCatalog
       .map((t) => t.name)
       .filter((name) =>
-        /^(update|submit|post|rsvp|cancel|join|leave|add|delete|follow|unfollow|save|unsave|set|mark|unmark|report|like|unlike|redeploy|rename|create|upvote|remove|request|refer|apply|close|review|accept|express|contact|regenerate|clear|resolve|pin|unpin|reply|start)_/.test(
+        /^(update|submit|post|rsvp|cancel|join|leave|add|delete|follow|unfollow|save|unsave|set|mark|unmark|report|like|unlike|redeploy|rename|create|upvote|remove|request|refer|apply|close|review|accept|express|contact|regenerate|clear|resolve|pin|unpin|reply|start|edit)_/.test(
           name
         )
       );
@@ -246,6 +246,8 @@ describe('scope registry', () => {
       ...reads,
       'start_forum_thread',
       'reply_to_forum_thread',
+      'edit_forum_post',
+      'delete_forum_post',
     ]);
   });
 

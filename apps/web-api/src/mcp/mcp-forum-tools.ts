@@ -5,8 +5,8 @@ import { decodeHtmlEntities } from '../utils/html-entities';
 import { McpActorContext, McpToolDef } from './mcp-tools';
 
 /**
- * Forum tools (LAB-3031): an agent searches and reads threads, lists categories, starts threads and replies in NodeBB
- * as the member who connected it. Every call mints a one-time member proof for this connection (LAB-3075) and sends it
+ * Forum tools (LAB-3031): an agent searches and reads threads, lists categories, starts threads, replies, and edits or
+ * deletes the member's own posts (LAB-3144, LAB-3145) in NodeBB as the member who connected it. Every call mints a one-time member proof for this connection (LAB-3075) and sends it
  * to NodeBB in `X-PL-Member-Proof`; NodeBB redeems it, runs that one request as the member under the member's own
  * forum privileges, and stores which agent wrote the post. No session outlives the request, so a disconnected agent
  * can't post: no proof is issued for it.
@@ -100,7 +100,13 @@ export function forumError(status: number | undefined, data: unknown, cause?: un
 }
 
 /** One request to NodeBB as the member behind this connection. Returns NodeBB's `response` payload. */
-async function callForum(proofs: ProofIssuer, ctx: McpActorContext, method: 'GET' | 'POST', path: string, body?: Row) {
+async function callForum(
+  proofs: ProofIssuer,
+  ctx: McpActorContext,
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  path: string,
+  body?: Row
+) {
   const base = forumApiUrl();
   const audience = forumProofAudience();
   if (!base || !audience) {
@@ -377,6 +383,15 @@ export function forumThread(payload: Row): Row {
   };
 }
 
+/** A post id from the agent, checked before a proof is minted: it goes into the NodeBB path. */
+function forumPostId(value: unknown): number {
+  const pid = Number(value);
+  if (!Number.isInteger(pid) || pid < 1) {
+    throw new BadRequestException(`Forum post pid is a positive number, got: ${String(value)}`);
+  }
+  return pid;
+}
+
 export function forumTools(proofs: ProofIssuer): McpToolDef[] {
   return [
     {
@@ -535,6 +550,54 @@ export function forumTools(proofs: ProofIssuer): McpToolDef[] {
             ...(cid !== undefined ? { cid, url: forumThreadUrl(cid, tid) } : {}),
           },
         };
+      },
+    },
+    {
+      name: 'edit_forum_post',
+      description:
+        "Edit one of the member's own LabOS forum posts: a thread's opening post or a reply (pid from " +
+        'get_forum_thread). content is Markdown and replaces the whole post; title renames the thread and applies only ' +
+        "to a thread's opening post. Only the member's own posts can be edited, and only what the member asked you to.",
+      visibility: 'forum_write',
+      inputSchema: {
+        pid: z.number().int().positive().describe('Post id (pid) from get_forum_thread'),
+        content: z.string().trim().min(1).max(CONTENT_MAX).describe('The whole new post, Markdown'),
+        title: z.string().trim().min(1).max(TITLE_MAX).optional().describe('New thread title (opening post only)'),
+      },
+      execute: async (ctx, args = {}) => {
+        const pid = forumPostId(args.pid);
+        const edited = await callForum(proofs, ctx, 'PUT', `/api/v3/posts/${pid}`, {
+          content: args.content,
+          ...(typeof args.title === 'string' && args.title.trim() ? { title: args.title } : {}),
+        });
+        const topic = (edited.topic ?? {}) as Row;
+        const tid = asNumber(edited.tid) ?? asNumber(topic.tid);
+        const cid = asNumber(topic.cid);
+        return {
+          edited: {
+            pid,
+            ...(tid !== undefined ? { tid } : {}),
+            ...(forumText(topic.title) ? { title: forumText(topic.title) } : {}),
+            ...(tid !== undefined && cid !== undefined ? { cid, url: forumThreadUrl(cid, tid) } : {}),
+          },
+        };
+      },
+    },
+    {
+      name: 'delete_forum_post',
+      description:
+        "Delete one of the member's own LabOS forum posts (pid from get_forum_thread). It is a soft delete: the post " +
+        'disappears for members, and forum moderators can restore it. Deleting the opening post of a thread with no ' +
+        "replies deletes the thread. Only the member's own posts can be deleted. Confirm with the member before you " +
+        'delete.',
+      visibility: 'forum_write',
+      inputSchema: {
+        pid: z.number().int().positive().describe('Post id (pid) from get_forum_thread'),
+      },
+      execute: async (ctx, args = {}) => {
+        const pid = forumPostId(args.pid);
+        await callForum(proofs, ctx, 'DELETE', `/api/v3/posts/${pid}/state`);
+        return { deleted: { pid } };
       },
     },
   ];

@@ -131,6 +131,12 @@ export const MCP_TOOL_PROPERTY_BUILDERS: Readonly<Record<string, McpToolProperty
     const posted = result?.posted as Record<string, unknown> | undefined;
     return { tid: numberProp(args.tid), pid: numberProp(posted?.pid), toPid: numberProp(args.toPid) };
   },
+  // Ids only, never the new text (LAB-3144).
+  edit_forum_post: (args, result) => {
+    const edited = result?.edited as Record<string, unknown> | undefined;
+    return { pid: numberProp(args.pid), tid: numberProp(edited?.tid), titleChanged: typeof args.title === 'string' };
+  },
+  delete_forum_post: (args) => ({ pid: numberProp(args.pid) }),
 
   list_news: (args, result) => ({
     feed: stringProp(result?.feed) ?? stringProp(args.feed) ?? 'latest',
