@@ -435,6 +435,7 @@ describe('forum tools (LAB-3031)', () => {
     const topic = (tid: number, extra: Record<string, unknown> = {}) => ({
       tid,
       cid: 2,
+      mainPid: tid * 10,
       title: `Topic ${tid} &amp; more`,
       slug: `${tid}/topic-${tid}`,
       postcount: 3,
@@ -476,6 +477,7 @@ describe('forum tools (LAB-3031)', () => {
             topicUrl: 'https://labos.example/forum/topics/2/4',
             replyCount: 2,
             cid: 2,
+            mainPid: 40,
             author: 'Ada & Co',
             createdAt: '2026-11-03T10:00:00.000Z',
             lastActivityAt: '2026-11-04T10:00:00.000Z',
@@ -492,6 +494,39 @@ describe('forum tools (LAB-3031)', () => {
         threadCount: 41,
         sort: 'recently_created',
       });
+    });
+
+    it('fills the snippet of a thread with no replies from its opening post, and tolerates a failed read', async () => {
+      const { proofs, tools } = build();
+      request.mockImplementation(async (url: string) => {
+        if (url.includes('/api/category/')) {
+          return answer(
+            200,
+            category([topic(4), topic(5, { teaser: null, postcount: 1 }), topic(6, { teaser: null, postcount: 1 })])
+          );
+        }
+        if (url.endsWith('/api/v3/posts/50/summary')) {
+          return answer(200, { status: { code: 'ok' }, response: { pid: 50, content: '<p>Opening &amp; post</p>' } });
+        }
+        return answer(500, {});
+      });
+
+      const result = await tools.list_forum_threads.execute(CTX, { cid: 2 });
+
+      const urls = request.mock.calls.map(([url]) => url);
+      expect(urls).toEqual([
+        'https://forum.example/api/category/2?page=1&sort=recently_created',
+        'https://forum.example/api/v3/posts/50/summary',
+        'https://forum.example/api/v3/posts/60/summary',
+      ]);
+      expect(proofs.issueForAuthorization).toHaveBeenCalledTimes(3);
+      expect(
+        (result.threads as { uid: string; snippet: string | null }[]).map(({ uid, snippet }) => ({ uid, snippet }))
+      ).toEqual([
+        { uid: '4', snippet: 'Latest reply "here"' },
+        { uid: '5', snippet: 'Opening & post' },
+        { uid: '6', snippet: null },
+      ]);
     });
 
     it('asks NodeBB for the page and sort the agent chose', async () => {
