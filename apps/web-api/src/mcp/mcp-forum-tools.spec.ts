@@ -96,6 +96,76 @@ describe('forum tools (LAB-3031)', () => {
     expect(result).toEqual({ posted: { pid: 7, tid: 42, cid: 2, url: 'https://labos.example/forum/topics/2/42' } });
   });
 
+  it("edits the member's own post: new content, and a new title for a thread's opening post", async () => {
+    const { proofs, tools } = build();
+    request.mockResolvedValue(
+      answer(200, { response: { pid: 100, tid: 42, topic: { tid: 42, cid: 2, title: 'Q&amp;A, renamed' } } })
+    );
+
+    const result = await tools.edit_forum_post.execute(CTX, { pid: 100, content: 'Fixed typo', title: 'Q&A, renamed' });
+
+    expect(proofs.issueForAuthorization).toHaveBeenCalledWith('auth-1', 'key-nodebb', 'forum');
+    expect(call()).toEqual({
+      method: 'PUT',
+      url: 'https://forum.example/api/v3/posts/100',
+      data: { content: 'Fixed typo', title: 'Q&A, renamed' },
+      headers: { [FORUM_PROOF_HEADER]: 'mcp_mp_abc', 'Content-Type': 'application/json' },
+    });
+    expect(result).toEqual({
+      edited: { pid: 100, tid: 42, title: 'Q&A, renamed', cid: 2, url: 'https://labos.example/forum/topics/2/42' },
+    });
+  });
+
+  it('edits a reply without sending a title', async () => {
+    const { tools } = build();
+    request.mockResolvedValue(answer(200, { response: { pid: 7, tid: 42, topic: { tid: 42, cid: 2 } } }));
+
+    await tools.edit_forum_post.execute(CTX, { pid: 7, content: 'Better reply' });
+
+    expect(call().data).toEqual({ content: 'Better reply' });
+  });
+
+  it("soft-deletes the member's own post", async () => {
+    const { proofs, tools } = build();
+    request.mockResolvedValue(answer(200, { status: { code: 'ok' }, response: {} }));
+
+    const result = await tools.delete_forum_post.execute(CTX, { pid: 7 });
+
+    expect(proofs.issueForAuthorization).toHaveBeenCalledWith('auth-1', 'key-nodebb', 'forum');
+    expect(call()).toEqual({
+      method: 'DELETE',
+      url: 'https://forum.example/api/v3/posts/7/state',
+      data: undefined,
+      headers: { [FORUM_PROOF_HEADER]: 'mcp_mp_abc', 'Content-Type': 'application/json' },
+    });
+    expect(result).toEqual({ deleted: { pid: 7 } });
+  });
+
+  it("passes NodeBB's refusal through when the post is not the member's own", async () => {
+    const { tools } = build();
+    const refusal = { error: "Agents can only edit or delete the member's own posts" };
+    request.mockResolvedValueOnce(answer(403, refusal)).mockResolvedValueOnce(answer(403, refusal));
+
+    await expect(tools.edit_forum_post.execute(CTX, { pid: 6, content: 'x' })).rejects.toThrow(
+      "Agents can only edit or delete the member's own posts"
+    );
+    await expect(tools.delete_forum_post.execute(CTX, { pid: 6 })).rejects.toThrow(
+      "Agents can only edit or delete the member's own posts"
+    );
+  });
+
+  it('refuses a pid that is not a post id without minting a proof', async () => {
+    const { proofs, tools } = build();
+    for (const pid of ['7/../../api/admin', 0, -3, 2.5]) {
+      await expect(tools.delete_forum_post.execute(CTX, { pid })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(tools.edit_forum_post.execute(CTX, { pid, content: 'x' })).rejects.toBeInstanceOf(
+        BadRequestException
+      );
+    }
+    expect(proofs.issueForAuthorization).not.toHaveBeenCalled();
+    expect(request).not.toHaveBeenCalled();
+  });
+
   it('mints a new proof for every call: a proof redeems once', async () => {
     const { proofs, tools } = build();
     request.mockResolvedValue(answer(200, { response: { pid: 7 } }));

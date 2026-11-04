@@ -30,6 +30,8 @@ export const MCP_TOOL_SCOPES: Readonly<Record<string, McpToolScope>> = {
   list_forum_categories: { scope: 'forum', level: 'read' },
   start_forum_thread: { scope: 'forum', level: 'write' },
   reply_to_forum_thread: { scope: 'forum', level: 'write' },
+  edit_forum_post: { scope: 'forum', level: 'write' },
+  delete_forum_post: { scope: 'forum', level: 'write' },
 
   list_news: { scope: 'news', level: 'read' },
   get_news_item: { scope: 'news', level: 'read' },
