@@ -29,6 +29,15 @@ const SEARCH_POSTS_PER_THREAD = 3;
 const SEARCH_POSTS_MAX = 100;
 const SEARCH_QUERY_MAX = 200;
 const SNIPPET_MAX = 240;
+/** NodeBB's category sorts. The Directory forum opens on recently created, so the agent does too. */
+export const FORUM_THREAD_SORTS = [
+  'recently_created',
+  'recently_replied',
+  'most_posts',
+  'most_votes',
+  'most_views',
+] as const;
+const LIST_PAGE_MAX = 1000;
 
 const NOT_SET_UP = 'Agents cannot use the forum on this LabOS environment yet.';
 const FORUM_DOWN = 'The forum did not answer. Try again later.';
@@ -244,6 +253,51 @@ export function forumThreadRows(payload: Row, limit: number): ForumThreadRow[] {
 }
 
 /**
+ * One page of a NodeBB category as the agent sees it: its threads in the order NodeBB sorted them, pinned ones first
+ * as NodeBB puts them. NodeBB sends one page (the member's topics-per-page setting, 20 by default). The snippet is the
+ * thread's teaser, its latest post. Deleted threads are left out.
+ */
+export function forumCategoryThreads(payload: Row, page: number, sort: string) {
+  const cid = asNumber(payload.cid);
+  if (cid === undefined) {
+    throw new NotFoundException('Forum category not found');
+  }
+  const topics = Array.isArray(payload.topics) ? (payload.topics as Row[]) : [];
+  const threads = topics
+    .filter((topic) => topic && !topic.deleted && asNumber(topic.tid) !== undefined)
+    .map((topic) => {
+      const tid = asNumber(topic.tid) as number;
+      const user = (topic.user ?? {}) as Row;
+      const teaser = (topic.teaser ?? {}) as Row;
+      return {
+        uid: String(tid),
+        topicTitle: forumText(topic.title),
+        topicSlug: typeof topic.slug === 'string' ? topic.slug : null,
+        topicUrl: forumThreadUrl(cid, tid),
+        replyCount: Math.max(0, (asNumber(topic.postcount) ?? 1) - 1),
+        cid,
+        author: forumText(user.displayname) || forumText(user.username) || null,
+        createdAt: typeof topic.timestampISO === 'string' ? topic.timestampISO : null,
+        lastActivityAt: typeof topic.lastposttimeISO === 'string' ? topic.lastposttimeISO : null,
+        pinned: Boolean(topic.pinned),
+        locked: Boolean(topic.locked),
+        upvotes: asNumber(topic.upvotes) ?? 0,
+        views: asNumber(topic.viewcount) ?? 0,
+        snippet: snippetOf(teaser.content),
+      };
+    });
+  const pagination = (payload.pagination ?? {}) as Row;
+  return {
+    category: { cid, name: forumText(payload.name) },
+    threads,
+    page,
+    pageCount: asNumber(pagination.pageCount) ?? 1,
+    threadCount: asNumber(payload.topic_count) ?? threads.length,
+    sort,
+  };
+}
+
+/**
  * A NodeBB topic page as the agent sees it: the thread, then its posts as plain text, oldest first. NodeBB sends one
  * page of posts (the member's posts-per-page setting, 20 by default); `truncated` says the thread has more.
  */
@@ -334,10 +388,43 @@ export function forumTools(proofs: ProofIssuer): McpToolDef[] {
       },
     },
     {
+      name: 'list_forum_threads',
+      description:
+        'List the threads in one LabOS forum category (cid from list_forum_categories), one page at a time, newest ' +
+        'first by default. Each row: uid (the thread id, tid), topicTitle, topicUrl, replyCount, author, createdAt, ' +
+        'lastActivityAt, pinned, locked, upvotes, views, and a snippet of the latest post. Returns page, pageCount ' +
+        'and threadCount; ask for the next page while page < pageCount. Then call get_forum_thread with a uid for ' +
+        'the whole thread.',
+      visibility: 'forum',
+      inputSchema: {
+        cid: z.number().int().positive().describe('Category id from list_forum_categories'),
+        page: z.number().int().min(1).max(LIST_PAGE_MAX).optional().describe('Page, from 1 (default 1)'),
+        sort: z
+          .enum(FORUM_THREAD_SORTS)
+          .optional()
+          .describe(
+            'Order (default recently_created): recently_created, recently_replied, most_posts, most_votes, most_views'
+          ),
+      },
+      execute: async (ctx, args = {}) => {
+        const cid = Number(args.cid);
+        if (!Number.isInteger(cid) || cid < 1) {
+          throw new BadRequestException(`Forum category cid is a positive number, got: ${String(args.cid)}`);
+        }
+        const page = Math.min(Math.max(Math.trunc(asNumber(args.page) ?? 1), 1), LIST_PAGE_MAX);
+        const sort = (FORUM_THREAD_SORTS as readonly string[]).includes(String(args.sort))
+          ? String(args.sort)
+          : FORUM_THREAD_SORTS[0];
+        const query = new URLSearchParams({ page: String(page), sort });
+        const found = await callForum(proofs, ctx, 'GET', `/api/category/${cid}?${query.toString()}`);
+        return forumCategoryThreads(found, page, sort);
+      },
+    },
+    {
       name: 'list_forum_categories',
       description:
-        'List the LabOS forum categories this member can see, with their cid. Call it before start_forum_thread to ' +
-        'pick a category.',
+        'List the LabOS forum categories this member can see, with their cid. Call it before list_forum_threads to ' +
+        'browse a category, or before start_forum_thread to pick one.',
       visibility: 'forum',
       execute: async (ctx) => ({
         categories: forumCategories(await callForum(proofs, ctx, 'GET', '/api/v3/categories')),
