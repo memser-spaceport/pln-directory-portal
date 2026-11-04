@@ -261,9 +261,14 @@ The `ai_apps` scope SHALL also offer `redeploy_ai_app`, `rename_ai_app` and `upd
 - **WHEN** an agent of a member who did not create the app, and is not a directory admin, calls `redeploy_ai_app`
 - **THEN** the call fails as not allowed and no deploy starts
 
-### Requirement: Agents start forum threads and reply as the member
+### Requirement: Agents read the forum, start threads and reply as the member
 
-The `forum` scope SHALL offer `list_forum_categories` at `read` and `start_forum_thread` and `reply_to_forum_thread` at `write`. The posting tools SHALL be listed only to members with `forum.write`. Each call SHALL get a new one-time member proof with scope `forum` for the calling connection, audience `FORUM_MEMBER_PROOF_AUDIENCE`, and SHALL send it to NodeBB at `FORUM_API_URL` in `X-PL-Member-Proof` as the only credential, so NodeBB posts under the member's own account and forum privileges. A revoked connection, or one whose `forum` level does not allow the call, SHALL get no proof and SHALL NOT reach NodeBB. When either variable is unset, or the audience is not a live key, the tools SHALL refuse with "Agents cannot post to the forum on this LabOS environment yet." without calling NodeBB. A NodeBB refusal SHALL reach the agent in NodeBB's words; a NodeBB 5xx, timeout or network failure SHALL tell the agent to try again later. `list_forum_categories` SHALL return only real, enabled categories (no links, no `uncategorized`). A post SHALL return its ids and its LabOS forum URL. Agents SHALL NOT edit or delete forum posts.
+The `forum` scope SHALL offer `search_forum_threads`, `get_forum_thread` and `list_forum_categories` at `read` and `start_forum_thread` and `reply_to_forum_thread` at `write`. The posting tools SHALL be listed only to members with `forum.write`. Each call SHALL get a new one-time member proof with scope `forum` for the calling connection, audience `FORUM_MEMBER_PROOF_AUDIENCE`, and SHALL send it to NodeBB at `FORUM_API_URL` in `X-PL-Member-Proof` as the only credential, so NodeBB reads and posts under the member's own account and forum privileges. The read tools SHALL read from NodeBB, not from the OpenSearch `forum_thread` index, so an agent sees only what the member may read and a new thread is readable at once. A revoked connection, or one whose `forum` level does not allow the call, SHALL get no proof and SHALL NOT reach NodeBB. When either variable is unset, or the audience is not a live key, the tools SHALL refuse with "Agents cannot use the forum on this LabOS environment yet." without calling NodeBB. A NodeBB refusal SHALL reach the agent in NodeBB's words; a NodeBB 5xx, timeout or network failure SHALL tell the agent to try again later. `search_forum_threads` SHALL return one row per thread, best match first, leaving out deleted posts and threads. `get_forum_thread` SHALL take a numeric thread id and return the thread with its non-deleted posts as plain text, oldest first, one NodeBB page at most, with `truncated` set when the thread has more. `list_forum_categories` SHALL return only real, enabled categories (no links, no `uncategorized`). A post SHALL return its ids and its LabOS forum URL. Agents SHALL NOT edit or delete forum posts.
+
+#### Scenario: Read a thread just posted
+
+- **WHEN** an agent with `forum: read` calls `get_forum_thread` with the `tid` of a thread posted a moment ago
+- **THEN** LabOS issues a forum proof for that connection, NodeBB returns the thread as the member sees it, and the agent gets its posts as plain text
 
 #### Scenario: Reply in a thread
 
@@ -278,7 +283,7 @@ The `forum` scope SHALL offer `list_forum_categories` at `read` and `start_forum
 #### Scenario: Environment not set up
 
 - **WHEN** `FORUM_MEMBER_PROOF_AUDIENCE` is unset
-- **THEN** `start_forum_thread` refuses with "Agents cannot post to the forum on this LabOS environment yet." and no proof is issued
+- **THEN** `start_forum_thread` and `search_forum_threads` refuse with "Agents cannot use the forum on this LabOS environment yet." and no proof is issued
 
 ### Requirement: Agent writes are rate limited per member
 

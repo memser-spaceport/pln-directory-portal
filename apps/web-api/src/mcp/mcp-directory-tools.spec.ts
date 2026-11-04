@@ -4,7 +4,7 @@ import { MembersService } from '../members/members.service';
 import { TeamsService } from '../teams/teams.service';
 import { ProjectsService } from '../projects/projects.service';
 import { PLEventsService } from '../pl-events/pl-events.service';
-import { SearchService } from '../search/search.service';
+import { forumTools } from './mcp-forum-tools';
 import { compactMemberRow, compactTeamRow, compactProjectRow, compactEventRow } from './mcp-directory-viewer';
 import { directoryTools } from './mcp-directory-tools';
 import { McpActorContext, toolsForPermissions, WHOAMI_TOOL } from './mcp-tools';
@@ -104,8 +104,7 @@ describe('directoryTools get_member permission parity', () => {
   const teams = {} as unknown as TeamsService;
   const projects = {} as unknown as ProjectsService;
   const events = {} as unknown as PLEventsService;
-  const search = {} as unknown as SearchService;
-  const catalog = directoryTools(members, teams, projects, events, search);
+  const catalog = directoryTools(members, teams, projects, events);
 
   beforeEach(() => jest.clearAllMocks());
 
@@ -142,8 +141,7 @@ describe('directoryTools get_team permission parity', () => {
   const teams = { searchTeams: jest.fn(), findTeamByUid: jest.fn() } as unknown as TeamsService;
   const projects = {} as unknown as ProjectsService;
   const events = {} as unknown as PLEventsService;
-  const search = {} as unknown as SearchService;
-  const catalog = directoryTools(members, teams, projects, events, search);
+  const catalog = directoryTools(members, teams, projects, events);
 
   it('throws ForbiddenException for an L0 team when the actor is not a member/admin, same as REST', async () => {
     (teams.findTeamByUid as jest.Mock).mockRejectedValue(new ForbiddenException('Team is inactive'));
@@ -160,8 +158,7 @@ describe('directoryTools get_project respects isDeleted', () => {
   const teams = {} as unknown as TeamsService;
   const projects = { searchProjects: jest.fn(), getProjectByUid: jest.fn() } as unknown as ProjectsService;
   const events = {} as unknown as PLEventsService;
-  const search = {} as unknown as SearchService;
-  const catalog = directoryTools(members, teams, projects, events, search);
+  const catalog = directoryTools(members, teams, projects, events);
 
   it('throws NotFoundException for a soft-deleted project, same as REST', async () => {
     (projects.getProjectByUid as jest.Mock).mockResolvedValue({ uid: 'p1', isDeleted: true });
@@ -177,8 +174,7 @@ describe('directoryTools get_event', () => {
   const teams = {} as unknown as TeamsService;
   const projects = {} as unknown as ProjectsService;
   const events = { searchPLEvents: jest.fn(), getPLEventForViewer: jest.fn() } as unknown as PLEventsService;
-  const search = {} as unknown as SearchService;
-  const catalog = directoryTools(members, teams, projects, events, search);
+  const catalog = directoryTools(members, teams, projects, events);
 
   it('applies guest telegram preference hiding via getPLEventForViewer as an authenticated viewer', async () => {
     const eventWithGuests = {
@@ -196,13 +192,12 @@ describe('directoryTools get_event', () => {
   });
 });
 
-describe('directoryTools forum visibility', () => {
+describe('forum read tool visibility', () => {
   const members = {} as unknown as MembersService;
   const teams = {} as unknown as TeamsService;
   const projects = {} as unknown as ProjectsService;
   const events = {} as unknown as PLEventsService;
-  const search = { searchForumPosts: jest.fn(), getForumThreadByUid: jest.fn() } as unknown as SearchService;
-  const catalog = [WHOAMI_TOOL, ...directoryTools(members, teams, projects, events, search)];
+  const catalog = [WHOAMI_TOOL, ...directoryTools(members, teams, projects, events), ...forumTools({} as any)];
 
   it('hides forum tools without forum.read', () => {
     const visible = toolsForPermissions(new Set<string>(), catalog).map((t) => t.name);
@@ -235,7 +230,7 @@ describe('directoryTools search tools return whitelisted compact rows', () => {
         ],
       }),
     } as unknown as MembersService;
-    const catalog = directoryTools(members, {} as any, {} as any, {} as any, {} as any);
+    const catalog = directoryTools(members, {} as any, {} as any, {} as any);
 
     const result = await tool(catalog, 'search_members').execute(ctxFor('actor-1'), { q: 'alice' });
     const results = result.results as Record<string, unknown>[];

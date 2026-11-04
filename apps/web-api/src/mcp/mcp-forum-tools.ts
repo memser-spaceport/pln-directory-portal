@@ -5,11 +5,14 @@ import { decodeHtmlEntities } from '../utils/html-entities';
 import { McpActorContext, McpToolDef } from './mcp-tools';
 
 /**
- * Forum tools (LAB-3031): an agent reads categories, starts threads and replies in NodeBB as the member who connected
- * it. Every call mints a one-time member proof for this connection (LAB-3075) and sends it to NodeBB in
- * `X-PL-Member-Proof`; NodeBB redeems it, runs that one request as the member under the member's own forum
- * privileges, and stores which agent wrote the post. No session outlives the request, so a disconnected agent can't
- * post: no proof is issued for it.
+ * Forum tools (LAB-3031): an agent searches and reads threads, lists categories, starts threads and replies in NodeBB
+ * as the member who connected it. Every call mints a one-time member proof for this connection (LAB-3075) and sends it
+ * to NodeBB in `X-PL-Member-Proof`; NodeBB redeems it, runs that one request as the member under the member's own
+ * forum privileges, and stores which agent wrote the post. No session outlives the request, so a disconnected agent
+ * can't post: no proof is issued for it.
+ *
+ * Reads go to NodeBB too, not to the OpenSearch `forum_thread` index: the agent sees exactly what the member may read,
+ * a thread is readable the moment it is posted, and no environment needs OpenSearch access for the forum.
  */
 
 export const FORUM_PROOF_HEADER = 'X-PL-Member-Proof';
@@ -18,8 +21,16 @@ const FORUM_TIMEOUT_MS = 10_000;
 const CONTENT_MAX = 32_767;
 const TITLE_MAX = 255;
 const TAGS_MAX = 5;
+const SEARCH_LIMIT_DEFAULT = 20;
+const SEARCH_LIMIT_MAX = 50;
+/** NodeBB returns matching posts, several per thread; ask for more posts than threads so a page fills. */
+const SEARCH_POSTS_PER_THREAD = 3;
+/** NodeBB caps itemsPerPage at 100. */
+const SEARCH_POSTS_MAX = 100;
+const SEARCH_QUERY_MAX = 200;
+const SNIPPET_MAX = 240;
 
-const NOT_SET_UP = 'Agents cannot post to the forum on this LabOS environment yet.';
+const NOT_SET_UP = 'Agents cannot use the forum on this LabOS environment yet.';
 const FORUM_DOWN = 'The forum did not answer. Try again later.';
 
 const logger = new Logger('McpForumTools');
@@ -159,8 +170,169 @@ export function forumCategories(payload: Row): ForumCategory[] {
   return out;
 }
 
+/**
+ * NodeBB post HTML as plain text an agent can read: paragraphs and list items keep their line breaks, a link keeps its
+ * URL next to its text, every other tag is dropped. Tags are stripped before entities are decoded (see
+ * `decodeHtmlEntities`), so an escaped `&lt;b&gt;` in a post stays the text `<b>`.
+ */
+export function forumPlainText(html: unknown): string {
+  if (typeof html !== 'string') return '';
+  const text = html
+    .replace(/<a\b[^>]*?\bhref="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, (_match, href: string, inner: string) => {
+      const label = inner.replace(/<[^>]*>/g, '').trim();
+      const url = decodeHtmlEntities(href);
+      return /^https?:\/\//i.test(url) && label && decodeHtmlEntities(label) !== url ? `${label} (${href})` : label;
+    })
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<li\b[^>]*>/gi, '- ')
+    .replace(/<\/(p|div|li|ul|ol|blockquote|pre|h[1-6]|tr)>/gi, '\n')
+    .replace(/<[^>]*>/g, '');
+  return decodeHtmlEntities(text)
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function snippetOf(html: unknown): string | null {
+  const text = forumPlainText(html).replace(/\s+/g, ' ');
+  if (!text) return null;
+  return text.length > SNIPPET_MAX ? `${text.slice(0, SNIPPET_MAX)}…` : text;
+}
+
+function clampSearchLimit(value: unknown): number {
+  const n = asNumber(value);
+  if (n === undefined) return SEARCH_LIMIT_DEFAULT;
+  return Math.min(Math.max(Math.trunc(n), 1), SEARCH_LIMIT_MAX);
+}
+
+type ForumThreadRow = {
+  uid: string;
+  topicTitle: string;
+  topicSlug: string | null;
+  topicUrl: string;
+  replyCount: number;
+  cid: number;
+  snippet: string | null;
+};
+
+/**
+ * NodeBB's search answers with matching posts, best first, several per thread. One row per thread, in the order its
+ * best post ranked; the snippet is from that post. Deleted posts and threads are left out.
+ */
+export function forumThreadRows(payload: Row, limit: number): ForumThreadRow[] {
+  const posts = Array.isArray(payload.posts) ? (payload.posts as Row[]) : [];
+  const rows: ForumThreadRow[] = [];
+  const seen = new Set<number>();
+  for (const post of posts) {
+    const topic = (post?.topic ?? {}) as Row;
+    const tid = asNumber(topic.tid) ?? asNumber(post?.tid);
+    const cid = asNumber(topic.cid);
+    if (tid === undefined || cid === undefined || seen.has(tid) || post.deleted || topic.deleted) continue;
+    seen.add(tid);
+    rows.push({
+      uid: String(tid),
+      topicTitle: forumText(topic.title),
+      topicSlug: typeof topic.slug === 'string' ? topic.slug : null,
+      topicUrl: forumThreadUrl(cid, tid),
+      replyCount: Math.max(0, (asNumber(topic.postcount) ?? 1) - 1),
+      cid,
+      snippet: snippetOf(post.content),
+    });
+    if (rows.length >= limit) break;
+  }
+  return rows;
+}
+
+/**
+ * A NodeBB topic page as the agent sees it: the thread, then its posts as plain text, oldest first. NodeBB sends one
+ * page of posts (the member's posts-per-page setting, 20 by default); `truncated` says the thread has more.
+ */
+export function forumThread(payload: Row): Row {
+  const tid = asNumber(payload.tid);
+  const cid = asNumber(payload.cid);
+  if (tid === undefined) {
+    throw new NotFoundException('Forum thread not found');
+  }
+  const postCount = asNumber(payload.postcount) ?? 0;
+  const rawPosts = Array.isArray(payload.posts) ? (payload.posts as Row[]) : [];
+  const posts = rawPosts
+    .filter((post) => post && !post.deleted)
+    .map((post) => {
+      const user = (post.user ?? {}) as Row;
+      const author = forumText(user.displayname) || forumText(user.username);
+      const toPid = asNumber(post.toPid);
+      return {
+        pid: asNumber(post.pid),
+        index: asNumber(post.index),
+        author: author || null,
+        postedAt: typeof post.timestampISO === 'string' ? post.timestampISO : null,
+        ...(toPid ? { toPid } : {}),
+        upvotes: asNumber(post.upvotes) ?? 0,
+        content: forumPlainText(post.content),
+      };
+    });
+  const tags = Array.isArray(payload.tags)
+    ? (payload.tags as Row[]).map((tag) => forumText(tag?.value)).filter(Boolean)
+    : [];
+  return {
+    uid: String(tid),
+    tid,
+    cid: cid ?? null,
+    title: forumText(payload.title),
+    url: cid !== undefined ? forumThreadUrl(cid, tid) : null,
+    replyCount: Math.max(0, postCount - 1),
+    locked: Boolean(payload.locked),
+    ...(tags.length ? { tags } : {}),
+    posts,
+    truncated: rawPosts.length < postCount,
+  };
+}
+
 export function forumTools(proofs: ProofIssuer): McpToolDef[] {
   return [
+    {
+      name: 'search_forum_threads',
+      description:
+        'Search LabOS forum threads the member can read, by words in thread titles and posts (all words must match). ' +
+        'Returns one row per thread, best match first: uid (the thread id, tid), topicTitle, topicSlug, topicUrl, ' +
+        'replyCount, cid, and a snippet of the best-matching post. Then call get_forum_thread with a uid for the ' +
+        'whole thread.',
+      visibility: 'forum',
+      inputSchema: {
+        q: z.string().trim().min(1).max(SEARCH_QUERY_MAX).describe('Search text'),
+        limit: z.number().int().min(1).max(SEARCH_LIMIT_MAX).optional().describe('Max threads (default 20, max 50)'),
+      },
+      execute: async (ctx, args = {}) => {
+        const limit = clampSearchLimit(args.limit);
+        const query = new URLSearchParams({
+          term: String(args.q ?? '').trim(),
+          in: 'titlesposts',
+          matchWords: 'all',
+          itemsPerPage: String(Math.min(limit * SEARCH_POSTS_PER_THREAD, SEARCH_POSTS_MAX)),
+          searchOnly: '1',
+        });
+        const found = await callForum(proofs, ctx, 'GET', `/api/search?${query.toString()}`);
+        return { results: forumThreadRows(found, limit), limit };
+      },
+    },
+    {
+      name: 'get_forum_thread',
+      description:
+        'Fetch one LabOS forum thread by uid (the thread id, tid, from search_forum_threads): title, category, and ' +
+        'its posts as plain text, oldest first, with author and time. Returns the first page of posts (20 by ' +
+        'default); truncated is true when the thread has more.',
+      visibility: 'forum',
+      inputSchema: {
+        uid: z.string().trim().min(1).describe('Forum thread uid (tid) from search_forum_threads'),
+      },
+      execute: async (ctx, args = {}) => {
+        const uid = String(args.uid ?? '').trim();
+        if (!/^\d+$/.test(uid)) {
+          throw new BadRequestException(`Forum thread uid is a number (tid), got: ${uid}`);
+        }
+        return forumThread(await callForum(proofs, ctx, 'GET', `/api/topic/${uid}`));
+      },
+    },
     {
       name: 'list_forum_categories',
       description:
