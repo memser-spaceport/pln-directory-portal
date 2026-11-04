@@ -310,6 +310,7 @@ model Member {
   memberEnrichment  MemberEnrichment?
   mcpAuthorizations McpAuthorization[]
   cvImport          MemberCvImport?
+  memberSignals     MemberSignal[]
 }
 
 model MemberApproval {
@@ -4868,4 +4869,27 @@ model WarmIntrosV2Run {
   @@index([status, lockedUntil])
   @@index([startedAt])
   @@index([investorProfileUid])
+}
+
+/// Append-only log of a logged-in member's actions (LAB-3121, LAB-3123). Rows are
+/// never updated or deleted, except by the member cascade. `action` and
+/// `entityType` are text checked against constants in `member-signals.constants.ts`.
+model MemberSignal {
+  id         Int      @id @default(autoincrement())
+  uid        String   @unique @default(cuid())
+  memberUid  String
+  member     Member   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  action     String
+  /// TEAM | MEMBER | PROJECT | NEWS_ITEM | JOB_OPENING
+  entityType String
+  entityUid  String
+  /// The entity is the member, one of the member's teams, or something they own.
+  own        Boolean  @default(false)
+  /// `backfill:<table>:<record uid>` for backfilled rows; null for live rows.
+  sourceKey  String?  @unique
+  createdAt  DateTime @default(now())
+
+  @@index([memberUid, createdAt])
+  @@index([entityType, entityUid])
+  @@index([memberUid, action, entityType, entityUid, createdAt])
 }

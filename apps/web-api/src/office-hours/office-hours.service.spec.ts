@@ -58,7 +58,8 @@ describe('OfficeHoursService link check', () => {
     {} as any,
     {} as any,
     membersServiceMock as any,
-    {} as any
+    {} as any,
+    { record: jest.fn() } as any
   );
 
   beforeEach(() => {
@@ -254,5 +255,68 @@ describe('OfficeHoursService link check', () => {
       expect(memberUpdate).toHaveBeenCalledWith({ where: { uid: 'm1' }, data: { ohStatus: 'BROKEN' } });
       expect(getMock).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('OfficeHoursService.createInteraction member signals (LAB-3121)', () => {
+  const record = jest.fn();
+  const create = jest.fn();
+  const adjustments = { bumpOnScheduleMeetingTx: jest.fn() };
+  const prismaMock = {
+    $transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn({ memberInteraction: { create } })),
+  };
+  const service = new OfficeHoursService(
+    prismaMock as any,
+    { info: jest.fn(), error: jest.fn() } as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    adjustments as any,
+    { record } as any
+  );
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('records office-hours-booking-intent after a SCHEDULE_MEETING with a target commits', async () => {
+    create.mockResolvedValue({
+      uid: 'ix1',
+      type: 'SCHEDULE_MEETING',
+      sourceMemberUid: 'm1',
+      targetMemberUid: 'm2',
+      hasFollowUp: false,
+    });
+
+    const result = await service.createInteraction({ type: 'SCHEDULE_MEETING' } as any, { uid: 'm1' });
+
+    expect(result).toEqual(expect.objectContaining({ uid: 'ix1' }));
+    expect(record).toHaveBeenCalledWith({
+      memberUid: 'm1',
+      action: 'office-hours-booking-intent',
+      entityType: 'MEMBER',
+      entityUid: 'm2',
+    });
+  });
+
+  it('records nothing for other interaction types or without a target', async () => {
+    create.mockResolvedValueOnce({ uid: 'ix2', type: 'BROKEN_OH_LINK', sourceMemberUid: 'm1', targetMemberUid: 'm2' });
+    create.mockResolvedValueOnce({
+      uid: 'ix3',
+      type: 'SCHEDULE_MEETING',
+      sourceMemberUid: 'm1',
+      targetMemberUid: null,
+    });
+
+    await service.createInteraction({} as any, { uid: 'm1' });
+    await service.createInteraction({} as any, { uid: 'm1' });
+
+    expect(record).not.toHaveBeenCalled();
+  });
+
+  it('records nothing when the booking transaction fails', async () => {
+    create.mockRejectedValue(new Error('db down'));
+
+    await expect(service.createInteraction({} as any, { uid: 'm1' })).rejects.toThrow('db down');
+    expect(record).not.toHaveBeenCalled();
   });
 });
