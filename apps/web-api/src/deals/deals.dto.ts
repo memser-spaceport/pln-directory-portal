@@ -26,6 +26,8 @@ export class UpsertDealDto {
   status?: DealStatus;
   submissionUid?: string;
   isHighValue?: boolean;
+  /** Short value for Home's deals pill ("12 mo free"); blank or null clears it. See `normalizeOfferValue`. */
+  offerValue?: string | null;
 }
 
 export class SubmitDealDto {

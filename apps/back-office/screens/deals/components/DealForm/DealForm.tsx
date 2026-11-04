@@ -77,6 +77,7 @@ export const DealForm = ({ onClose, onSubmit, initialData, mode }: Props) => {
       fullDescription: '',
       redemptionInstructions: '',
       isHighValue: false,
+      offerValue: '',
       status: 'DRAFT',
     },
   });
@@ -93,6 +94,7 @@ export const DealForm = ({ onClose, onSubmit, initialData, mode }: Props) => {
 
   const shortDescriptionValue = watch('shortDescription');
   const SHORT_DESC_MAX = 100;
+  const OFFER_VALUE_MAX = 24;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
@@ -115,6 +117,7 @@ export const DealForm = ({ onClose, onSubmit, initialData, mode }: Props) => {
         fullDescription: initialData.fullDescription,
         redemptionInstructions: initialData.redemptionInstructions,
         isHighValue: initialData.isHighValue ?? false,
+        offerValue: initialData.offerValue ?? '',
         status: initialData.status,
       });
 
@@ -393,6 +396,23 @@ export const DealForm = ({ onClose, onSubmit, initialData, mode }: Props) => {
                 </div>
 
                 <FormCheckboxField name="isHighValue" label={HIGH_VALUE_DEAL_LABEL} labelClassName={s.highValueLabel} />
+
+                {/* Offer value: the pill on the directory's Home deals rail (LAB-3071). Optional. */}
+                <div className={s.field}>
+                  <div className={s.labelRow}>
+                    <label className={s.label} htmlFor="deal-offer-value">
+                      Offer value
+                    </label>
+                  </div>
+                  <input
+                    id="deal-offer-value"
+                    className={s.input}
+                    maxLength={OFFER_VALUE_MAX}
+                    placeholder="e.g. 12 mo free, $50K credits"
+                    {...register('offerValue')}
+                  />
+                  <p className={s.helperText}>Shown as a short pill on Home. Leave empty to show none.</p>
+                </div>
 
                 {/* Short Description */}
                 <div className={s.field}>
