@@ -311,6 +311,7 @@ model Member {
   mcpAuthorizations McpAuthorization[]
   cvImport          MemberCvImport?
   memberSignals     MemberSignal[]
+  interestProfile   MemberInterestProfileEntry[]
 }
 
 model MemberApproval {
@@ -4892,4 +4893,39 @@ model MemberSignal {
   @@index([memberUid, createdAt])
   @@index([entityType, entityUid])
   @@index([memberUid, action, entityType, entityUid, createdAt])
+}
+
+/// One scored key of a member's interest profile (LAB-3122). Rebuilt by the
+/// daily job from the member signal log and declared interests; read by admins
+/// only until the LAB-3124 pilot passes.
+model MemberInterestProfileEntry {
+  id        Int      @id @default(autoincrement())
+  memberUid String
+  member    Member   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  /// TOPIC | ENTITY | EXPERTISE
+  kind      String
+  /// Focus-area slug (TOPIC, EXPERTISE) or `<TEAM|MEMBER|PROJECT>:<uid>` (ENTITY).
+  key       String
+  score     Float
+  updatedAt DateTime @updatedAt
+
+  @@unique([memberUid, kind, key])
+  @@index([kind, key])
+}
+
+/// One member interest profile rebuild (LAB-3122). Also serializes rebuilds
+/// across API instances: a RUNNING row blocks a second one.
+model MemberInterestProfileRun {
+  id            Int       @id @default(autoincrement())
+  /// CRON | ADMIN
+  trigger       String
+  /// RUNNING | DONE | FAILED
+  status        String
+  startedAt     DateTime  @default(now())
+  finishedAt    DateTime?
+  membersCount  Int?
+  nonEmptyCount Int?
+  error         String?
+
+  @@index([status, startedAt])
 }

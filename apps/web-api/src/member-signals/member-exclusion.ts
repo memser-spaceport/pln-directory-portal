@@ -18,16 +18,17 @@ export function isExcludedMember(member: ExclusionFields | null | undefined): bo
 }
 
 /**
- * The same rule as a Prisma `Member` filter, for bulk reads (backfill, profile
- * build). `email` is nullable, so the domain test is wrapped to keep members
- * without an email.
+ * The same rule as a Prisma `Member` filter, for bulk reads: use it as
+ * `NOT: excludedMemberWhere()`. Each branch pairs its test with `not: null`,
+ * because SQL `NOT (col = x)` is NULL, not true, for a NULL column, and would
+ * silently drop every member without a sign-up source or email.
  */
-export function excludedMemberWhereNot() {
+export function excludedMemberWhere() {
   return {
     OR: [
-      { signUpSource: BOT_SIGN_UP_SOURCE },
+      { AND: [{ signUpSource: { not: null } }, { signUpSource: BOT_SIGN_UP_SOURCE }] },
       ...TEST_ACCOUNT_EMAIL_DOMAINS.map((domain) => ({
-        email: { endsWith: `@${domain}`, mode: 'insensitive' as const },
+        AND: [{ email: { not: null } }, { email: { endsWith: `@${domain}`, mode: 'insensitive' as const } }],
       })),
     ],
   };

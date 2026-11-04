@@ -1,4 +1,4 @@
-import { excludedMemberWhereNot, isExcludedMember } from './member-exclusion';
+import { excludedMemberWhere, isExcludedMember } from './member-exclusion';
 
 describe('isExcludedMember', () => {
   it('excludes trending-seed bots', () => {
@@ -20,9 +20,12 @@ describe('isExcludedMember', () => {
     expect(isExcludedMember(null)).toBe(true);
   });
 
-  it('builds the matching Prisma filter', () => {
-    expect(excludedMemberWhereNot()).toEqual({
-      OR: [{ signUpSource: 'system-trending-seed' }, { email: { endsWith: '@yopmail.com', mode: 'insensitive' } }],
+  it('builds a null-safe Prisma filter to use under NOT', () => {
+    expect(excludedMemberWhere()).toEqual({
+      OR: [
+        { AND: [{ signUpSource: { not: null } }, { signUpSource: 'system-trending-seed' }] },
+        { AND: [{ email: { not: null } }, { email: { endsWith: '@yopmail.com', mode: 'insensitive' } }] },
+      ],
     });
   });
 });
