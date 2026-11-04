@@ -25,7 +25,6 @@ import { ProjectsService } from '../projects/projects.service';
 import { PLEventGuestsService } from '../pl-events/pl-event-guests.service';
 import { PLEventLocationsService } from '../pl-events/pl-event-locations.service';
 import { PLEventsService } from '../pl-events/pl-events.service';
-import { SearchService } from '../search/search.service';
 import { AiAppsService } from '../ai-apps/ai-apps.service';
 import { PlNetworkPortfolioService } from '../spv-spotlights/pl-network-portfolio.service';
 import { aiAppFeedbackTools, aiAppWriteTools } from './mcp-ai-app-feedback-tools';
@@ -125,7 +124,6 @@ export class McpController {
     private readonly teams: TeamsService,
     private readonly projects: ProjectsService,
     private readonly plEvents: PLEventsService,
-    private readonly search: SearchService,
     private readonly aiApps: AiAppsService,
     private readonly portfolio: PlNetworkPortfolioService,
     private readonly analytics: AnalyticsService,
@@ -219,7 +217,7 @@ export class McpController {
       toolsForPermissions(permissions, [
         WHOAMI_TOOL,
         ...warmIntroTools(this.masterProfiles, this.warmIntros),
-        ...directoryTools(this.members, this.teams, this.projects, this.plEvents, this.search),
+        ...directoryTools(this.members, this.teams, this.projects, this.plEvents),
         ...forumTools(this.memberProofs),
         ...aiAppFeedbackTools(this.aiApps),
         ...aiAppWriteTools(this.aiApps),

@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { FORUM_PROOF_HEADER, forumCategories, forumTools } from './mcp-forum-tools';
+import { FORUM_PROOF_HEADER, forumCategories, forumPlainText, forumThreadRows, forumTools } from './mcp-forum-tools';
 import { McpActorContext } from './mcp-tools';
 
 const request = jest.fn();
@@ -173,7 +173,7 @@ describe('forum tools (LAB-3031)', () => {
     delete process.env.FORUM_MEMBER_PROOF_AUDIENCE;
 
     await expect(tools.start_forum_thread.execute(CTX, { cid: 2, title: 't', content: 'c' })).rejects.toThrow(
-      'Agents cannot post to the forum on this LabOS environment yet.'
+      'Agents cannot use the forum on this LabOS environment yet.'
     );
     expect(proofs.issueForAuthorization).not.toHaveBeenCalled();
     expect(request).not.toHaveBeenCalled();
@@ -188,9 +188,180 @@ describe('forum tools (LAB-3031)', () => {
 
     proofs.issueForAuthorization.mockRejectedValueOnce(new NotFoundException('Unknown audience'));
     await expect(tools.reply_to_forum_thread.execute(CTX, { tid: 1, content: 'c' })).rejects.toThrow(
-      'Agents cannot post to the forum on this LabOS environment yet.'
+      'Agents cannot use the forum on this LabOS environment yet.'
     );
     expect(request).not.toHaveBeenCalled();
+  });
+
+  describe('reading threads from NodeBB as the member', () => {
+    /** One post of NodeBB's /api/search answer (posts.getPostSummaryByPids). */
+    const hit = (pid: number, tid: number, extra: Record<string, unknown> = {}) => ({
+      pid,
+      tid,
+      content: `<p>Post ${pid} about <strong>IPFS</strong> &amp; Filecoin</p>`,
+      topic: { tid, cid: 3, title: `Thread ${tid} &#x27;q&#x27;`, slug: `${tid}/thread-${tid}`, postcount: 4 },
+      ...extra,
+    });
+
+    it('searches through NodeBB with a fresh proof, one row per thread in rank order', async () => {
+      const { proofs, tools } = build();
+      request.mockResolvedValue(
+        answer(200, { posts: [hit(10, 1), hit(11, 2), hit(12, 1)], matchCount: 3, pageCount: 1 })
+      );
+
+      const result = await tools.search_forum_threads.execute(CTX, { q: 'ipfs filecoin', limit: 5 });
+
+      expect(proofs.issueForAuthorization).toHaveBeenCalledWith('auth-1', 'key-nodebb', 'forum');
+      const { url, method, headers } = call();
+      expect(method).toBe('GET');
+      expect(headers).toEqual({ [FORUM_PROOF_HEADER]: 'mcp_mp_abc', 'Content-Type': 'application/json' });
+      const sent = new URL(url);
+      expect(sent.origin + sent.pathname).toBe('https://forum.example/api/search');
+      expect(sent.search).toBe('?term=ipfs+filecoin&in=titlesposts&matchWords=all&itemsPerPage=15&searchOnly=1');
+      expect(result).toEqual({
+        limit: 5,
+        results: [
+          {
+            uid: '1',
+            topicTitle: "Thread 1 'q'",
+            topicSlug: '1/thread-1',
+            topicUrl: 'https://labos.example/forum/topics/3/1',
+            replyCount: 3,
+            cid: 3,
+            snippet: 'Post 10 about IPFS & Filecoin',
+          },
+          expect.objectContaining({ uid: '2', snippet: 'Post 11 about IPFS & Filecoin' }),
+        ],
+      });
+    });
+
+    it('defaults the limit to 20 threads and never asks NodeBB for more than 100 posts', async () => {
+      const { tools } = build();
+      request.mockResolvedValue(answer(200, { posts: [] }));
+
+      await expect(tools.search_forum_threads.execute(CTX, { q: 'x' })).resolves.toEqual({ results: [], limit: 20 });
+      expect(new URL(call(0).url).searchParams.get('itemsPerPage')).toBe('60');
+
+      await tools.search_forum_threads.execute(CTX, { q: 'x', limit: 50 });
+      expect(new URL(call(1).url).searchParams.get('itemsPerPage')).toBe('100');
+    });
+
+    it('leaves deleted posts and threads out of search rows and stops at the limit', () => {
+      const rows = forumThreadRows(
+        {
+          posts: [
+            hit(1, 1, { deleted: 1 }),
+            hit(2, 2, { topic: { tid: 2, cid: 3, title: 'Gone', deleted: 1 } }),
+            hit(3, 3),
+            hit(4, 4),
+            { pid: 5, content: 'no topic' },
+          ],
+        },
+        1
+      );
+      expect(rows.map((row) => row.uid)).toEqual(['3']);
+    });
+
+    it('reads a whole thread as plain text: posts oldest first, deleted ones left out', async () => {
+      const { tools } = build();
+      request.mockResolvedValue(
+        answer(200, {
+          tid: 3,
+          cid: 3,
+          title: 'Test post (LAB-3076 MCP forum write)',
+          slug: '3/test-post',
+          postcount: 3,
+          locked: 0,
+          tags: [{ value: 'mcp' }],
+          posts: [
+            {
+              pid: 4,
+              index: 0,
+              timestampISO: '2026-11-04T10:00:00.000Z',
+              upvotes: 2,
+              user: { username: 'olegverzunov', displayname: 'Oleg V' },
+              content: '<p>First line<br />second line</p>\n<p>See <a href="https://ipfs.tech">the docs</a></p>',
+            },
+            { pid: 5, index: 1, deleted: 1, content: '<p>[[topic:post-is-deleted]]</p>', user: { username: 'x' } },
+            {
+              pid: 6,
+              index: 2,
+              toPid: 4,
+              timestampISO: '2026-11-04T11:00:00.000Z',
+              user: { username: 'ada' },
+              content: '<ul><li>one</li><li>two</li></ul>',
+            },
+          ],
+        })
+      );
+
+      const thread = await tools.get_forum_thread.execute(CTX, { uid: '3' });
+
+      expect(call().url).toBe('https://forum.example/api/topic/3');
+      expect(thread).toEqual({
+        uid: '3',
+        tid: 3,
+        cid: 3,
+        title: 'Test post (LAB-3076 MCP forum write)',
+        url: 'https://labos.example/forum/topics/3/3',
+        replyCount: 2,
+        locked: false,
+        tags: ['mcp'],
+        truncated: false,
+        posts: [
+          {
+            pid: 4,
+            index: 0,
+            author: 'Oleg V',
+            postedAt: '2026-11-04T10:00:00.000Z',
+            upvotes: 2,
+            content: 'First line\nsecond line\n\nSee the docs (https://ipfs.tech)',
+          },
+          {
+            pid: 6,
+            index: 2,
+            author: 'ada',
+            postedAt: '2026-11-04T11:00:00.000Z',
+            toPid: 4,
+            upvotes: 0,
+            content: '- one\n- two',
+          },
+        ],
+      });
+    });
+
+    it('says the thread is truncated when NodeBB sent one page of a longer thread', async () => {
+      const { tools } = build();
+      request.mockResolvedValue(answer(200, { tid: 9, cid: 2, title: 'Long', postcount: 45, posts: [{ pid: 1 }] }));
+      await expect(tools.get_forum_thread.execute(CTX, { uid: '9' })).resolves.toMatchObject({
+        replyCount: 44,
+        truncated: true,
+      });
+    });
+
+    it('refuses a uid that is not a thread id without calling the forum', async () => {
+      const { proofs, tools } = build();
+      await expect(tools.get_forum_thread.execute(CTX, { uid: '3/../../api/admin' })).rejects.toBeInstanceOf(
+        BadRequestException
+      );
+      expect(proofs.issueForAuthorization).not.toHaveBeenCalled();
+      expect(request).not.toHaveBeenCalled();
+    });
+
+    it('passes NodeBB refusals through: unknown thread is not found', async () => {
+      const { tools } = build();
+      request.mockResolvedValueOnce(answer(404, {}));
+      await expect(tools.get_forum_thread.execute(CTX, { uid: '999' })).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  it('turns post HTML into plain text, stripping tags before decoding entities', () => {
+    expect(forumPlainText('<p>Use &lt;b&gt; for bold &amp;amp; more</p>')).toBe('Use <b> for bold &amp; more');
+    expect(forumPlainText('<p><a href="https://x.io/a?b=1&amp;c=2">https://x.io/a?b=1&amp;c=2</a></p>')).toBe(
+      'https://x.io/a?b=1&c=2'
+    );
+    expect(forumPlainText('<p>Hi <a href="/user/ada">@ada</a></p>')).toBe('Hi @ada');
+    expect(forumPlainText(undefined)).toBe('');
   });
 
   it('skips categories without a usable cid', () => {
