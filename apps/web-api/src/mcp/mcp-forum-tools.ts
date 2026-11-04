@@ -255,7 +255,8 @@ export function forumThreadRows(payload: Row, limit: number): ForumThreadRow[] {
 /**
  * One page of a NodeBB category as the agent sees it: its threads in the order NodeBB sorted them, pinned ones first
  * as NodeBB puts them. NodeBB sends one page (the member's topics-per-page setting, 20 by default). The snippet is the
- * thread's teaser, its latest post. Deleted threads are left out.
+ * thread's teaser, its latest reply; a thread with no replies has none (pln-nodebb's teaserPost is `last-reply`), and
+ * `withOpeningPostSnippets` fills it from the opening post. Deleted threads are left out.
  */
 export function forumCategoryThreads(payload: Row, page: number, sort: string) {
   const cid = asNumber(payload.cid);
@@ -276,6 +277,7 @@ export function forumCategoryThreads(payload: Row, page: number, sort: string) {
         topicUrl: forumThreadUrl(cid, tid),
         replyCount: Math.max(0, (asNumber(topic.postcount) ?? 1) - 1),
         cid,
+        mainPid: asNumber(topic.mainPid) ?? null,
         author: forumText(user.displayname) || forumText(user.username) || null,
         createdAt: typeof topic.timestampISO === 'string' ? topic.timestampISO : null,
         lastActivityAt: typeof topic.lastposttimeISO === 'string' ? topic.lastposttimeISO : null,
@@ -295,6 +297,39 @@ export function forumCategoryThreads(payload: Row, page: number, sort: string) {
     threadCount: asNumber(payload.topic_count) ?? threads.length,
     sort,
   };
+}
+
+const SNIPPET_FETCH_CONCURRENCY = 5;
+
+/**
+ * Threads with no teaser (no replies yet) get the opening post as their snippet: one NodeBB read each, through a new
+ * proof, a few at a time. A read that fails leaves that snippet empty instead of failing the whole list.
+ */
+async function withOpeningPostSnippets<T extends { snippet: string | null; mainPid: number | null }>(
+  proofs: ProofIssuer,
+  ctx: McpActorContext,
+  threads: T[]
+): Promise<T[]> {
+  const missing = threads.filter((thread) => thread.snippet === null && thread.mainPid !== null);
+  const snippets = new Map<number, string | null>();
+  for (let i = 0; i < missing.length; i += SNIPPET_FETCH_CONCURRENCY) {
+    await Promise.all(
+      missing.slice(i, i + SNIPPET_FETCH_CONCURRENCY).map(async ({ mainPid }) => {
+        const pid = mainPid as number;
+        try {
+          const summary = await callForum(proofs, ctx, 'GET', `/api/v3/posts/${pid}/summary`);
+          snippets.set(pid, snippetOf(summary.content));
+        } catch (error) {
+          logger.warn(`Opening post ${pid} snippet failed: ${String((error as Error)?.message ?? error)}`);
+        }
+      })
+    );
+  }
+  return threads.map((thread) =>
+    thread.mainPid !== null && snippets.has(thread.mainPid)
+      ? { ...thread, snippet: snippets.get(thread.mainPid) ?? null }
+      : thread
+  );
 }
 
 /**
@@ -391,8 +426,9 @@ export function forumTools(proofs: ProofIssuer): McpToolDef[] {
       name: 'list_forum_threads',
       description:
         'List the threads in one LabOS forum category (cid from list_forum_categories), one page at a time, newest ' +
-        'first by default. Each row: uid (the thread id, tid), topicTitle, topicUrl, replyCount, author, createdAt, ' +
-        'lastActivityAt, pinned, locked, upvotes, views, and a snippet of the latest post. Returns page, pageCount ' +
+        'first by default. Each row: uid (the thread id, tid), topicTitle, topicUrl, replyCount, mainPid (the opening ' +
+        'post), author, createdAt, lastActivityAt, pinned, locked, upvotes, views, and a snippet of the latest reply ' +
+        '(of the opening post when there are no replies). Returns page, pageCount ' +
         'and threadCount; ask for the next page while page < pageCount. Then call get_forum_thread with a uid for ' +
         'the whole thread.',
       visibility: 'forum',
@@ -417,7 +453,8 @@ export function forumTools(proofs: ProofIssuer): McpToolDef[] {
           : FORUM_THREAD_SORTS[0];
         const query = new URLSearchParams({ page: String(page), sort });
         const found = await callForum(proofs, ctx, 'GET', `/api/category/${cid}?${query.toString()}`);
-        return forumCategoryThreads(found, page, sort);
+        const listed = forumCategoryThreads(found, page, sort);
+        return { ...listed, threads: await withOpeningPostSnippets(proofs, ctx, listed.threads) };
       },
     },
     {
