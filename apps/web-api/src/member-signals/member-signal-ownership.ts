@@ -13,8 +13,9 @@ type OwnershipPrisma = Pick<PrismaClient, 'teamMemberRole' | 'project' | 'teamNe
  * - NEWS_ITEM: posted by the member, or news of one of their teams
  * - JOB_OPENING: a role on one of their teams
  *
- * Lookups are cached for the lifetime of the resolver, so the backfill can
- * share one across a run; the live writer uses a fresh one per signal.
+ * Lookups are cached for the lifetime of the resolver; the live writer uses a
+ * fresh one per signal. The backfill migration
+ * `20261104170000_backfill_member_signals` repeats these rules in SQL.
  */
 export class MemberSignalOwnershipResolver {
   private readonly teamsByMember = new Map<string, Promise<Set<string>>>();

@@ -46,8 +46,6 @@ export const MEMBER_SIGNAL_REMOVALS: Readonly<Partial<Record<MemberSignalAction,
 /** Actions deduplicated to one row per member, entity and UTC day. */
 export const MEMBER_SIGNAL_DAILY_DEDUPE_ACTIONS: ReadonlySet<MemberSignalAction> = new Set(['view']);
 
-export const MEMBER_SIGNAL_SOURCE_KEY_PREFIX = 'backfill:';
-
 export const isMemberSignalAction = (value: string): value is MemberSignalAction =>
   (MEMBER_SIGNAL_ACTIONS as readonly string[]).includes(value);
 

@@ -1,7 +1,8 @@
 /**
  * Members whose actions are never recorded and who never get an interest
  * profile: the trending-seed bots and test accounts. Shared by the signal
- * writer, the signal backfill and the profile build.
+ * writer and the profile build; the backfill migration
+ * `20261104170000_backfill_member_signals` repeats the rule in SQL.
  */
 export const BOT_SIGN_UP_SOURCE = 'system-trending-seed';
 

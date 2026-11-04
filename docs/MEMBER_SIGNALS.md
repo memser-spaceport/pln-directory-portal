@@ -65,22 +65,15 @@ domain in `TEST_ACCOUNT_EMAIL_DOMAINS` (`yopmail.com`). Excluded members add no 
 Each added row sends the server event `member-signal-recorded` (`distinctId` = member uid, properties `action`,
 `entityType`, `own`). Deduplicated, excluded and backfilled rows send nothing.
 
-## Backfill (once per environment)
+## Backfill (migration)
 
-Copies the current `Follow`, `TeamNewsUpvote`, `FeedNewsLike`, `FeedComment`, `JobOpeningInterest`, `SavedJobOpening`,
-`TeamInterest` and `MemberInteraction` (`SCHEDULE_MEETING` with a target) records. Deleted records and repeat or removal
-history cannot be recovered.
+Migration `20261104170000_backfill_member_signals` copies the stored `Follow`, `TeamNewsUpvote`, `FeedNewsLike`,
+`FeedComment`, `JobOpeningInterest`, `SavedJobOpening`, `TeamInterest` and `MemberInteraction` (`SCHEDULE_MEETING`
+with a target) records into the log when the deploy applies migrations. Each row keeps the source record's
+`createdAt`, gets `sourceKey = backfill:<table>:<uid>` and the same exclusion and `own` rules as the live writer
+(repeated in SQL). Records created at or after the first live row of the same action are skipped, because the live
+writer already logged them. Deleted records and repeat or removal history cannot be recovered. Conflicts on
+`sourceKey` are ignored, so a re-run adds nothing.
 
-```bash
-yarn api:backfill-member-signals                 # dry run: per-table counts, writes nothing
-yarn api:backfill-member-signals --apply         # write
-yarn api:backfill-member-signals --apply --batch=500
-```
-
-Re-runnable: rows are keyed by `sourceKey` and inserted with `skipDuplicates`. Records created at or after the first
-live row of the same action are skipped, because the live writer already logged them.
-
-Where to run it: from a repo checkout, with `DATABASE_URL` pointing at the target database through its tunnel. The
-deployed API image holds only the compiled bundle, so the script cannot run inside the pod. Check the database name in
-`DATABASE_URL` before `--apply`: dev, feature envs (`dev_directory_service_lab_<n>`) and prod differ only by name or
-host. Ownership lookups run at most 10 at a time, so a batch stays within the Prisma connection pool over a slow tunnel.
+If the exclusion list (`TEST_ACCOUNT_EMAIL_DOMAINS`) or the `own` rules change, the migration is not re-run; rows it
+already wrote keep the old rules.
