@@ -96,6 +96,8 @@ function build(
     settings?: unknown[] | Error;
     requestsFail?: boolean;
     writeLimited?: boolean;
+    warned?: boolean;
+    limitUnavailable?: boolean;
   } = {}
 ) {
   const actor = {
@@ -141,7 +143,35 @@ function build(
     },
   };
   const accessRequests = new McpAccessRequestsService(requestPrisma as any);
-  const writeLimit = { tryConsume: jest.fn().mockResolvedValue(!opts.writeLimited) };
+  const limits = {
+    tryConsume: jest.fn(async (_member: string, callType: string) => {
+      const unavailable = Boolean(opts.limitUnavailable);
+      const limited = unavailable ? callType !== 'read' : Boolean(opts.writeLimited && callType === 'write');
+      return {
+        allowed: !limited,
+        warned: Boolean(opts.warned) && !limited,
+        unavailable,
+        callType,
+        used: limited ? 30 : opts.warned ? 24 : 1,
+        limit: 30,
+        resetsAt: '2026-11-05T12:00:00.000Z',
+        tier: 'standard',
+        override: false,
+      };
+    }),
+    peek: jest.fn(async (_member: string, callType: string) => ({
+      allowed: !opts.limitUnavailable,
+      warned: false,
+      unavailable: Boolean(opts.limitUnavailable),
+      callType,
+      used: 0,
+      remaining: opts.limitUnavailable ? 0 : 30,
+      limit: 30,
+      resetsAt: '2026-11-05T12:00:00.000Z',
+      tier: 'standard',
+      override: false,
+    })),
+  };
   const scopes = new McpScopesService(prisma as any, analytics as any, accessRequests);
   const stub = {} as any;
   const controller = new McpController(
@@ -164,7 +194,7 @@ function build(
     stub,
     stub,
     stub,
-    writeLimit as any,
+    limits as any,
     {} as any,
     {} as any,
     stub,
@@ -216,7 +246,7 @@ function build(
     await controller.handle({ headers: { authorization: 'Bearer mcp_at_live' }, body } as any, {} as any);
     return new Map(registered);
   };
-  return { handle, aiApps, analytics, requests };
+  return { handle, aiApps, analytics, requests, limits };
 }
 
 type Harness = ReturnType<typeof build>;
@@ -352,14 +382,42 @@ describe('McpController scope enforcement', () => {
     const h = build({ scopeLevels: { ai_apps: 'write' }, writeLimited: true });
     const result: any = await call(h, 'update_ai_app_feedback_status', { feedbackUid: 'fb-1', status: 'VIEWED' });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toBe(
-      'LabOS limits agents to 10 update_ai_app_feedback_status calls an hour. Try again later.'
-    );
+    expect(result.content[0].text).toContain('30 write calls per hour');
+    expect(result.content[0].text).toContain('The limit resets at 2026-11-05T12:00:00.000Z UTC');
+    expect(result.content[0].text).toContain('Tell the member');
+    expect(result.content[0].text).toContain('https://labos.example/settings/mcp');
     expect(h.aiApps.updateFeedbackStatusForMcp).not.toHaveBeenCalled();
     expect(h.analytics.trackEvent).toHaveBeenCalledWith(
       expect.objectContaining({ properties: expect.objectContaining({ reason: 'rate_limited' }) })
     );
     expect(h.requests).toEqual([]);
+  });
+
+  it('counts a write and a read as their call types, not as the tool name', async () => {
+    const h = build({ scopeLevels: { ai_apps: 'write' } });
+    await call(h, 'update_ai_app_feedback_status', { feedbackUid: 'fb-1', status: 'VIEWED' });
+    await call(h, 'list_my_ai_apps');
+    expect(h.limits.tryConsume.mock.calls.map((call) => call[1])).toEqual(['write', 'read']);
+  });
+
+  it('adds the near-limit warning on the tool result', async () => {
+    const h = build({ warned: true });
+    const result: any = await call(h, 'list_my_ai_apps');
+    expect(result.isError).toBeFalsy();
+    expect(result.content[1].text).toContain('Warning: this member has used 24 of 30 read calls per hour');
+    expect(result.content[1].text).toContain('2026-11-05T12:00:00.000Z');
+    expect(result.content[1].text).toContain('Tell the member');
+    expect(h.analytics.trackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ properties: expect.objectContaining({ limitResult: 'warned', callType: 'read' }) })
+    );
+  });
+
+  it('refuses a write when the limit store is down and does not run it', async () => {
+    const h = build({ scopeLevels: { ai_apps: 'write' }, limitUnavailable: true });
+    const result: any = await call(h, 'update_ai_app_feedback_status', { feedbackUid: 'fb-1', status: 'VIEWED' });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("couldn't check the write limit");
+    expect(h.aiApps.updateFeedbackStatusForMcp).not.toHaveBeenCalled();
   });
 
   it('still refuses, with the plain Settings link, when the request cannot be stored', async () => {
@@ -413,6 +471,8 @@ describe('McpController per-tool events (LAB-3050)', () => {
           operation: 'read',
           result: 'ok',
           resultCount: 1,
+          callType: 'read',
+          limitResult: 'allowed',
         },
       },
     ]);
@@ -441,6 +501,7 @@ describe('McpController per-tool events (LAB-3050)', () => {
       operation: 'write',
       result: 'refused',
       reason: 'needs_write',
+      callType: 'write',
     });
     expect(perTool(h, 'mcp-tool-refused')).toHaveLength(1);
   });

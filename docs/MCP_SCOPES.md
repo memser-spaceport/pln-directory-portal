@@ -55,10 +55,11 @@ Every MCP tool call sends a server-side PostHog event named `mcp-<tool name with
 `errorKind`, the exception class name), and when it is refused (`result: refused`, with `reason`: `needs_write`,
 `scope_none`, `admin_off`, `rate_limited` or `unavailable`). `mcp-tool-invoked` and `mcp-tool-refused` are still sent
 as before, beside it. When `ANALYTICS_PROVIDER` is not `posthog`, these events are still sent to PostHog if `POSTHOG_API_KEY` and `POSTHOG_HOST` are set.
+`mcp-tool-refused` are still sent as before, beside it.
 
 Every per-tool event has `toolName`, `memberUid`, `authorizationUid` (the connection), `clientName`, `scope` (from the
-registry; `unscoped` for `whoami`), `operation` (`read` or `write`) and `result`. A refused event has no other
-property. Search and list tools add their query text as `query`, trimmed to 200 characters (investor DB searches
+registry; `unscoped` for `whoami`), `operation` (`read` or `write`), `result` and `callType`. When a limit check runs
+it also has `limitResult` (`allowed`, `warned` or `limited`). A refused event has no argument properties. Search and list tools add their query text as `query`, trimmed to 200 characters (investor DB searches
 excepted: their text is a person's name or email). Write tools send item ids, field names and counts, never values:
 no message text, body, note, email, Telegram or LinkedIn value reaches an event. `MCP_TOOL_PROPERTY_BUILDERS` has
 one entry per tool; a spec fails when a registry tool has none, so a new tool needs one.
@@ -224,9 +225,21 @@ same connection and scope from the last 24 hours (a write refusal raises a read 
   requested level on that same connection. `mcp-scope-levels-updated` carries `viaRequest` and `requestResolved`.
 - The table is also the "Blocked by permissions" record for the activity drawer (LAB-2938).
 
-## Write limit
+## Call limits
 
-Every write tool allows 10 calls per member per tool per hour (`McpWriteLimitService`, a fixed-window counter in the
-shared cache). Over the limit the call is refused with "LabOS limits agents to 10 <tool> calls an hour. Try again
-later." and `mcp-tool-refused` reason `rate_limited`; no access request is created. If the cache is unavailable the
-call is allowed.
+Each tool has one call type: `read`, `contact_read` (`get_member`, `get_team`, `get_project`, `get_event`), `write`,
+or `forum_post` (a Forum member proof with write access). One counter per member and call type is shared by every tool
+and every pod. A contact read counts each member in the response who has an email, Telegram, or LinkedIn value.
+A page with more of those members than remain is refused and returns none of them. Draft numbers, the 80% warning ratio and the 5× PL infra multiplier are in
+`apps/web-api/src/mcp/mcp-limits.config.ts`. The tier comes from the PL infra policy. A directory admin sets a
+per-member override, with an optional end date, at `/v1/admin/mcp/limits`. Each change is stored with the admin and
+the time.
+
+Over the limit the call is refused. The message names the call type, the usage, the limit and the reset time, and tells
+the agent to inform the member and point them to Settings → MCP connections. No access request is created. At 80% the
+tool result includes that warning once per window. If the cache is down, contact reads, writes and forum posts are
+refused. Reads are allowed.
+
+`GET /v1/mcp/limits` returns the member's usage. The same Settings page shows it. Directory admins also see usage,
+recent limits and overrides there. Each tool call sends `callType` and `limitResult` (`allowed`, `warned` or `limited`)
+on `mcp-<tool>-called`.

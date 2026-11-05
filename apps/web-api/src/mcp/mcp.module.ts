@@ -41,6 +41,7 @@ import { PathfinderModule } from '../pathfinder/pathfinder.module';
 import { InvestorListsModule } from '../investor-lists/investor-lists.module';
 import { FounderSourcingModule } from '../founder-sourcing/founder-sourcing.module';
 import { RoadmapModule } from '../roadmap/roadmap.module';
+import { McpAdminLimitsController } from './mcp-admin-limits.controller';
 import { McpAdminScopesController } from './mcp-admin-scopes.controller';
 import { McpAppSessionService } from './mcp-app-session.service';
 import { McpAppSessionsController } from './mcp-app-sessions.controller';
@@ -52,7 +53,7 @@ import { McpOAuthService } from './mcp-oauth.service';
 import { McpController } from './mcp.controller';
 import { McpScopesService } from './mcp-scopes.service';
 import { McpAccessRequestsService } from './mcp-access-requests.service';
-import { McpWriteLimitService } from './mcp-write-limit.service';
+import { McpLimitService } from './mcp-limit.service';
 import { JwtService } from '../utils/jwt/jwt.service';
 
 @Module({
@@ -104,6 +105,7 @@ import { JwtService } from '../utils/jwt/jwt.service';
     McpOAuthController,
     McpAuthorizationsController,
     McpAdminScopesController,
+    McpAdminLimitsController,
     McpAppSessionsController,
     McpMemberProofsController,
     McpMemberProofsIntegrationController,
@@ -115,7 +117,7 @@ import { JwtService } from '../utils/jwt/jwt.service';
     McpMemberProofService,
     McpScopesService,
     McpAccessRequestsService,
-    McpWriteLimitService,
+    McpLimitService,
     JwtService,
   ],
 })

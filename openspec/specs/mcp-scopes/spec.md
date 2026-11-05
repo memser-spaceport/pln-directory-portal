@@ -24,6 +24,25 @@ Each MCP authorization SHALL store one level per scope: `none`, `read` or `write
 - **WHEN** a member sets `forum` to `none` on connection A
 - **THEN** connection B of the same member still lists the forum tools
 
+### Requirement: Only approved members can connect an agent
+
+`mcp.connect` SHALL be granted by the founder, unassigned, and investor policies, and by Directory Admin and PL Infra. `job_aspirant` SHALL NOT grant it. Effective access SHALL include `mcp.connect` only when the member's approval state is `APPROVED`. A member who is `PENDING`, `VERIFIED`, or `REJECTED` SHALL NOT see MCP in Settings and SHALL NOT be able to connect or call tools, even when a policy lists `mcp.connect`.
+
+#### Scenario: An approved founder
+
+- **WHEN** an approved member holds a founder policy
+- **THEN** Settings shows MCP connections and the member can approve an agent
+
+#### Scenario: LinkedIn Verified
+
+- **WHEN** a member's approval state is `VERIFIED` and the member holds a founder policy
+- **THEN** effective access does not include `mcp.connect`
+
+#### Scenario: Job Aspirant
+
+- **WHEN** a member holds only `job_aspirant`
+- **THEN** effective access does not include `mcp.connect`
+
 ### Requirement: New connections start read only
 On consent approval, the server SHALL store `read` for every scope, or `none` where the admin maximum is `none`, whatever `allowChanges` the request sends. When the approve request sends `acknowledgedContactDetails: true`, the server SHALL store `contactAckAt` on the authorization.
 
@@ -261,17 +280,61 @@ The `ai_apps` scope SHALL also offer `redeploy_ai_app`, `rename_ai_app` and `upd
 - **WHEN** an agent of a member who did not create the app, and is not a directory admin, calls `redeploy_ai_app`
 - **THEN** the call fails as not allowed and no deploy starts
 
-### Requirement: Agent writes are rate limited per member
+### Requirement: Each MCP call type has a limit per member
 
-Each write tool SHALL allow at most 10 calls per member per tool per hour. A call over the limit SHALL be refused with an error that names the limit, SHALL NOT run, SHALL NOT create an access request, and SHALL emit `mcp-tool-refused` with reason `rate_limited`. If the limit store is unavailable the call SHALL be allowed.
+Each MCP tool SHALL belong to one call type: `read`, `contact_read`, `write` or `forum_post`. `get_member`, `get_team`, `get_project` and `get_event` SHALL be `contact_read`. Other reads and `whoami` SHALL be `read`. Write tools SHALL be `write`. A forum post issued through a Forum member proof SHALL count as `forum_post`. The limit numbers, the 80% warning ratio and the PL infra multiplier SHALL live in one config. The first numbers are drafts.
 
-#### Scenario: Eleventh post in an hour
+Each call type SHALL have one limit per member, shared by every tool of that type and by every pod. A `contact_read` SHALL count each member in the response who has an email, Telegram, or LinkedIn value. The same member SHALL count once. A contact-read response with more such members than remain SHALL be refused and SHALL return none of those contact details. A call over the limit SHALL be refused, SHALL NOT run, and SHALL NOT create an access request. The refusal SHALL name the call type, the amount used, the limit and the reset time, and SHALL tell the agent to inform the member and point them to Settings → MCP connections. When usage reaches 80% of a limit, the tool result SHALL include that warning once in the window. If the limit store is unavailable, `contact_read`, `write` and `forum_post` SHALL be refused. `read` SHALL be allowed.
 
-- **WHEN** a connection calls `post_team_news` an eleventh time within the hour
-- **THEN** the call is refused with "LabOS limits agents to 10 post_team_news calls an hour. Try again later."
+#### Scenario: Writes share one limit
+
+- **WHEN** a member's agent uses the write limit on `post_team_news` and then calls `update_my_profile`
+- **THEN** the second call counts against the same write limit
+
+#### Scenario: At the limit
+
+- **WHEN** a call would pass the member's contact read limit
+- **THEN** the call is refused, the tool does not run, and the message names the limit, the reset time and Settings
+
+#### Scenario: Near the limit
+
+- **WHEN** a call reaches 80% of a limit and a later call in the same window stays under the limit
+- **THEN** only the first of those calls includes the warning
+
+#### Scenario: Store down
+
+- **WHEN** the limit store cannot be read
+- **THEN** a write, a contact read and a forum post are refused, and a read is allowed
+
+### Requirement: PL infra members have higher limits
+
+A member assigned the PL infra policy SHALL get 5 times the standard limit for each call type. Any other member SHALL get the standard limit.
+
+#### Scenario: PL infra tier
+
+- **WHEN** a PL infra member's agent passes the standard contact read limit
+- **THEN** the call is still allowed, up to 5 times that limit
+
+### Requirement: Directory admins can override one member's limit
+
+A directory admin SHALL set, change and remove a limit for one member and one call type, with an optional end date, through `/v1/admin/mcp/limits`. The route SHALL accept the same LabOS session as Settings and SHALL require `directory.admin.full`. A signed-in member without that permission SHALL get 403. After the end date the tier limit SHALL apply again. Each change SHALL be stored with the admin and the time. Admins SHALL be able to read a member's usage, members limited in the last 7 days, and the active overrides.
+
+#### Scenario: Override end date
+
+- **WHEN** an admin sets a write limit that ends in the current window
+- **THEN** the custom limit applies until that time, and the tier limit applies after it
+
+### Requirement: Members can read their MCP limits
+
+`GET /v1/mcp/limits` SHALL return each call type with the amount used, the limit, the reset time, any active override, and whether the limit was hit in the last 7 days.
+
+#### Scenario: Member reads limits
+
+- **WHEN** the member opens their MCP limits
+- **THEN** each call type shows usage, the limit, the reset time and any override
 
 ### Requirement: Each MCP tool call sends its own event
-Each MCP tool call SHALL send a PostHog event named `mcp-<tool name with dashes>-called`, with `result` `ok`, `error` (plus `errorKind`) or `refused` (plus `reason`), and `toolName`, `memberUid`, `authorizationUid`, `clientName`, `scope` and `operation`. Search and list tools SHALL add the query text, at most 200 characters, and filters. Write tools SHALL send only ids, field names and counts. `mcp-tool-invoked` SHALL still be sent. When `ANALYTICS_PROVIDER` is not `posthog`, the same MCP events SHALL still be sent to PostHog if `POSTHOG_API_KEY` and `POSTHOG_HOST` are set.
+Each MCP tool call SHALL send a PostHog event named `mcp-<tool name with dashes>-called`, with `result` `ok`, `error` (plus `errorKind`) or `refused` (plus `reason`), `callType`, and `toolName`, `memberUid`, `authorizationUid`, `clientName`, `scope` and `operation`. When a limit check runs, the event SHALL also send `limitResult` of `allowed`, `warned` or `limited`. Search and list tools SHALL add the query text, at most 200 characters, and filters. Write tools SHALL send only ids, field names and counts. `mcp-tool-invoked` SHALL still be sent. A forum post counted through a member proof SHALL send `mcp-forum-post-called` with `callType` `forum_post`.
 
 #### Scenario: Search call
 - **GIVEN** a connected agent
