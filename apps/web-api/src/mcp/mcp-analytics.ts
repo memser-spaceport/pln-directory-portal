@@ -137,6 +137,8 @@ export const MCP_TOOL_PROPERTY_BUILDERS: Readonly<Record<string, McpToolProperty
     return { pid: numberProp(args.pid), tid: numberProp(edited?.tid), titleChanged: typeof args.title === 'string' };
   },
   delete_forum_post: (args) => ({ pid: numberProp(args.pid) }),
+  upvote_forum_post: (args) => ({ pid: numberProp(args.pid) }),
+  remove_forum_post_upvote: (args) => ({ pid: numberProp(args.pid) }),
 
   list_news: (args, result) => ({
     feed: stringProp(result?.feed) ?? stringProp(args.feed) ?? 'latest',

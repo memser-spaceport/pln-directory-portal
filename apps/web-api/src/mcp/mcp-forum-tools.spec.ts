@@ -154,10 +154,43 @@ describe('forum tools (LAB-3031)', () => {
     );
   });
 
+  it('upvotes a post as the member, and takes the upvote back (LAB-3170)', async () => {
+    const { proofs, tools } = build();
+    request.mockResolvedValue(answer(200, { status: { code: 'ok' }, response: {} }));
+
+    expect(await tools.upvote_forum_post.execute(CTX, { pid: 6 })).toEqual({ upvoted: { pid: 6 } });
+    expect(await tools.remove_forum_post_upvote.execute(CTX, { pid: 6 })).toEqual({ removedUpvote: { pid: 6 } });
+
+    expect(proofs.issueForAuthorization).toHaveBeenCalledTimes(2);
+    expect(call(0)).toEqual({
+      method: 'PUT',
+      url: 'https://forum.example/api/v3/posts/6/vote',
+      data: { delta: 1 },
+      headers: { [FORUM_PROOF_HEADER]: 'mcp_mp_abc', 'Content-Type': 'application/json' },
+    });
+    expect(call(1)).toEqual({
+      method: 'DELETE',
+      url: 'https://forum.example/api/v3/posts/6/vote',
+      data: undefined,
+      headers: { [FORUM_PROOF_HEADER]: 'mcp_mp_abc', 'Content-Type': 'application/json' },
+    });
+  });
+
+  it("passes NodeBB's refusal through when the member upvotes their own post", async () => {
+    const { tools } = build();
+    request.mockResolvedValue(
+      answer(400, { status: { code: 'bad-request', message: 'You cannot vote on your own post' }, response: {} })
+    );
+
+    await expect(tools.upvote_forum_post.execute(CTX, { pid: 7 })).rejects.toThrow('You cannot vote on your own post');
+  });
+
   it('refuses a pid that is not a post id without minting a proof', async () => {
     const { proofs, tools } = build();
     for (const pid of ['7/../../api/admin', 0, -3, 2.5]) {
       await expect(tools.delete_forum_post.execute(CTX, { pid })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(tools.upvote_forum_post.execute(CTX, { pid })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(tools.remove_forum_post_upvote.execute(CTX, { pid })).rejects.toBeInstanceOf(BadRequestException);
       await expect(tools.edit_forum_post.execute(CTX, { pid, content: 'x' })).rejects.toBeInstanceOf(
         BadRequestException
       );
