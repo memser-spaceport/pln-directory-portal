@@ -24,6 +24,25 @@ Each MCP authorization SHALL store one level per scope: `none`, `read` or `write
 - **WHEN** a member sets `forum` to `none` on connection A
 - **THEN** connection B of the same member still lists the forum tools
 
+### Requirement: Only approved members can connect an agent
+
+`mcp.connect` SHALL be granted by the founder, unassigned, and investor policies, and by Directory Admin and PL Infra. `job_aspirant` SHALL NOT grant it. Effective access SHALL include `mcp.connect` only when the member's approval state is `APPROVED`. A member who is `PENDING`, `VERIFIED`, or `REJECTED` SHALL NOT see MCP in Settings and SHALL NOT be able to connect or call tools, even when a policy lists `mcp.connect`.
+
+#### Scenario: An approved founder
+
+- **WHEN** an approved member holds a founder policy
+- **THEN** Settings shows MCP connections and the member can approve an agent
+
+#### Scenario: LinkedIn Verified
+
+- **WHEN** a member's approval state is `VERIFIED` and the member holds a founder policy
+- **THEN** effective access does not include `mcp.connect`
+
+#### Scenario: Job Aspirant
+
+- **WHEN** a member holds only `job_aspirant`
+- **THEN** effective access does not include `mcp.connect`
+
 ### Requirement: New connections start read only
 On consent approval, the server SHALL store `read` for every scope, or `none` where the admin maximum is `none`, whatever `allowChanges` the request sends. When the approve request sends `acknowledgedContactDetails: true`, the server SHALL store `contactAckAt` on the authorization.
 
@@ -298,7 +317,7 @@ A member assigned the PL infra policy SHALL get 5 times the standard limit for e
 
 ### Requirement: Directory admins can override one member's limit
 
-A directory admin SHALL set, change and remove a limit for one member and one call type, with an optional end date, through `/v1/admin/mcp/limits`. After the end date the tier limit SHALL apply again. Each change SHALL be stored with the admin and the time. Admins SHALL be able to read a member's usage, members limited in the last 7 days, and the active overrides.
+A directory admin SHALL set, change and remove a limit for one member and one call type, with an optional end date, through `/v1/admin/mcp/limits`. The route SHALL accept the same LabOS session as Settings and SHALL require `directory.admin.full`. A signed-in member without that permission SHALL get 403. After the end date the tier limit SHALL apply again. Each change SHALL be stored with the admin and the time. Admins SHALL be able to read a member's usage, members limited in the last 7 days, and the active overrides.
 
 #### Scenario: Override end date
 

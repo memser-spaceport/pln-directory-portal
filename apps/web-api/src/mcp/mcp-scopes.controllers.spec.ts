@@ -54,9 +54,12 @@ describe('MCP scope routes', () => {
     expect(scopes.setAdminScopes).toHaveBeenCalledWith({ scopes: { forum: 'none' } }, 'admin-1');
   });
 
-  it('GET, PUT and DELETE /v1/admin/mcp/limits require AdminAuthGuard and record the admin', async () => {
+  it('GET, PUT and DELETE /v1/admin/mcp/limits use the LabOS session and record the admin', async () => {
     expect(Reflect.getMetadata(PATH_METADATA, McpAdminLimitsController)).toBe('v1/admin/mcp/limits');
-    expect(Reflect.getMetadata(GUARDS_METADATA, McpAdminLimitsController)).toEqual([AdminAuthGuard]);
+    expect(Reflect.getMetadata(GUARDS_METADATA, McpAdminLimitsController)).toEqual([
+      UserAccessTokenValidateGuard,
+      RbacGuard,
+    ]);
     expect(Reflect.getMetadata(METHOD_METADATA, McpAdminLimitsController.prototype.view)).toBe(RequestMethod.GET);
     expect(Reflect.getMetadata(METHOD_METADATA, McpAdminLimitsController.prototype.set)).toBe(RequestMethod.PUT);
     expect(Reflect.getMetadata(METHOD_METADATA, McpAdminLimitsController.prototype.remove)).toBe(RequestMethod.DELETE);
@@ -65,7 +68,7 @@ describe('MCP scope routes', () => {
       setOverride: jest.fn().mockResolvedValue({ uid: 'o1' }),
       removeOverride: jest.fn().mockResolvedValue({ removed: true }),
     };
-    const controller = new McpAdminLimitsController(limits as any);
+    const controller = new McpAdminLimitsController(limits as any, {} as any);
     const body = { callType: 'write', limit: 5 };
     await controller.set('member-1', body, { user: { memberUid: 'admin-1' } });
     expect(limits.setOverride).toHaveBeenCalledWith('member-1', body, 'admin-1');
