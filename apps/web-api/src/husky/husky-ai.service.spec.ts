@@ -255,6 +255,39 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
     expect(HuskyResponseSchema.parse(JSON.parse(raw)).content).toBe('Hello');
   });
 
+  it('streams "Searching the web" for a web search and returns its cited pages as web sources', async () => {
+    const webResult =
+      'Web search results (public web, not directory data).\n\nSummary: Saturn Grid builds storage.\n\n' +
+      'Web page: Saturn Grid - About [WebLink](https://saturngrid.example/about)';
+    streamTextMock.mockImplementation(({ onStepFinish }) => ({
+      fullStream: (async function* () {
+        yield { type: 'tool-call-streaming-start', toolCallId: 'c1', toolName: 'searchWeb' };
+        await onStepFinish({ toolResults: [{ toolName: 'searchWeb', result: webResult }] });
+        yield {
+          type: 'text-delta',
+          textDelta: 'From the web: Saturn Grid builds storage [1](https://saturngrid.example/about).',
+        };
+      })(),
+      finishReason: Promise.resolve('stop'),
+    }));
+    streamObjectMock.mockReturnValue(
+      structuredStream(['{"followUpQuestions":[],"sources":["https://saturngrid.example/about"],"actions":[]}'])
+    );
+
+    const raw = await readAll(await service.createContextualToolsResponse(chatInfo, false));
+
+    expect(raw.indexOf('"Searching the web"')).toBeGreaterThan(-1);
+    expect(raw.indexOf('"Found 1 web page"')).toBeGreaterThan(raw.indexOf('"Searching the web"'));
+    const refs = HuskyResponseSchema.parse(JSON.parse(raw)).sourceRefs ?? [];
+    expect(refs[0]).toEqual({
+      index: 1,
+      title: 'Saturn Grid - About',
+      type: 'web',
+      externalUrl: 'https://saturngrid.example/about',
+    });
+    expect(refs.filter((ref) => ref.type === 'web')).toHaveLength(1);
+  });
+
   it('streams one valid JSON object even when the answer contains quotes, backslashes and newlines', async () => {
     prisma.member.findUnique.mockResolvedValue({ uid: 'member-1', deletedAt: null });
     const answer = 'Example Team builds "storage" tools.\nSee C:\\path for details.';

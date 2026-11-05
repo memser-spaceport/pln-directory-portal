@@ -353,6 +353,11 @@ Each MCP tool call SHALL send a PostHog event named `mcp-<tool name with dashes>
 - **WHEN** a tool is in the registry, or is `whoami`
 - **THEN** it has one per-tool event name and one property builder
 
+#### Scenario: Database provider still reaches PostHog
+- **GIVEN** `ANALYTICS_PROVIDER` is `db` and PostHog is configured
+- **WHEN** an agent calls `search_members`
+- **THEN** PostHog gets `mcp-search-members-called` and `mcp-tool-invoked`
+
 ### Requirement: Agents can do the remaining member actions
 
 The connected agent SHALL be able to do the member actions LabOS allows by hand, except sign-in, email change, forum writes, file uploads, deal redeem codes, and AI-app deploy keys. Each action SHALL be its own tool, SHALL call the same service as the page, and SHALL use that page's permission check. A call that names a field the tool does not accept SHALL change nothing.

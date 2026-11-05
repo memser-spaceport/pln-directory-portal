@@ -14,6 +14,7 @@ import { WarmIntrosTool } from './warm-intros.tool';
 import { JobOpeningsTool } from './job-openings.tool';
 import { NewsTool } from './news.tool';
 import { DemoDayTool } from './demo-day.tool';
+import { WebSearchTool } from './web-search.tool';
 import { SearchModule } from '../../search/search.module';
 import { RbacModule } from '../../rbac/rbac.module';
 import { AccessControlV2Module } from '../../access-control-v2/access-control-v2.module';
@@ -54,6 +55,7 @@ import { WarmIntrosV2Module } from '../../warm-intros-v2/warm-intros-v2.module';
     JobOpeningsTool,
     NewsTool,
     DemoDayTool,
+    WebSearchTool,
   ],
   exports: [HuskyAiToolsService],
 })
