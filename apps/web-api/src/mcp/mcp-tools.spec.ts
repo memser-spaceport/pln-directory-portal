@@ -248,6 +248,8 @@ describe('scope registry', () => {
       'reply_to_forum_thread',
       'edit_forum_post',
       'delete_forum_post',
+      'upvote_forum_post',
+      'remove_forum_post_upvote',
     ]);
   });
 

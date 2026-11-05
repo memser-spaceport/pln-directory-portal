@@ -5,8 +5,9 @@ import { decodeHtmlEntities } from '../utils/html-entities';
 import { McpActorContext, McpToolDef } from './mcp-tools';
 
 /**
- * Forum tools (LAB-3031): an agent searches and reads threads, lists categories, starts threads, replies, and edits or
- * deletes the member's own posts (LAB-3144, LAB-3145) in NodeBB as the member who connected it. Every call mints a one-time member proof for this connection (LAB-3075) and sends it
+ * Forum tools (LAB-3031): an agent searches and reads threads, lists categories, starts threads, replies, edits or
+ * deletes the member's own posts (LAB-3144, LAB-3145), and upvotes posts (LAB-3170) in NodeBB as the member who
+ * connected it. Every call mints a one-time member proof for this connection (LAB-3075) and sends it
  * to NodeBB in `X-PL-Member-Proof`; NodeBB redeems it, runs that one request as the member under the member's own
  * forum privileges, and stores which agent wrote the post. No session outlives the request, so a disconnected agent
  * can't post: no proof is issued for it.
@@ -398,6 +399,8 @@ function forumPostId(value: unknown): number {
   return pid;
 }
 
+const VOTE_PID_HINT = 'Post id (pid) from get_forum_thread, or mainPid from list_forum_threads';
+
 export function forumTools(proofs: ProofIssuer): McpToolDef[] {
   return [
     {
@@ -604,6 +607,38 @@ export function forumTools(proofs: ProofIssuer): McpToolDef[] {
         const pid = forumPostId(args.pid);
         await callForum(proofs, ctx, 'DELETE', `/api/v3/posts/${pid}/state`);
         return { deleted: { pid } };
+      },
+    },
+    {
+      name: 'upvote_forum_post',
+      description:
+        'Upvote a LabOS forum post as the member: the Like on the forum page. pid is a post id from get_forum_thread, ' +
+        "or a thread's mainPid from list_forum_threads to upvote the thread itself. Upvoting a post the member already " +
+        "upvoted keeps it upvoted. The member can't upvote their own posts. Only upvote what the member asked you to.",
+      visibility: 'forum_write',
+      inputSchema: {
+        pid: z.number().int().positive().describe(VOTE_PID_HINT),
+      },
+      execute: async (ctx, args = {}) => {
+        const pid = forumPostId(args.pid);
+        // delta 1 is an upvote; NodeBB refuses any other delta from an agent (no downvotes).
+        await callForum(proofs, ctx, 'PUT', `/api/v3/posts/${pid}/vote`, { delta: 1 });
+        return { upvoted: { pid } };
+      },
+    },
+    {
+      name: 'remove_forum_post_upvote',
+      description:
+        "Take back the member's upvote on a LabOS forum post (pid from get_forum_thread, or a thread's mainPid). " +
+        "Nothing changes when the member hasn't upvoted it.",
+      visibility: 'forum_write',
+      inputSchema: {
+        pid: z.number().int().positive().describe(VOTE_PID_HINT),
+      },
+      execute: async (ctx, args = {}) => {
+        const pid = forumPostId(args.pid);
+        await callForum(proofs, ctx, 'DELETE', `/api/v3/posts/${pid}/vote`);
+        return { removedUpvote: { pid } };
       },
     },
   ];
