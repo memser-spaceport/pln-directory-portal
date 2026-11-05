@@ -311,7 +311,6 @@ export const MCP_TOOL_PROPERTY_BUILDERS: Readonly<Record<string, McpToolProperty
   update_team_communities: uidsOnly('teamUid'),
   update_team_roster: uidsOnly('teamUid', 'memberUid'),
   create_team: none,
-  delete_team: uidsOnly('teamUid'),
   review_team_enrichment: uidsOnly('teamUid'),
   create_project: uidsOnly('maintainingTeamUid'),
   delete_project: uidsOnly('projectUid'),

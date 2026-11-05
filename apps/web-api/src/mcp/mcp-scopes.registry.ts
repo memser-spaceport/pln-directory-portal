@@ -133,7 +133,6 @@ export const MCP_TOOL_SCOPES: Readonly<Record<string, McpToolScope>> = {
   update_team_communities: { scope: 'directory', level: 'write' },
   update_team_roster: { scope: 'directory', level: 'write' },
   create_team: { scope: 'directory', level: 'write' },
-  delete_team: { scope: 'directory', level: 'write' },
   review_team_enrichment: { scope: 'directory', level: 'write' },
   create_project: { scope: 'directory', level: 'write' },
   delete_project: { scope: 'directory', level: 'write' },

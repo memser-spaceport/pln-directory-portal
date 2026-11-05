@@ -236,6 +236,13 @@ describe('scope registry', () => {
     expect(registryMaxLevel('search')).toBe('read');
   });
 
+  it('offers no team delete, even to a directory admin (LAB-3079)', () => {
+    // A directory admin deletes a team on its page; agents can't
+    expect(fullCatalog.map((t) => t.name)).not.toContain('delete_team');
+    expect(MCP_TOOL_SCOPES).not.toHaveProperty('delete_team');
+    expect(toolsForPermissions(everything, fullCatalog).map((t) => t.name)).not.toContain('delete_team');
+  });
+
   it('keeps RBAC visibility independent of scopes', () => {
     expect(toolsForPermissions(everything, fullCatalog).map((t) => t.name)).toEqual(fullCatalog.map((t) => t.name));
   });
