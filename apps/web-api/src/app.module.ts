@@ -44,7 +44,6 @@ import { HuskyModule } from './husky/husky.module';
 import { HuskySearchModule } from './husky/husky-search.module';
 import { HomeModule } from './home/home.module';
 import { InternalsModule } from './internals/internals.module';
-import { OsoMetricsModule } from './oso-metrics/oso-metrics.module';
 import { MemberSubscriptionsModule } from './member-subscriptions/member-subscriptions.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AskModule } from './asks/asks.module';
@@ -66,6 +65,7 @@ import { DemoDaysModule } from './demo-days/demo-days.module';
 import { TeamPitchesModule } from './team-pitches/team-pitches.module';
 import { SpvSpotlightsModule } from './spv-spotlights/spv-spotlights.module';
 import { ContactSupportModule } from './contact-support/contact-support.module';
+import { IntroRequestsModule } from './intro-requests/intro-requests.module';
 import { PushNotificationsModule } from './push-notifications/push-notifications.module';
 import { WebSocketModule } from './websocket/websocket.module';
 import { TeamEnrichmentModule } from './team-enrichment/team-enrichment.module';
@@ -82,6 +82,8 @@ import { NetworkOverviewModule } from './network-overview/network-overview.modul
 import { PlInfraMembersModule } from './pl-infra-members/pl-infra-members.module';
 import { FeedModule } from './feed/feed.module';
 import { FollowsModule } from './follows/follows.module';
+import { MemberSignalsModule } from './member-signals/member-signals.module';
+import { MemberInterestProfileModule } from './member-interest-profile/member-interest-profile.module';
 import { InvestorOutreachModule } from './investor-outreach/investor-outreach.module';
 import { PathfinderModule } from './pathfinder/pathfinder.module';
 import { MasterProfileModule } from './master-profile/master-profile.module';
@@ -161,7 +163,6 @@ import { McpModule } from './mcp/mcp.module';
     HuskySearchModule,
     HomeModule,
     InternalsModule,
-    OsoMetricsModule,
     MemberSubscriptionsModule,
     NotificationsModule,
     AskModule,
@@ -179,6 +180,7 @@ import { McpModule } from './mcp/mcp.module';
     TeamPitchesModule,
     SpvSpotlightsModule,
     ContactSupportModule,
+    IntroRequestsModule,
     PushNotificationsModule,
     WebSocketModule,
     TeamEnrichmentModule,
@@ -195,6 +197,8 @@ import { McpModule } from './mcp/mcp.module';
     PlInfraMembersModule,
     FeedModule,
     FollowsModule,
+    MemberSignalsModule,
+    MemberInterestProfileModule,
     InvestorOutreachModule,
     PathfinderModule,
     MasterProfileModule,

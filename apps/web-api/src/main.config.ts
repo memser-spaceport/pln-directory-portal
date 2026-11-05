@@ -6,8 +6,11 @@ import { CsrfFilter, nestCsrf } from 'ncsrf';
 import { NotFoundExceptionFilter } from './filters/not-found-exception.filter';
 import { CSRFGuard } from './guards/csfr.guard';
 import { buildCorsOptions } from './utils/constants';
+import { resolveTrustProxyHops } from './utils/trust-proxy';
 
 export function mainConfig(app: INestApplication) {
+  // `req.ip` is the real client behind the ALB, so the throttler limits each client on its own (LAB-3086).
+  app.getHttpAdapter().getInstance().set('trust proxy', resolveTrustProxyHops(process.env.TRUST_PROXY_HOPS));
   // API Versioning
   app.enableVersioning({
     type: VersioningType.URI,

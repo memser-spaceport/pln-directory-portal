@@ -1,10 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { FeedNewsLikeStatus } from 'libs/contracts/src/schema/feed';
 import { PrismaService } from '../shared/prisma.service';
+import { MemberSignalsService } from '../member-signals/member-signals.service';
 
 @Injectable()
 export class FeedLikesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly memberSignals: MemberSignalsService) {}
 
   /** Like a Feed News item. Idempotent: re-liking succeeds without double-counting. */
   async like(memberUid: string, newsItemUid: string): Promise<FeedNewsLikeStatus> {
@@ -13,6 +14,10 @@ export class FeedLikesService {
       throw new NotFoundException(`News item with uid ${newsItemUid} not found`);
     }
 
+    const existing = await this.prisma.feedNewsLike.findUnique({
+      where: { newsItemUid_memberUid: { newsItemUid, memberUid } },
+      select: { id: true },
+    });
     await this.prisma.feedNewsLike.upsert({
       where: {
         newsItemUid_memberUid: { newsItemUid, memberUid },
@@ -20,15 +25,31 @@ export class FeedLikesService {
       create: { newsItemUid, memberUid },
       update: {},
     });
+    if (!existing) {
+      void this.memberSignals.record({
+        memberUid,
+        action: 'news-like',
+        entityType: 'NEWS_ITEM',
+        entityUid: newsItemUid,
+      });
+    }
 
     return this.buildStatus(newsItemUid, true);
   }
 
   /** Remove a like. Idempotent: removing when not liked succeeds. */
   async unlike(memberUid: string, newsItemUid: string): Promise<FeedNewsLikeStatus> {
-    await this.prisma.feedNewsLike.deleteMany({
+    const { count } = await this.prisma.feedNewsLike.deleteMany({
       where: { newsItemUid, memberUid },
     });
+    if (count > 0) {
+      void this.memberSignals.record({
+        memberUid,
+        action: 'news-like-removed',
+        entityType: 'NEWS_ITEM',
+        entityUid: newsItemUid,
+      });
+    }
 
     return this.buildStatus(newsItemUid, false);
   }

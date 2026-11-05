@@ -7,10 +7,8 @@
 - Backend: NestJS `9.4.3` (`@nestjs/common`, `@nestjs/core`, `@nestjs/platform-express`)
 - Frontend: Next.js `15.5.28` with React `18.3.1` (Pages Router, not App Router). `apps/back-office` does not use the Nx Next plugin: its `build` / `serve` targets run the `next` CLI through `@nrwl/workspace:run-commands`, `next.config.js` holds the settings the plugin used to add (`experimental.externalDir` for `libs/*`, the SVGR rule for `{ ReactComponent }` SVG imports), and tests use `next/jest`. The production build writes `dist/apps/back-office` (`.next`, `public`, `next.config.js`, `package.json`), which `next start dist/apps/back-office` serves.
 - Data layer: Prisma `4.4.0` + PostgreSQL, Redis (`cache-manager-redis-store`, Bull `4.x`); also MongoDB (`mongodb` driver) and OpenSearch (`@opensearch-project/opensearch`)
-- Prisma schemas (two clients):
-  - `apps/web-api/prisma/schema.prisma`: main Directory database (`DATABASE_URL`); client in `@prisma/client`; migrations in `apps/web-api/prisma/migrations`
-  - `apps/web-api/prisma/oso-schema.prisma`: read-only models for the external OSO (Open Source Observer) metrics database (`OSO_DATABASE_URL`); client generated to `node_modules/.prisma/oso-client` and used by `OsoPrismaService` (`apps/web-api/src/shared/oso-prisma.service.ts`) and the `oso-metrics` module. It has no migrations in this repo.
-  - Generate both clients after install or a schema change: `npx prisma generate --schema=apps/web-api/prisma/schema.prisma` and `npx prisma generate --schema=apps/web-api/prisma/oso-schema.prisma`. The `Dockerfile` and `heroku-postbuild` generate both; `ci-check-up.yml` generates only the main client.
+- Prisma schema:
+  - `apps/web-api/prisma/schema.prisma`: Directory database (`DATABASE_URL`); client in `@prisma/client`; migrations in `apps/web-api/prisma/migrations`
 - Language/testing: TypeScript `4.7.4` (locked; `^4.3.5` in `package.json`), Jest `27.2.3` with `ts-jest` `27.1.5`, `@types/node` `16.11.7`
 - API/schema tooling: `@ts-rest/*` `3.19.3`, Zod `3.19.0`, `nestjs-zod`
 - Observability/analytics: Sentry (`@sentry/node`), OpenTelemetry, PostHog (`posthog-node`)
@@ -20,7 +18,7 @@
 - `apps/web-api`: NestJS API service
 - `apps/web-api/src`: domain modules (`members`, `teams`, `projects`, `deals`, etc.), controllers, services, guards, interceptors
 - `apps/web-api/src/app.module.ts`: central Nest module composition and global middleware/interceptor/filter wiring
-- `apps/web-api/prisma`: Prisma schemas (`schema.prisma`, `oso-schema.prisma`), migrations, seeds, fixtures
+- `apps/web-api/prisma`: Prisma schema (`schema.prisma`), migrations, seeds, fixtures
 - `apps/web-api/src/scripts`: one-off `ts-node` scripts run through the `api:*` scripts in `package.json` (imports, seeds, backfills, exports)
 - `apps/web-api/src/cli.ts`: `nest-commander` CLI entry (commands in `src/commands`; built by the `web-api:build-cli` target)
 - `apps/web-api/docs`: API docs (data model, deployment guide, testing guidelines)

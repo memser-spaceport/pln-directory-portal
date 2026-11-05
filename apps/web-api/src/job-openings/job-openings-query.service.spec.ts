@@ -183,12 +183,20 @@ describe('JobTeamSchema inAppApplyAvailable', () => {
 });
 
 describe('JobOpeningsQueryService.listCrawlIndex', () => {
-  it('returns uid and updatedAt for visible openings', async () => {
-    const findMany = jest.fn().mockResolvedValue([{ uid: 'j1', updatedAt: new Date('2026-01-01T00:00:00.000Z') }]);
+  const row = (dates: { publishedAt?: string; postedDate?: string }) => ({
+    uid: 'j1',
+    updatedAt: new Date('2026-11-03T03:00:00.000Z'),
+    publishedAt: dates.publishedAt ? new Date(dates.publishedAt) : null,
+    postedDate: dates.postedDate ? new Date(dates.postedDate) : null,
+    detectionDate: new Date('2026-09-01T00:00:00.000Z'),
+  });
+
+  it('returns uid, updatedAt and the posting date as lastModified for visible openings', async () => {
+    const findMany = jest.fn().mockResolvedValue([row({ publishedAt: '2026-10-01T00:00:00.000Z' })]);
     const service = new JobOpeningsQueryService({ jobOpening: { findMany } } as unknown as PrismaService);
 
     await expect(service.listCrawlIndex()).resolves.toEqual({
-      jobs: [{ uid: 'j1', updatedAt: '2026-01-01T00:00:00.000Z' }],
+      jobs: [{ uid: 'j1', updatedAt: '2026-11-03T03:00:00.000Z', lastModified: '2026-10-01T00:00:00.000Z' }],
     });
 
     expect(findMany).toHaveBeenCalledWith(
@@ -197,9 +205,20 @@ describe('JobOpeningsQueryService.listCrawlIndex', () => {
           status: { notIn: HIDDEN_JOB_OPENING_STATUSES },
           teamUid: { not: null },
         },
-        select: { uid: true, updatedAt: true },
+        select: { uid: true, updatedAt: true, publishedAt: true, postedDate: true, detectionDate: true },
       })
     );
+  });
+
+  // LAB-3094: the nightly sync rewrites updatedAt on every row, so it says nothing about the posting.
+  it('falls back from publishedAt to postedDate to detectionDate, never to updatedAt', async () => {
+    const findMany = jest
+      .fn()
+      .mockResolvedValue([row({ postedDate: '2026-08-15T00:00:00.000Z' }), { ...row({}), uid: 'j2' }]);
+    const service = new JobOpeningsQueryService({ jobOpening: { findMany } } as unknown as PrismaService);
+
+    const { jobs } = await service.listCrawlIndex();
+    expect(jobs.map((job) => job.lastModified)).toEqual(['2026-08-15T00:00:00.000Z', '2026-09-01T00:00:00.000Z']);
   });
 });
 

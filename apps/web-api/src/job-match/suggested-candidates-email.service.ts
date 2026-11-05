@@ -229,6 +229,7 @@ export class SuggestedCandidatesEmailService {
       await this.awsService.sendHtmlEmail({
         from: process.env.SES_SOURCE_EMAIL || 'no-reply@plnetwork.io',
         to: [lead.email],
+        bcc: process.env.LABOS_EMAIL ? [process.env.LABOS_EMAIL] : [],
         subject: email.subject,
         html: email.html,
         text: email.text,
