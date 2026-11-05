@@ -341,15 +341,21 @@ async function withOpeningPostSnippets<T extends { snippet: string | null; mainP
 /**
  * A NodeBB topic page as the agent sees it: the thread, then its posts as plain text, oldest first. NodeBB sends one
  * page of posts (the member's posts-per-page setting, 20 by default); `truncated` says the thread has more.
+ *
+ * Deleted posts are left out, and so is a deleted thread: NodeBB still sends one to a member who may view deleted
+ * threads (a moderator, or its author), but the agent sees the forum as members do. NodeBB's `postcount` keeps
+ * soft-deleted posts (only a purge lowers it), so `replyCount` takes off the deleted posts on this page. A deleted
+ * post on a later page of a truncated thread is still counted.
  */
 export function forumThread(payload: Row): Row {
   const tid = asNumber(payload.tid);
   const cid = asNumber(payload.cid);
-  if (tid === undefined) {
+  if (tid === undefined || payload.deleted) {
     throw new NotFoundException('Forum thread not found');
   }
   const postCount = asNumber(payload.postcount) ?? 0;
   const rawPosts = Array.isArray(payload.posts) ? (payload.posts as Row[]) : [];
+  const deletedOnPage = rawPosts.filter((post) => post?.deleted).length;
   const posts = rawPosts
     .filter((post) => post && !post.deleted)
     .map((post) => {
@@ -375,7 +381,7 @@ export function forumThread(payload: Row): Row {
     cid: cid ?? null,
     title: forumText(payload.title),
     url: cid !== undefined ? forumThreadUrl(cid, tid) : null,
-    replyCount: Math.max(0, postCount - 1),
+    replyCount: Math.max(0, postCount - 1 - deletedOnPage),
     locked: Boolean(payload.locked),
     ...(tags.length ? { tags } : {}),
     posts,

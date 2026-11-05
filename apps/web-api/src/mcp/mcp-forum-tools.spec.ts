@@ -381,7 +381,8 @@ describe('forum tools (LAB-3031)', () => {
         cid: 3,
         title: 'Test post (LAB-3076 MCP forum write)',
         url: 'https://labos.example/forum/topics/3/3',
-        replyCount: 2,
+        // NodeBB's postcount (3) still counts the deleted reply: one reply is left.
+        replyCount: 1,
         locked: false,
         tags: ['mcp'],
         truncated: false,
@@ -414,6 +415,32 @@ describe('forum tools (LAB-3031)', () => {
         replyCount: 44,
         truncated: true,
       });
+    });
+
+    it('counts deleted posts on the page out of a truncated thread, and keeps it truncated', async () => {
+      const { tools } = build();
+      request.mockResolvedValue(
+        answer(200, { tid: 9, cid: 2, title: 'Long', postcount: 45, posts: [{ pid: 1 }, { pid: 2, deleted: 1 }] })
+      );
+      await expect(tools.get_forum_thread.execute(CTX, { uid: '9' })).resolves.toMatchObject({
+        replyCount: 43,
+        truncated: true,
+      });
+    });
+
+    it('says a deleted thread is not found, even when NodeBB sends it to a member who may view deleted threads', async () => {
+      const { tools } = build();
+      request.mockResolvedValue(
+        answer(200, {
+          tid: 7,
+          cid: 3,
+          title: 'LAB-3145 delete check',
+          deleted: 1,
+          postcount: 1,
+          posts: [{ pid: 15, index: 0, deleted: 1, content: '<p>gone</p>' }],
+        })
+      );
+      await expect(tools.get_forum_thread.execute(CTX, { uid: '7' })).rejects.toThrow('Forum thread not found');
     });
 
     it('refuses a uid that is not a thread id without calling the forum', async () => {
