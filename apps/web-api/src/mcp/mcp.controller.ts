@@ -97,8 +97,9 @@ import { FollowsService } from '../follows/follows.service';
 import { JobOpeningsSavedService } from '../job-openings/job-openings-saved.service';
 import { JobOpeningsQueryService } from '../job-openings/job-openings-query.service';
 import { JobAlertsService } from '../job-alerts/job-alerts.service';
+import { countContactMembers } from './mcp-contact-count';
 import { McpLimitService } from './mcp-limit.service';
-import { limitRefusalText, limitWarningText } from './mcp-limit.messages';
+import { contactPageRefusalText, limitRefusalText, limitWarningText } from './mcp-limit.messages';
 import { McpLimitDecision } from './mcp-limits.config';
 import { TeamNewsService } from '../team-news/team-news.service';
 import { MembersHooksService } from '../members/members.hooks.service';
@@ -388,9 +389,103 @@ export class McpController {
         }
         continue;
       }
+      const refuseLimited = (decision: McpLimitDecision) => {
+        const reason = decision.unavailable ? 'limit_unavailable' : 'rate_limited';
+        trackMcpToolCalled(this.analytics, actor, {
+          toolName: tool.name,
+          result: 'refused',
+          reason,
+          callType: decision.callType,
+          limitResult: 'limited',
+        });
+        const scopeEntry = toolScope(tool.name);
+        if (scopeEntry) {
+          void this.analytics.trackEvent({
+            name: ANALYTICS_EVENTS.MCP.TOOL_REFUSED,
+            distinctId: actor.memberUid,
+            properties: {
+              toolName: tool.name,
+              scope: scopeEntry.scope,
+              reason,
+              callType: decision.callType,
+              memberUid: actor.memberUid,
+              clientName: actor.clientName,
+              authorizationUid: actor.authorizationUid,
+            },
+          });
+        }
+        return {
+          isError: true as const,
+          content: [{ type: 'text' as const, text: limitRefusalText(decision) }],
+        };
+      };
+
       register(tool, tool.description, async (args) => {
         const toolArgs = args ?? {};
         const callType = toolCallType(tool.name);
+        if (callType === 'contact_read') {
+          const peek = await this.limits.peek(actor.memberUid, callType);
+          if (!peek.allowed) return refuseLimited(peek);
+          try {
+            const result = await tool.execute(ctx, toolArgs);
+            const contacts = countContactMembers(result);
+            if (contacts > peek.remaining) {
+              trackMcpToolCalled(this.analytics, actor, {
+                toolName: tool.name,
+                result: 'refused',
+                reason: 'rate_limited',
+                callType: 'contact_read',
+                limitResult: 'limited',
+              });
+              return {
+                isError: true as const,
+                content: [{ type: 'text' as const, text: contactPageRefusalText(peek, contacts) }],
+              };
+            }
+            const decision =
+              contacts > 0 ? await this.limits.tryConsume(actor.memberUid, callType, Date.now(), contacts) : peek;
+            if (!decision.allowed) return refuseLimited(decision);
+            trackMcpToolInvocation(this.analytics, actor, {
+              toolName: tool.name,
+              args: toolArgs,
+              result,
+              success: true,
+              isError: false,
+            });
+            trackMcpToolCalled(this.analytics, actor, {
+              toolName: tool.name,
+              result: 'ok',
+              args: toolArgs,
+              output: result,
+              callType: 'contact_read',
+              limitResult: decision.warned ? 'warned' : 'allowed',
+            });
+            const content = [{ type: 'text' as const, text: JSON.stringify(result) }];
+            if (decision.warned) content.push({ type: 'text' as const, text: limitWarningText(decision) });
+            return { content };
+          } catch (error) {
+            const isSoftError = error instanceof NotFoundException || error instanceof BadRequestException;
+            trackMcpToolInvocation(this.analytics, actor, {
+              toolName: tool.name,
+              args: toolArgs,
+              success: false,
+              isError: isSoftError,
+              error,
+            });
+            trackMcpToolCalled(this.analytics, actor, {
+              toolName: tool.name,
+              result: 'error',
+              args: toolArgs,
+              error,
+              callType: 'contact_read',
+              limitResult: 'allowed',
+            });
+            if (isSoftError) {
+              return { isError: true as const, content: [{ type: 'text' as const, text: String(error.message) }] };
+            }
+            throw error;
+          }
+        }
         let decision: McpLimitDecision | null = null;
         if (callType) {
           decision = await this.limits.tryConsume(actor.memberUid, callType);

@@ -228,7 +228,8 @@ same connection and scope from the last 24 hours (a write refusal raises a read 
 
 Each tool has one call type: `read`, `contact_read` (`get_member`, `get_team`, `get_project`, `get_event`), `write`,
 or `forum_post` (a Forum member proof with write access). One counter per member and call type is shared by every tool
-and every pod. Draft numbers, the 80% warning ratio and the 5× PL infra multiplier are in
+and every pod. A contact read counts each member in the response who has an email, Telegram, or LinkedIn value.
+A page with more of those members than remain is refused and returns none of them. Draft numbers, the 80% warning ratio and the 5× PL infra multiplier are in
 `apps/web-api/src/mcp/mcp-limits.config.ts`. The tier comes from the PL infra policy. A directory admin sets a
 per-member override, with an optional end date, at `/v1/admin/mcp/limits`. Each change is stored with the admin and
 the time.

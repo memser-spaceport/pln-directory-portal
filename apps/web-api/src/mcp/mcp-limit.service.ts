@@ -15,13 +15,48 @@ import {
   tierLimit,
 } from './mcp-limits.config';
 
+type RedisReply<T> = (error: Error | null, value: T) => void;
+
+/**
+ * The cache store uses Redis 3. Its commands return `true` when queued and pass the reply to a callback.
+ * A promise-style client (tests, Redis 4) returns the reply instead. `redisReply` accepts both.
+ */
 type LimitRedis = {
-  incr: (key: string) => Promise<number>;
-  decr: (key: string) => Promise<number>;
-  expire: (key: string, seconds: number) => Promise<unknown>;
-  get: (key: string) => Promise<string | null>;
-  set: (key: string, value: string, options: { EX: number; NX: true }) => Promise<string | null>;
+  incr: (key: string, callback?: RedisReply<number>) => unknown;
+  incrby?: (key: string, amount: number, callback?: RedisReply<number>) => unknown;
+  incrBy?: (key: string, amount: number, callback?: RedisReply<number>) => unknown;
+  decr: (key: string, callback?: RedisReply<number>) => unknown;
+  decrby?: (key: string, amount: number, callback?: RedisReply<number>) => unknown;
+  decrBy?: (key: string, amount: number, callback?: RedisReply<number>) => unknown;
+  expire: (key: string, seconds: number, callback?: RedisReply<number>) => unknown;
+  get: (key: string, callback?: RedisReply<string | null>) => unknown;
+  set: (key: string, value: string, ...args: unknown[]) => unknown;
 };
+
+function redisReply<T>(invoke: (callback: RedisReply<T>) => unknown): Promise<T> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (error: Error | null, value?: T) => {
+      if (settled) return;
+      settled = true;
+      if (error) reject(error);
+      else resolve(value as T);
+    };
+    let result: unknown;
+    try {
+      result = invoke((error, value) => finish(error, value));
+    } catch (error) {
+      finish(error instanceof Error ? error : new Error(String(error)));
+      return;
+    }
+    if (result && typeof (result as Promise<T>).then === 'function') {
+      (result as Promise<T>).then(
+        (value) => finish(null, value),
+        (error: unknown) => finish(error instanceof Error ? error : new Error(String(error)))
+      );
+    }
+  });
+}
 
 type MemberRow = { uid: string; name: string | null; email: string | null };
 
@@ -104,28 +139,37 @@ export class McpLimitService {
     private readonly analytics: AnalyticsService
   ) {}
 
-  async tryConsume(memberUid: string, callType: McpCallType, now = Date.now()): Promise<McpLimitDecision> {
-    const tier = await this.tierFor(memberUid);
-    const override = await this.activeOverride(memberUid, callType, now);
-    const limit = override?.limit ?? tierLimit(tier, callType);
-    const { bucket, resetsAt } = limitBucket(callType, now);
-    const base = { callType, limit, resetsAt, tier, override: Boolean(override) };
-    const ttl = MCP_LIMITS.standard[callType].windowSeconds;
-
+  async tryConsume(memberUid: string, callType: McpCallType, now = Date.now(), amount = 1): Promise<McpLimitDecision> {
+    const { base, ttl, key } = await this.budget(memberUid, callType, now);
+    const count = Math.max(1, Math.trunc(amount));
     try {
-      const key = counterKey(callType, memberUid, bucket);
-      const used = await this.increment(key, ttl);
-      if (used > limit) {
-        await this.decrement(key, ttl);
-        await this.recordHit(memberUid, callType, resetsAt);
-        return { ...base, allowed: false, warned: false, unavailable: false, used: limit };
+      const used = await this.incrementBy(key, ttl, count);
+      if (used > base.limit) {
+        await this.decrementBy(key, ttl, count);
+        await this.recordHit(memberUid, callType, base.resetsAt);
+        return { ...base, allowed: false, warned: false, unavailable: false, used: base.limit };
       }
-      const warned = await this.warnOnce(callType, memberUid, bucket, ttl, used, limit);
+      const warned = await this.warnOnce(callType, memberUid, this.bucketOf(callType, now), ttl, used, base.limit);
       return { ...base, allowed: true, warned, unavailable: false, used };
     } catch (error) {
-      this.logger.warn(`MCP limit store unavailable for ${callType}: ${String(error)}`);
-      const failClosed = callType !== 'read';
-      return { ...base, allowed: !failClosed, warned: false, unavailable: true, used: 0 };
+      return this.storeDown(callType, base, error);
+    }
+  }
+
+  /** How many contact details remain in this window. Does not count a call. */
+  async peek(
+    memberUid: string,
+    callType: McpCallType,
+    now = Date.now()
+  ): Promise<McpLimitDecision & { remaining: number }> {
+    const { base, key } = await this.budget(memberUid, callType, now);
+    try {
+      const used = Math.min(await this.readCount(key), base.limit);
+      const remaining = Math.max(0, base.limit - used);
+      return { ...base, allowed: remaining > 0, warned: false, unavailable: false, used, remaining };
+    } catch (error) {
+      const decision = this.storeDown(callType, base, error);
+      return { ...decision, remaining: 0 };
     }
   }
 
@@ -395,35 +439,88 @@ export class McpLimitService {
     return null;
   }
 
-  private async increment(key: string, ttlSeconds: number): Promise<number> {
+  private async budget(memberUid: string, callType: McpCallType, now: number) {
+    const tier = await this.tierFor(memberUid);
+    const override = await this.activeOverride(memberUid, callType, now);
+    const limit = override?.limit ?? tierLimit(tier, callType);
+    const { bucket, resetsAt } = limitBucket(callType, now);
+    return {
+      ttl: MCP_LIMITS.standard[callType].windowSeconds,
+      key: counterKey(callType, memberUid, bucket),
+      base: { callType, limit, resetsAt, tier, override: Boolean(override) },
+    };
+  }
+
+  private bucketOf(callType: McpCallType, now: number): number {
+    return limitBucket(callType, now).bucket;
+  }
+
+  private storeDown(
+    callType: McpCallType,
+    base: { callType: McpCallType; limit: number; resetsAt: string; tier: McpLimitTier; override: boolean },
+    error: unknown
+  ): McpLimitDecision {
+    this.logger.warn(`MCP limit store unavailable for ${callType}: ${String(error)}`);
+    const failClosed = callType !== 'read';
+    return { ...base, allowed: !failClosed, warned: false, unavailable: true, used: 0 };
+  }
+
+  private async incrementBy(key: string, ttlSeconds: number, amount: number): Promise<number> {
     const client = this.redisClient();
     if (client) {
-      const count = Number(await client.incr(key));
-      if (count === 1) {
-        await client.expire(key, ttlSeconds);
+      const count = await this.add(client, key, amount);
+      if (count === amount) {
+        await redisReply<number>((callback) => client.expire(key, ttlSeconds, callback));
       }
       return count;
     }
     const used = Number((await this.cache.get<number>(key)) ?? 0);
-    const next = used + 1;
+    const next = used + amount;
     await this.cache.set(key, next, { ttl: ttlSeconds });
     return next;
   }
 
-  private async decrement(key: string, ttlSeconds: number): Promise<void> {
+  private async decrementBy(key: string, ttlSeconds: number, amount: number): Promise<void> {
     const client = this.redisClient();
     if (client) {
-      await client.decr(key);
+      await this.subtract(client, key, amount);
       return;
     }
     const used = Number((await this.cache.get<number>(key)) ?? 0);
-    await this.cache.set(key, Math.max(0, used - 1), { ttl: ttlSeconds });
+    await this.cache.set(key, Math.max(0, used - amount), { ttl: ttlSeconds });
+  }
+
+  private add(client: LimitRedis, key: string, amount: number): Promise<number> {
+    const incrBy = client.incrby ?? client.incrBy;
+    if (incrBy) {
+      return redisReply<number>((callback) => incrBy(key, amount, callback));
+    }
+    return this.step(client, key, amount, 1);
+  }
+
+  private subtract(client: LimitRedis, key: string, amount: number): Promise<number> {
+    const decrBy = client.decrby ?? client.decrBy;
+    if (decrBy) {
+      return redisReply<number>((callback) => decrBy(key, amount, callback));
+    }
+    return this.step(client, key, amount, -1);
+  }
+
+  private async step(client: LimitRedis, key: string, amount: number, direction: 1 | -1): Promise<number> {
+    let count = 0;
+    for (let i = 0; i < amount; i++) {
+      count =
+        direction === 1
+          ? await redisReply<number>((callback) => client.incr(key, callback))
+          : await redisReply<number>((callback) => client.decr(key, callback));
+    }
+    return count;
   }
 
   private async readCount(key: string): Promise<number> {
     const client = this.redisClient();
     if (client) {
-      const value = await client.get(key);
+      const value = await redisReply<string | null>((callback) => client.get(key, callback));
       return value ? Number(value) : 0;
     }
     return Number((await this.cache.get<number>(key)) ?? 0);
@@ -442,7 +539,7 @@ export class McpLimitService {
     const key = warnKey(callType, memberUid, bucket);
     const client = this.redisClient();
     if (client) {
-      const set = await client.set(key, '1', { EX: ttlSeconds, NX: true });
+      const set = await redisReply<string | null>((callback) => client.set(key, '1', 'EX', ttlSeconds, 'NX', callback));
       return set === 'OK';
     }
     if (await this.cache.get(key)) return false;

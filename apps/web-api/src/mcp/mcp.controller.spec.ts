@@ -159,6 +159,18 @@ function build(
         override: false,
       };
     }),
+    peek: jest.fn(async (_member: string, callType: string) => ({
+      allowed: !opts.limitUnavailable,
+      warned: false,
+      unavailable: Boolean(opts.limitUnavailable),
+      callType,
+      used: 0,
+      remaining: opts.limitUnavailable ? 0 : 30,
+      limit: 30,
+      resetsAt: '2026-11-05T12:00:00.000Z',
+      tier: 'standard',
+      override: false,
+    })),
   };
   const scopes = new McpScopesService(prisma as any, analytics as any, accessRequests);
   const stub = {} as any;

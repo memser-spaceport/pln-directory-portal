@@ -1,5 +1,6 @@
 jest.mock('../analytics/service/analytics.service', () => ({ AnalyticsService: jest.fn() }));
 
+import { countContactMembers } from './mcp-contact-count';
 import { MCP_LIMITS } from './mcp-limits.config';
 import { McpLimitService } from './mcp-limit.service';
 import { limitRefusalText } from './mcp-limit.messages';
@@ -28,7 +29,7 @@ function cache() {
   };
 }
 
-function build(opts: { infra?: boolean } = {}) {
+function build(opts: { infra?: boolean; cache?: unknown } = {}) {
   const overrides: OverrideRow[] = [];
   const changes: Array<Record<string, unknown>> = [];
   const hits: Array<Record<string, unknown>> = [];
@@ -91,7 +92,7 @@ function build(opts: { infra?: boolean } = {}) {
     },
   };
   const analytics = { trackEvent: jest.fn().mockResolvedValue(undefined) };
-  const service = new McpLimitService(cache() as any, prisma as any, analytics as any);
+  const service = new McpLimitService((opts.cache ?? cache()) as any, prisma as any, analytics as any);
   return { service, prisma, analytics, overrides, changes, hits };
 }
 
@@ -142,6 +143,32 @@ describe('McpLimitService', () => {
     expect((await service.tryConsume('m1', 'contact_read', NOW)).allowed).toBe(true);
     expect((await service.tryConsume('m2', 'write', NOW)).allowed).toBe(true);
     expect((await service.tryConsume('m1', 'write', NOW + 60 * 60 * 1000)).allowed).toBe(true);
+  });
+
+  it('counts contact details per member and does not keep a batch that does not fit', async () => {
+    const { service } = build();
+    const start = Date.parse('2026-11-05T10:00:00.000Z');
+    await service.setOverride('m1', { callType: 'contact_read', limit: 10 }, 'admin-1', start);
+
+    expect((await service.tryConsume('m1', 'contact_read', start, 6)).used).toBe(6);
+    const peek = await service.peek('m1', 'contact_read', start);
+    expect(peek.remaining).toBe(4);
+    expect((await service.tryConsume('m1', 'contact_read', start, 5)).allowed).toBe(false);
+    expect((await service.peek('m1', 'contact_read', start)).remaining).toBe(4);
+    expect((await service.tryConsume('m1', 'contact_read', start, 4)).allowed).toBe(true);
+  });
+
+  it('counts each member with email, Telegram, or LinkedIn once', () => {
+    const count = countContactMembers({
+      teamMemberRoles: [
+        { member: { uid: 'a', email: 'a@example.com', name: 'Ada' } },
+        { member: { uid: 'a', email: 'a@example.com' } },
+        { member: { uid: 'b', telegramHandler: '@b' } },
+        { member: { uid: 'c', linkedinHandler: 'c' } },
+        { member: { uid: 'd', name: 'Dee' } },
+      ],
+    });
+    expect(count).toBe(3);
   });
 
   it('gives a PL infra member 5 times the standard limit', async () => {
@@ -207,6 +234,58 @@ describe('McpLimitService', () => {
     expect(refused.allowed).toBe(false);
     expect(limitRefusalText(refused)).toContain('5 forum post calls per day');
     expect(limitRefusalText(refused)).toContain('Point them to their limits in Settings');
+  });
+
+  it('counts Redis 3 replies, which return true and pass the count to a callback', async () => {
+    const counts = new Map<string, number>();
+    const warned = new Set<string>();
+    const client = {
+      incr(key: string, callback: (error: null, value: number) => void) {
+        const next = (counts.get(key) ?? 0) + 1;
+        counts.set(key, next);
+        callback(null, next);
+        return true;
+      },
+      incrby(key: string, amount: number, callback: (error: null, value: number) => void) {
+        const next = (counts.get(key) ?? 0) + amount;
+        counts.set(key, next);
+        callback(null, next);
+        return true;
+      },
+      decrby(key: string, amount: number, callback: (error: null, value: number) => void) {
+        const next = (counts.get(key) ?? 0) - amount;
+        counts.set(key, next);
+        callback(null, next);
+        return true;
+      },
+      expire(_key: string, _ttl: number, callback: (error: null, value: number) => void) {
+        callback(null, 1);
+        return true;
+      },
+      get(key: string, callback: (error: null, value: string | null) => void) {
+        const value = counts.get(key);
+        callback(null, value === undefined ? null : String(value));
+        return true;
+      },
+      set(key: string, _value: string, ...args: unknown[]) {
+        const callback = args[args.length - 1] as (error: null, value: string | null) => void;
+        if (warned.has(key)) callback(null, null);
+        else {
+          warned.add(key);
+          callback(null, 'OK');
+        }
+        return true;
+      },
+    };
+    const { service } = build({
+      cache: { store: { getClient: () => client }, get: jest.fn(), set: jest.fn() },
+    });
+    await service.setOverride('m1', { callType: 'contact_read', limit: 10 }, 'admin-1', NOW);
+
+    const burst = await Promise.all(Array.from({ length: 18 }, () => service.tryConsume('m1', 'contact_read', NOW)));
+    expect(burst.filter((result) => result.allowed)).toHaveLength(10);
+    expect(burst.filter((result) => !result.allowed)).toHaveLength(8);
+    expect((await service.tryConsume('m1', 'contact_read', NOW)).allowed).toBe(false);
   });
 
   it('refuses contact reads, writes and forum posts when the store is down, and allows reads', async () => {
