@@ -60,6 +60,15 @@ export class AnalyticsService {
     } catch (error) {
       this.logger.error(`Failed to track event: ${event.name}`, error);
     }
+
+    // The database provider does not reach PostHog. MCP events still must.
+    if (this.provider !== this.postHogProvider && event.name.startsWith('mcp-')) {
+      try {
+        await this.postHogProvider.trackEvent(event);
+      } catch (error) {
+        this.logger.error(`Failed to send ${event.name} to PostHog`, error);
+      }
+    }
   }
 
   async shutdown(): Promise<void> {
