@@ -133,22 +133,49 @@ function urlKeys(url: string): string[] {
   return [...keys];
 }
 
+/** A bare root path names no page: every site has one. */
+const ROOT_KEYS = new Set(['', '/']);
+
 function sharesKey(left: string, right: string): boolean {
-  const rightKeys = new Set(urlKeys(right));
+  const rightKeys = new Set(urlKeys(right).filter((key) => !ROOT_KEYS.has(key)));
   return urlKeys(left).some((key) => rightKeys.has(key));
 }
 
-/** A web page matches only its own full URL: two sites can share a path such as `/`. */
-function sameWebUrl(left: string, right: string): boolean {
-  const normalize = (url: string) => url.trim().replace(/\/$/, '');
-  return normalize(left) === normalize(right);
+function isAbsolute(url: string): boolean {
+  return /^https?:\/\//i.test(url.trim());
+}
+
+/** Host without `www.`, path without trailing slash, and query: one page on one site. */
+function siteKey(url: string): string | null {
+  try {
+    const parsed = new URL(url.trim());
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+    return `${host}${parsed.pathname.replace(/\/+$/, '')}${parsed.search}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Two absolute URLs are the same source only on the same site and page. An absolute URL
+ * matches a relative directory path through its own path.
+ */
+function linksMatch(cited: string, link: string): boolean {
+  if (isAbsolute(cited) && isAbsolute(link)) {
+    const citedKey = siteKey(cited);
+    return citedKey !== null && citedKey === siteKey(link);
+  }
+  return sharesKey(cited, link);
 }
 
 function findEntry(catalog: CatalogEntry[], cited: string): CatalogEntry | undefined {
-  return catalog.find((entry) =>
-    entry.type === 'web'
-      ? sameWebUrl(cited, entry.directoryLink)
-      : sharesKey(cited, entry.directoryLink) || (entry.externalUrl ? sharesKey(cited, entry.externalUrl) : false)
+  // A page the web search returned wins: its URL can share a site with a directory record's website.
+  const web = catalog.find((entry) => entry.type === 'web' && linksMatch(cited, entry.directoryLink));
+  if (web) return web;
+  return catalog.find(
+    (entry) =>
+      entry.type !== 'web' &&
+      (linksMatch(cited, entry.directoryLink) || (entry.externalUrl ? linksMatch(cited, entry.externalUrl) : false))
   );
 }
 
@@ -162,7 +189,7 @@ function pushEntry(sourceRefs: HuskySourceRef[], seenUrls: Set<string>, index: n
   if (entry.type === 'web') {
     // A web page found by the searchWeb tool: it has no page in the directory.
     sourceRefs.push({ index, title: entry.title, type: 'web', externalUrl: entry.directoryLink });
-    remember(seenUrls, entry.directoryLink, true);
+    remember(seenUrls, entry.directoryLink);
     return;
   }
   sourceRefs.push({
@@ -176,16 +203,22 @@ function pushEntry(sourceRefs: HuskySourceRef[], seenUrls: Set<string>, index: n
   remember(seenUrls, entry.externalUrl);
 }
 
-function remember(seen: Set<string>, url?: string, exact = false) {
+/** An absolute URL is remembered as its site page; a directory path by its path keys. */
+function remember(seen: Set<string>, url?: string) {
   if (!url) return;
-  for (const key of exact ? [url.trim(), url.trim().replace(/\/$/, '')] : urlKeys(url)) seen.add(key);
+  if (isAbsolute(url)) {
+    const key = siteKey(url);
+    if (key !== null) seen.add(`site:${key}`);
+    return;
+  }
+  for (const key of urlKeys(url)) seen.add(key);
 }
 
 function alreadyRepresented(seen: Set<string>, url: string): boolean {
-  if (/^https?:\/\//.test(url.trim())) {
-    // An absolute URL is the same source only when the whole URL matches, or when a
-    // directory path that it names was already cited.
-    return [url.trim(), url.trim().replace(/\/$/, '')].some((key) => seen.has(key)) || pathSeen(seen, url);
+  if (isAbsolute(url)) {
+    // The same site page, or a directory path that the absolute URL names, was already cited.
+    const key = siteKey(url);
+    return (key !== null && seen.has(`site:${key}`)) || pathSeen(seen, url);
   }
   return urlKeys(url).some((key) => seen.has(key));
 }
@@ -228,7 +261,7 @@ export function buildSourceRefs(input: {
       continue;
     }
 
-    const citedDirectory = entry.type === 'web' || sharesKey(cited, entry.directoryLink);
+    const citedDirectory = entry.type === 'web' || linksMatch(cited, entry.directoryLink);
     if (!citedDirectory && entry.externalUrl) {
       mismatches.push(`citation [${index}](${cited}) resolved to ${entry.directoryLink}`);
     }

@@ -285,3 +285,87 @@ Web page: Bar [WebLink](https://bar.example/)`,
     ]);
   });
 });
+
+describe('buildSourceRefs matching of absolute URLs', () => {
+  const TEAM_WITH_SITE = (website: string) => `Team: Saturn Grid [TeamLink](/teams/t1)
+Website: ${website}`;
+
+  it('does not link a cited site root to a team whose website is another site', () => {
+    const { sourceRefs } = buildSourceRefs({
+      content:
+        'Saturn Grid is in the directory [1](/teams/t1). From the web: it ships storage [2](https://example.org/).',
+      toolResults: `${TEAM_WITH_SITE('https://saturngrid.io')}\n\nWeb page: Example [WebLink](https://example.org/)`,
+    });
+
+    expect(sourceRefs).toEqual([
+      {
+        index: 1,
+        title: 'Saturn Grid',
+        type: 'team',
+        directoryLink: '/teams/t1',
+        externalUrl: 'https://saturngrid.io',
+      },
+      { index: 2, title: 'Example', type: 'web', externalUrl: 'https://example.org/' },
+    ]);
+  });
+
+  it('keeps a URL on another site with the same path as a team website external', () => {
+    const { sourceRefs } = buildSourceRefs({
+      content: 'See [1](https://other.org/about).',
+      toolResults: TEAM_WITH_SITE('https://saturngrid.io/about'),
+    });
+
+    expect(sourceRefs).toEqual([
+      { index: 1, title: 'https://other.org/about', type: 'external', externalUrl: 'https://other.org/about' },
+    ]);
+  });
+
+  it('still links the team when the answer cites its own website with www and a trailing slash', () => {
+    const { sourceRefs } = buildSourceRefs({
+      content: 'Saturn Grid [1](https://www.saturngrid.io/).',
+      toolResults: TEAM_WITH_SITE('https://saturngrid.io'),
+    });
+
+    expect(sourceRefs).toEqual([
+      {
+        index: 1,
+        title: 'Saturn Grid',
+        type: 'team',
+        directoryLink: '/teams/t1',
+        externalUrl: 'https://saturngrid.io',
+      },
+    ]);
+  });
+
+  it('still links the directory page when the answer cites it as an absolute directory URL', () => {
+    const { sourceRefs } = buildSourceRefs({
+      content: 'Saturn Grid [1](https://directory.example/teams/t1).',
+      toolResults: TEAM_WITH_SITE('https://saturngrid.io'),
+    });
+
+    expect(sourceRefs).toEqual([
+      {
+        index: 1,
+        title: 'Saturn Grid',
+        type: 'team',
+        directoryLink: '/teams/t1',
+        externalUrl: 'https://saturngrid.io',
+      },
+    ]);
+  });
+
+  it('does not treat an uncited LLM source on another site as already represented by a team website', () => {
+    const { sourceRefs } = buildSourceRefs({
+      content: 'Saturn Grid [1](/teams/t1).',
+      toolResults: TEAM_WITH_SITE('https://saturngrid.io'),
+      llmSources: ['https://example.org/'],
+    });
+
+    expect(sourceRefs[1]).toEqual({
+      index: 2,
+      title: 'https://example.org/',
+      type: 'external',
+      externalUrl: 'https://example.org/',
+    });
+  });
+});
