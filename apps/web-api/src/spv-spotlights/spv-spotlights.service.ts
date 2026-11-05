@@ -7,6 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { directoryListedMemberWhere } from '../members/member-visibility';
 import { PrismaService } from '../shared/prisma.service';
 import {
   accessRequestConflict,
@@ -40,6 +41,8 @@ const spotlightInclude = {
         where: {
           endDate: null,
           OR: [{ teamLead: true }, { role: { contains: 'founder', mode: 'insensitive' as const } }],
+          // Same public list as the team profile. Pending (L0) members stay off this card.
+          member: directoryListedMemberWhere(),
         },
         select: {
           role: true,

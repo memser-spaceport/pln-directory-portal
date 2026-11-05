@@ -6,6 +6,22 @@ SPV spotlights let admins present a team's SPV to investors and email them from 
 
 ## Requirements
 
+### Requirement: The public spotlight lists only approved team members
+
+The public spotlight response SHALL list a team member under founders only when that member's approval state is `APPROVED`, the role has no end date, and the role is a team lead or the role text contains "founder". The system SHALL omit pending (L0), verified, and rejected members. This is the same member set the public team profile lists.
+
+#### Scenario: A pending team lead is on the team
+
+- **GIVEN** a team lead whose member approval state is `PENDING`
+- **WHEN** a visitor opens the public spotlight for that team
+- **THEN** the founders list does not include that member
+
+#### Scenario: An approved founder is on the team
+
+- **GIVEN** a current team member whose role contains "founder" and whose member approval state is `APPROVED`
+- **WHEN** a visitor opens the public spotlight for that team
+- **THEN** the founders list includes that member
+
 ### Requirement: Admins save investors as a named list per SPV spotlight
 
 `POST /v1/admin/spv-spotlights/:uid/investor-lists` SHALL create an investor list on that spotlight from `name` and `participantUids`. The system SHALL trim `name`. The system SHALL refuse an empty `name`, a `name` longer than 100 characters and an empty `participantUids` with HTTP 422. The list SHALL store the email of each participant that is an investor participant of that spotlight, trimmed and lower-cased, once, in the order of `participantUids`. The system SHALL skip participants that are not investor participants of that spotlight or have no email; if none is left, the system SHALL return HTTP 400 and store nothing. A list name SHALL be unique within a spotlight; a second list with the same name SHALL return HTTP 409. The response SHALL be the list as `{ uid, name, emails, createdAt, updatedAt }`.
