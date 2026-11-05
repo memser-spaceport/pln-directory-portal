@@ -2,6 +2,8 @@ import {
   BadRequestException,
   CACHE_MANAGER,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Inject,
   Injectable,
   Logger,
@@ -13,7 +15,10 @@ import { AnalyticsService } from '../analytics/service/analytics.service';
 import { MemberSignInService, SignedInMember } from '../integration-keys/member-sign-in.service';
 import { PrismaService } from '../shared/prisma.service';
 import { ANALYTICS_EVENTS } from '../utils/constants';
+import { trackMcpToolCalled } from './mcp-analytics';
 import { MemberProofScope } from './dto/member-proof.dto';
+import { limitRefusalText, limitWarningText } from './mcp-limit.messages';
+import { McpLimitService } from './mcp-limit.service';
 import { MCP_CONNECT_PERMISSION, MCP_MEMBER_PROOF_TTL_SECONDS, MCP_TOKEN_PREFIX } from './mcp.constants';
 import { generateSecret, hashSecret } from './mcp.crypto';
 import { McpOAuthService } from './mcp-oauth.service';
@@ -63,14 +68,15 @@ export class McpMemberProofService {
     private readonly signIn: MemberSignInService,
     private readonly analytics: AnalyticsService,
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
-    private readonly scopes: McpScopesService
+    private readonly scopes: McpScopesService,
+    private readonly limits: McpLimitService
   ) {}
 
   async issue(
     accessToken: string,
     audience: string,
     scope: MemberProofScope = 'ai_apps'
-  ): Promise<{ proof: string; expiresAt: Date }> {
+  ): Promise<{ proof: string; expiresAt: Date; warning?: string }> {
     const actor = await this.oauth.authenticateAccessToken(accessToken);
     const key = await this.prisma.integrationKey.findUnique({
       where: { uid: audience },
@@ -85,6 +91,22 @@ export class McpMemberProofService {
       throw new ForbiddenException(`This connection has no ${scopeLabel(scope)} access`);
     }
 
+    let warning: string | undefined;
+    if (scope === 'forum' && access === 'write') {
+      const decision = await this.limits.tryConsume(actor.memberUid, 'forum_post');
+      trackMcpToolCalled(this.analytics, actor, {
+        toolName: 'forum_post',
+        result: decision.allowed ? 'ok' : 'refused',
+        reason: decision.allowed ? undefined : decision.unavailable ? 'limit_unavailable' : 'rate_limited',
+        callType: 'forum_post',
+        limitResult: decision.allowed ? (decision.warned ? 'warned' : 'allowed') : 'limited',
+      });
+      if (!decision.allowed) {
+        throw new HttpException(limitRefusalText(decision), HttpStatus.TOO_MANY_REQUESTS);
+      }
+      if (decision.warned) warning = limitWarningText(decision);
+    }
+
     const proof = generateSecret(MCP_TOKEN_PREFIX.memberProof);
     const expiresAt = new Date(Date.now() + MCP_MEMBER_PROOF_TTL_SECONDS * 1000);
     const stored: StoredProof = {
@@ -97,7 +119,7 @@ export class McpMemberProofService {
     };
     await this.cache.set(proofKey(proof), stored, { ttl: MCP_MEMBER_PROOF_TTL_SECONDS });
     this.track(ANALYTICS_EVENTS.MCP.MEMBER_PROOF_ISSUED, actor.memberUid, { audience, scope });
-    return { proof, expiresAt };
+    return warning ? { proof, expiresAt, warning } : { proof, expiresAt };
   }
 
   /**

@@ -97,7 +97,9 @@ import { FollowsService } from '../follows/follows.service';
 import { JobOpeningsSavedService } from '../job-openings/job-openings-saved.service';
 import { JobOpeningsQueryService } from '../job-openings/job-openings-query.service';
 import { JobAlertsService } from '../job-alerts/job-alerts.service';
-import { McpWriteLimitService } from './mcp-write-limit.service';
+import { McpLimitService } from './mcp-limit.service';
+import { limitRefusalText, limitWarningText } from './mcp-limit.messages';
+import { McpLimitDecision } from './mcp-limits.config';
 import { TeamNewsService } from '../team-news/team-news.service';
 import { MembersHooksService } from '../members/members.hooks.service';
 import { PrismaService } from '../shared/prisma.service';
@@ -107,7 +109,7 @@ import { McpToolDef, toolInputSchema, toolsForPermissions, WHOAMI_TOOL, warmIntr
 import { McpAdminCaps, McpScopesService, resolveScope } from './mcp-scopes.service';
 import { McpAccessRequestsService } from './mcp-access-requests.service';
 import { calledToolNames, MCP_NEEDS_WRITE_NOTE, McpRefusalReason, planTools, refusalText } from './mcp-tool-plan';
-import { isWriteTool, toolScope } from './mcp-scopes.registry';
+import { toolCallType, toolScope } from './mcp-scopes.registry';
 import { mcpSettingsUrl } from './mcp.constants';
 
 @ApiTags('MCP')
@@ -134,7 +136,7 @@ export class McpController {
     private readonly teamNews: TeamNewsService,
     private readonly memberHooks: MembersHooksService,
     private readonly prisma: PrismaService,
-    private readonly writeLimit: McpWriteLimitService,
+    private readonly limits: McpLimitService,
     private readonly eventGuests: PLEventGuestsService,
     private readonly eventLocations: PLEventLocationsService,
     private readonly experiences: MemberExperiencesService,
@@ -367,7 +369,7 @@ export class McpController {
       return {
         isError: true,
         content: [
-          { type: 'text' as const, text: refusalText(reason, entry.scope, entry.level, settingsUrl, tool.name) },
+          { type: 'text' as const, text: refusalText(reason, entry.scope, entry.level, settingsUrl) },
         ],
       };
     };
@@ -388,10 +390,42 @@ export class McpController {
       }
       register(tool, tool.description, async (args) => {
         const toolArgs = args ?? {};
-        // Per-member hourly allowance for agent writes (LAB-3020).
-        if (isWriteTool(tool.name) && !(await this.writeLimit.tryConsume(actor.memberUid, tool.name))) {
-          return refuse(tool, 'rate_limited')();
+        const callType = toolCallType(tool.name);
+        let decision: McpLimitDecision | null = null;
+        if (callType) {
+          decision = await this.limits.tryConsume(actor.memberUid, callType);
+          if (!decision.allowed) {
+            const reason = decision.unavailable ? 'limit_unavailable' : 'rate_limited';
+            trackMcpToolCalled(this.analytics, actor, {
+              toolName: tool.name,
+              result: 'refused',
+              reason,
+              callType: decision.callType,
+              limitResult: 'limited',
+            });
+            const entry = toolScope(tool.name);
+            if (entry) {
+              void this.analytics.trackEvent({
+                name: ANALYTICS_EVENTS.MCP.TOOL_REFUSED,
+                distinctId: actor.memberUid,
+                properties: {
+                  toolName: tool.name,
+                  scope: entry.scope,
+                  reason,
+                  callType: decision.callType,
+                  memberUid: actor.memberUid,
+                  clientName: actor.clientName,
+                  authorizationUid: actor.authorizationUid,
+                },
+              });
+            }
+            return {
+              isError: true,
+              content: [{ type: 'text' as const, text: limitRefusalText(decision) }],
+            };
+          }
         }
+        const limitResult = decision?.warned ? 'warned' : decision ? 'allowed' : undefined;
         try {
           const result = await tool.execute(ctx, toolArgs);
           trackMcpToolInvocation(this.analytics, actor, {
@@ -406,10 +440,14 @@ export class McpController {
             result: 'ok',
             args: toolArgs,
             output: result,
+            callType: decision?.callType,
+            limitResult,
           });
-          return {
-            content: [{ type: 'text' as const, text: JSON.stringify(result) }],
-          };
+          const content = [{ type: 'text' as const, text: JSON.stringify(result) }];
+          if (decision?.warned) {
+            content.push({ type: 'text' as const, text: limitWarningText(decision) });
+          }
+          return { content };
         } catch (error) {
           const isSoftError = error instanceof NotFoundException || error instanceof BadRequestException;
           trackMcpToolInvocation(this.analytics, actor, {
@@ -419,7 +457,14 @@ export class McpController {
             isError: isSoftError,
             error,
           });
-          trackMcpToolCalled(this.analytics, actor, { toolName: tool.name, result: 'error', args: toolArgs, error });
+          trackMcpToolCalled(this.analytics, actor, {
+            toolName: tool.name,
+            result: 'error',
+            args: toolArgs,
+            error,
+            callType: decision?.callType,
+            limitResult,
+          });
           if (isSoftError) {
             return {
               isError: true,

@@ -309,6 +309,8 @@ model Member {
 
   memberEnrichment  MemberEnrichment?
   mcpAuthorizations McpAuthorization[]
+  mcpLimitOverrides McpLimitOverride[]
+  mcpLimitHits      McpLimitHit[]
   cvImport          MemberCvImport?
   memberSignals     MemberSignal[]
   interestProfile   MemberInterestProfileEntry[]
@@ -4695,6 +4697,53 @@ model McpAccessRequest {
   authorization    McpAuthorization @relation(fields: [authorizationUid], references: [uid], onDelete: Cascade)
 
   @@index([authorizationUid, scope, createdAt])
+}
+
+/// A custom MCP limit for one member and one call type (LAB-3150). No row, or a past `endsAt`, means the tier limit.
+model McpLimitOverride {
+  uid          String    @id @default(cuid())
+  memberUid    String
+  /// read | contact_read | write | forum_post
+  callType     String
+  limit        Int
+  endsAt       DateTime?
+  createdByUid String?
+  updatedByUid String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  member       Member    @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+
+  @@unique([memberUid, callType])
+  @@index([endsAt])
+}
+
+/// Who changed an MCP limit override, and when (LAB-3150).
+model McpLimitChange {
+  uid       String    @id @default(cuid())
+  memberUid String
+  callType  String
+  /// set | update | remove
+  action    String
+  limit     Int?
+  endsAt    DateTime?
+  actorUid  String?
+  createdAt DateTime  @default(now())
+
+  @@index([memberUid, createdAt])
+  @@index([createdAt])
+}
+
+/// A member hit an MCP limit in one window. One row per member, call type and reset time.
+model McpLimitHit {
+  uid       String   @id @default(cuid())
+  memberUid String
+  callType  String
+  hitAt     DateTime @default(now())
+  resetsAt  DateTime
+  member    Member   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+
+  @@unique([memberUid, callType, resetsAt])
+  @@index([hitAt])
 }
 
 /// Hash of a refresh token this grant already rotated (LAB-2895). Presenting one again revokes the grant.

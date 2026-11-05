@@ -383,6 +383,7 @@ export const ANALYTICS_EVENTS = {
     TOOL_REFUSED: 'mcp-tool-refused',
     SCOPE_LEVELS_UPDATED: 'mcp-scope-levels-updated',
     ADMIN_SCOPE_UPDATED: 'mcp-admin-scope-updated',
+    LIMIT_OVERRIDE_CHANGED: 'mcp-limit-override-changed',
   },
   INVESTOR_DB: {
     MANUAL_FIELDS_PATCHED: 'investor-db-manual-fields-patched',
