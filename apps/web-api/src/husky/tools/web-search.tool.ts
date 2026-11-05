@@ -13,6 +13,11 @@ import {
 export const WEB_SEARCH_TIMEOUT_MS = 20_000;
 /** At most this many web pages go back to the answer model. */
 export const MAX_WEB_PAGES = 6;
+/** Time limit to turn one Gemini grounding redirect into the page URL. */
+export const REDIRECT_RESOLVE_TIMEOUT_MS = 3_000;
+
+/** Gemini grounding gives a temporary redirect link to each page, not the page URL. */
+const GEMINI_REDIRECT_RE = /^https:\/\/vertexaisearch\.cloud\.google\.com\/grounding-api-redirect\//;
 
 /** Returned when the web search fails, times out or finds nothing. The answer then uses directory data only. */
 export const WEB_SEARCH_NOT_AVAILABLE =
@@ -84,8 +89,24 @@ function uniquePages(pages: WebPage[]): WebPage[] {
 
 /** The summary without the "Sources:" list, which the page lines replace. */
 function summaryOf(text: string): string {
-  const index = text.search(/^\s*\**sources\**:?\s*$/im);
+  const index = text.search(/(^|\s)\**sources\**\s*:/i);
   return (index === -1 ? text : text.slice(0, index)).trim();
+}
+
+/** Aborts when the parent signal aborts or when the time limit ends. */
+function linkedSignal(timeoutMs: number, parent?: AbortSignal): { signal: AbortSignal; done: () => void } {
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  const timer = setTimeout(abort, timeoutMs);
+  if (parent?.aborted) abort();
+  parent?.addEventListener('abort', abort);
+  return {
+    signal: controller.signal,
+    done: () => {
+      clearTimeout(timer);
+      parent?.removeEventListener('abort', abort);
+    },
+  };
 }
 
 function oneLine(text: string): string {
@@ -111,7 +132,7 @@ export class WebSearchTool {
         'Search the public web. Call this only when the directory tools returned nothing relevant or too little ' +
         'to answer the question well. Do not call it when the directory data answers the question.',
       parameters: WebSearchParams,
-      execute: (args) => this.execute(args),
+      execute: (args, options) => this.execute(args, options?.abortSignal),
     });
   }
 
@@ -121,19 +142,37 @@ export class WebSearchTool {
    * Opus setup searches with Gemini.
    */
   resolveSearchProvider(): AiProviderType {
-    const configured = process.env[HUSKY_SEARCH_PROVIDER_ENV_VAR]?.trim() as AiProviderType | undefined;
+    const configured = process.env[HUSKY_SEARCH_PROVIDER_ENV_VAR] as AiProviderType | undefined;
     const opus = process.env[HUSKY_SEARCH_OPUS_ENABLED_ENV_VAR]?.trim().toLowerCase() === 'true';
     if (opus || configured === 'anthropic') return 'gemini';
     if (configured === 'openai' || configured === 'gemini') return configured;
     return HUSKY_SEARCH_FALLBACK_PROVIDER;
   }
 
-  private async execute(args: z.infer<typeof WebSearchParams>): Promise<string> {
+  /**
+   * Turns a Gemini grounding redirect into the page URL (the Location header), so the
+   * answer cites a short, lasting URL. On failure the redirect link stays.
+   */
+  async resolvePageUrl(url: string, parent: AbortSignal): Promise<string> {
+    if (!GEMINI_REDIRECT_RE.test(url)) return url;
+    const { signal, done } = linkedSignal(REDIRECT_RESOLVE_TIMEOUT_MS, parent);
+    try {
+      const response = await fetch(url, { method: 'GET', redirect: 'manual', signal });
+      const location = response.headers.get('location');
+      return location && /^https?:\/\//.test(location) ? location : url;
+    } catch (error) {
+      this.logger.info(`Husky web search could not resolve a grounding redirect: ${error?.message ?? error}`);
+      return url;
+    } finally {
+      done();
+    }
+  }
+
+  private async execute(args: z.infer<typeof WebSearchParams>, parentSignal?: AbortSignal): Promise<string> {
     const query = args.query.trim();
     const provider = this.resolveSearchProvider();
     this.logger.info(`Husky web search (${provider}) for query: ${JSON.stringify(query)}`);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), WEB_SEARCH_TIMEOUT_MS);
+    const { signal, done } = linkedSignal(WEB_SEARCH_TIMEOUT_MS, parentSignal);
     try {
       const { text, experimental_providerMetadata: providerMetadata } = await generateText({
         model: this.aiProvider.getResponsesModel(undefined, { providerOverride: provider, useSearchGrounding: true }),
@@ -143,11 +182,15 @@ export class WebSearchTool {
         system: WEB_SEARCH_SYSTEM_PROMPT,
         prompt: query,
         maxSteps: 2,
-        abortSignal: controller.signal,
+        abortSignal: signal,
       });
 
-      const grounded = pagesFromGrounding(providerMetadata);
-      const pages = uniquePages(grounded.length ? grounded : pagesFromText(text ?? ''));
+      const grounded = pagesFromGrounding(providerMetadata).slice(0, MAX_WEB_PAGES * 2);
+      const found = grounded.length ? grounded : pagesFromText(text ?? '');
+      const resolved = await Promise.all(
+        found.map(async (page) => ({ ...page, url: await this.resolvePageUrl(page.url, signal) }))
+      );
+      const pages = uniquePages(resolved);
       const summary = summaryOf(text ?? '');
       if (!pages.length || !summary) {
         this.logger.error(`Husky web search (${provider}) returned no pages for query: ${JSON.stringify(query)}`);
@@ -162,7 +205,7 @@ export class WebSearchTool {
       );
       return WEB_SEARCH_NOT_AVAILABLE;
     } finally {
-      clearTimeout(timer);
+      done();
     }
   }
 }

@@ -270,4 +270,18 @@ Web page: Saturn Grid raises seed [WebLink](https://news.example/saturn-grid-see
 
     expect(sourceRefs.some((ref) => ref.type === 'web')).toBe(false);
   });
+
+  it('matches a web page by its full URL, not by a path that another site shares', () => {
+    const { sourceRefs } = buildSourceRefs({
+      content: 'Foo [1](https://foo.example/). Bar [2](https://bar.example/).',
+      toolResults: `Web page: Foo [WebLink](https://foo.example/)
+Web page: Bar [WebLink](https://bar.example/)`,
+      llmSources: ['https://foo.example/', 'https://bar.example/'],
+    });
+
+    expect(sourceRefs).toEqual([
+      { index: 1, title: 'Foo', type: 'web', externalUrl: 'https://foo.example/' },
+      { index: 2, title: 'Bar', type: 'web', externalUrl: 'https://bar.example/' },
+    ]);
+  });
 });

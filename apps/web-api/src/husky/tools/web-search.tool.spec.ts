@@ -134,6 +134,58 @@ describe('WebSearchTool', () => {
     expect(logger.error).toHaveBeenCalled();
   });
 
+  it('replaces a Gemini grounding redirect with the page URL from its Location header', async () => {
+    const redirect = 'https://vertexaisearch.cloud.google.com/grounding-api-redirect/AbC123';
+    const failing = 'https://vertexaisearch.cloud.google.com/grounding-api-redirect/Broken';
+    const fetchMock = jest.fn(async (url: string) => {
+      if (url === failing) throw new Error('network down');
+      return { headers: { get: () => 'https://saturngrid.example/about' } };
+    });
+    global.fetch = fetchMock as any;
+    generateText.mockResolvedValue({
+      text: 'Saturn Grid builds storage. Sources: https://inline.example',
+      experimental_providerMetadata: {
+        google: {
+          groundingMetadata: {
+            groundingChunks: [
+              { web: { uri: redirect, title: 'saturngrid.example' } },
+              { web: { uri: failing, title: 'other.example' } },
+            ],
+          },
+        },
+      },
+    });
+
+    const result = await run('Saturn Grid');
+
+    expect(fetchMock).toHaveBeenCalledWith(redirect, expect.objectContaining({ redirect: 'manual' }));
+    expect(result).toContain('Web page: saturngrid.example [WebLink](https://saturngrid.example/about)');
+    expect(result).toContain(`Web page: other.example [WebLink](${failing})`);
+    expect(result).toContain('Summary: Saturn Grid builds storage.');
+    expect(result).not.toContain('inline.example');
+  });
+
+  it('stops the web call when the answer stream is aborted', async () => {
+    let signal: AbortSignal | undefined;
+    generateText.mockImplementation(
+      (options: { abortSignal: AbortSignal }) =>
+        new Promise((_, reject) => {
+          signal = options.abortSignal;
+          options.abortSignal.addEventListener('abort', () => reject(new Error('aborted')));
+        })
+    );
+    const parent = new AbortController();
+
+    const pending = (webSearch.getTool() as any).execute(
+      { query: 'slow' },
+      { toolCallId: 'c1', messages: [], abortSignal: parent.signal }
+    );
+    parent.abort();
+
+    await expect(pending).resolves.toBe(WEB_SEARCH_NOT_AVAILABLE);
+    expect(signal?.aborted).toBe(true);
+  });
+
   it(`keeps at most ${MAX_WEB_PAGES} pages`, async () => {
     const urls = Array.from({ length: 9 }, (_, i) => `https://p${i}.example`);
     generateText.mockResolvedValue({ text: `Summary text.\n\nSources:\n${urls.join('\n')}` });

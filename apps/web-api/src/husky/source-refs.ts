@@ -138,10 +138,17 @@ function sharesKey(left: string, right: string): boolean {
   return urlKeys(left).some((key) => rightKeys.has(key));
 }
 
+/** A web page matches only its own full URL: two sites can share a path such as `/`. */
+function sameWebUrl(left: string, right: string): boolean {
+  const normalize = (url: string) => url.trim().replace(/\/$/, '');
+  return normalize(left) === normalize(right);
+}
+
 function findEntry(catalog: CatalogEntry[], cited: string): CatalogEntry | undefined {
-  return catalog.find(
-    (entry) =>
-      sharesKey(cited, entry.directoryLink) || (entry.externalUrl ? sharesKey(cited, entry.externalUrl) : false)
+  return catalog.find((entry) =>
+    entry.type === 'web'
+      ? sameWebUrl(cited, entry.directoryLink)
+      : sharesKey(cited, entry.directoryLink) || (entry.externalUrl ? sharesKey(cited, entry.externalUrl) : false)
   );
 }
 
@@ -155,7 +162,7 @@ function pushEntry(sourceRefs: HuskySourceRef[], seenUrls: Set<string>, index: n
   if (entry.type === 'web') {
     // A web page found by the searchWeb tool: it has no page in the directory.
     sourceRefs.push({ index, title: entry.title, type: 'web', externalUrl: entry.directoryLink });
-    remember(seenUrls, entry.directoryLink);
+    remember(seenUrls, entry.directoryLink, true);
     return;
   }
   sourceRefs.push({
@@ -169,13 +176,28 @@ function pushEntry(sourceRefs: HuskySourceRef[], seenUrls: Set<string>, index: n
   remember(seenUrls, entry.externalUrl);
 }
 
-function remember(seen: Set<string>, url?: string) {
+function remember(seen: Set<string>, url?: string, exact = false) {
   if (!url) return;
-  for (const key of urlKeys(url)) seen.add(key);
+  for (const key of exact ? [url.trim(), url.trim().replace(/\/$/, '')] : urlKeys(url)) seen.add(key);
 }
 
 function alreadyRepresented(seen: Set<string>, url: string): boolean {
+  if (/^https?:\/\//.test(url.trim())) {
+    // An absolute URL is the same source only when the whole URL matches, or when a
+    // directory path that it names was already cited.
+    return [url.trim(), url.trim().replace(/\/$/, '')].some((key) => seen.has(key)) || pathSeen(seen, url);
+  }
   return urlKeys(url).some((key) => seen.has(key));
+}
+
+function pathSeen(seen: Set<string>, url: string): boolean {
+  try {
+    const parsed = new URL(url.trim());
+    const path = `${parsed.pathname}${parsed.search}`;
+    return path.length > 1 && (seen.has(path) || seen.has(path.replace(/\/$/, '')));
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -206,7 +228,7 @@ export function buildSourceRefs(input: {
       continue;
     }
 
-    const citedDirectory = sharesKey(cited, entry.directoryLink);
+    const citedDirectory = entry.type === 'web' || sharesKey(cited, entry.directoryLink);
     if (!citedDirectory && entry.externalUrl) {
       mismatches.push(`citation [${index}](${cited}) resolved to ${entry.directoryLink}`);
     }
