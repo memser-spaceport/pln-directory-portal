@@ -54,7 +54,7 @@ Every MCP tool call sends a server-side PostHog event named `mcp-<tool name with
 (`apps/web-api/src/mcp/mcp-analytics.ts`): when the tool runs (`result: ok`), when it throws (`result: error`, with
 `errorKind`, the exception class name), and when it is refused (`result: refused`, with `reason`: `needs_write`,
 `scope_none`, `admin_off`, `rate_limited` or `unavailable`). `mcp-tool-invoked` and `mcp-tool-refused` are still sent
-as before, beside it.
+as before, beside it. When `ANALYTICS_PROVIDER` is not `posthog`, these events are still sent to PostHog if `POSTHOG_API_KEY` and `POSTHOG_HOST` are set.
 
 Every per-tool event has `toolName`, `memberUid`, `authorizationUid` (the connection), `clientName`, `scope` (from the
 registry; `unscoped` for `whoami`), `operation` (`read` or `write`) and `result`. A refused event has no other

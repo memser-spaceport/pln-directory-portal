@@ -271,7 +271,7 @@ Each write tool SHALL allow at most 10 calls per member per tool per hour. A cal
 - **THEN** the call is refused with "LabOS limits agents to 10 post_team_news calls an hour. Try again later."
 
 ### Requirement: Each MCP tool call sends its own event
-Each MCP tool call SHALL send a PostHog event named `mcp-<tool name with dashes>-called`, with `result` `ok`, `error` (plus `errorKind`) or `refused` (plus `reason`), and `toolName`, `memberUid`, `authorizationUid`, `clientName`, `scope` and `operation`. Search and list tools SHALL add the query text, at most 200 characters, and filters. Write tools SHALL send only ids, field names and counts. `mcp-tool-invoked` SHALL still be sent.
+Each MCP tool call SHALL send a PostHog event named `mcp-<tool name with dashes>-called`, with `result` `ok`, `error` (plus `errorKind`) or `refused` (plus `reason`), and `toolName`, `memberUid`, `authorizationUid`, `clientName`, `scope` and `operation`. Search and list tools SHALL add the query text, at most 200 characters, and filters. Write tools SHALL send only ids, field names and counts. `mcp-tool-invoked` SHALL still be sent. When `ANALYTICS_PROVIDER` is not `posthog`, the same MCP events SHALL still be sent to PostHog if `POSTHOG_API_KEY` and `POSTHOG_HOST` are set.
 
 #### Scenario: Search call
 - **GIVEN** a connected agent
@@ -289,6 +289,11 @@ Each MCP tool call SHALL send a PostHog event named `mcp-<tool name with dashes>
 #### Scenario: Every tool has an event
 - **WHEN** a tool is in the registry, or is `whoami`
 - **THEN** it has one per-tool event name and one property builder
+
+#### Scenario: Database provider still reaches PostHog
+- **GIVEN** `ANALYTICS_PROVIDER` is `db` and PostHog is configured
+- **WHEN** an agent calls `search_members`
+- **THEN** PostHog gets `mcp-search-members-called` and `mcp-tool-invoked`
 
 ### Requirement: Agents can do the remaining member actions
 
