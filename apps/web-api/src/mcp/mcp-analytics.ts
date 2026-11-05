@@ -139,6 +139,15 @@ export const MCP_TOOL_PROPERTY_BUILDERS: Readonly<Record<string, McpToolProperty
   delete_forum_post: (args) => ({ pid: numberProp(args.pid) }),
   upvote_forum_post: (args) => ({ pid: numberProp(args.pid) }),
   remove_forum_post_upvote: (args) => ({ pid: numberProp(args.pid) }),
+  // Where the image came from, its type and size: never the URL or the bytes (LAB-3156).
+  upload_forum_image: (args, result) => {
+    const uploaded = result?.uploaded as Record<string, unknown> | undefined;
+    return {
+      source: typeof args.imageUrl === 'string' && args.imageUrl.trim() ? 'url' : 'data',
+      mimeType: stringProp(uploaded?.mimeType),
+      size: numberProp(uploaded?.size),
+    };
+  },
 
   list_news: (args, result) => ({
     feed: stringProp(result?.feed) ?? stringProp(args.feed) ?? 'latest',

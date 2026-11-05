@@ -30,6 +30,8 @@ import { PlNetworkPortfolioService } from '../spv-spotlights/pl-network-portfoli
 import { aiAppFeedbackTools, aiAppWriteTools } from './mcp-ai-app-feedback-tools';
 import { trackMcpToolCalled, trackMcpToolInvocation } from './mcp-analytics';
 import { forumTools } from './mcp-forum-tools';
+import { forumImageTools } from './mcp-forum-image-tools';
+import { ImagesService } from '../images/images.service';
 import { McpMemberProofService } from './mcp-member-proof.service';
 import { directoryTools } from './mcp-directory-tools';
 import { McpOAuthService } from './mcp-oauth.service';
@@ -179,7 +181,8 @@ export class McpController {
     private readonly aiAccess: AiAppsAccessService,
     private readonly pitches: TeamPitchesService,
     private readonly pitchEngagement: TeamPitchEngagementService,
-    private readonly memberProofs: McpMemberProofService
+    private readonly memberProofs: McpMemberProofService,
+    private readonly images: ImagesService
   ) {}
 
   private readonly logger = new Logger(McpController.name);
@@ -219,6 +222,7 @@ export class McpController {
         ...warmIntroTools(this.masterProfiles, this.warmIntros),
         ...directoryTools(this.members, this.teams, this.projects, this.plEvents),
         ...forumTools(this.memberProofs),
+        ...forumImageTools(this.images),
         ...aiAppFeedbackTools(this.aiApps),
         ...aiAppWriteTools(this.aiApps),
         ...portfolioTools(this.portfolio),
