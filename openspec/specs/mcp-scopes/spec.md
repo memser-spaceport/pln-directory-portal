@@ -326,11 +326,11 @@ Each MCP tool call SHALL send a PostHog event named `mcp-<tool name with dashes>
 
 ### Requirement: Agents can do the remaining member actions
 
-The connected agent SHALL be able to do the member actions LabOS allows by hand, except sign-in, email change, editing or deleting other members' forum posts, file uploads, deal redeem codes, and AI-app deploy keys. Each action SHALL be its own tool, SHALL call the same service as the page, and SHALL use that page's permission check. A call that names a field the tool does not accept SHALL change nothing.
+The connected agent SHALL be able to do the member actions LabOS allows by hand, except sign-in, email change, editing or deleting other members' forum posts, file uploads, deal redeem codes, AI-app deploy keys, and team delete (a directory admin deletes a team on its page). Each action SHALL be its own tool, SHALL call the same service as the page, and SHALL use that page's permission check. A call that names a field the tool does not accept SHALL change nothing.
 
 The `profile` scope SHALL offer investor profile, privacy, role on a team the member already belongs to, an existing project contribution, the profile role label, photo delete, recommendation notification settings, job apply and interest, guide comments, office hours, Demo Day and pitch actions that are not file uploads, deal submit and request, support, notification delete, and roadmap create, edit, pin and unpin when the member has that roadmap permission.
 
-The `directory` scope SHALL offer team fund profile, membership sources (directory admins only), community tags, roster edits, team create, team delete (directory admins only), enrichment review, project create and delete, and team and project asks.
+The `directory` scope SHALL offer team fund profile, membership sources (directory admins only), community tags, roster edits, team create, enrichment review, project create and delete, and team and project asks.
 
 The `events` scope SHALL offer event submit, an update of the member's own RSVP details, and a presence request.
 
@@ -354,3 +354,8 @@ The `investors` scope SHALL offer warm-intro regenerate, list membership, pathfi
 
 - **WHEN** an agent who is not a directory admin calls `update_team_membership_sources`
 - **THEN** the call fails and the team's sources are unchanged
+
+#### Scenario: No team delete
+
+- **WHEN** an agent with `directory: write`, for a directory admin too, lists tools or calls `delete_team`
+- **THEN** no `delete_team` tool is listed, the call is refused as an unknown tool, and the team is unchanged
