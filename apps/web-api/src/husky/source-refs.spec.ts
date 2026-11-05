@@ -209,3 +209,65 @@ Warm intro: Devin Okafor [WarmIntroLink](/investors?mode=warm-intros-v2&wi2_q=De
     expect(sourceRefs).toHaveLength(2);
   });
 });
+
+describe('buildSourceRefs with web search results', () => {
+  const WEB_TOOLS = `Web search results (public web, not directory data).
+Summary: Saturn Grid builds grid storage software.
+
+Web page: Saturn Grid - About [WebLink](https://saturngrid.example/about)
+Web page: Saturn Grid raises seed [WebLink](https://news.example/saturn-grid-seed)`;
+
+  it('turns a cited web page into a web source with an external URL and no directory link', () => {
+    const { sourceRefs, mismatches } = buildSourceRefs({
+      content:
+        'Saturn Grid is a team in the directory [1](/teams/saturn). From the web: it builds grid storage software [2](https://saturngrid.example/about).',
+      toolResults: `Team: Saturn Grid [TeamLink](/teams/saturn)\n\n${WEB_TOOLS}`,
+      llmSources: ['/teams/saturn', 'https://saturngrid.example/about'],
+    });
+
+    expect(sourceRefs).toEqual([
+      { index: 1, title: 'Saturn Grid', type: 'team', directoryLink: '/teams/saturn' },
+      { index: 2, title: 'Saturn Grid - About', type: 'web', externalUrl: 'https://saturngrid.example/about' },
+    ]);
+    expect(mismatches).toEqual([]);
+  });
+
+  it('appends an uncited web page from the LLM sources as a web source', () => {
+    const { sourceRefs } = buildSourceRefs({
+      content: 'It builds grid storage software [1](https://saturngrid.example/about).',
+      toolResults: WEB_TOOLS,
+      llmSources: ['https://saturngrid.example/about', 'https://news.example/saturn-grid-seed'],
+    });
+
+    expect(sourceRefs).toEqual([
+      { index: 1, title: 'Saturn Grid - About', type: 'web', externalUrl: 'https://saturngrid.example/about' },
+      { index: 2, title: 'Saturn Grid raises seed', type: 'web', externalUrl: 'https://news.example/saturn-grid-seed' },
+    ]);
+  });
+
+  it('keeps a cited URL that no tool returned as external, not web', () => {
+    const { sourceRefs } = buildSourceRefs({
+      content: 'See [1](https://unknown.example/page).',
+      toolResults: WEB_TOOLS,
+    });
+
+    expect(sourceRefs).toEqual([
+      {
+        index: 1,
+        title: 'https://unknown.example/page',
+        type: 'external',
+        externalUrl: 'https://unknown.example/page',
+      },
+    ]);
+  });
+
+  it('gives an answer from directory data only no web source', () => {
+    const { sourceRefs } = buildSourceRefs({
+      content: 'Acme is hiring [1](/jobs/openings/role-1).',
+      toolResults: '- Senior Backend Engineer [JobLink](/jobs/openings/role-1)',
+      llmSources: ['/jobs/openings/role-1'],
+    });
+
+    expect(sourceRefs.some((ref) => ref.type === 'web')).toBe(false);
+  });
+});

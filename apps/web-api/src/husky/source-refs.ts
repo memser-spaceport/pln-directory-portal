@@ -10,8 +10,10 @@ const MARKER_TYPE = {
   ForumLink: 'forum',
   InvestorLink: 'investor',
   WarmIntroLink: 'warm_intro',
+  WebLink: 'web',
 } as const;
 
+/** Every tool marker type; `web` marks a public web page from the searchWeb tool, not a directory page. */
 type DirectoryType = typeof MARKER_TYPE[keyof typeof MARKER_TYPE];
 
 const LABEL_TYPES: Record<string, DirectoryType[]> = {
@@ -23,13 +25,14 @@ const LABEL_TYPES: Record<string, DirectoryType[]> = {
 };
 
 const MARKER_RE =
-  /\[(TeamLink|MemberLink|ProjectLink|EventLink|JobLink|NewsLink|ForumLink|InvestorLink|WarmIntroLink)\]\(([^)]+)\)/g;
+  /\[(TeamLink|MemberLink|ProjectLink|EventLink|JobLink|NewsLink|ForumLink|InvestorLink|WarmIntroLink|WebLink)\]\(([^)]+)\)/g;
 const LABEL_RE = /\*{0,2}(Source|Website|LinkedIn|Apply|Forum Link)\*{0,2}:\s*(https?:\/\/[^\s)]+)/gi;
 const CITATION_RE = /\[(\d+)\]\(([^)\s]+)\)/g;
 
 interface CatalogEntry {
   type: DirectoryType;
   title: string;
+  /** The marker's link: an in-product path, or the page URL for a `web` entry. */
   directoryLink: string;
   externalUrl?: string;
   offset: number;
@@ -44,7 +47,7 @@ function cleanTitle(raw: string): string {
   return raw
     .replace(/^[-*]\s+/, '')
     .replace(
-      /^(Topic|Name|Title|Teams|Team|Projects|Project|Members|Member|Event|Investor DB record|Warm intro):\s*/i,
+      /^(Topic|Name|Title|Teams|Team|Projects|Project|Members|Member|Event|Investor DB record|Warm intro|Web page):\s*/i,
       ''
     )
     .replace(/^[\s,;]+/, '')
@@ -149,6 +152,12 @@ function entriesInSource(text: string, catalog: CatalogEntry[]): CatalogEntry[] 
 }
 
 function pushEntry(sourceRefs: HuskySourceRef[], seenUrls: Set<string>, index: number, entry: CatalogEntry) {
+  if (entry.type === 'web') {
+    // A web page found by the searchWeb tool: it has no page in the directory.
+    sourceRefs.push({ index, title: entry.title, type: 'web', externalUrl: entry.directoryLink });
+    remember(seenUrls, entry.directoryLink);
+    return;
+  }
   sourceRefs.push({
     index,
     title: entry.title,

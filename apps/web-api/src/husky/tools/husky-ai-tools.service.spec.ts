@@ -7,6 +7,7 @@ jest.mock('./demo-day.tool', () => ({ DemoDayTool: jest.fn() }));
 jest.mock('../../analytics/service/analytics.service', () => ({ AnalyticsService: jest.fn() }));
 // irl-events.tool imports PLEventGuestsService -> MembersService -> axios, same ESM problem.
 jest.mock('./irl-events.tool', () => ({ IrlEventsTool: jest.fn() }));
+jest.mock('../../shared/ai-provider.service', () => ({ AiProviderService: jest.fn() }));
 
 import { CoreTool } from 'ai';
 import { HuskyAiToolsService } from './husky-ai-tools.serivice';
@@ -41,6 +42,7 @@ describe('HuskyAiToolsService.getTools', () => {
   const demoDay = fakeTool(async () => 'demo day teams');
   const investorDb = fakeTool(async () => 'investor db');
   const warmIntros = fakeTool(async () => 'warm intros');
+  const webSearch = fakeTool(async () => 'web results');
 
   const service = new HuskyAiToolsService(
     logger as any,
@@ -56,12 +58,13 @@ describe('HuskyAiToolsService.getTools', () => {
     news as any,
     demoDay as any,
     investorDb as any,
-    warmIntros as any
+    warmIntros as any,
+    webSearch as any
   );
 
   beforeEach(() => jest.clearAllMocks());
 
-  it('exposes only database-backed tools and passes the auth context where it matters', () => {
+  it('exposes the directory tools plus searchWeb, and passes the auth context where it matters', () => {
     const auth = { isLoggedIn: true, memberUid: 'member-1' };
     const tools = service.getTools(auth);
     expect(Object.keys(tools).sort()).toEqual(
@@ -79,6 +82,7 @@ describe('HuskyAiToolsService.getTools', () => {
         'getTeams',
         'getTeamNews',
         'getDemoDayTeams',
+        'searchWeb',
       ].sort()
     );
     expect(irlEvents.getTool).toHaveBeenCalledWith(auth);
@@ -90,6 +94,8 @@ describe('HuskyAiToolsService.getTools', () => {
     expect(news.getTool).toHaveBeenCalledWith(auth);
     expect(demoDay.getTool).toHaveBeenCalledWith();
     expect(jobOpenings.getTool).toHaveBeenCalledWith();
+    // The web search never sees the signed-in member.
+    expect(webSearch.getTool).toHaveBeenCalledWith();
   });
 
   it('turns a throwing tool into a tool result instead of an exception', async () => {
