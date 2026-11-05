@@ -246,13 +246,15 @@ describe('McpLimitService', () => {
         callback(null, next);
         return true;
       },
-      incrby(key: string, amount: number, callback: (error: null, value: number) => void) {
+      incrby(this: unknown, key: string, amount: number, callback: (error: null, value: number) => void) {
+        if (this !== client) throw new TypeError('Redis command lost its client');
         const next = (counts.get(key) ?? 0) + amount;
         counts.set(key, next);
         callback(null, next);
         return true;
       },
-      decrby(key: string, amount: number, callback: (error: null, value: number) => void) {
+      decrby(this: unknown, key: string, amount: number, callback: (error: null, value: number) => void) {
+        if (this !== client) throw new TypeError('Redis command lost its client');
         const next = (counts.get(key) ?? 0) - amount;
         counts.set(key, next);
         callback(null, next);

@@ -491,17 +491,22 @@ export class McpLimitService {
   }
 
   private add(client: LimitRedis, key: string, amount: number): Promise<number> {
-    const incrBy = client.incrby ?? client.incrBy;
-    if (incrBy) {
-      return redisReply<number>((callback) => incrBy(key, amount, callback));
+    // Call on the client. Redis 3 command methods use `this` and throw when detached.
+    if (client.incrby) {
+      return redisReply<number>((callback) => client.incrby!(key, amount, callback));
+    }
+    if (client.incrBy) {
+      return redisReply<number>((callback) => client.incrBy!(key, amount, callback));
     }
     return this.step(client, key, amount, 1);
   }
 
   private subtract(client: LimitRedis, key: string, amount: number): Promise<number> {
-    const decrBy = client.decrby ?? client.decrBy;
-    if (decrBy) {
-      return redisReply<number>((callback) => decrBy(key, amount, callback));
+    if (client.decrby) {
+      return redisReply<number>((callback) => client.decrby!(key, amount, callback));
+    }
+    if (client.decrBy) {
+      return redisReply<number>((callback) => client.decrBy!(key, amount, callback));
     }
     return this.step(client, key, amount, -1);
   }
