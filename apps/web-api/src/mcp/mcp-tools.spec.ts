@@ -31,6 +31,7 @@ import { WarmIntrosV2Service } from '../warm-intros-v2/warm-intros-v2.service';
 import { aiAppFeedbackTools, aiAppWriteTools } from './mcp-ai-app-feedback-tools';
 import { directoryTools } from './mcp-directory-tools';
 import { forumTools } from './mcp-forum-tools';
+import { forumImageTools } from './mcp-forum-image-tools';
 import { portfolioTools } from './mcp-portfolio-tools';
 import { newsTools } from './mcp-news-tools';
 import { directoryWriteTools, eventWriteTools, membershipTools, newsWriteTools, profileTools } from './mcp-write-tools';
@@ -169,6 +170,7 @@ describe('scope registry', () => {
     ...warmIntroTools(stub, stub),
     ...directoryTools(stub, stub, stub, stub),
     ...forumTools(stub),
+    ...forumImageTools(stub),
     ...aiAppFeedbackTools(stub),
     ...aiAppWriteTools(stub),
     ...portfolioTools(stub),
@@ -213,7 +215,7 @@ describe('scope registry', () => {
     const writesByName = fullCatalog
       .map((t) => t.name)
       .filter((name) =>
-        /^(update|submit|post|rsvp|cancel|join|leave|add|delete|follow|unfollow|save|unsave|set|mark|unmark|report|like|unlike|redeploy|rename|create|upvote|remove|request|refer|apply|close|review|accept|express|contact|regenerate|clear|resolve|pin|unpin|reply|start|edit)_/.test(
+        /^(update|submit|post|rsvp|cancel|join|leave|add|delete|follow|unfollow|save|unsave|set|mark|unmark|report|like|unlike|redeploy|rename|create|upvote|remove|request|refer|apply|close|review|accept|express|contact|regenerate|clear|resolve|pin|unpin|reply|start|edit|upload)_/.test(
           name
         )
       );
