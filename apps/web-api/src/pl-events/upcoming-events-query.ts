@@ -59,6 +59,7 @@ export function upcomingEventsFindArgs(options: UpcomingEventsOptions, now: Date
 type UpcomingEventRow = {
   uid: string;
   name: string;
+  externalId: string | null;
   websiteURL: string | null;
   startDate: Date;
   endDate: Date;
@@ -71,6 +72,9 @@ export function toUpcomingEvent(event: UpcomingEventRow) {
   return {
     uid: event.uid,
     name: event.name,
+    // The pln-events event id: the events calendar opens this event from `/embed/program#<externalId>` (LabOS Home's
+    // upcoming events link there). Null for an event that didn't come from pln-events.
+    externalId: event.externalId ?? null,
     websiteUrl: event.websiteURL ?? null,
     logo: event.logo?.url ?? null,
     location: event.location?.location ?? null,

@@ -72,6 +72,8 @@ export const ResponsePLEventSchemaWithRelationsSchema = ResponsePLEventSchema.ex
 export const ResponseUpcomingEventSchema = z.object({
   uid: z.string(),
   name: z.string(),
+  /** The pln-events event id, for a link that opens this event in the events calendar. */
+  externalId: z.string().nullable(),
   websiteUrl: z.string().nullable(),
   logo: z.string().nullable(),
   location: z.string().nullable(),
