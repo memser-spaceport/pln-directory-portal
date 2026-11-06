@@ -1,4 +1,4 @@
-// FEATURE-ENV ONLY — never merge (branch lab-2837-env-seed only).
+// FEATURE-ENV ONLY — never merge (branches lab-2837-env-seed / lab-3139-env-seed only).
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
 import { currentRoleTextHash, isLiveOpening, MATCH_JOB_SELECT } from './job-match.logic';
@@ -12,7 +12,7 @@ import { currentRoleTextHash, isLiveOpening, MATCH_JOB_SELECT } from './job-matc
  *
  * Runs when FEATURE_ENV_SEED_TEAM_UID is set (seed that team's live roles) and/or when BOTH
  * FEATURE_ENV_SEED_TEST_LEAD_EMAIL and FEATURE_ENV_SEED_TEST_CANDIDATE_EMAIL are set (seed a dedicated test
- * team whose members are those existing leads (comma-separated), with one role whose top suggestion is a test candidate — so the
+ * team whose members are those existing leads (comma-separated), with four roles (the email shows the newest three) whose top suggestion is a test candidate — so the
  * weekly email can be sent to the developer's own inbox without touching any real team).
  * Idempotent: it owns two runs with fixed uids and fixed past run dates (so it never collides with a real daily
  * run) and rewrites their rows each start; the test team, role, candidate and lead membership are upserts.
@@ -35,7 +35,17 @@ const IN_PREVIOUS_RUN = 2; // the first two suggestions also appear in the previ
 const TEST_TEAM_UID = 'env-seed-test-team';
 const TEST_TEAM_NAME = 'Env Seed Test Team';
 const TEST_ROLE_UID = 'env-seed-test-role';
-const TEST_ROLE_TITLE = 'Senior Backend Engineer (test)';
+/**
+ * The test team's live roles (LAB-3139: the email covers a team's 3 most recently published roles). The first keeps
+ * the LAB-2837 uid so old links still open; the fourth is the oldest and must NOT appear in the email.
+ * `ageDays` sets publishedAt = now - ageDays on every start.
+ */
+const TEST_ROLES = [
+  { uid: TEST_ROLE_UID, title: 'Senior Backend Engineer (test)', ageDays: 0 },
+  { uid: 'env-seed-test-role-2', title: 'Product Designer (test)', ageDays: 1 },
+  { uid: 'env-seed-test-role-3', title: 'Developer Relations Lead (test)', ageDays: 2 },
+  { uid: 'env-seed-test-role-4', title: 'Oldest Role, Not In Email (test)', ageDays: 3 },
+];
 const TEST_CANDIDATE_UID = 'env-seed-test-candidate';
 const TEST_CANDIDATE_NAME = 'Test Candidate (env seed)';
 const TEST_ROLE_DESCRIPTION_HTML =
@@ -49,7 +59,8 @@ const LOOKABLE = {
   OR: [{ jobSearchStatus: null }, { jobSearchStatus: { not: 'NOT_LOOKING' as const } }],
 };
 
-type SeedRole = { uid: string; roleTitle: string; hash: string };
+/** `members` overrides the plan's members for this role (the test team gives each role its own list). */
+type SeedRole = { uid: string; roleTitle: string; hash: string; members?: { uid: string }[] };
 type RoleSeed = { teamUid: string; roles: SeedRole[]; members: { uid: string }[]; previousIndexes: number[] };
 
 type SeedCriterion = {
@@ -224,22 +235,25 @@ export class JobMatchEnvSeedService implements OnApplicationBootstrap {
       create: { uid: TEST_TEAM_UID, name: TEST_TEAM_NAME },
       update: { name: TEST_TEAM_NAME },
     });
-    const now = new Date();
-    const role = {
-      companyName: TEST_TEAM_NAME,
-      signalType: 'env-seed',
-      roleTitle: TEST_ROLE_TITLE,
-      canonicalKey: TEST_ROLE_UID,
-      dedupKey: TEST_ROLE_UID,
-      teamUid: TEST_TEAM_UID,
-      descriptionHtml: TEST_ROLE_DESCRIPTION_HTML,
-    };
-    // NEW is a board-visible status; publishedAt is reset every start so the role is always live and recent.
-    await this.prisma.jobOpening.upsert({
-      where: { uid: TEST_ROLE_UID },
-      create: { uid: TEST_ROLE_UID, ...role, status: 'NEW', detectionDate: now, publishedAt: now },
-      update: { ...role, status: 'NEW', publishedAt: now },
-    });
+    const now = Date.now();
+    for (const testRole of TEST_ROLES) {
+      const publishedAt = new Date(now - testRole.ageDays * 864e5);
+      const role = {
+        companyName: TEST_TEAM_NAME,
+        signalType: 'env-seed',
+        roleTitle: testRole.title,
+        canonicalKey: testRole.uid,
+        dedupKey: testRole.uid,
+        teamUid: TEST_TEAM_UID,
+        descriptionHtml: TEST_ROLE_DESCRIPTION_HTML,
+      };
+      // NEW is a board-visible status; publishedAt is reset every start so the roles are always live and recent.
+      await this.prisma.jobOpening.upsert({
+        where: { uid: testRole.uid },
+        create: { uid: testRole.uid, ...role, status: 'NEW', detectionDate: publishedAt, publishedAt },
+        update: { ...role, status: 'NEW', publishedAt },
+      });
+    }
     await this.prisma.member.upsert({
       where: { uid: TEST_CANDIDATE_UID },
       create: { uid: TEST_CANDIDATE_UID, name: TEST_CANDIDATE_NAME, email: candidateEmail, role: 'Backend Engineer' },
@@ -259,8 +273,8 @@ export class JobMatchEnvSeedService implements OnApplicationBootstrap {
       });
     }
 
-    const job = await this.prisma.jobOpening.findUniqueOrThrow({
-      where: { uid: TEST_ROLE_UID },
+    const jobs = await this.prisma.jobOpening.findMany({
+      where: { uid: { in: TEST_ROLES.map((role) => role.uid) } },
       select: MATCH_JOB_SELECT,
     });
     const teamMembers = await this.prisma.teamMemberRole.findMany({
@@ -269,12 +283,22 @@ export class JobMatchEnvSeedService implements OnApplicationBootstrap {
     });
     const others = await this.pickMembers(
       [...teamMembers.map((row) => row.memberUid), ...leads.map((l) => l.uid), TEST_CANDIDATE_UID],
-      SUGGESTIONS - 1
+      SUGGESTIONS - 1 + TEST_ROLES.length
     );
+    // Each role lists the test candidate first, then a different window of other members, so the sections differ.
     return {
       teamUid: TEST_TEAM_UID,
-      roles: [{ uid: job.uid, roleTitle: job.roleTitle, hash: currentRoleTextHash(job) }],
-      members: [{ uid: TEST_CANDIDATE_UID }, ...others],
+      roles: TEST_ROLES.map((testRole, i) => {
+        const job = jobs.find((row) => row.uid === testRole.uid);
+        if (!job) throw new Error(`env seed: test role ${testRole.uid} missing after upsert`);
+        return {
+          uid: job.uid,
+          roleTitle: job.roleTitle,
+          hash: currentRoleTextHash(job),
+          members: [{ uid: TEST_CANDIDATE_UID }, ...others.slice(i, i + SUGGESTIONS - 1)],
+        };
+      }),
+      members: [{ uid: TEST_CANDIDATE_UID }, ...others.slice(0, SUGGESTIONS - 1)],
       previousIndexes: TEST_PREVIOUS_INDEXES,
     };
   }
@@ -312,6 +336,7 @@ export class JobMatchEnvSeedService implements OnApplicationBootstrap {
     const previousAt = new Date(now - 14 * 864e5);
     const latestAt = new Date(now - 7 * 864e5);
     for (const job of plan.roles) {
+      const members = job.members ?? plan.members;
       const criteria = criteriaFor(job.roleTitle);
       const base = { teamUid: plan.teamUid, roleUid: job.uid };
 
@@ -325,7 +350,7 @@ export class JobMatchEnvSeedService implements OnApplicationBootstrap {
         data: { ...base, runUid: SEED_RUN_PREV, kind: 'ROLE', createdAt: previousAt },
       });
       for (const index of plan.previousIndexes) {
-        const member = plan.members[index];
+        const member = members[index];
         if (!member) continue;
         await this.prisma.jobMatchRow.create({
           data: {
@@ -345,7 +370,7 @@ export class JobMatchEnvSeedService implements OnApplicationBootstrap {
         [SEED_RUN_NEXT, new Date(now)],
       ] as const) {
         await this.prisma.jobMatchRow.create({ data: { ...base, runUid, kind: 'ROLE', createdAt } });
-        for (const [index, member] of plan.members.entries()) {
+        for (const [index, member] of members.entries()) {
           await this.prisma.jobMatchRow.create({
             data: {
               ...base,
