@@ -17,22 +17,20 @@ import { resolveLiveMemberUidByEmail } from '../shared/resolve-live-member-uid.u
 import { v4 as uuidv4 } from 'uuid';
 import { HuskyAiToolsService } from './tools/husky-ai-tools.serivice';
 import { HuskyAuthContext } from './tools/husky-auth-context';
-import { AiProviderService, AiProviderType } from '../shared/ai-provider.service';
+import { AiProviderService } from '../shared/ai-provider.service';
 import { StallWatchdog } from './stall-watchdog';
 import { MAX_OVERLAP_CHARS, trimRepeatedPrefix } from './answer-continuation.util';
 import { buildSourceRefs } from './source-refs';
 import { z } from 'zod';
 
-/**
- * Provider selection for Husky AI search (chat answers, chat summaries, thread titles).
- * Set HUSKY_SEARCH_AI_PROVIDER=gemini|anthropic|openai to switch; defaults to Gemini
- * regardless of the global AI_PROVIDER.
- */
-export const HUSKY_SEARCH_PROVIDER_ENV_VAR = 'HUSKY_SEARCH_AI_PROVIDER';
-export const HUSKY_SEARCH_FALLBACK_PROVIDER: AiProviderType = 'gemini';
+import {
+  HUSKY_SEARCH_FALLBACK_PROVIDER,
+  HUSKY_SEARCH_OPUS_ENABLED_ENV_VAR,
+  HUSKY_SEARCH_PROVIDER_ENV_VAR,
+} from './husky-search.constants';
 
-/** `true` (any case) runs Husky search answers on Opus. Anything else keeps the current provider. */
-export const HUSKY_SEARCH_OPUS_ENABLED_ENV_VAR = 'HUSKY_SEARCH_OPUS_ENABLED';
+export { HUSKY_SEARCH_FALLBACK_PROVIDER, HUSKY_SEARCH_OPUS_ENABLED_ENV_VAR, HUSKY_SEARCH_PROVIDER_ENV_VAR };
+
 /** Optional slug override. Defaults to claude-opus-5-5. Does not change CLAUDE_MODEL. */
 export const HUSKY_SEARCH_OPUS_MODEL_ENV_VAR = 'HUSKY_SEARCH_OPUS_MODEL';
 export const DEFAULT_HUSKY_SEARCH_OPUS_MODEL = 'claude-opus-5-5';
@@ -83,7 +81,7 @@ const WRITING_STEP = 'Writing the answer';
  * How to count a tool's text result. The marker is the row prefix that tool
  * already writes; a sentence result ("No … found", "unavailable") has none.
  */
-const TOOL_STATUS: Record<string, { marker: string; singular: string; plural: string }> = {
+const TOOL_STATUS: Record<string, { marker: string; singular: string; plural: string; searching?: string }> = {
   getMembers: { marker: 'Member ID:', singular: 'member', plural: 'members' },
   getTeams: { marker: 'Team ID:', singular: 'team', plural: 'teams' },
   getProjects: { marker: 'Project ID:', singular: 'project', plural: 'projects' },
@@ -97,11 +95,13 @@ const TOOL_STATUS: Record<string, { marker: string; singular: string; plural: st
   getDemoDayTeams: { marker: '[TeamLink](', singular: 'team', plural: 'teams' },
   getAsks: { marker: 'Ask ID:', singular: 'ask', plural: 'asks' },
   getFocusAreas: { marker: 'Focus Area ID:', singular: 'focus area', plural: 'focus areas' },
+  searchWeb: { marker: '[WebLink](', singular: 'web page', plural: 'web pages', searching: 'Searching the web' },
 };
 
 function searchingLineForTool(toolName: string): string | null {
   const spec = TOOL_STATUS[toolName];
-  return spec ? `Searching ${spec.plural}` : null;
+  if (!spec) return null;
+  return spec.searching ?? `Searching ${spec.plural}`;
 }
 
 function statusLineForTool(toolName: string, result: string): string | null {

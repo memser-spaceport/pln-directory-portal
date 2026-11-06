@@ -1,3 +1,4 @@
+import { McpCallType } from 'libs/contracts/src/schema/mcp-limits';
 import { MCP_SCOPE_KEYS, McpLevel, McpScopeKey } from 'libs/contracts/src/schema/mcp-scopes';
 
 /**
@@ -202,6 +203,31 @@ export function toolScope(toolName: string): McpToolScope | undefined {
 
 export function isWriteTool(toolName: string): boolean {
   return MCP_TOOL_SCOPES[toolName]?.level === 'write';
+}
+
+/** Reads that return another member's email, Telegram or LinkedIn. */
+export const MCP_CONTACT_READ_TOOLS: ReadonlySet<string> = new Set([
+  'get_member',
+  'get_team',
+  'get_project',
+  'get_event',
+]);
+
+/**
+ * Tools that publish a new forum post as the member. They count against the forum post limit, the same as a post an
+ * agent makes with a member proof it asked for itself. Other forum writes (edit, delete, upvote, image) are writes.
+ */
+export const MCP_FORUM_POST_TOOLS: ReadonlySet<string> = new Set(['start_forum_thread', 'reply_to_forum_thread']);
+
+/** One call type per tool. A tool missing from the registry has none (`whoami` is a read). */
+export function toolCallType(toolName: string): McpCallType | undefined {
+  if (MCP_UNSCOPED_TOOLS.has(toolName)) return 'read';
+  const entry = MCP_TOOL_SCOPES[toolName];
+  if (!entry) return undefined;
+  if (MCP_FORUM_POST_TOOLS.has(toolName)) return 'forum_post';
+  if (entry.level === 'write') return 'write';
+  if (MCP_CONTACT_READ_TOOLS.has(toolName)) return 'contact_read';
+  return 'read';
 }
 
 /**

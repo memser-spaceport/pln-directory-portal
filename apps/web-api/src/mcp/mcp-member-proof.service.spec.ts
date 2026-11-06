@@ -1,7 +1,13 @@
 jest.mock('../analytics/service/analytics.service', () => ({ AnalyticsService: jest.fn() }));
 jest.mock('../integration-keys/member-sign-in.service', () => ({ MemberSignInService: jest.fn() }));
 
-import { BadRequestException, ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  HttpException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { McpMemberProofService } from './mcp-member-proof.service';
 import { McpScopesService } from './mcp-scopes.service';
 import { MCP_MEMBER_PROOF_TTL_SECONDS } from './mcp.constants';
@@ -56,6 +62,19 @@ function build() {
   const signIn = { member: jest.fn().mockResolvedValue(MEMBER) };
   const analytics = { trackEvent: jest.fn().mockResolvedValue(undefined) };
   const cache = fakeCache();
+  const limits = {
+    tryConsume: jest.fn(async () => ({
+      allowed: true,
+      warned: false,
+      unavailable: false,
+      callType: 'forum_post',
+      used: 1,
+      limit: 10,
+      resetsAt: '2026-11-06T00:00:00.000Z',
+      tier: 'standard',
+      override: false,
+    })),
+  };
   const service = new McpMemberProofService(
     prisma as any,
     oauth as any,
@@ -63,9 +82,10 @@ function build() {
     signIn as any,
     analytics as any,
     cache as any,
-    new McpScopesService(prisma as any, analytics as any, {} as any)
+    new McpScopesService(prisma as any, analytics as any, {} as any),
+    limits as any
   );
-  return { service, prisma, oauth, accessControl, signIn, analytics, cache };
+  return { service, prisma, oauth, accessControl, signIn, analytics, cache, limits };
 }
 
 describe('McpMemberProofService', () => {
@@ -203,6 +223,55 @@ describe('McpMemberProofService', () => {
       await expect(service.redeem(proof, 'key-infralfg')).resolves.toMatchObject({ agent: { access: 'read' } });
     });
 
+    it('counts a forum write against the forum post limit and refuses at the limit', async () => {
+      const { service, oauth, cache, limits } = build();
+      oauth.authenticateAccessToken.mockResolvedValue({ ...ACTOR, scopeLevels: { forum: 'write' } });
+      limits.tryConsume.mockResolvedValue({
+        allowed: false,
+        warned: false,
+        unavailable: false,
+        callType: 'forum_post',
+        used: 10,
+        limit: 10,
+        resetsAt: '2026-11-06T00:00:00.000Z',
+        tier: 'standard',
+        override: false,
+      });
+
+      await expect(service.issue('mcp_at_live', 'key-infralfg', 'forum')).rejects.toBeInstanceOf(HttpException);
+      await expect(service.issue('mcp_at_live', 'key-infralfg', 'forum')).rejects.toThrow(/forum post/);
+      await expect(service.issue('mcp_at_live', 'key-infralfg', 'forum')).rejects.toThrow(/Settings/);
+      expect(limits.tryConsume).toHaveBeenCalledWith('member-1', 'forum_post');
+      expect(cache.set).not.toHaveBeenCalled();
+    });
+
+    it('refuses a forum write when the limit store is down', async () => {
+      const { service, oauth, cache, limits } = build();
+      oauth.authenticateAccessToken.mockResolvedValue({ ...ACTOR, scopeLevels: { forum: 'write' } });
+      limits.tryConsume.mockResolvedValue({
+        allowed: false,
+        warned: false,
+        unavailable: true,
+        callType: 'forum_post',
+        used: 0,
+        limit: 10,
+        resetsAt: '2026-11-06T00:00:00.000Z',
+        tier: 'standard',
+        override: false,
+      });
+
+      await expect(service.issue('mcp_at_live', 'key-infralfg', 'forum')).rejects.toThrow(
+        /couldn't check the forum post limit/
+      );
+      expect(cache.set).not.toHaveBeenCalled();
+    });
+
+    it('does not count a forum read', async () => {
+      const { service, limits } = build();
+      await service.issue('mcp_at_live', 'key-infralfg', 'forum');
+      expect(limits.tryConsume).not.toHaveBeenCalled();
+    });
+
     it('fails closed when admin settings cannot be read', async () => {
       const { service, prisma, cache } = build();
       prisma.mcpScopeSetting.findMany.mockRejectedValue(new Error('db down'));
@@ -258,6 +327,14 @@ describe('McpMemberProofService', () => {
       await expect(service.issueForAuthorization('auth-1', 'key-jobs-only', 'forum')).rejects.toBeInstanceOf(
         NotFoundException
       );
+    });
+
+    it('does not count against the forum post limit: the MCP controller limits each tool call', async () => {
+      const { service, prisma, limits } = build();
+      prisma.mcpAuthorization.findUnique.mockResolvedValue(CONNECTION as any);
+      await service.issueForAuthorization('auth-1', 'key-infralfg', 'forum');
+      await service.issueForAuthorization('auth-1', 'key-infralfg', 'forum');
+      expect(limits.tryConsume).not.toHaveBeenCalled();
     });
   });
 

@@ -23,6 +23,7 @@ import { ApproveMcpOAuthDto } from './dto/approve-mcp-oauth.dto';
 import { McpOAuthService } from './mcp-oauth.service';
 import { McpScopesService } from './mcp-scopes.service';
 import { McpAccessRequestsService } from './mcp-access-requests.service';
+import { McpLimitService } from './mcp-limit.service';
 
 const CONNECT = { anyOf: [RBAC_PERMISSION_CODES.MCP_CONNECT] };
 
@@ -35,7 +36,8 @@ export class McpAuthorizationsController {
     private readonly oauth: McpOAuthService,
     private readonly rbacService: RbacService,
     private readonly scopes: McpScopesService,
-    private readonly accessRequests: McpAccessRequestsService
+    private readonly accessRequests: McpAccessRequestsService,
+    private readonly limits: McpLimitService
   ) {}
 
   @NoCache()
@@ -44,6 +46,14 @@ export class McpAuthorizationsController {
   async approve(@Body() body: ApproveMcpOAuthDto, @Req() req: any) {
     const memberUid = await this.resolveMemberUid(req);
     return this.oauth.approve(memberUid, body);
+  }
+
+  /** This member's MCP limits, usage, reset time and any override (LAB-3151). */
+  @NoCache()
+  @Get('limits')
+  async limitsForMember(@Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.limits.usageFor(memberUid);
   }
 
   @NoCache()

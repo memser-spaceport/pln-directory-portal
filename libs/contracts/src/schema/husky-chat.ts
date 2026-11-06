@@ -43,7 +43,23 @@ export const HuskyFeedbackSchema = z.object({
 export const HuskySourceRefSchema = z.object({
   index: z.number().int().positive(),
   title: z.string(),
-  type: z.enum(['team', 'member', 'news', 'job', 'project', 'event', 'forum', 'investor', 'warm_intro', 'external']),
+  /**
+   * `web`: a page that the searchWeb tool found on the public web (externalUrl, no directoryLink).
+   * `external`: a URL the model cited that no tool returned.
+   */
+  type: z.enum([
+    'team',
+    'member',
+    'news',
+    'job',
+    'project',
+    'event',
+    'forum',
+    'investor',
+    'warm_intro',
+    'web',
+    'external',
+  ]),
   directoryLink: z.string().optional(),
   externalUrl: z.string().optional(),
 });

@@ -50,6 +50,33 @@ export class InvestorBulkProvisionService {
     return normalized || undefined;
   }
 
+  private profileFieldsToFill(
+    profile: NonNullable<ExistingMemberForBulk['investorProfile']>,
+    participantData: InvestorBulkParticipantInput,
+    isTeamInvestorProfile: boolean
+  ): Prisma.InvestorProfileUpdateInput | undefined {
+    const data: Prisma.InvestorProfileUpdateInput = {};
+
+    if (!profile.type && participantData.investmentType) {
+      data.type = participantData.investmentType;
+    }
+
+    if (profile.secRulesAccepted !== true && participantData.secRulesAccepted === true) {
+      data.secRulesAccepted = true;
+    }
+
+    if (!isTeamInvestorProfile) {
+      if (profile.typicalCheckSize == null && participantData.typicalCheckSize != null) {
+        data.typicalCheckSize = participantData.typicalCheckSize;
+      }
+      if (!profile.investInStartupStages?.length && participantData.investInStartupStages?.length) {
+        data.investInStartupStages = participantData.investInStartupStages;
+      }
+    }
+
+    return Object.keys(data).length > 0 ? data : undefined;
+  }
+
   async provisionInvestorFromBulkRow(
     tx: TransactionClient,
     participantData: InvestorBulkParticipantInput,
@@ -112,35 +139,11 @@ export class InvestorBulkProvisionService {
         updateData.telegramHandler = normalizedTelegram;
       }
 
-      if (existingMember.investorProfile) {
-        const updatedInvestorType = participantData.investmentType || existingMember.investorProfile.type;
-        const profileUpdate = isTeamInvestorProfile
-          ? {
-              type: updatedInvestorType ?? undefined,
-              secRulesAccepted:
-                participantData.secRulesAccepted !== undefined
-                  ? participantData.secRulesAccepted ?? undefined
-                  : existingMember.investorProfile.secRulesAccepted ?? undefined,
-            }
-          : {
-              type: updatedInvestorType ?? undefined,
-              typicalCheckSize:
-                participantData.typicalCheckSize !== undefined
-                  ? participantData.typicalCheckSize ?? undefined
-                  : existingMember.investorProfile.typicalCheckSize ?? undefined,
-              investInStartupStages:
-                participantData.investInStartupStages !== undefined
-                  ? participantData.investInStartupStages ?? undefined
-                  : existingMember.investorProfile.investInStartupStages ?? undefined,
-              secRulesAccepted:
-                participantData.secRulesAccepted !== undefined
-                  ? participantData.secRulesAccepted ?? undefined
-                  : existingMember.investorProfile.secRulesAccepted ?? undefined,
-            };
-
-        updateData.investorProfile = {
-          update: profileUpdate,
-        };
+      const profileUpdate = existingMember.investorProfile
+        ? this.profileFieldsToFill(existingMember.investorProfile, participantData, !!isTeamInvestorProfile)
+        : undefined;
+      if (profileUpdate) {
+        updateData.investorProfile = { update: profileUpdate };
       }
 
       await tx.member.update({
@@ -244,13 +247,19 @@ export class InvestorBulkProvisionService {
         });
 
         if (teamInvestorProfile) {
-          await tx.investorProfile.update({
-            where: { uid: teamInvestorProfile.uid },
-            data: {
-              typicalCheckSize: participantData.typicalCheckSize || undefined,
-              investInStartupStages: participantData.investInStartupStages || undefined,
-            },
-          });
+          const teamProfileUpdate: Prisma.InvestorProfileUpdateInput = {};
+          if (teamInvestorProfile.typicalCheckSize == null && participantData.typicalCheckSize != null) {
+            teamProfileUpdate.typicalCheckSize = participantData.typicalCheckSize;
+          }
+          if (!teamInvestorProfile.investInStartupStages?.length && participantData.investInStartupStages?.length) {
+            teamProfileUpdate.investInStartupStages = participantData.investInStartupStages;
+          }
+          if (Object.keys(teamProfileUpdate).length > 0) {
+            await tx.investorProfile.update({
+              where: { uid: teamInvestorProfile.uid },
+              data: teamProfileUpdate,
+            });
+          }
         } else {
           const newInvestorProfile = await tx.investorProfile.create({
             data: {

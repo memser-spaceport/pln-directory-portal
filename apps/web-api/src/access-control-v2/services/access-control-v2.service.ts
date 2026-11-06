@@ -3,7 +3,7 @@ import { Cache } from 'cache-manager';
 import { createHash } from 'crypto';
 import { PrismaService } from '../../shared/prisma.service';
 import { MemberApprovalsService } from '../../member-approvals/member-approvals.service';
-import { expandEffectivePermissions } from '../access-control-v2.constants';
+import { expandEffectivePermissions, MCP_PERMISSIONS } from '../access-control-v2.constants';
 
 function memberAccessCacheKey(token: string): string {
   const env = process.env.ENVIRONMENT ?? 'local';
@@ -407,29 +407,41 @@ export class AccessControlV2Service {
       orderBy: { createdAt: 'asc' },
     });
 
+    const approval = await this.prisma.memberApproval.findUnique({
+      where: { memberUid: member.uid },
+      select: { state: true },
+    });
+    const mcpConnectAllowed = approval?.state === 'APPROVED';
+    const withoutMcpConnect = (codes: string[]) =>
+      mcpConnectAllowed ? codes : codes.filter((code) => code !== MCP_PERMISSIONS.CONNECT);
+
     const policies = assignments.map((assignment) => ({
       uid: assignment.uid,
       code: assignment.policy.code,
       name: assignment.policy.name,
       role: assignment.policy.role,
       group: assignment.policy.group,
-      permissions: assignment.policy.policyPermissions.map((pp) => pp.permission.code),
-      permissionItems: assignment.policy.policyPermissions.map((pp) => ({
-        uid: pp.permission.uid,
-        code: pp.permission.code,
-        description: pp.permission.description,
-        module: pp.permission.module,
-      })),
+      permissions: withoutMcpConnect(assignment.policy.policyPermissions.map((pp) => pp.permission.code)),
+      permissionItems: assignment.policy.policyPermissions
+        .map((pp) => ({
+          uid: pp.permission.uid,
+          code: pp.permission.code,
+          description: pp.permission.description,
+          module: pp.permission.module,
+        }))
+        .filter((item) => mcpConnectAllowed || item.code !== MCP_PERMISSIONS.CONNECT),
     }));
 
-    const directPermissions = directPermissionRows.map((row) => row.permission.code);
+    const directPermissions = withoutMcpConnect(directPermissionRows.map((row) => row.permission.code));
 
-    const directPermissionItems = directPermissionRows.map((row) => ({
-      uid: row.permission.uid,
-      code: row.permission.code,
-      description: row.permission.description,
-      module: row.permission.module,
-    }));
+    const directPermissionItems = directPermissionRows
+      .map((row) => ({
+        uid: row.permission.uid,
+        code: row.permission.code,
+        description: row.permission.description,
+        module: row.permission.module,
+      }))
+      .filter((item) => mcpConnectAllowed || item.code !== MCP_PERMISSIONS.CONNECT);
 
     const effectivePermissions = expandEffectivePermissions([
       ...policies.flatMap((policy) => policy.permissions),

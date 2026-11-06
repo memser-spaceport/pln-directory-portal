@@ -1,7 +1,10 @@
+import { McpCallType } from 'libs/contracts/src/schema/mcp-limits';
 import { AnalyticsService } from '../analytics/service/analytics.service';
 import { ANALYTICS_EVENTS } from '../utils/constants';
-import { isWriteTool, toolScope } from './mcp-scopes.registry';
+import { isWriteTool, toolCallType, toolScope } from './mcp-scopes.registry';
 import type { McpTokenActor } from './mcp-oauth.service';
+
+export type McpLimitResult = 'allowed' | 'warned' | 'limited';
 
 export type McpToolOperation = 'read' | 'write';
 
@@ -432,18 +435,23 @@ export function trackMcpToolCalled(
     output?: Record<string, unknown> | null;
     reason?: string;
     error?: unknown;
+    callType?: McpCallType;
+    limitResult?: McpLimitResult;
   }
 ): void {
   const args = input.args ?? {};
+  const callType = input.callType ?? toolCallType(input.toolName);
   const properties = compact({
     toolName: input.toolName,
     memberUid: actor.memberUid,
     authorizationUid: actor.authorizationUid,
     clientName: actor.clientName,
-    scope: toolScope(input.toolName)?.scope ?? 'unscoped',
-    operation: mcpToolOperation(input.toolName),
+    scope: callType === 'forum_post' ? 'forum' : toolScope(input.toolName)?.scope ?? 'unscoped',
+    operation: callType === 'forum_post' ? 'write' : mcpToolOperation(input.toolName),
     result: input.result,
     reason: input.reason,
+    callType,
+    limitResult: input.limitResult,
     // A refusal runs nothing, so it sends nothing from the arguments.
     ...(input.result === 'refused'
       ? {}
