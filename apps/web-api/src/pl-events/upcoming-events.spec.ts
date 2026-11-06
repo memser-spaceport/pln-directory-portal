@@ -52,6 +52,7 @@ describe('upcomingEventsFindArgs and toUpcomingEvent (LAB-3071)', () => {
       toUpcomingEvent({
         uid: 'e1',
         name: 'FIL Lisbon',
+        externalId: 'JdkJYigZLBTL',
         websiteURL: null,
         startDate: new Date('2026-11-07T09:00:00Z'),
         endDate: new Date('2026-11-08T18:00:00Z'),
@@ -61,6 +62,7 @@ describe('upcomingEventsFindArgs and toUpcomingEvent (LAB-3071)', () => {
     ).toEqual({
       uid: 'e1',
       name: 'FIL Lisbon',
+      externalId: 'JdkJYigZLBTL',
       websiteUrl: null,
       logo: 'https://img/x.png',
       location: 'Lisbon',
@@ -68,5 +70,19 @@ describe('upcomingEventsFindArgs and toUpcomingEvent (LAB-3071)', () => {
       startDate: '2026-11-07T09:00:00.000Z',
       endDate: '2026-11-08T18:00:00.000Z',
     });
+  });
+
+  it('answers a null externalId for an event that did not come from pln-events', () => {
+    const row = toUpcomingEvent({
+      uid: 'e2',
+      name: 'Manual event',
+      externalId: null,
+      websiteURL: null,
+      startDate: new Date('2026-11-07T09:00:00Z'),
+      endDate: new Date('2026-11-07T18:00:00Z'),
+      logo: null,
+      location: null,
+    });
+    expect(row.externalId).toBeNull();
   });
 });
