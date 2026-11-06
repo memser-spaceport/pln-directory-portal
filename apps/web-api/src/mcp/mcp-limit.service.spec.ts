@@ -108,6 +108,11 @@ describe('MCP call types', () => {
     expect(toolCallType('search_members')).toBe('read');
     expect(toolCallType('list_news')).toBe('read');
     expect(toolCallType('whoami')).toBe('read');
+    expect(toolCallType('start_forum_thread')).toBe('forum_post');
+    expect(toolCallType('reply_to_forum_thread')).toBe('forum_post');
+    expect(toolCallType('upvote_forum_post')).toBe('write');
+    expect(toolCallType('upload_forum_image')).toBe('write');
+    expect(toolCallType('get_forum_thread')).toBe('read');
     for (const name of MCP_CONTACT_READ_TOOLS) {
       expect(toolCallType(name)).toBe('contact_read');
       expect(MCP_TOOL_SCOPES[name]?.level).toBe('read');

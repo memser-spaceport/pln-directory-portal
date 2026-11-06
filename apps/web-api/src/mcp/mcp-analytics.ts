@@ -118,6 +118,39 @@ export const MCP_TOOL_PROPERTY_BUILDERS: Readonly<Record<string, McpToolProperty
 
   search_forum_threads: directorySearch,
   get_forum_thread: getByUid,
+  list_forum_threads: (args, result) => ({
+    cid: numberProp(args.cid),
+    page: numberProp(result?.page),
+    sort: typeof result?.sort === 'string' ? result.sort : undefined,
+    resultCount: countOf(result?.threads),
+  }),
+  list_forum_categories: (_args, result) => ({ resultCount: countOf(result?.categories) }),
+  // Ids only, never the title or the post (LAB-3050).
+  start_forum_thread: (args, result) => {
+    const posted = result?.posted as Record<string, unknown> | undefined;
+    return { cid: numberProp(args.cid), tid: numberProp(posted?.tid), tagCount: countOf(args.tags) };
+  },
+  reply_to_forum_thread: (args, result) => {
+    const posted = result?.posted as Record<string, unknown> | undefined;
+    return { tid: numberProp(args.tid), pid: numberProp(posted?.pid), toPid: numberProp(args.toPid) };
+  },
+  // Ids only, never the new text (LAB-3144).
+  edit_forum_post: (args, result) => {
+    const edited = result?.edited as Record<string, unknown> | undefined;
+    return { pid: numberProp(args.pid), tid: numberProp(edited?.tid), titleChanged: typeof args.title === 'string' };
+  },
+  delete_forum_post: (args) => ({ pid: numberProp(args.pid) }),
+  upvote_forum_post: (args) => ({ pid: numberProp(args.pid) }),
+  remove_forum_post_upvote: (args) => ({ pid: numberProp(args.pid) }),
+  // Where the image came from, its type and size: never the URL or the bytes (LAB-3156).
+  upload_forum_image: (args, result) => {
+    const uploaded = result?.uploaded as Record<string, unknown> | undefined;
+    return {
+      source: typeof args.imageUrl === 'string' && args.imageUrl.trim() ? 'url' : 'data',
+      mimeType: stringProp(uploaded?.mimeType),
+      size: numberProp(uploaded?.size),
+    };
+  },
 
   list_news: (args, result) => ({
     feed: stringProp(result?.feed) ?? stringProp(args.feed) ?? 'latest',
@@ -314,7 +347,6 @@ export const MCP_TOOL_PROPERTY_BUILDERS: Readonly<Record<string, McpToolProperty
   update_team_communities: uidsOnly('teamUid'),
   update_team_roster: uidsOnly('teamUid', 'memberUid'),
   create_team: none,
-  delete_team: uidsOnly('teamUid'),
   review_team_enrichment: uidsOnly('teamUid'),
   create_project: uidsOnly('maintainingTeamUid'),
   delete_project: uidsOnly('projectUid'),

@@ -30,7 +30,6 @@ jest.mock('../projects/projects.service', () => ({ ProjectsService: jest.fn() })
 jest.mock('../pl-events/pl-events.service', () => ({ PLEventsService: jest.fn() }));
 jest.mock('../pl-events/pl-event-guests.service', () => ({ PLEventGuestsService: jest.fn() }));
 jest.mock('../pl-events/pl-event-locations.service', () => ({ PLEventLocationsService: jest.fn() }));
-jest.mock('../search/search.service', () => ({ SearchService: jest.fn() }));
 jest.mock('../ai-apps/ai-apps.service', () => ({ AiAppsService: jest.fn() }));
 jest.mock('../spv-spotlights/pl-network-portfolio.service', () => ({ PlNetworkPortfolioService: jest.fn() }));
 jest.mock('./mcp-oauth.service', () => ({ McpOAuthService: jest.fn() }));
@@ -118,7 +117,6 @@ function build(
     listOwnAppsForMcp: jest.fn().mockResolvedValue([{ uid: 'app-1' }]),
     updateFeedbackStatusForMcp: jest.fn().mockResolvedValue({ uid: 'fb-1', status: 'VIEWED' }),
   };
-  const search = { getForumThreadByUid: jest.fn().mockResolvedValue({ uid: 't-1' }) };
   const analytics = { trackEvent: jest.fn().mockResolvedValue(undefined) };
   const settings = opts.settings ?? [];
   const prisma = {
@@ -183,7 +181,6 @@ function build(
     stub,
     stub,
     stub,
-    search as any,
     aiApps as any,
     stub,
     analytics as any,
@@ -197,6 +194,8 @@ function build(
     limits as any,
     {} as any,
     {} as any,
+    stub,
+    stub,
     stub,
     stub,
     stub,

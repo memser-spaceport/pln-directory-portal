@@ -54,6 +54,7 @@ import { McpController } from './mcp.controller';
 import { McpScopesService } from './mcp-scopes.service';
 import { McpAccessRequestsService } from './mcp-access-requests.service';
 import { McpLimitService } from './mcp-limit.service';
+import { ImagesModule } from '../images/images.module';
 import { JwtService } from '../utils/jwt/jwt.service';
 
 @Module({
@@ -100,6 +101,7 @@ import { JwtService } from '../utils/jwt/jwt.service';
     InvestorListsModule,
     FounderSourcingModule,
     RoadmapModule,
+    ImagesModule,
   ],
   controllers: [
     McpOAuthController,

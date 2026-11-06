@@ -235,20 +235,6 @@ export function directoryCoverageTools(deps: {
       },
     },
     {
-      name: 'delete_team',
-      description: 'Hide a team from the directory. Directory admins only.',
-      visibility: 'always',
-      keepUnknownArgs: true,
-      inputSchema: { teamUid: z.string() },
-      execute: async (ctx, args = {}) => {
-        refuseUnknown(args, ['teamUid']);
-        if (!isAdmin(ctx)) throw new ForbiddenException('Only directory admins can delete a team');
-        const teamUid = requiredUid(args, 'teamUid');
-        await teams.softDeleteTeam(teamUid);
-        return { teamUid, deleted: true };
-      },
-    },
-    {
       name: 'review_team_enrichment',
       description: 'Mark a team you lead as having its generated profile reviewed or approved.',
       visibility: 'always',

@@ -27,6 +27,15 @@ export const MCP_TOOL_SCOPES: Readonly<Record<string, McpToolScope>> = {
 
   search_forum_threads: { scope: 'forum', level: 'read' },
   get_forum_thread: { scope: 'forum', level: 'read' },
+  list_forum_threads: { scope: 'forum', level: 'read' },
+  list_forum_categories: { scope: 'forum', level: 'read' },
+  start_forum_thread: { scope: 'forum', level: 'write' },
+  reply_to_forum_thread: { scope: 'forum', level: 'write' },
+  edit_forum_post: { scope: 'forum', level: 'write' },
+  delete_forum_post: { scope: 'forum', level: 'write' },
+  upvote_forum_post: { scope: 'forum', level: 'write' },
+  remove_forum_post_upvote: { scope: 'forum', level: 'write' },
+  upload_forum_image: { scope: 'forum', level: 'write' },
 
   list_news: { scope: 'news', level: 'read' },
   get_news_item: { scope: 'news', level: 'read' },
@@ -134,7 +143,6 @@ export const MCP_TOOL_SCOPES: Readonly<Record<string, McpToolScope>> = {
   update_team_communities: { scope: 'directory', level: 'write' },
   update_team_roster: { scope: 'directory', level: 'write' },
   create_team: { scope: 'directory', level: 'write' },
-  delete_team: { scope: 'directory', level: 'write' },
   review_team_enrichment: { scope: 'directory', level: 'write' },
   create_project: { scope: 'directory', level: 'write' },
   delete_project: { scope: 'directory', level: 'write' },
@@ -205,11 +213,18 @@ export const MCP_CONTACT_READ_TOOLS: ReadonlySet<string> = new Set([
   'get_event',
 ]);
 
+/**
+ * Tools that publish a new forum post as the member. They count against the forum post limit, the same as a post an
+ * agent makes with a member proof it asked for itself. Other forum writes (edit, delete, upvote, image) are writes.
+ */
+export const MCP_FORUM_POST_TOOLS: ReadonlySet<string> = new Set(['start_forum_thread', 'reply_to_forum_thread']);
+
 /** One call type per tool. A tool missing from the registry has none (`whoami` is a read). */
 export function toolCallType(toolName: string): McpCallType | undefined {
   if (MCP_UNSCOPED_TOOLS.has(toolName)) return 'read';
   const entry = MCP_TOOL_SCOPES[toolName];
   if (!entry) return undefined;
+  if (MCP_FORUM_POST_TOOLS.has(toolName)) return 'forum_post';
   if (entry.level === 'write') return 'write';
   if (MCP_CONTACT_READ_TOOLS.has(toolName)) return 'contact_read';
   return 'read';

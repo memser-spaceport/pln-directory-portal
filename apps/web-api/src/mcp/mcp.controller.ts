@@ -25,11 +25,14 @@ import { ProjectsService } from '../projects/projects.service';
 import { PLEventGuestsService } from '../pl-events/pl-event-guests.service';
 import { PLEventLocationsService } from '../pl-events/pl-event-locations.service';
 import { PLEventsService } from '../pl-events/pl-events.service';
-import { SearchService } from '../search/search.service';
 import { AiAppsService } from '../ai-apps/ai-apps.service';
 import { PlNetworkPortfolioService } from '../spv-spotlights/pl-network-portfolio.service';
 import { aiAppFeedbackTools, aiAppWriteTools } from './mcp-ai-app-feedback-tools';
 import { trackMcpToolCalled, trackMcpToolInvocation } from './mcp-analytics';
+import { forumTools } from './mcp-forum-tools';
+import { forumImageTools } from './mcp-forum-image-tools';
+import { ImagesService } from '../images/images.service';
+import { McpMemberProofService } from './mcp-member-proof.service';
 import { directoryTools } from './mcp-directory-tools';
 import { McpOAuthService } from './mcp-oauth.service';
 import { portfolioTools } from './mcp-portfolio-tools';
@@ -126,7 +129,6 @@ export class McpController {
     private readonly teams: TeamsService,
     private readonly projects: ProjectsService,
     private readonly plEvents: PLEventsService,
-    private readonly search: SearchService,
     private readonly aiApps: AiAppsService,
     private readonly portfolio: PlNetworkPortfolioService,
     private readonly analytics: AnalyticsService,
@@ -181,7 +183,9 @@ export class McpController {
     private readonly warmIntroRegenerate: WarmIntrosV2RegenerateService,
     private readonly aiAccess: AiAppsAccessService,
     private readonly pitches: TeamPitchesService,
-    private readonly pitchEngagement: TeamPitchEngagementService
+    private readonly pitchEngagement: TeamPitchEngagementService,
+    private readonly memberProofs: McpMemberProofService,
+    private readonly images: ImagesService
   ) {}
 
   private readonly logger = new Logger(McpController.name);
@@ -219,7 +223,9 @@ export class McpController {
       toolsForPermissions(permissions, [
         WHOAMI_TOOL,
         ...warmIntroTools(this.masterProfiles, this.warmIntros),
-        ...directoryTools(this.members, this.teams, this.projects, this.plEvents, this.search),
+        ...directoryTools(this.members, this.teams, this.projects, this.plEvents),
+        ...forumTools(this.memberProofs),
+        ...forumImageTools(this.images),
         ...aiAppFeedbackTools(this.aiApps),
         ...aiAppWriteTools(this.aiApps),
         ...portfolioTools(this.portfolio),
