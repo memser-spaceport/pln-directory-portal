@@ -1956,6 +1956,8 @@ model Deal {
   fullDescription        String
   redemptionInstructions String
   isHighValue            Boolean          @default(false)
+  /// Short value shown as a pill on Home's deals rail, e.g. "12 mo free" (LAB-3071). Null hides the pill.
+  offerValue             String?
   contact                String           @default("")
   status                 DealStatus       @default(DRAFT)
   createdAt              DateTime         @default(now())
