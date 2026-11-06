@@ -6,13 +6,16 @@ describe('TeamNewsUpvotesService', () => {
   let service: TeamNewsUpvotesService;
 
   const teamNewsItemFindUnique = jest.fn();
+  const teamNewsUpvoteFindUnique = jest.fn();
   const teamNewsUpvoteUpsert = jest.fn();
+  const recordSignal = jest.fn();
   const teamNewsUpvoteDeleteMany = jest.fn();
   const teamNewsUpvoteCount = jest.fn();
 
   const prismaMock = {
     teamNewsItem: { findUnique: teamNewsItemFindUnique },
     teamNewsUpvote: {
+      findUnique: teamNewsUpvoteFindUnique,
       upsert: teamNewsUpvoteUpsert,
       deleteMany: teamNewsUpvoteDeleteMany,
       count: teamNewsUpvoteCount,
@@ -22,10 +25,11 @@ describe('TeamNewsUpvotesService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     teamNewsItemFindUnique.mockResolvedValue({ uid: 'news-1' });
+    teamNewsUpvoteFindUnique.mockResolvedValue(null);
     teamNewsUpvoteUpsert.mockResolvedValue({});
     teamNewsUpvoteDeleteMany.mockResolvedValue({ count: 1 });
     teamNewsUpvoteCount.mockResolvedValue(2);
-    service = new TeamNewsUpvotesService(prismaMock);
+    service = new TeamNewsUpvotesService(prismaMock, { record: recordSignal } as never);
   });
 
   it('throws NotFound when the news item does not exist', async () => {
@@ -55,5 +59,39 @@ describe('TeamNewsUpvotesService', () => {
       where: { newsItemUid: 'news-1', memberUid: 'member-1' },
     });
     expect(result).toEqual({ upvoteCount: 1, viewerHasUpvoted: false });
+  });
+});
+
+describe('TeamNewsUpvotesService member signals (LAB-3121)', () => {
+  const findUnique = jest.fn();
+  const deleteMany = jest.fn();
+  const record = jest.fn();
+  const prisma = {
+    teamNewsItem: { findUnique: jest.fn(async () => ({ uid: 'news-1' })) },
+    teamNewsUpvote: { findUnique, upsert: jest.fn(async () => ({})), deleteMany, count: jest.fn(async () => 1) },
+  } as unknown as PrismaService;
+  const service = new TeamNewsUpvotesService(prisma, { record } as never);
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('records news-upvote only for a new upvote', async () => {
+    findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 1 });
+    await service.upvote('member-1', 'news-1');
+    await service.upvote('member-1', 'news-1');
+    expect(record).toHaveBeenCalledTimes(1);
+    expect(record).toHaveBeenCalledWith({
+      memberUid: 'member-1',
+      action: 'news-upvote',
+      entityType: 'NEWS_ITEM',
+      entityUid: 'news-1',
+    });
+  });
+
+  it('records news-upvote-removed only when an upvote was deleted', async () => {
+    deleteMany.mockResolvedValueOnce({ count: 0 }).mockResolvedValueOnce({ count: 1 });
+    await service.removeUpvote('member-1', 'news-1');
+    await service.removeUpvote('member-1', 'news-1');
+    expect(record).toHaveBeenCalledTimes(1);
+    expect(record).toHaveBeenCalledWith(expect.objectContaining({ action: 'news-upvote-removed' }));
   });
 });

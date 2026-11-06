@@ -54,6 +54,7 @@ describe('JobOpeningsInterestService', () => {
 
   const atsPushMock = { pushJobInterest: jest.fn(), pushTeamInterest: jest.fn() };
   const analyticsMock = { trackEvent: jest.fn() };
+  const signalsMock = { record: jest.fn() };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -75,7 +76,12 @@ describe('JobOpeningsInterestService', () => {
     teamInterestFindUnique.mockResolvedValue(null);
     teamInterestUpsert.mockResolvedValue({ uid: 'team-interest-1' });
     teamInterestCount.mockResolvedValue(1);
-    service = new JobOpeningsInterestService(prismaMock, atsPushMock as never, analyticsMock as never);
+    service = new JobOpeningsInterestService(
+      prismaMock,
+      atsPushMock as never,
+      analyticsMock as never,
+      signalsMock as never
+    );
   });
 
   describe('markInterest', () => {
@@ -205,6 +211,45 @@ describe('JobOpeningsInterestService', () => {
 
       await expect(service.removeInterest('missing', 'a@b.com')).rejects.toBeInstanceOf(NotFoundException);
       expect(interestDeleteMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('member signals (LAB-3121)', () => {
+    it('records job-interest on a first mark only, not on a note update', async () => {
+      await service.markInterest('job-1', 'a@b.co');
+      interestFindUnique.mockResolvedValue({ uid: 'interest-1' });
+      await service.markInterest('job-1', 'a@b.co', { note: 'updated' });
+
+      expect(signalsMock.record).toHaveBeenCalledTimes(1);
+      expect(signalsMock.record).toHaveBeenCalledWith({
+        memberUid: 'member-1',
+        action: 'job-interest',
+        entityType: 'JOB_OPENING',
+        entityUid: 'job-1',
+      });
+    });
+
+    it('records team-interest on a first mark only', async () => {
+      await service.markTeamInterest('team-1', 'a@b.co');
+      teamInterestFindUnique.mockResolvedValue({ uid: 'team-interest-1' });
+      await service.markTeamInterest('team-1', 'a@b.co');
+
+      expect(signalsMock.record).toHaveBeenCalledTimes(1);
+      expect(signalsMock.record).toHaveBeenCalledWith({
+        memberUid: 'member-1',
+        action: 'team-interest',
+        entityType: 'TEAM',
+        entityUid: 'team-1',
+      });
+    });
+
+    it('records job-interest-removed only when a row was deleted', async () => {
+      interestDeleteMany.mockResolvedValueOnce({ count: 0 }).mockResolvedValueOnce({ count: 1 });
+      await service.removeInterest('job-1', 'a@b.co');
+      await service.removeInterest('job-1', 'a@b.co');
+
+      expect(signalsMock.record).toHaveBeenCalledTimes(1);
+      expect(signalsMock.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'job-interest-removed' }));
     });
   });
 

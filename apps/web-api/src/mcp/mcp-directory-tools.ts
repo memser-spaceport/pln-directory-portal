@@ -4,11 +4,9 @@ import { MembersService } from '../members/members.service';
 import { TeamsService } from '../teams/teams.service';
 import { ProjectsService } from '../projects/projects.service';
 import { PLEventsService } from '../pl-events/pl-events.service';
-import { SearchService } from '../search/search.service';
 import {
   canViewJobSearchStatus,
   compactEventRow,
-  compactForumThreadRow,
   compactMemberRow,
   compactProjectRow,
   compactTeamRow,
@@ -46,8 +44,7 @@ export function directoryTools(
   members: MembersService,
   teams: TeamsService,
   projects: ProjectsService,
-  events: PLEventsService,
-  search: SearchService
+  events: PLEventsService
 ): McpToolDef[] {
   return [
     {
@@ -160,37 +157,6 @@ export function directoryTools(
         const uid = stringArg(args.uid) ?? '';
         const event = await events.getPLEventForViewer(uid, { isUserLoggedIn: true });
         return event as unknown as Record<string, unknown>;
-      },
-    },
-    {
-      name: 'search_forum_threads',
-      description:
-        'Search forum threads by text matched against thread titles and post content. Returns compact rows only (uid, topicTitle, topicSlug, topicUrl, replyCount, cid, snippet). Requires forum.read. Then call get_forum_thread with a uid for the full thread.',
-      visibility: 'forum',
-      inputSchema: searchInputSchema,
-      execute: async (_ctx, args = {}) => {
-        const limit = clampLimit(args.limit);
-        const q = stringArg(args.q) ?? '';
-        const hits = await search.searchForumPosts(q, limit);
-        return {
-          results: hits.map((hit) => compactForumThreadRow(hit as Record<string, unknown>)),
-          limit,
-        };
-      },
-    },
-    {
-      name: 'get_forum_thread',
-      description:
-        'Fetch one forum thread by uid (tid) with the full thread, including the root post and replies. Requires forum.read. Search first with search_forum_threads to get a uid.',
-      visibility: 'forum',
-      inputSchema: getByUidInputSchema('Forum thread uid (tid) from search_forum_threads'),
-      execute: async (_ctx, args = {}) => {
-        const uid = stringArg(args.uid) ?? '';
-        const thread = await search.getForumThreadByUid(uid);
-        if (!thread) {
-          throw new NotFoundException(`Forum thread not found: ${uid}`);
-        }
-        return thread as Record<string, unknown>;
       },
     },
   ];

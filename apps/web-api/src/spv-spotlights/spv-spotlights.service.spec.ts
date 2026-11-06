@@ -1,3 +1,4 @@
+import { directoryListedMemberWhere } from '../members/member-visibility';
 import { SpvSpotlightsService } from './spv-spotlights.service';
 import { dataRoomEmailSubject } from './spv-spotlight.utils';
 
@@ -60,6 +61,29 @@ describe('SpvSpotlightsService getBySlug viewer access', () => {
     };
     return { service: new SpvSpotlightsService(prisma as never, { send: jest.fn() } as never), prisma };
   };
+
+  it('loads founders with the same approved-member rule as the team profile', async () => {
+    const { service, prisma } = buildService(null, null);
+
+    await service.getBySlug('netholabs', null);
+
+    expect(prisma.spvSpotlight.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          team: expect.objectContaining({
+            select: expect.objectContaining({
+              teamMemberRoles: expect.objectContaining({
+                where: expect.objectContaining({
+                  endDate: null,
+                  member: directoryListedMemberWhere(),
+                }),
+              }),
+            }),
+          }),
+        }),
+      })
+    );
+  });
 
   it('approves a founder participant and shows the data room', async () => {
     const { service, prisma } = buildService({ type: 'FOUNDER' });

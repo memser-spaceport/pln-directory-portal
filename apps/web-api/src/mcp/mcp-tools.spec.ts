@@ -30,6 +30,8 @@ import { MasterProfileService } from '../master-profile/master-profile.service';
 import { WarmIntrosV2Service } from '../warm-intros-v2/warm-intros-v2.service';
 import { aiAppFeedbackTools, aiAppWriteTools } from './mcp-ai-app-feedback-tools';
 import { directoryTools } from './mcp-directory-tools';
+import { forumTools } from './mcp-forum-tools';
+import { forumImageTools } from './mcp-forum-image-tools';
 import { portfolioTools } from './mcp-portfolio-tools';
 import { newsTools } from './mcp-news-tools';
 import { directoryWriteTools, eventWriteTools, membershipTools, newsWriteTools, profileTools } from './mcp-write-tools';
@@ -166,7 +168,9 @@ describe('scope registry', () => {
   const fullCatalog = [
     WHOAMI_TOOL,
     ...warmIntroTools(stub, stub),
-    ...directoryTools(stub, stub, stub, stub, stub),
+    ...directoryTools(stub, stub, stub, stub),
+    ...forumTools(stub),
+    ...forumImageTools(stub),
     ...aiAppFeedbackTools(stub),
     ...aiAppWriteTools(stub),
     ...portfolioTools(stub),
@@ -193,7 +197,7 @@ describe('scope registry', () => {
     ...actionCoverageTools(stub),
     ...platformCoverageTools(stub),
   ];
-  const everything = new Set(['directory.admin.full', 'investor_db.edit', 'forum.read', 'ai_apps.read']);
+  const everything = new Set(['directory.admin.full', 'investor_db.edit', 'forum.read', 'forum.write', 'ai_apps.read']);
 
   it('puts every catalog tool except whoami in the scope registry', () => {
     const missing = fullCatalog
@@ -211,7 +215,7 @@ describe('scope registry', () => {
     const writesByName = fullCatalog
       .map((t) => t.name)
       .filter((name) =>
-        /^(update|submit|post|rsvp|cancel|join|leave|add|delete|follow|unfollow|save|unsave|set|mark|unmark|report|like|unlike|redeploy|rename|create|upvote|remove|request|refer|apply|close|review|accept|express|contact|regenerate|clear|resolve|pin|unpin|reply)_/.test(
+        /^(update|submit|post|rsvp|cancel|join|leave|add|delete|follow|unfollow|save|unsave|set|mark|unmark|report|like|unlike|redeploy|rename|create|upvote|remove|request|refer|apply|close|review|accept|express|contact|regenerate|clear|resolve|pin|unpin|reply|start|edit|upload)_/.test(
           name
         )
       );
@@ -231,9 +235,31 @@ describe('scope registry', () => {
     for (const scope of ['investors', 'ai_apps', 'news', 'profile', 'events', 'directory'] as const) {
       expect(registryMaxLevel(scope)).toBe('write');
     }
-    // Forum's tools only read; write is for NodeBB acting through a member proof (LAB-3075)
+    // Forum writes through start_forum_thread and reply_to_forum_thread (LAB-3031), and NodeBB member proofs (LAB-3075)
     expect(registryMaxLevel('forum')).toBe('write');
     expect(registryMaxLevel('search')).toBe('read');
+  });
+
+  it('shows forum posting tools only with forum.write, like posting in the forum UI', () => {
+    const forum = forumTools(stub);
+    const reads = ['search_forum_threads', 'get_forum_thread', 'list_forum_threads', 'list_forum_categories'];
+    expect(toolsForPermissions(new Set(['forum.read']), forum).map((t) => t.name)).toEqual(reads);
+    expect(toolsForPermissions(new Set(['forum.read', 'forum.write']), forum).map((t) => t.name)).toEqual([
+      ...reads,
+      'start_forum_thread',
+      'reply_to_forum_thread',
+      'edit_forum_post',
+      'delete_forum_post',
+      'upvote_forum_post',
+      'remove_forum_post_upvote',
+    ]);
+  });
+
+  it('offers no team delete, even to a directory admin (LAB-3079)', () => {
+    // A directory admin deletes a team on its page; agents can't
+    expect(fullCatalog.map((t) => t.name)).not.toContain('delete_team');
+    expect(MCP_TOOL_SCOPES).not.toHaveProperty('delete_team');
+    expect(toolsForPermissions(everything, fullCatalog).map((t) => t.name)).not.toContain('delete_team');
   });
 
   it('keeps RBAC visibility independent of scopes', () => {

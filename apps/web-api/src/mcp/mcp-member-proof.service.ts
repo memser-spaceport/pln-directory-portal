@@ -2,6 +2,8 @@ import {
   BadRequestException,
   CACHE_MANAGER,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Inject,
   Injectable,
   Logger,
@@ -13,12 +15,15 @@ import { AnalyticsService } from '../analytics/service/analytics.service';
 import { MemberSignInService, SignedInMember } from '../integration-keys/member-sign-in.service';
 import { PrismaService } from '../shared/prisma.service';
 import { ANALYTICS_EVENTS } from '../utils/constants';
+import { trackMcpToolCalled } from './mcp-analytics';
 import { MemberProofScope } from './dto/member-proof.dto';
+import { limitRefusalText, limitWarningText } from './mcp-limit.messages';
+import { McpLimitService } from './mcp-limit.service';
 import { MCP_CONNECT_PERMISSION, MCP_MEMBER_PROOF_TTL_SECONDS, MCP_TOKEN_PREFIX } from './mcp.constants';
 import { generateSecret, hashSecret } from './mcp.crypto';
-import { McpOAuthService } from './mcp-oauth.service';
+import { McpOAuthService, McpTokenActor } from './mcp-oauth.service';
 import { scopeLabel } from './mcp-scopes.registry';
-import { McpScopesService } from './mcp-scopes.service';
+import { McpScopesService, parseStoredLevels } from './mcp-scopes.service';
 
 const MEMBER_SIGN_IN_SCOPE = 'members:sign-in';
 const INVALID_PROOF = 'Invalid or expired member proof';
@@ -63,15 +68,59 @@ export class McpMemberProofService {
     private readonly signIn: MemberSignInService,
     private readonly analytics: AnalyticsService,
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
-    private readonly scopes: McpScopesService
+    private readonly scopes: McpScopesService,
+    private readonly limits: McpLimitService
   ) {}
 
   async issue(
     accessToken: string,
     audience: string,
     scope: MemberProofScope = 'ai_apps'
-  ): Promise<{ proof: string; expiresAt: Date }> {
+  ): Promise<{ proof: string; expiresAt: Date; warning?: string }> {
     const actor = await this.oauth.authenticateAccessToken(accessToken);
+    // The agent posts to NodeBB with this proof itself, so a forum-write proof counts as one forum post.
+    return this.issueForConnection(actor, audience, scope, { countForumPost: true });
+  }
+
+  /**
+   * A proof for a connection the caller already authenticated: the MCP forum tools (LAB-3031) post to NodeBB as the
+   * member from inside an MCP request. Re-reads the connection, so one disconnected since gets no proof.
+   */
+  async issueForAuthorization(
+    authorizationUid: string,
+    audience: string,
+    scope: MemberProofScope
+  ): Promise<{ proof: string; expiresAt: Date; warning?: string }> {
+    const authorization = await this.prisma.mcpAuthorization.findUnique({
+      where: { uid: authorizationUid },
+      select: { memberUid: true, clientName: true, scopeLevels: true, revokedAt: true },
+    });
+    if (!authorization || authorization.revokedAt) {
+      throw new ForbiddenException('This connection is no longer allowed');
+    }
+    return this.issueForConnection(
+      {
+        authorizationUid,
+        memberUid: authorization.memberUid,
+        clientName: authorization.clientName,
+        scopeLevels: parseStoredLevels(authorization.scopeLevels),
+      },
+      audience,
+      scope
+    );
+  }
+
+  /**
+   * `countForumPost`: only proofs an agent asks for directly (`issue`) count against the forum post limit. The MCP
+   * forum tools (`issueForAuthorization`) mint one per call, reads included, and the MCP controller already limits
+   * each tool call by its own call type (`toolCallType`: posting tools are `forum_post`).
+   */
+  private async issueForConnection(
+    actor: Pick<McpTokenActor, 'authorizationUid' | 'memberUid' | 'clientName' | 'scopeLevels'>,
+    audience: string,
+    scope: MemberProofScope,
+    { countForumPost = false }: { countForumPost?: boolean } = {}
+  ): Promise<{ proof: string; expiresAt: Date; warning?: string }> {
     const key = await this.prisma.integrationKey.findUnique({
       where: { uid: audience },
       select: { revokedAt: true, scopes: true },
@@ -83,6 +132,22 @@ export class McpMemberProofService {
     const access = await this.accessFor(actor.scopeLevels, scope);
     if (access === 'none') {
       throw new ForbiddenException(`This connection has no ${scopeLabel(scope)} access`);
+    }
+
+    let warning: string | undefined;
+    if (countForumPost && scope === 'forum' && access === 'write') {
+      const decision = await this.limits.tryConsume(actor.memberUid, 'forum_post');
+      trackMcpToolCalled(this.analytics, actor, {
+        toolName: 'forum_post',
+        result: decision.allowed ? 'ok' : 'refused',
+        reason: decision.allowed ? undefined : decision.unavailable ? 'limit_unavailable' : 'rate_limited',
+        callType: 'forum_post',
+        limitResult: decision.allowed ? (decision.warned ? 'warned' : 'allowed') : 'limited',
+      });
+      if (!decision.allowed) {
+        throw new HttpException(limitRefusalText(decision), HttpStatus.TOO_MANY_REQUESTS);
+      }
+      if (decision.warned) warning = limitWarningText(decision);
     }
 
     const proof = generateSecret(MCP_TOKEN_PREFIX.memberProof);
@@ -97,7 +162,7 @@ export class McpMemberProofService {
     };
     await this.cache.set(proofKey(proof), stored, { ttl: MCP_MEMBER_PROOF_TTL_SECONDS });
     this.track(ANALYTICS_EVENTS.MCP.MEMBER_PROOF_ISSUED, actor.memberUid, { audience, scope });
-    return { proof, expiresAt };
+    return warning ? { proof, expiresAt, warning } : { proof, expiresAt };
   }
 
   /**

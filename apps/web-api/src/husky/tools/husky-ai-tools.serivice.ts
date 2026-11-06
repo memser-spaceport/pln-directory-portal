@@ -14,11 +14,13 @@ import { NewsTool } from './news.tool';
 import { DemoDayTool } from './demo-day.tool';
 import { InvestorDbTool } from './investor-db.tool';
 import { WarmIntrosTool } from './warm-intros.tool';
+import { WebSearchTool } from './web-search.tool';
 import { HuskyAuthContext } from './husky-auth-context';
 
 /**
- * Directory database tools exposed to the Husky search model. Every tool reads
- * from PostgreSQL (or the forum search index); there is no vector store.
+ * Tools exposed to the Husky search model. The directory tools read from PostgreSQL
+ * (or the forum search index); there is no vector store. `searchWeb` is the one tool
+ * that reads the public web, for questions the directory data answers too thinly.
  */
 @Injectable()
 export class HuskyAiToolsService implements OnModuleInit {
@@ -36,7 +38,8 @@ export class HuskyAiToolsService implements OnModuleInit {
     private newsTool: NewsTool,
     private demoDayTool: DemoDayTool,
     private investorDbTool: InvestorDbTool,
-    private warmIntrosTool: WarmIntrosTool
+    private warmIntrosTool: WarmIntrosTool,
+    private webSearchTool: WebSearchTool
   ) {}
 
   async onModuleInit() {
@@ -59,6 +62,8 @@ export class HuskyAiToolsService implements OnModuleInit {
       getJobOpenings: this.jobOpeningsTool.getTool(),
       getTeamNews: this.newsTool.getTool(auth),
       getDemoDayTeams: this.demoDayTool.getTool(),
+      // Gets only the query the model writes, never the auth context.
+      searchWeb: this.webSearchTool.getTool(),
     };
     return Object.fromEntries(
       Object.entries(tools).map(([name, tool]) => [name, this.withFailureFallback(name, tool)])

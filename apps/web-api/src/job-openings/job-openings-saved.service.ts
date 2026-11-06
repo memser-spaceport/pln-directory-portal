@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import type { SavedJobStatus } from 'libs/contracts/src/schema/job-opening';
 import { PrismaService } from '../shared/prisma.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
+import { MemberSignalsService } from '../member-signals/member-signals.service';
 import { trackJobSaveRecorded } from './job-openings-analytics';
 import { HIDDEN_JOB_OPENING_STATUSES } from './job-openings-query.service';
 import { resolveVisibleJobOpening } from './job-openings-resolve';
@@ -16,7 +17,11 @@ import { resolveVisibleJobOpening } from './job-openings-resolve';
  */
 @Injectable()
 export class JobOpeningsSavedService {
-  constructor(private readonly prisma: PrismaService, private readonly analytics: AnalyticsService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly analytics: AnalyticsService,
+    private readonly memberSignals: MemberSignalsService
+  ) {}
 
   /**
    * Save a job opening. Idempotent, and the empty `update` is load-bearing:
@@ -45,6 +50,7 @@ export class JobOpeningsSavedService {
         jobUid,
         teamUid: jobOpening.teamUid!,
       });
+      void this.memberSignals.record({ memberUid, action: 'job-saved', entityType: 'JOB_OPENING', entityUid: jobUid });
     }
 
     return { jobUid, viewerHasSaved: true };
@@ -59,9 +65,17 @@ export class JobOpeningsSavedService {
   async unsave(jobUid: string, memberEmail: string | undefined): Promise<SavedJobStatus> {
     const memberUid = await this.resolveMemberUid(memberEmail);
 
-    await this.prisma.savedJobOpening.deleteMany({
+    const { count } = await this.prisma.savedJobOpening.deleteMany({
       where: { jobOpeningUid: jobUid, memberUid },
     });
+    if (count > 0) {
+      void this.memberSignals.record({
+        memberUid,
+        action: 'job-unsaved',
+        entityType: 'JOB_OPENING',
+        entityUid: jobUid,
+      });
+    }
 
     return { jobUid, viewerHasSaved: false };
   }

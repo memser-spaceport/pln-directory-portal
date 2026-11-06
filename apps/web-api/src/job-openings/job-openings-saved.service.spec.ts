@@ -30,6 +30,7 @@ describe('JobOpeningsSavedService', () => {
   } as unknown as PrismaService;
 
   const analyticsMock = { trackEvent: jest.fn() };
+  const signalsMock = { record: jest.fn() };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -47,7 +48,7 @@ describe('JobOpeningsSavedService', () => {
     savedDeleteMany.mockResolvedValue({ count: 1 });
     savedFindMany.mockResolvedValue([]);
 
-    service = new JobOpeningsSavedService(prismaMock, analyticsMock as never);
+    service = new JobOpeningsSavedService(prismaMock, analyticsMock as never, signalsMock as never);
   });
 
   describe('save', () => {
@@ -196,6 +197,31 @@ describe('JobOpeningsSavedService', () => {
     });
   });
 
+  describe('member signals (LAB-3121)', () => {
+    it('records job-saved on a first save only', async () => {
+      await service.save('job-1', 'a@b.co');
+      savedFindUnique.mockResolvedValue({ uid: 'save-1' });
+      await service.save('job-1', 'a@b.co');
+
+      expect(signalsMock.record).toHaveBeenCalledTimes(1);
+      expect(signalsMock.record).toHaveBeenCalledWith({
+        memberUid: 'member-1',
+        action: 'job-saved',
+        entityType: 'JOB_OPENING',
+        entityUid: 'job-1',
+      });
+    });
+
+    it('records job-unsaved only when a save was deleted', async () => {
+      savedDeleteMany.mockResolvedValueOnce({ count: 0 }).mockResolvedValueOnce({ count: 1 });
+      await service.unsave('job-1', 'a@b.co');
+      await service.unsave('job-1', 'a@b.co');
+
+      expect(signalsMock.record).toHaveBeenCalledTimes(1);
+      expect(signalsMock.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'job-unsaved' }));
+    });
+  });
+
   describe('listMine', () => {
     it('returns the caller saves newest first, with the save time', async () => {
       savedFindMany.mockResolvedValue([
@@ -210,9 +236,7 @@ describe('JobOpeningsSavedService', () => {
         ],
       });
 
-      expect(savedFindMany).toHaveBeenCalledWith(
-        expect.objectContaining({ orderBy: { createdAt: 'desc' } })
-      );
+      expect(savedFindMany).toHaveBeenCalledWith(expect.objectContaining({ orderBy: { createdAt: 'desc' } }));
     });
 
     it('asks only for the caller saves whose job is still on the board', async () => {

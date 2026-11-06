@@ -10,5 +10,7 @@ import { ServiceImagesController } from './service-images.controller';
 @Module({
   controllers: [ImagesController, AdminImagesController, ServiceImagesController],
   providers: [ImagesService, FileUploadService, AwsService, JwtService],
+  // MCP agents add images to forum posts through the same storage (LAB-3156)
+  exports: [ImagesService],
 })
 export class ImagesModule {}

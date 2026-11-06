@@ -1,15 +1,20 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { TeamNewsUpvoteStatus } from 'libs/contracts/src/schema/team-news';
 import { PrismaService } from '../shared/prisma.service';
+import { MemberSignalsService } from '../member-signals/member-signals.service';
 
 @Injectable()
 export class TeamNewsUpvotesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly memberSignals: MemberSignalsService) {}
 
   /** Upvote a news item. Idempotent: re-upvoting succeeds without double-counting. */
   async upvote(memberUid: string, newsItemUid: string): Promise<TeamNewsUpvoteStatus> {
     await this.assertNewsItemExists(newsItemUid);
 
+    const existing = await this.prisma.teamNewsUpvote.findUnique({
+      where: { newsItemUid_memberUid: { newsItemUid, memberUid } },
+      select: { id: true },
+    });
     await this.prisma.teamNewsUpvote.upsert({
       where: {
         newsItemUid_memberUid: { newsItemUid, memberUid },
@@ -17,6 +22,14 @@ export class TeamNewsUpvotesService {
       create: { newsItemUid, memberUid },
       update: {},
     });
+    if (!existing) {
+      void this.memberSignals.record({
+        memberUid,
+        action: 'news-upvote',
+        entityType: 'NEWS_ITEM',
+        entityUid: newsItemUid,
+      });
+    }
 
     return this.buildStatus(newsItemUid, true);
   }
@@ -25,9 +38,17 @@ export class TeamNewsUpvotesService {
   async removeUpvote(memberUid: string, newsItemUid: string): Promise<TeamNewsUpvoteStatus> {
     await this.assertNewsItemExists(newsItemUid);
 
-    await this.prisma.teamNewsUpvote.deleteMany({
+    const { count } = await this.prisma.teamNewsUpvote.deleteMany({
       where: { newsItemUid, memberUid },
     });
+    if (count > 0) {
+      void this.memberSignals.record({
+        memberUid,
+        action: 'news-upvote-removed',
+        entityType: 'NEWS_ITEM',
+        entityUid: newsItemUid,
+      });
+    }
 
     return this.buildStatus(newsItemUid, false);
   }

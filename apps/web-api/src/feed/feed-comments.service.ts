@@ -8,6 +8,7 @@ import type {
   DeleteFeedCommentResponse,
 } from 'libs/contracts/src/schema/feed';
 import { PrismaService } from '../shared/prisma.service';
+import { MemberSignalsService } from '../member-signals/member-signals.service';
 import { PushNotificationsService } from '../push-notifications/push-notifications.service';
 import { decodeHtmlEntities } from '../utils/html-entities';
 
@@ -27,7 +28,8 @@ export class FeedCommentsService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly pushNotificationsService: PushNotificationsService
+    private readonly pushNotificationsService: PushNotificationsService,
+    private readonly memberSignals: MemberSignalsService
   ) {}
 
   /** Batch comment counts for a list of news item uids. Includes replies at any depth. */
@@ -94,6 +96,12 @@ export class FeedCommentsService {
           select: { uid: true, name: true, image: { select: { url: true } } },
         },
       },
+    });
+    void this.memberSignals.record({
+      memberUid,
+      action: 'news-comment',
+      entityType: 'NEWS_ITEM',
+      entityUid: newsItemUid,
     });
 
     await this.notifyCommentRecipients(comment, newsItem.title, parentAuthorUid);
@@ -191,9 +199,7 @@ export class FeedCommentsService {
       });
     } catch (error) {
       this.logger.error(
-        `Failed to send ${eventType} notification to ${recipientUid}: ${
-          error instanceof Error ? error.message : error
-        }`
+        `Failed to send ${eventType} notification to ${recipientUid}: ${error instanceof Error ? error.message : error}`
       );
     }
   }

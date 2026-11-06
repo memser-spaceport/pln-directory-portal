@@ -17,7 +17,10 @@ type PermissionSeed = {
 };
 
 const permissionSeeds: PermissionSeed[] = [
+  { code: 'mcp.connect', module: 'MCP' },
   { code: 'plaa.access', module: 'PLAA' },
+  { code: 'plaa.guest', module: 'PLAA' },
+  { code: 'plaa.member', module: 'PLAA' },
   { code: 'admin.tools.access', module: 'Admin Tool' },
   { code: 'directory.admin.full', module: 'Directory' },
   { code: 'member.search.read', module: 'Directory' },
@@ -406,6 +409,25 @@ const policies: PolicySeed[] = [
   },
 ];
 
+const MCP_CONNECT_MEMBER_POLICIES = new Set([
+  'founder_plc_plvs',
+  'founder_plc_crypto',
+  'founder_plc_founder_forge',
+  'founder_plc_neuro',
+  'founder_pln_close_contributor',
+  'founder_plc_other',
+  'founder_pln_other',
+  'investor_pl',
+  'investor_pl_crecimiento_founder_school',
+  'unassigned_plc_plvs',
+  'unassigned_plc_crypto',
+  'unassigned_plc_founder_forge',
+  'unassigned_plc_neuro',
+  'unassigned_pln_close_contributor',
+  'unassigned_pln_other',
+  'unassigned_plc_other',
+]);
+
 export async function seedAccessControlV2() {
   for (const { code, module } of permissionSeeds) {
     await prisma.permission.upsert({
@@ -443,7 +465,10 @@ export async function seedAccessControlV2() {
       },
     });
 
-    for (const permissionCode of policy.permissions) {
+    const permissionCodes = MCP_CONNECT_MEMBER_POLICIES.has(policy.code)
+      ? [...new Set([...policy.permissions, 'mcp.connect'])]
+      : policy.permissions;
+    for (const permissionCode of permissionCodes) {
       const permission = await prisma.permission.findUnique({ where: { code: permissionCode } });
       if (!permission) continue;
 
