@@ -1,48 +1,94 @@
-import { renderSuggestedCandidatesEmail, type SuggestedCandidatesEmailInput } from './suggested-candidates-email';
+import {
+  initials,
+  personLine,
+  renderSuggestedCandidatesEmail,
+  requirementsText,
+  roleMeta,
+  type SuggestedCandidatesEmailCandidate,
+  type SuggestedCandidatesEmailInput,
+  type SuggestedCandidatesEmailRole,
+} from './suggested-candidates-email';
 
-type Candidate = SuggestedCandidatesEmailInput['candidates'][number];
+/**
+ * LAB-3139: one weekly email per team, up to three roles, two cards per role with one "Why" line each (Figma
+ * "Email templates | Protocol Labs" 13252:1368 desktop, 13253:1187 mobile).
+ */
 
 const BASE = 'https://directory.example';
-const UTM = (content: string) =>
-  `utm_source=job_suggested_candidates_email&utm_medium=email&utm_content=${content}&job_uid=role-1`;
+const UTM = (content: string, roleUid: string) =>
+  `utm_source=job_suggested_candidates_email&utm_medium=email&utm_content=${content}&job_uid=${roleUid}`;
 /** An href as it appears in the html: `&` is escaped inside the attribute. */
 const attr = (url: string) => `href="${url.replace(/&/g, '&amp;')}"`;
 
-const CRITERIA: Candidate['criteria'] = [
-  { label: 'Distributed systems', statement: 'Runs a retrieval path at scale', matched: true },
-  { label: 'Protocol experience', statement: 'Contributed to IPFS', matched: false },
-  { label: 'Rust or Go', statement: 'Rust and Go on the profile', matched: true },
-];
-
-const candidate = (overrides: Partial<Candidate> = {}): Candidate => ({
+const candidate = (overrides: Partial<SuggestedCandidatesEmailCandidate> = {}): SuggestedCandidatesEmailCandidate => ({
   memberUid: 'm1',
-  name: 'Grace Hopper',
-  role: 'Engineer at Navy',
-  imageUrl: 'https://img.example/grace.png',
+  name: 'Inês Carvalho',
+  role: 'Senior Engineer',
+  company: 'Saturn',
+  location: 'Porto, Portugal',
+  imageUrl: null,
   label: 'Strong match',
-  blurb: 'Compilers and COBOL.',
-  location: 'Boston, United States',
-  criteria: CRITERIA,
+  blurb: 'Runs Saturn’s retrieval path; four years on Cloudflare’s edge cache.',
+  requirements: { met: 5, total: 5 },
   ...overrides,
 });
 
-const baseInput = (overrides: Partial<SuggestedCandidatesEmailInput> = {}): SuggestedCandidatesEmailInput =>
-  ({
-    kind: 'first',
-    leadName: 'Ada Lovelace',
-    teamUid: 'team-1',
-    teamName: 'Analytical Engines',
-    roleUid: 'role-1',
-    roleTitle: 'Rust Engineer',
+const role = (overrides: Partial<SuggestedCandidatesEmailRole> = {}): SuggestedCandidatesEmailRole => ({
+  roleUid: 'role-1',
+  roleTitle: 'Senior Engineer',
+  matchCount: 5,
+  appliedCount: 0,
+  candidates: [
+    candidate(),
+    candidate({
+      memberUid: 'm2',
+      name: 'Kofi Mensah',
+      role: 'Infrastructure Engineer',
+      company: 'Filebase',
+      location: 'Toronto, Canada',
+      blurb: 'Worked with 3 people on your team at Protocol Labs.',
+      requirements: { met: 4, total: 5 },
+    }),
+  ],
+  ...overrides,
+});
+
+/** The Figma's three roles, 12 members. */
+const THREE_ROLES = [
+  role(),
+  role({
+    roleUid: 'role-2',
+    roleTitle: 'Product Designer',
+    matchCount: 4,
     candidates: [
-      candidate(),
-      candidate({ memberUid: 'm2', name: 'Linus Torvalds', label: 'Good match' }),
-      candidate({ memberUid: 'm3', name: 'Barbara Liskov' }),
+      candidate({ memberUid: 'm3', name: 'Lena Fischer', blurb: 'Designed the Lotus wallet onboarding flow.' }),
+      candidate({ memberUid: 'm4', name: 'Tomás Rivera', label: 'Good match', blurb: 'Led design on Fleek.' }),
     ],
-    preferencesUrl: `${BASE}/settings/email`,
-    unsubscribeUrl: `${BASE}/settings/email/unsubscribed?token=v1.a.b`,
-    ...overrides,
-  } as SuggestedCandidatesEmailInput);
+  }),
+  role({
+    roleUid: 'role-3',
+    roleTitle: 'Networking Engineer',
+    matchCount: 3,
+    candidates: [
+      candidate({ memberUid: 'm5', name: 'Amara Okafor' }),
+      candidate({ memberUid: 'm6', name: 'Yuki Tanaka', label: 'Good match' }),
+    ],
+  }),
+];
+
+const baseInput = (overrides: Partial<SuggestedCandidatesEmailInput> = {}): SuggestedCandidatesEmailInput => ({
+  kind: 'first',
+  leadName: 'Maria Silva',
+  teamUid: 'team-1',
+  teamName: 'Acme',
+  roles: THREE_ROLES,
+  memberCount: 12,
+  newCount: 12,
+  newRoleCount: 3,
+  preferencesUrl: `${BASE}/settings/email`,
+  unsubscribeUrl: `${BASE}/settings/email/unsubscribed?token=v1.a.b`,
+  ...overrides,
+});
 
 /** Visible text of the html, head, tags and the hidden preheader removed, entities left as-is. */
 const visibleText = (html: string) =>
@@ -53,25 +99,6 @@ const visibleText = (html: string) =>
     .replace(/&nbsp;/g, ' ')
     .replace(/\s+/g, ' ');
 
-/** The html of one card: from the candidate's name to its View profile link. */
-const cardOf = (html: string, name: string) => {
-  const at = html.indexOf(`>${name}</td>`);
-  if (at < 0) throw new Error(`no card for ${name}`);
-  const start = html.lastIndexOf('<td', at);
-  return html.slice(start, html.indexOf('>View profile</a>', start));
-};
-
-/** The criterion lines of a card, in order, as "label|statement|met" (statement '' when absent). */
-const criteriaOf = (cardHtml: string) =>
-  [
-    ...cardHtml.matchAll(
-      /<p style="margin: 0; [^"]*color: (#[0-9a-f]{6});">([^<]*)<\/p>(?:<p style="margin: 0; [^"]*">([^<]*)<\/p>)?<\/td>/g
-    ),
-  ].map(
-    ([, color, title, statement]) =>
-      `${title}|${statement ?? ''}|${color === '#0a0c11' ? 'met' : color === '#a0a7b4' ? 'unmet' : color}`
-  );
-
 describe('renderSuggestedCandidatesEmail', () => {
   const env = process.env.WEB_UI_BASE_URL;
   beforeEach(() => {
@@ -81,265 +108,217 @@ describe('renderSuggestedCandidatesEmail', () => {
     process.env.WEB_UI_BASE_URL = env;
   });
 
-  describe('scenario: 3 new suggested candidates and 12 total matches', () => {
-    it('shows 3 cards, each with a View profile link, then the "All top matches for this role" button', () => {
-      const { html, text } = renderSuggestedCandidatesEmail(baseInput());
-      expect(html.match(/>View profile<\/a>/g)).toHaveLength(3);
-      expect(html).toContain('>All top matches for this role</a>');
-      expect(text).toContain('All top matches for this role');
-      expect(html).toContain('>Edit criteria</a>');
-    });
+  describe('scenario: the Figma email, 12 members across 3 roles', () => {
+    const { subject, html, text } = (() => {
+      process.env.WEB_UI_BASE_URL = `${BASE}/`;
+      return renderSuggestedCandidatesEmail(baseInput());
+    })();
+    const visible = visibleText(html);
 
-    it('titles each card with the candidate name, in rank order, with the band and the role below the name', () => {
-      const { html, text } = renderSuggestedCandidatesEmail(baseInput());
-      for (const body of [html, text]) {
-        expect(body.indexOf('Grace Hopper')).toBeLessThan(body.indexOf('Linus Torvalds'));
-        expect(body.indexOf('Linus Torvalds')).toBeLessThan(body.indexOf('Barbara Liskov'));
-        expect(body).toContain('Strong match');
-        // LAB-2837 feedback: only Strong is marked; a Good match card is the name alone.
-        expect(body).not.toContain('Good match');
-      }
-      expect(text).toContain('\nLinus Torvalds\n');
-      const grace = cardOf(html, 'Grace Hopper');
-      expect(grace).toMatch(/font-size: 16px; line-height: 24px; font-weight: 500;[^"]*">Grace Hopper<\/td>/);
-      expect(grace).toMatch(/border-radius: 26px;[^"]*">Strong match<\/span>/);
-      expect(grace).toMatch(
-        /font-size: 14px; line-height: 22px; font-weight: 400; color: #667085;">Engineer at Navy<\/p>/
+    it('has the subject and intro of the design', () => {
+      expect(subject).toBe('12 members match 3 of your roles');
+      expect(visible).toContain(
+        'Hi Maria, 12 members of the Protocol Labs network match 3 of your open roles at Acme. Here are the strongest for each. None have applied yet.'
       );
-      expect(grace.indexOf('Strong match')).toBeLessThan(grace.indexOf('Engineer at Navy'));
-      expect(text).toContain('Grace Hopper · Strong match\nEngineer at Navy\n');
     });
 
-    it('paints the Strong band as its gradient over a flat fill, and gives a Good match no band', () => {
-      const { html } = renderSuggestedCandidatesEmail(baseInput());
-      expect(cardOf(html, 'Grace Hopper')).toContain(
-        'background-color: #2b76b9; background-image: linear-gradient(-26deg, rgb(61, 51, 147) 8.3%'
+    it('lists the roles in order, each with its title, View role and "N matches · none have applied"', () => {
+      const order = [
+        'Senior Engineer View role 5 matches',
+        'Product Designer View role 4 matches',
+        'Networking Engineer View role 3 matches',
+      ];
+      const at = order.map((piece) => visible.indexOf(piece));
+      expect(at.every((index) => index >= 0)).toBe(true);
+      expect([...at].sort((a, b) => a - b)).toEqual(at);
+      expect(visible).toContain('5 matches · none have applied');
+    });
+
+    it('draws each card: name, Strong match, role · company and location, the Why line, the count, View profile', () => {
+      expect(visible).toContain(
+        'Inês Carvalho Strong match Senior Engineer · Saturn, Porto, Portugal Runs Saturn’s retrieval path; four years on Cloudflare’s edge cache. 5 of 5 requirements View profile'
       );
-      const linus = cardOf(html, 'Linus Torvalds');
-      expect(linus).not.toContain('border-radius: 26px;');
-      expect(linus).not.toContain('background-image');
-      expect(linus).toMatch(/">Linus Torvalds<\/td>\s*<\/tr>/);
+      expect(visible).toContain('Kofi Mensah Strong match Infrastructure Engineer · Filebase, Toronto, Canada');
     });
 
-    it('greets the lead by first name and names the role and the team, with no count', () => {
-      const { subject, html, text } = renderSuggestedCandidatesEmail(baseInput());
-      expect(subject).toBe('Top matches for your Rust Engineer role');
-      // LAB-2837 feedback: no count and no "They have not applied yet."
-      const sentence = 'Top matched members for your Rust Engineer role at Analytical Engines.';
-      expect(visibleText(html)).toContain(`Hi Ada, ${sentence}`);
-      expect(text).toContain(`Hi Ada,\n\n${sentence}`);
-      expect(visibleText(html)).not.toContain('Lovelace');
-      for (const body of [visibleText(html), text]) expect(body).not.toContain('have not applied');
+    it('marks only a Strong match, with a solid pill and no gradient', () => {
+      expect(html.match(/>Strong match<\/span>/g)).toHaveLength(4);
+      expect(html).not.toContain('>Good match<');
+      expect(html).not.toContain('gradient');
+      expect(html).toMatch(/background-color: #1b4dff; padding: 2px 6px; border-radius: 26px;[^>]*>Strong match</);
     });
 
-    it('drops the old heading, blurb and "at most one a week" lines', () => {
-      const { html, text } = renderSuggestedCandidatesEmail(baseInput());
-      expect(html).not.toContain('<h1');
-      expect(visibleText(html)).not.toContain('3 new suggested candidates');
-      for (const body of [html, text]) {
-        expect(body).not.toContain('Compilers and COBOL.');
-        expect(body).not.toContain('At most one a week');
-      }
-    });
-  });
-
-  describe('headline', () => {
-    it('reads the same for one card as for many', () => {
-      const { html } = renderSuggestedCandidatesEmail(baseInput({ candidates: [candidate()] }));
-      expect(visibleText(html)).toContain('Top matched members for your Rust Engineer role at Analytical Engines.');
+    it('ends each role with "All N matches for this role" and the email with one Review all button', () => {
+      expect(visible).toContain('All 5 matches for this role');
+      expect(visible).toContain('All 4 matches for this role');
+      expect(visible).toContain('All 3 matches for this role');
+      expect(html.match(/>Review all 12 candidates<\/a>/g)).toHaveLength(1);
     });
 
-    it('counts every new candidate in a "new" subject, beyond the five cards it shows', () => {
-      const many = Array.from({ length: 7 }, (_, i) => candidate({ memberUid: `m${i}`, name: `Person ${i}` }));
-      const { subject } = renderSuggestedCandidatesEmail(
-        baseInput({ kind: 'new', alreadySeenCount: 0, candidates: many })
-      );
-      expect(subject).toBe('7 new matches for Rust Engineer');
+    it('has no Edit criteria and no "Why we suggested" checklist', () => {
+      expect(`${html}\n${text}`).not.toMatch(/Edit criteria|Why we suggested/);
     });
 
-    it('says "Hi," when the lead has no name', () => {
-      const { html, text } = renderSuggestedCandidatesEmail(baseInput({ leadName: '  ' }));
-      expect(visibleText(html)).toContain(' Hi, Top matched members');
-      expect(text.startsWith('Hi,\n')).toBe(true);
-    });
-  });
-
-  /* LAB-2837 feedback: a card is name, role and location — no "N of M requirements" count. */
-  describe('location, and no requirements count', () => {
-    it('shows the location after a map pin, under the role, with no count', () => {
-      const { html, text } = renderSuggestedCandidatesEmail(baseInput());
-      const grace = cardOf(html, 'Grace Hopper');
-      expect(grace).not.toMatch(/\d+ of \d+ requirements/);
-      expect(text).not.toMatch(/\d+ of \d+ requirements/);
-      expect(grace).toContain(`src="${BASE}/images/email/email-icon-map-pin@2x.png" width="14" height="14"`);
-      expect(grace).toMatch(/color: #455468;">Boston, United States<\/td>/);
-      expect(grace.indexOf('Engineer at Navy')).toBeLessThan(grace.indexOf('Boston'));
-      expect(text).toContain('Grace Hopper · Strong match\nEngineer at Navy\nBoston, United States\nWhy we suggested:');
-    });
-
-    it('omits the pin and the location row when the location is null or blank', () => {
-      for (const location of [null, '  ']) {
-        const { html, text } = renderSuggestedCandidatesEmail(baseInput({ candidates: [candidate({ location })] }));
-        expect(html).not.toContain('email-icon-map-pin');
-        expect(text).toContain('Engineer at Navy\nWhy we suggested:');
-      }
-    });
-
-    it('still shows the location when there are no criteria', () => {
-      const { html, text } = renderSuggestedCandidatesEmail(baseInput({ candidates: [candidate({ criteria: [] })] }));
-      expect(html).not.toContain('requirements');
-      expect(html).toContain('email-icon-map-pin');
-      expect(text).toContain('Engineer at Navy\nBoston, United States\nView profile: ');
-    });
-  });
-
-  describe('"Why we suggested"', () => {
-    it('lists met criteria first, in their order, then unmet ones, each with a check icon', () => {
-      const { html, text } = renderSuggestedCandidatesEmail(baseInput({ candidates: [candidate()] }));
-      const grace = cardOf(html, 'Grace Hopper');
-      expect(grace).toContain('>Why we suggested</p>');
-      expect(criteriaOf(grace)).toEqual([
-        'Distributed systems|Runs a retrieval path at scale|met',
-        'Rust or Go|Rust and Go on the profile|met',
-        'Protocol experience|Contributed to IPFS|unmet',
-      ]);
-      expect(grace.match(/email-icon-check@2x\.png/g)).toHaveLength(3);
+    it('mirrors the html in the text part', () => {
       expect(text).toContain(
-        'Why we suggested:\n✓ Distributed systems: Runs a retrieval path at scale\n✓ Rust or Go: Rust and Go on the profile\n– Protocol experience: Contributed to IPFS (not met)\n'
+        'Hi Maria,\n\n12 members of the Protocol Labs network match 3 of your open roles at Acme.'
       );
-    });
-
-    it('fades unmet criteria: lighter text colours (Outlook-safe) and a 40% icon', () => {
-      const { html } = renderSuggestedCandidatesEmail(baseInput({ candidates: [candidate()] }));
-      const grace = cardOf(html, 'Grace Hopper');
-      expect(grace).toMatch(
-        /color: #a0a7b4;">Protocol experience<\/p><p style="[^"]*color: #b4bac6;">Contributed to IPFS/
+      expect(text).toContain('Senior Engineer\nView role: ');
+      expect(text).toContain(
+        'Inês Carvalho · Strong match\nSenior Engineer · Saturn, Porto, Portugal\nRuns Saturn’s retrieval path; four years on Cloudflare’s edge cache.\n5 of 5 requirements\nView profile: '
       );
-      expect(grace).toMatch(
-        /color: #0a0c11;">Distributed systems<\/p><p style="[^"]*color: #455468;">Runs a retrieval/
-      );
-      expect(grace.match(/opacity: 0\.4;/g)).toHaveLength(1);
-    });
-
-    it('lists at most three criteria, keeping every met one ahead of the unmet', () => {
-      const criteria = [
-        { label: 'U1', statement: 'unmet one', matched: false },
-        { label: 'M1', statement: 'met one', matched: true },
-        { label: 'U2', statement: 'unmet two', matched: false },
-        { label: 'M2', statement: 'met two', matched: true },
-        { label: 'M3', statement: 'met three', matched: true },
-        { label: 'M4', statement: 'met four', matched: true },
-      ];
-      const { html } = renderSuggestedCandidatesEmail(baseInput({ candidates: [candidate({ criteria })] }));
-      const grace = cardOf(html, 'Grace Hopper');
-      expect(criteriaOf(grace)).toEqual(['M1|met one|met', 'M2|met two|met', 'M3|met three|met']);
-    });
-
-    it('shows the statement as the main line, with no grey line, when a criterion has no label', () => {
-      const criteria = [
-        { statement: 'Ships compilers', matched: true },
-        { label: '  ', statement: 'Writes COBOL', matched: false },
-      ];
-      const { html, text } = renderSuggestedCandidatesEmail(baseInput({ candidates: [candidate({ criteria })] }));
-      expect(criteriaOf(cardOf(html, 'Grace Hopper'))).toEqual(['Ships compilers||met', 'Writes COBOL||unmet']);
-      expect(text).toContain('✓ Ships compilers\n– Writes COBOL (not met)\n');
-    });
-
-    it('hides the block and the requirements text when there are no criteria', () => {
-      const { html, text } = renderSuggestedCandidatesEmail(
-        baseInput({ candidates: [candidate({ criteria: [], location: null })] })
-      );
-      expect(html).not.toContain('Why we suggested');
-      expect(html).not.toContain('email-icon-check');
-      expect(html).not.toContain('requirements');
-      expect(text).not.toContain('Why we suggested');
-      expect(text).toContain('Grace Hopper · Strong match\nEngineer at Navy\nView profile: ');
-    });
-  });
-
-  describe('images', () => {
-    it('loads the 193x44 logo and the 14px icons from the directory domain, not pfps.plnetwork.io', () => {
-      const { html } = renderSuggestedCandidatesEmail(baseInput());
-      expect(html).toContain(
-        `<img src="${BASE}/images/email/email-logo-protocol-labs@2x.png" width="193" height="44" alt="Protocol Labs"`
-      );
-      for (const name of ['check', 'map-pin', 'arrow']) {
-        expect(html).toContain(`src="${BASE}/images/email/email-icon-${name}@2x.png" width="14" height="14"`);
-      }
-      expect(html).not.toContain('protocol-labs-logo-246');
-      expect(html).not.toContain('pfps.plnetwork.io');
-      expect(html).not.toContain('.svg');
-    });
-
-    it('draws no candidate photo', () => {
-      const { html } = renderSuggestedCandidatesEmail(baseInput());
-      expect(html).not.toContain('img.example');
+      expect(text).toContain('Tomás Rivera\n');
+      expect(text).toContain(`Review all 12 candidates: ${BASE}/teams/team-1/applicants?role=role-1&tab=suggested&`);
     });
   });
 
   describe('links', () => {
-    it("opens each card on that person on the role's Candidates page, tagged utm_content=profile", () => {
+    it('opens each person on their role’s Suggested tab', () => {
       const { html, text } = renderSuggestedCandidatesEmail(baseInput());
-      for (const uid of ['m1', 'm2', 'm3']) {
-        const url = `${BASE}/teams/team-1/applicants?role=role-1&tab=suggested&suggested=${uid}&${UTM('profile')}`;
-        expect(html).toContain(attr(url));
-        expect(text).toContain(`View profile: ${url}`);
-      }
+      const kofi = `${BASE}/teams/team-1/applicants?role=role-1&tab=suggested&suggested=m2&${UTM('profile', 'role-1')}`;
+      const lena = `${BASE}/teams/team-1/applicants?role=role-2&tab=suggested&suggested=m3&${UTM('profile', 'role-2')}`;
+      expect(html).toContain(attr(kofi));
+      expect(html).toContain(attr(lena));
+      expect(text).toContain(`View profile: ${kofi}`);
     });
 
-    it('draws View profile in blue with a bottom rule, followed by the arrow linking to the same profile', () => {
-      const { html } = renderSuggestedCandidatesEmail(baseInput({ candidates: [candidate()] }));
-      const url = attr(`${BASE}/teams/team-1/applicants?role=role-1&tab=suggested&suggested=m1&${UTM('profile')}`);
-      expect(html).toMatch(
-        new RegExp(
-          `${url.replace(
-            /[?.]/g,
-            '\\$&'
-          )} style="[^"]*font-weight: 500; color: #1b4dff; text-decoration: none; border-bottom: 1px solid #1b4dff;">View profile</a><a ${url.replace(
-            /[?.]/g,
-            '\\$&'
-          )}[^>]*><img src="${BASE}/images/email/email-icon-arrow@2x\\.png"`
-        )
+    it('opens the public posting from View role, and the role’s list from All N matches', () => {
+      const { html } = renderSuggestedCandidatesEmail(baseInput());
+      expect(html).toContain(attr(`${BASE}/jobs/openings/role-2?${UTM('role', 'role-2')}`));
+      expect(html).toContain(attr(`${BASE}/teams/team-1/applicants?role=role-3&tab=suggested&${UTM('all', 'role-3')}`));
+    });
+
+    it('opens the first role’s Suggested tab from Review all', () => {
+      const { html } = renderSuggestedCandidatesEmail(baseInput());
+      expect(html).toContain(
+        attr(`${BASE}/teams/team-1/applicants?role=role-1&tab=suggested&${UTM('review_all', 'role-1')}`)
       );
     });
 
-    it('opens the Suggested tab for "All top matches" (all) and Edit criteria (criteria, with the modal open)', () => {
-      const { html, text } = renderSuggestedCandidatesEmail(baseInput());
-      const all = `${BASE}/teams/team-1/applicants?role=role-1&tab=suggested&${UTM('all')}`;
-      const criteria = `${BASE}/teams/team-1/applicants?role=role-1&tab=suggested&edit=criteria&${UTM('criteria')}`;
-      expect(html).toMatch(new RegExp(`${attr(all).replace(/[?.]/g, '\\$&')} style="[^"]*">All top matches`));
-      expect(html).toMatch(new RegExp(`${attr(criteria).replace(/[?.]/g, '\\$&')} style="[^"]*">Edit criteria`));
-      expect(text).toContain(`All top matches for this role: ${all}`);
-      expect(text).toContain(`Edit criteria: ${criteria}`);
+    it('stretches Review all to the column on a phone', () => {
+      const { html } = renderSuggestedCandidatesEmail(baseInput());
+      expect(html).toContain('.email-button-full { width: 100% !important; }');
+      expect(html).toContain('<table role="presentation" class="email-button-full"');
+    });
+  });
+
+  describe('avatars', () => {
+    it('shows the member’s photo, with the initials as its alt text', () => {
+      const { html } = renderSuggestedCandidatesEmail(
+        baseInput({ roles: [role({ candidates: [candidate({ imageUrl: 'https://img.example/ines.webp' })] })] })
+      );
+      expect(html).toMatch(/<img src="https:\/\/img\.example\/ines\.webp" width="40" height="40" alt="IC"/);
     });
 
-    it('draws "All top matches" as a bulletproof blue button: the cell paints the colour too', () => {
-      const { html } = renderSuggestedCandidatesEmail(baseInput());
-      expect(html).toMatch(
-        /<td align="center" bgcolor="#1b4dff" style="background-color: #1b4dff; border: 1px solid rgba\(14, 15, 17, 0\.12\); border-radius: 8px;">\s*<a href="[^"]*utm_content=all[^"]*" style="display: inline-block; padding: 10px 20px;[^"]*color: #ffffff;/
+    it('shows the initials on a tint from the design when there is no photo', () => {
+      const { html } = renderSuggestedCandidatesEmail(baseInput({ roles: [role({ candidates: [candidate()] })] }));
+      expect(html).toMatch(/background-color: #(dee8ff|dcf4e7|faeadc); text-align: center;[^>]*>IC<\/td>/);
+    });
+
+    it.each([
+      ['Inês Carvalho', 'IC'],
+      ['Tomás de la Rivera', 'TR'],
+      ['Cher', 'C'],
+      ['  ', ''],
+    ])('initials(%s) is %s', (name, expected) => {
+      expect(initials(name)).toBe(expected);
+    });
+  });
+
+  describe('kinds', () => {
+    it('new: counts only the new people, in the subject and the intro', () => {
+      const { subject, html } = renderSuggestedCandidatesEmail(
+        baseInput({ kind: 'new', newCount: 3, newRoleCount: 2 })
+      );
+      expect(subject).toBe('3 new members match 2 of your roles');
+      expect(visibleText(html)).toContain(
+        '3 new members of the Protocol Labs network matched your open roles at Acme since last week. Here are the strongest for each. None have applied yet.'
+      );
+      expect(visibleText(html)).toContain('Review all 12 candidates');
+    });
+
+    it('new: one person, one role of several', () => {
+      const { subject, html } = renderSuggestedCandidatesEmail(
+        baseInput({ kind: 'new', newCount: 1, newRoleCount: 1 })
+      );
+      expect(subject).toBe('1 new member matches one of your roles');
+      expect(visibleText(html)).toContain('1 new member of the Protocol Labs network matched your open roles');
+    });
+
+    it('reminder: says nobody new matched, and still shows every card with its Why line', () => {
+      const { subject, html } = renderSuggestedCandidatesEmail(
+        baseInput({ kind: 'reminder', newCount: 0, newRoleCount: 0 })
+      );
+      expect(subject).toBe('Your top matches for 3 roles are waiting');
+      const visible = visibleText(html);
+      expect(visible).toContain(
+        'No new members matched your open roles at Acme since last week. Here are your strongest matches.'
+      );
+      expect(visible).toContain('Runs Saturn’s retrieval path');
+      expect(html.match(/>View profile<\/a>/g)).toHaveLength(6);
+    });
+
+    it('names the role when the email covers one', () => {
+      const one = { roles: [role()], memberCount: 5, newCount: 5, newRoleCount: 1 };
+      expect(renderSuggestedCandidatesEmail(baseInput(one)).subject).toBe('5 members match your Senior Engineer role');
+      expect(visibleText(renderSuggestedCandidatesEmail(baseInput(one)).html)).toContain(
+        '5 members of the Protocol Labs network match your open Senior Engineer role at Acme. Here are the strongest. None have applied yet.'
+      );
+      expect(renderSuggestedCandidatesEmail(baseInput({ ...one, kind: 'new', newCount: 2 })).subject).toBe(
+        '2 new members match your Senior Engineer role'
+      );
+      expect(renderSuggestedCandidatesEmail(baseInput({ ...one, kind: 'reminder' })).subject).toBe(
+        'Your top matches for Senior Engineer are waiting'
       );
     });
+  });
 
-    it('encodes uids that would break the path or the query', () => {
-      const { text } = renderSuggestedCandidatesEmail(
-        baseInput({ teamUid: 'team/1', candidates: [candidate({ memberUid: 'm&1' })] })
+  describe('applied counts', () => {
+    it.each([
+      [0, '5 matches · none have applied'],
+      [1, '5 matches · 1 has applied'],
+      [2, '5 matches · 2 have applied'],
+    ])('roleMeta with %i applied', (appliedCount, expected) => {
+      expect(roleMeta({ matchCount: 5, appliedCount })).toBe(expected);
+    });
+
+    it('says "1 match"', () => {
+      expect(roleMeta({ matchCount: 1, appliedCount: 0 })).toBe('1 match · none have applied');
+    });
+
+    it('drops "None have applied yet." from the intro once anyone has applied', () => {
+      const roles = [role({ appliedCount: 1 }), ...THREE_ROLES.slice(1)];
+      expect(visibleText(renderSuggestedCandidatesEmail(baseInput({ roles })).html)).not.toContain('None have applied');
+    });
+  });
+
+  describe('missing optional fields', () => {
+    it('drops unknown parts of the person line', () => {
+      expect(personLine({ role: 'Engineer', company: null, location: null })).toBe('Engineer');
+      expect(personLine({ role: null, company: 'Saturn', location: 'Porto, Portugal' })).toBe(
+        'Saturn, Porto, Portugal'
       );
-      expect(text).toContain(`${BASE}/teams/team%2F1/applicants?role=role-1&tab=suggested&suggested=m%261&`);
+      expect(personLine({ role: null, company: null, location: null })).toBe('');
     });
 
-    it('sends every Candidates-page link to the Suggested tab', () => {
-      const { html } = renderSuggestedCandidatesEmail(baseInput());
-      const pageLinks = [...html.matchAll(/href="([^"]*\/applicants\?[^"]*)"/g)].map((m) => m[1]);
-      // Per card: View profile and its arrow; then All top matches and Edit criteria.
-      expect(pageLinks).toHaveLength(8);
-      for (const href of pageLinks) expect(href).toContain('?role=role-1&amp;tab=suggested&amp;');
+    it('draws no Why line and no count when the run had none', () => {
+      const { html, text } = renderSuggestedCandidatesEmail(
+        baseInput({ roles: [role({ candidates: [candidate({ blurb: null, requirements: null })] })] })
+      );
+      expect(html).not.toContain('Runs Saturn');
+      expect(html).not.toContain('requirements');
+      expect(text).toContain('Senior Engineer · Saturn, Porto, Portugal\nView profile: ');
     });
 
-    it('uses absolute URLs only: no relative href or src', () => {
-      const { html } = renderSuggestedCandidatesEmail(baseInput());
-      const refs = [...html.matchAll(/(?:href|src)="([^"]*)"/g)].map((m) => m[1]);
-      expect(refs.length).toBeGreaterThan(0);
-      for (const ref of refs) expect(ref).toMatch(/^https:\/\//);
+    it('requirementsText', () => {
+      expect(requirementsText({ met: 4, total: 5 })).toBe('4 of 5 requirements');
+      expect(requirementsText({ met: 1, total: 1 })).toBe('1 of 1 requirement');
+      expect(requirementsText({ met: 0, total: 0 })).toBe('');
+      expect(requirementsText(null)).toBe('');
+    });
+
+    it('greets without a name when there is none', () => {
+      expect(visibleText(renderSuggestedCandidatesEmail(baseInput({ leadName: '' })).html)).toContain('Hi, 12 members');
     });
   });
 
@@ -354,7 +333,7 @@ describe('renderSuggestedCandidatesEmail', () => {
       );
     });
 
-    it('has Manage (preferences) and Unsubscribe, with the input URLs untouched', () => {
+    it('keeps Unsubscribe next to Manage, with the input URLs untouched', () => {
       const { html, text } = renderSuggestedCandidatesEmail(baseInput());
       expect(html).toMatch(
         new RegExp(
@@ -366,142 +345,22 @@ describe('renderSuggestedCandidatesEmail', () => {
     });
   });
 
-  /* LAB-2837 feedback: three kinds, picked by the send against what this lead was already emailed. */
-  describe('kinds', () => {
-    it('first: every top match as cards, under "Top matched members"', () => {
-      const { subject, html, text } = renderSuggestedCandidatesEmail(baseInput());
-      expect(subject).toBe('Top matches for your Rust Engineer role');
-      expect(visibleText(html)).toContain('Top matched members for your Rust Engineer role at Analytical Engines.');
-      expect(html.match(/>View profile<\/a>/g)).toHaveLength(3);
-      expect(html).toContain('Why we suggested');
-      expect(text).not.toContain('already seen');
-    });
-
-    it('new: counts the new people, says "since last week", and how many seen ones are still listed', () => {
-      const { subject, html, text } = renderSuggestedCandidatesEmail(
-        baseInput({
-          kind: 'new',
-          alreadySeenCount: 2,
-          candidates: [candidate(), candidate({ memberUid: 'm2', name: 'Linus Torvalds' })],
-        })
-      );
-      expect(subject).toBe('2 new matches for Rust Engineer');
-      const intro = '2 new members matched your Rust Engineer role at Analytical Engines since last week.';
-      expect(visibleText(html)).toContain(intro);
-      expect(text).toContain(intro);
-      const note = "Plus 2 matches you've already seen are still on the list.";
-      expect(visibleText(html)).toContain(note.replace("'", '&#39;'));
-      expect(text).toContain(`${note}\n\nAll top matches for this role: `);
-      // The note sits above the button, not among the cards.
-      expect(html.indexOf('already seen')).toBeGreaterThan(html.lastIndexOf('>View profile</a>'));
-      expect(html.indexOf('already seen')).toBeLessThan(html.indexOf('>All top matches for this role</a>'));
-    });
-
-    it('new: reads singular for one, and drops the note when nobody seen is still listed', () => {
-      const one = renderSuggestedCandidatesEmail(
-        baseInput({ kind: 'new', alreadySeenCount: 1, candidates: [candidate()] })
-      );
-      expect(visibleText(one.html)).toContain('1 new member matched your Rust Engineer role');
-      expect(one.text).toContain("Plus 1 match you've already seen is still on the list.");
-      const none = renderSuggestedCandidatesEmail(baseInput({ kind: 'new', alreadySeenCount: 0 }));
-      expect(none.html).not.toContain('already seen');
-      expect(none.text).not.toContain('already seen');
-    });
-
-    it('reminder: a nudge and a compact list of name, role and View profile — no band, location or criteria', () => {
-      const { subject, html, text } = renderSuggestedCandidatesEmail(baseInput({ kind: 'reminder' }));
-      expect(subject).toBe('Your top matches for Rust Engineer are waiting');
-      const intro = "Your top matches for Rust Engineer at Analytical Engines haven't changed since last week.";
-      expect(visibleText(html)).toContain(intro);
-      expect(text).toContain(intro);
-      expect(html).not.toContain('Why we suggested');
-      expect(html).not.toContain('Strong match');
-      expect(html).not.toContain('email-icon-map-pin');
-      expect(html).not.toContain('Boston');
-      expect(html.match(/>View profile<\/a>/g)).toHaveLength(3);
-      for (const name of ['Grace Hopper', 'Linus Torvalds', 'Barbara Liskov']) expect(html).toContain(`>${name}</p>`);
-      expect(html.indexOf('Grace Hopper')).toBeLessThan(html.indexOf('Barbara Liskov'));
-      expect(html).toContain('>Engineer at Navy</p>');
-      expect(text).toContain(
-        `Grace Hopper\nEngineer at Navy\nView profile: ${BASE}/teams/team-1/applicants?role=role-1&tab=suggested&suggested=m1&`
-      );
-      expect(text).not.toContain('Why we suggested');
-      expect(text).not.toContain('Strong match');
-      expect(html).toContain('>All top matches for this role</a>');
-      expect(html).toContain('>Edit criteria</a>');
-    });
-
-    it('reminder: divides the rows with a hairline, none above the first', () => {
-      const { html } = renderSuggestedCandidatesEmail(baseInput({ kind: 'reminder' }));
-      expect(html.match(/border-top: 1px solid #E2E8F0;/g)?.length).toBeGreaterThanOrEqual(4); // 2 rows × 2 cells, + footer
-      const grace = html.slice(
-        html.lastIndexOf('<td', html.indexOf('>Grace Hopper</p>')),
-        html.indexOf('>Grace Hopper</p>')
-      );
-      expect(grace).not.toContain('border-top');
-    });
-
-    it('previews who is still waiting', () => {
-      const { html } = renderSuggestedCandidatesEmail(baseInput({ kind: 'reminder' }));
-      expect(html).toContain('Still on your list: Grace Hopper, Linus Torvalds, Barbara Liskov.');
-    });
-  });
-
-  describe('pluralisation', () => {
-    it('reads a singular "new" subject for one candidate, and the button carries no count', () => {
-      const { subject, html, text } = renderSuggestedCandidatesEmail(
-        baseInput({ kind: 'new', alreadySeenCount: 0, candidates: [candidate()] })
-      );
-      expect(subject).toBe('1 new match for Rust Engineer');
-      expect(html).toContain('>All top matches for this role</a>');
-      expect(text).toContain('All top matches for this role');
-      expect(visibleText(html)).not.toMatch(/All \d+ match/);
-    });
-  });
-
-  describe('missing optional fields', () => {
-    const bare = candidate({ role: null, imageUrl: null, blurb: null, location: null, criteria: [], name: 'Linus' });
-
-    it('scenario: a bare candidate shows name and band with no empty line, and no "undefined"/"null"', () => {
-      const { html, text } = renderSuggestedCandidatesEmail(baseInput({ candidates: [bare] }));
-      for (const body of [html, text]) {
-        expect(body).not.toMatch(/undefined|null/);
-      }
-      expect(html).toContain('>Linus</td>');
-      expect(html).not.toMatch(/<p[^>]*>\s*<\/p>/);
-      expect(html).not.toContain('color: #667085;">');
-      expect(text).toContain('Linus · Strong match\nView profile: ');
-    });
-
-    it('treats a blank role like a missing one', () => {
-      const { html, text } = renderSuggestedCandidatesEmail(
-        baseInput({ candidates: [candidate({ role: '  ', criteria: [], location: null })] })
-      );
-      expect(html).not.toMatch(/<p[^>]*>\s*<\/p>/);
-      expect(text).toContain('Grace Hopper · Strong match\nView profile: ');
-    });
-
-    it('tolerates criteria missing from the input', () => {
-      const { html } = renderSuggestedCandidatesEmail(
-        baseInput({ candidates: [candidate({ criteria: undefined as unknown as Candidate['criteria'] })] })
-      );
-      expect(html).not.toContain('Why we suggested');
-    });
-  });
-
   describe('escaping', () => {
     const hostile = baseInput({
       leadName: '<b>Ada</b> Lovelace',
       teamName: "Ada's <Team>",
-      roleTitle: 'Rust & "Go" Engineer',
-      candidates: [
-        candidate({
-          name: 'Grace <script>alert(1)</script>',
-          role: '<i>CTO</i>',
-          location: 'Boston <b>&</b> Co',
-          criteria: [
-            { label: '<u>Label</u>', statement: 'Met & <em>proven</em>', matched: true },
-            { statement: '<s>No label</s>', matched: false },
+      roles: [
+        role({
+          roleTitle: 'Rust & "Go" Engineer',
+          candidates: [
+            candidate({
+              name: 'Grace <script>alert(1)</script>',
+              role: '<i>CTO</i>',
+              company: '<u>Co</u>',
+              location: 'Boston <b>&</b> Co',
+              blurb: 'Met & <em>proven</em>',
+              imageUrl: 'https://img.example/a.png?x="1"',
+            }),
           ],
         }),
       ],
@@ -516,11 +375,11 @@ describe('renderSuggestedCandidatesEmail', () => {
         '<script>',
         '<Team>',
         '<i>',
-        'x=<y>',
-        'b="2"',
         '<u>',
         '<em>',
-        '<s>',
+        'x=<y>',
+        'b="2"',
+        'x="1"',
         '<b>&</b>',
       ]) {
         expect(html).not.toContain(raw);
@@ -529,22 +388,20 @@ describe('renderSuggestedCandidatesEmail', () => {
       expect(html).toContain('Rust &amp; &quot;Go&quot; Engineer');
       expect(html).toContain('Ada&#39;s &lt;Team&gt;');
       expect(html).toContain('Grace &lt;script&gt;alert(1)&lt;/script&gt;');
-      expect(html).toContain('&lt;i&gt;CTO&lt;/i&gt;');
-      expect(html).toContain('Boston &lt;b&gt;&amp;&lt;/b&gt; Co');
-      expect(html).toContain('&lt;u&gt;Label&lt;/u&gt;');
       expect(html).toContain('Met &amp; &lt;em&gt;proven&lt;/em&gt;');
-      expect(html).toContain('&lt;s&gt;No label&lt;/s&gt;');
       expect(html).toContain('href="https://directory.example/settings/email?a=1&amp;b=&quot;2&quot;"');
-      expect(html).toContain('token=v1.a.b&amp;x=&lt;y&gt;"');
     });
 
     it('keeps the subject and text part as plain text, one line per field', () => {
       const { subject, text } = renderSuggestedCandidatesEmail(
-        baseInput({ roleTitle: 'Rust &\nGo', candidates: [candidate({ name: 'Grace\nHopper', location: 'Bos\nton' })] })
+        baseInput({
+          roles: [role({ roleTitle: 'Rust &\nGo', candidates: [candidate({ name: 'Grace\nHopper', blurb: 'a\nb' })] })],
+          memberCount: 1,
+        })
       );
-      expect(subject).toBe('Top matches for your Rust & Go role');
+      expect(subject).toBe('1 member matches your Rust & Go role');
       expect(text).toContain('Grace Hopper · Strong match');
-      expect(text).toContain('\nBos ton\n');
+      expect(text).toContain('\na b\n');
     });
   });
 
@@ -554,32 +411,37 @@ describe('renderSuggestedCandidatesEmail', () => {
   });
 
   describe('refuses to build an email with a broken link', () => {
-    it('scenario: throws on no candidates', () => {
-      expect(() => renderSuggestedCandidatesEmail(baseInput({ candidates: [] }))).toThrow(
-        'renderSuggestedCandidatesEmail: at least one candidate is required'
+    it('throws on no roles', () => {
+      expect(() => renderSuggestedCandidatesEmail(baseInput({ roles: [] }))).toThrow(
+        'renderSuggestedCandidatesEmail: at least one role is required'
       );
     });
 
-    it.each(['teamUid', 'roleUid'] as const)('throws on a missing or blank %s', (field) => {
-      for (const value of ['', '  ', undefined]) {
-        expect(() => renderSuggestedCandidatesEmail(baseInput({ [field]: value as unknown as string }))).toThrow(
-          `renderSuggestedCandidatesEmail: ${field} is required`
-        );
-      }
+    it('throws on a role with no candidate', () => {
+      expect(() => renderSuggestedCandidatesEmail(baseInput({ roles: [role({ candidates: [] })] }))).toThrow(
+        'renderSuggestedCandidatesEmail: roles[0] needs at least one candidate'
+      );
     });
 
-    it('throws on a candidate without a memberUid', () => {
-      expect(() => renderSuggestedCandidatesEmail(baseInput({ candidates: [candidate({ memberUid: '' })] }))).toThrow(
-        'renderSuggestedCandidatesEmail: candidates[0].memberUid is required'
+    it('throws on a missing teamUid, roleUid or memberUid', () => {
+      expect(() => renderSuggestedCandidatesEmail(baseInput({ teamUid: ' ' }))).toThrow('teamUid is required');
+      expect(() => renderSuggestedCandidatesEmail(baseInput({ roles: [role({ roleUid: '' })] }))).toThrow(
+        'roles[0].roleUid is required'
       );
+      expect(() =>
+        renderSuggestedCandidatesEmail(baseInput({ roles: [role({ candidates: [candidate({ memberUid: '' })] })] }))
+      ).toThrow('roles[0].candidates[0].memberUid is required');
     });
   });
 
-  it('draws at most five cards', () => {
-    const many = Array.from({ length: 7 }, (_, i) => candidate({ memberUid: `m${i}`, name: `Person ${i}` }));
-    const { html } = renderSuggestedCandidatesEmail(baseInput({ candidates: many }));
-    expect(html.match(/>View profile<\/a>/g)).toHaveLength(5);
-    expect(html).not.toContain('Person 5');
+  it('loads the logo and the arrow icon from the directory domain, and no SVG', () => {
+    const { html } = renderSuggestedCandidatesEmail(baseInput());
+    expect(html).toContain(
+      `<img src="${BASE}/images/email/email-logo-protocol-labs@2x.png" width="193" height="44" alt="Protocol Labs"`
+    );
+    expect(html).toContain(`src="${BASE}/images/email/email-icon-arrow@2x.png" width="14" height="14"`);
+    expect(html).not.toContain('pfps.plnetwork.io');
+    expect(html).not.toContain('.svg');
   });
 
   it('is an email-safe document: tables, inline styles, a 640px fluid column, no flex or grid', () => {
@@ -588,14 +450,10 @@ describe('renderSuggestedCandidatesEmail', () => {
     expect(html).toContain('<table role="presentation"');
     expect(html).toMatch(/class="email-container" role="presentation" width="640"/);
     expect(html).toContain('@media only screen and (max-width: 640px)');
-    expect(html).toContain('background-color: #f6f7fb');
     expect(html).not.toMatch(/display:\s*(flex|grid)/);
-    // The only stylesheet is the Google Fonts one; Arial/Helvetica stand in where a client drops it.
     expect(html.match(/<link /g)).toHaveLength(1);
     expect(html).toContain(
-      '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&amp;family=Montserrat'
+      '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Montserrat'
     );
-    expect(html).toContain('font-family: Inter, Arial, Helvetica, sans-serif;');
-    expect(html).toContain('font-family: Montserrat, Arial, Helvetica, sans-serif;');
   });
 });
