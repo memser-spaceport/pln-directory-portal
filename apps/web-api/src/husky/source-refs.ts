@@ -10,8 +10,10 @@ const MARKER_TYPE = {
   ForumLink: 'forum',
   InvestorLink: 'investor',
   WarmIntroLink: 'warm_intro',
+  WebLink: 'web',
 } as const;
 
+/** Every tool marker type; `web` marks a public web page from the searchWeb tool, not a directory page. */
 type DirectoryType = typeof MARKER_TYPE[keyof typeof MARKER_TYPE];
 
 const LABEL_TYPES: Record<string, DirectoryType[]> = {
@@ -23,13 +25,14 @@ const LABEL_TYPES: Record<string, DirectoryType[]> = {
 };
 
 const MARKER_RE =
-  /\[(TeamLink|MemberLink|ProjectLink|EventLink|JobLink|NewsLink|ForumLink|InvestorLink|WarmIntroLink)\]\(([^)]+)\)/g;
+  /\[(TeamLink|MemberLink|ProjectLink|EventLink|JobLink|NewsLink|ForumLink|InvestorLink|WarmIntroLink|WebLink)\]\(([^)]+)\)/g;
 const LABEL_RE = /\*{0,2}(Source|Website|LinkedIn|Apply|Forum Link)\*{0,2}:\s*(https?:\/\/[^\s)]+)/gi;
 const CITATION_RE = /\[(\d+)\]\(([^)\s]+)\)/g;
 
 interface CatalogEntry {
   type: DirectoryType;
   title: string;
+  /** The marker's link: an in-product path, or the page URL for a `web` entry. */
   directoryLink: string;
   externalUrl?: string;
   offset: number;
@@ -44,7 +47,7 @@ function cleanTitle(raw: string): string {
   return raw
     .replace(/^[-*]\s+/, '')
     .replace(
-      /^(Topic|Name|Title|Teams|Team|Projects|Project|Members|Member|Event|Investor DB record|Warm intro):\s*/i,
+      /^(Topic|Name|Title|Teams|Team|Projects|Project|Members|Member|Event|Investor DB record|Warm intro|Web page):\s*/i,
       ''
     )
     .replace(/^[\s,;]+/, '')
@@ -130,15 +133,49 @@ function urlKeys(url: string): string[] {
   return [...keys];
 }
 
+/** A bare root path names no page: every site has one. */
+const ROOT_KEYS = new Set(['', '/']);
+
 function sharesKey(left: string, right: string): boolean {
-  const rightKeys = new Set(urlKeys(right));
+  const rightKeys = new Set(urlKeys(right).filter((key) => !ROOT_KEYS.has(key)));
   return urlKeys(left).some((key) => rightKeys.has(key));
 }
 
+function isAbsolute(url: string): boolean {
+  return /^https?:\/\//i.test(url.trim());
+}
+
+/** Host without `www.`, path without trailing slash, and query: one page on one site. */
+function siteKey(url: string): string | null {
+  try {
+    const parsed = new URL(url.trim());
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+    return `${host}${parsed.pathname.replace(/\/+$/, '')}${parsed.search}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Two absolute URLs are the same source only on the same site and page. An absolute URL
+ * matches a relative directory path through its own path.
+ */
+function linksMatch(cited: string, link: string): boolean {
+  if (isAbsolute(cited) && isAbsolute(link)) {
+    const citedKey = siteKey(cited);
+    return citedKey !== null && citedKey === siteKey(link);
+  }
+  return sharesKey(cited, link);
+}
+
 function findEntry(catalog: CatalogEntry[], cited: string): CatalogEntry | undefined {
+  // A page the web search returned wins: its URL can share a site with a directory record's website.
+  const web = catalog.find((entry) => entry.type === 'web' && linksMatch(cited, entry.directoryLink));
+  if (web) return web;
   return catalog.find(
     (entry) =>
-      sharesKey(cited, entry.directoryLink) || (entry.externalUrl ? sharesKey(cited, entry.externalUrl) : false)
+      entry.type !== 'web' &&
+      (linksMatch(cited, entry.directoryLink) || (entry.externalUrl ? linksMatch(cited, entry.externalUrl) : false))
   );
 }
 
@@ -149,6 +186,12 @@ function entriesInSource(text: string, catalog: CatalogEntry[]): CatalogEntry[] 
 }
 
 function pushEntry(sourceRefs: HuskySourceRef[], seenUrls: Set<string>, index: number, entry: CatalogEntry) {
+  if (entry.type === 'web') {
+    // A web page found by the searchWeb tool: it has no page in the directory.
+    sourceRefs.push({ index, title: entry.title, type: 'web', externalUrl: entry.directoryLink });
+    remember(seenUrls, entry.directoryLink);
+    return;
+  }
   sourceRefs.push({
     index,
     title: entry.title,
@@ -160,13 +203,34 @@ function pushEntry(sourceRefs: HuskySourceRef[], seenUrls: Set<string>, index: n
   remember(seenUrls, entry.externalUrl);
 }
 
+/** An absolute URL is remembered as its site page; a directory path by its path keys. */
 function remember(seen: Set<string>, url?: string) {
   if (!url) return;
+  if (isAbsolute(url)) {
+    const key = siteKey(url);
+    if (key !== null) seen.add(`site:${key}`);
+    return;
+  }
   for (const key of urlKeys(url)) seen.add(key);
 }
 
 function alreadyRepresented(seen: Set<string>, url: string): boolean {
+  if (isAbsolute(url)) {
+    // The same site page, or a directory path that the absolute URL names, was already cited.
+    const key = siteKey(url);
+    return (key !== null && seen.has(`site:${key}`)) || pathSeen(seen, url);
+  }
   return urlKeys(url).some((key) => seen.has(key));
+}
+
+function pathSeen(seen: Set<string>, url: string): boolean {
+  try {
+    const parsed = new URL(url.trim());
+    const path = `${parsed.pathname}${parsed.search}`;
+    return path.length > 1 && (seen.has(path) || seen.has(path.replace(/\/$/, '')));
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -197,7 +261,7 @@ export function buildSourceRefs(input: {
       continue;
     }
 
-    const citedDirectory = sharesKey(cited, entry.directoryLink);
+    const citedDirectory = entry.type === 'web' || linksMatch(cited, entry.directoryLink);
     if (!citedDirectory && entry.externalUrl) {
       mismatches.push(`citation [${index}](${cited}) resolved to ${entry.directoryLink}`);
     }

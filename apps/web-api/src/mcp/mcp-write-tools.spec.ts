@@ -11,7 +11,6 @@ import { BadRequestException, ForbiddenException, NotFoundException } from '@nes
 import { z } from 'zod';
 import { McpActorContext, McpToolDef, toolInputSchema } from './mcp-tools';
 import { directoryWriteTools, eventWriteTools, membershipTools, newsWriteTools, profileTools } from './mcp-write-tools';
-import { McpWriteLimitService, MCP_WRITE_LIMIT_PER_HOUR } from './mcp-write-limit.service';
 
 const CTX: McpActorContext = {
   memberUid: 'member-1',
@@ -684,32 +683,3 @@ describe('team and project membership tools', () => {
   });
 });
 
-describe('McpWriteLimitService', () => {
-  function cache() {
-    const store = new Map<string, unknown>();
-    return {
-      store,
-      get: jest.fn(async (k: string) => store.get(k)),
-      set: jest.fn(async (k: string, v: unknown) => void store.set(k, v)),
-    };
-  }
-
-  it(`allows ${MCP_WRITE_LIMIT_PER_HOUR} calls per member per tool per hour, then refuses`, async () => {
-    const c = cache();
-    const limit = new McpWriteLimitService(c as any);
-    const now = Date.UTC(2026, 9, 28, 10, 15);
-    for (let i = 0; i < MCP_WRITE_LIMIT_PER_HOUR; i++) {
-      expect(await limit.tryConsume('m1', 'post_team_news', now)).toBe(true);
-    }
-    expect(await limit.tryConsume('m1', 'post_team_news', now)).toBe(false);
-    // Another tool, another member and the next hour each have their own allowance.
-    expect(await limit.tryConsume('m1', 'update_my_profile', now)).toBe(true);
-    expect(await limit.tryConsume('m2', 'post_team_news', now)).toBe(true);
-    expect(await limit.tryConsume('m1', 'post_team_news', now + 60 * 60 * 1000)).toBe(true);
-  });
-
-  it('fails open when the cache is down', async () => {
-    const limit = new McpWriteLimitService({ get: jest.fn().mockRejectedValue(new Error('redis down')) } as any);
-    await expect(limit.tryConsume('m1', 'post_team_news')).resolves.toBe(true);
-  });
-});

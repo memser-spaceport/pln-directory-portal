@@ -1,13 +1,12 @@
 import { McpScopeKey } from 'libs/contracts/src/schema/mcp-scopes';
 import { McpToolDef } from './mcp-tools';
 import { levelAtLeast, MCP_UNSCOPED_TOOLS, scopeLabel, toolScope } from './mcp-scopes.registry';
-import { MCP_WRITE_LIMIT_PER_HOUR } from './mcp-write-limit.service';
 import { McpAdminCaps, McpStoredLevels, resolveScope } from './mcp-scopes.service';
 
 /**
  * Why a call is refused (LAB-2995). `needs_write` and `scope_none` are member-fixable in Settings; `admin_off` is not;
- * `unavailable` means the scope settings could not be read, so everything scoped fails closed. `rate_limited` is a write
- * tool over its per-member hourly allowance (LAB-3020).
+ * `unavailable` means the scope settings could not be read, so everything scoped fails closed. `rate_limited` is a
+ * call type over the member's limit (LAB-3149). The live text for that case comes from `limitRefusalText`.
  */
 export type McpRefusalReason = 'needs_write' | 'scope_none' | 'admin_off' | 'unavailable' | 'rate_limited';
 
@@ -61,8 +60,7 @@ export function refusalText(
   reason: McpRefusalReason,
   scope: McpScopeKey,
   toolLevel: 'read' | 'write',
-  settingsUrl: string,
-  toolName?: string
+  settingsUrl: string
 ) {
   const label = scopeLabel(scope);
   switch (reason) {
@@ -74,9 +72,7 @@ export function refusalText(
         ? `Changes in ${label} are turned off by LabOS admins.`
         : `${label} is turned off by LabOS admins.`;
     case 'rate_limited':
-      return `LabOS limits agents to ${MCP_WRITE_LIMIT_PER_HOUR} ${
-        toolName ?? 'write'
-      } calls an hour. Try again later.`;
+      return `LabOS limits this member's agents for this kind of call. Try again later. Tell the member, and point them to their limits in Settings: ${settingsUrl}`;
     case 'unavailable':
       return "LabOS couldn't check this connection's permissions. Try again later.";
   }

@@ -12,15 +12,15 @@ has no entry. Adding a tool to MCP means adding it there.
 | Scope | Label | Tools | Write tools |
 | --- | --- | --- | --- |
 | `search` | Search | `search_members`, `search_teams`, `search_projects`, `search_events` | none |
-| `forum` | Forum | `search_forum_threads`, `get_forum_thread` | none |
+| `forum` | Forum | `search_forum_threads`, `get_forum_thread`, `list_forum_categories` | `start_forum_thread`, `reply_to_forum_thread` (as the member through NodeBB with a one-time member proof; needs `FORUM_API_URL` and `FORUM_MEMBER_PROOF_AUDIENCE`; no edit or delete) |
 | `news` | News feed | `list_news` (feed `latest` = Home → Latest, `for_you` = one latest story per For You team, falls back to latest; `teamUid` = one team), `get_news_item` | `post_team_news` (team members / admins; duplicate link rejected), `upvote_team_news`, `remove_team_news_upvote` |
-| `directory` | Members, teams and projects | `get_member`, `get_team`, `get_project`, `list_portfolio_teams` | `update_team` (text, name, year founded, size, locations, funding stage, industry tags; status for admins; no logo), `update_team_fund_profile` (lead or admin; non-leads are refused), `update_team_membership_sources` (directory admin only), `update_team_communities`, `update_team_roster`, `create_team`, `delete_team` (admin), `review_team_enrichment`, `create_project`, `delete_project`, team and project asks, hiring-lead match criteria and applicant review, `update_fundraising_profile`, `update_team_pitch_profile` |
+| `directory` | Members, teams and projects | `get_member`, `get_team`, `get_project`, `list_portfolio_teams` | `update_team` (text, name, year founded, size, locations, funding stage, industry tags; status for admins; no logo), `update_team_fund_profile` (lead or admin; non-leads are refused), `update_team_membership_sources` (directory admin only), `update_team_communities`, `update_team_roster`, `create_team`, `review_team_enrichment`, `create_project`, `delete_project`, team and project asks, hiring-lead match criteria and applicant review, `update_fundraising_profile`, `update_team_pitch_profile` |
 | `events` | Events | `get_event` | `rsvp_event`, `cancel_event_rsvp`, `update_my_event_rsvp`, `submit_event`, `request_event_presence` |
 | `investors` | Investors and warm intros | master-profile and warm-intro reads | `submit_warm_path_feedback`, `submit_warm_path_note`, `clear_warm_path_refer`, `update_master_profile`, `update_connection_edge`, `update_warm_path`, `regenerate_warm_intro`, investor list add and remove, pathfinder correction and crosswalk resolve, `review_sourced_founder` |
 | `profile` | Your profile | `get_my_profile`, `list_my_experiences`, `get_my_job_alert`, `get_my_email_preferences`, `list_my_notifications`, `list_deals`, `list_my_office_hours_followups`, `list_my_job_applications`, `list_my_job_interests` | `update_my_profile` (bio, moreDetails, social handles including bluesky, officeHours, openToWork, jobSearchStatus, skills, name, currentCompany, teamOrProjectURL, plnFriend, plnStartDate, city, region, country; not email); `update_my_investor_profile`; `update_my_privacy`; `update_my_team_membership`; `update_my_project_contribution`; `update_my_self_role`; `delete_my_image`; `update_notification_settings`; join/leave team and project; experiences; follow; saved jobs; job alert; email preferences; Demo Day save; notifications; deals used/report (no redeem); `submit_deal`; `request_deal`; guide likes and comments; office hours request, close and broken-link report; Demo Day and pitch confidentiality, apply and express interest; jobs apply, interest and refer; support; roadmap create, edit, pin and unpin when the member has that permission |
 | `ai_apps` | AI Apps | `list_my_ai_apps`, `list_ai_app_feedback` | `update_ai_app_feedback_status`; `submit_ai_app_feedback`; `redeploy_ai_app` (stored bundle + stored secrets), `rename_ai_app`, `update_ai_app_description`, `delete_ai_app`, `delete_ai_app_deployment`, `update_ai_app_access`, `update_ai_app_public_paths` (app creator or directory admin, `ai_apps.write`). No deploy keys |
 
-Member RBAC still applies on top (investor DB tools need `investor_db.view` / `.edit`, forum tools `forum.read`).
+Member RBAC still applies on top (investor DB tools need `investor_db.view` / `.edit`, forum tools `forum.read`, forum posting tools `forum.write`).
 
 ## Levels
 
@@ -55,10 +55,11 @@ Every MCP tool call sends a server-side PostHog event named `mcp-<tool name with
 `errorKind`, the exception class name), and when it is refused (`result: refused`, with `reason`: `needs_write`,
 `scope_none`, `admin_off`, `rate_limited` or `unavailable`). `mcp-tool-invoked` and `mcp-tool-refused` are still sent
 as before, beside it. When `ANALYTICS_PROVIDER` is not `posthog`, these events are still sent to PostHog if `POSTHOG_API_KEY` and `POSTHOG_HOST` are set.
+`mcp-tool-refused` are still sent as before, beside it.
 
 Every per-tool event has `toolName`, `memberUid`, `authorizationUid` (the connection), `clientName`, `scope` (from the
-registry; `unscoped` for `whoami`), `operation` (`read` or `write`) and `result`. A refused event has no other
-property. Search and list tools add their query text as `query`, trimmed to 200 characters (investor DB searches
+registry; `unscoped` for `whoami`), `operation` (`read` or `write`), `result` and `callType`. When a limit check runs
+it also has `limitResult` (`allowed`, `warned` or `limited`). A refused event has no argument properties. Search and list tools add their query text as `query`, trimmed to 200 characters (investor DB searches
 excepted: their text is a person's name or email). Write tools send item ids, field names and counts, never values:
 no message text, body, note, email, Telegram or LinkedIn value reaches an event. `MCP_TOOL_PROPERTY_BUILDERS` has
 one entry per tool; a spec fails when a registry tool has none, so a new tool needs one.
@@ -72,6 +73,9 @@ one entry per tool; a spec fails when a registry tool has none, so a new tool ne
 | `mcp-search-events-called` | an agent calls `search_events` | `query`, `limit`, `resultCount` |
 | `mcp-search-forum-threads-called` | an agent calls `search_forum_threads` | `query`, `limit`, `resultCount` |
 | `mcp-get-forum-thread-called` | an agent calls `get_forum_thread` | `uid` |
+| `mcp-list-forum-categories-called` | an agent calls `list_forum_categories` | `resultCount` |
+| `mcp-start-forum-thread-called` | an agent calls `start_forum_thread` | `cid`, `tid`, `tagCount` |
+| `mcp-reply-to-forum-thread-called` | an agent calls `reply_to_forum_thread` | `tid`, `pid`, `toPid` |
 | `mcp-list-news-called` | an agent calls `list_news` | `query`, `feed`, `teamUid`, `limit`, `page`, `resultCount`, `hasMore` |
 | `mcp-get-news-item-called` | an agent calls `get_news_item` | `uid` |
 | `mcp-post-team-news-called` | an agent calls `post_team_news` | `teamUid`, `newsUid`, `hasBody` |
@@ -173,7 +177,6 @@ one entry per tool; a spec fails when a registry tool has none, so a new tool ne
 | `mcp-update-team-communities-called` | an agent calls `update_team_communities` | `teamUid` |
 | `mcp-update-team-roster-called` | an agent calls `update_team_roster` | `teamUid`, `memberUid` |
 | `mcp-create-team-called` | an agent calls `create_team` | none |
-| `mcp-delete-team-called` | an agent calls `delete_team` | `teamUid` |
 | `mcp-review-team-enrichment-called` | an agent calls `review_team_enrichment` | `teamUid` |
 | `mcp-create-project-called` | an agent calls `create_project` | `maintainingTeamUid` |
 | `mcp-delete-project-called` | an agent calls `delete_project` | `projectUid` |
@@ -224,9 +227,21 @@ same connection and scope from the last 24 hours (a write refusal raises a read 
   requested level on that same connection. `mcp-scope-levels-updated` carries `viaRequest` and `requestResolved`.
 - The table is also the "Blocked by permissions" record for the activity drawer (LAB-2938).
 
-## Write limit
+## Call limits
 
-Every write tool allows 10 calls per member per tool per hour (`McpWriteLimitService`, a fixed-window counter in the
-shared cache). Over the limit the call is refused with "LabOS limits agents to 10 <tool> calls an hour. Try again
-later." and `mcp-tool-refused` reason `rate_limited`; no access request is created. If the cache is unavailable the
-call is allowed.
+Each tool has one call type: `read`, `contact_read` (`get_member`, `get_team`, `get_project`, `get_event`), `write`,
+or `forum_post` (a Forum member proof with write access). One counter per member and call type is shared by every tool
+and every pod. A contact read counts each member in the response who has an email, Telegram, or LinkedIn value.
+A page with more of those members than remain is refused and returns none of them. Draft numbers, the 80% warning ratio and the 5× PL infra multiplier are in
+`apps/web-api/src/mcp/mcp-limits.config.ts`. The tier comes from the PL infra policy. A directory admin sets a
+per-member override, with an optional end date, at `/v1/admin/mcp/limits`. Each change is stored with the admin and
+the time.
+
+Over the limit the call is refused. The message names the call type, the usage, the limit and the reset time, and tells
+the agent to inform the member and point them to Settings → MCP connections. No access request is created. At 80% the
+tool result includes that warning once per window. If the cache is down, contact reads, writes and forum posts are
+refused. Reads are allowed.
+
+`GET /v1/mcp/limits` returns the member's usage. The same Settings page shows it. Directory admins also see usage,
+recent limits and overrides there. Each tool call sends `callType` and `limitResult` (`allowed`, `warned` or `limited`)
+on `mcp-<tool>-called`.

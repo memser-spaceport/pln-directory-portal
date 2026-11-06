@@ -8,6 +8,7 @@ import type {
 import { PrismaService } from '../shared/prisma.service';
 import { AtsPushService } from '../integration-keys/ats-push.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
+import { MemberSignalsService } from '../member-signals/member-signals.service';
 import { resolveVisibleJobOpening } from './job-openings-resolve';
 import { trackJobInterestRecorded, trackTeamInterestRecorded } from './job-openings-analytics';
 
@@ -16,7 +17,8 @@ export class JobOpeningsInterestService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly atsPush: AtsPushService,
-    private readonly analytics: AnalyticsService
+    private readonly analytics: AnalyticsService,
+    private readonly memberSignals: MemberSignalsService
   ) {}
 
   /** Mark interest in a job opening. Idempotent: re-marking succeeds without double-counting. */
@@ -45,6 +47,12 @@ export class JobOpeningsInterestService {
         interestUid: interest.uid,
         jobUid,
         teamUid: jobOpening.teamUid!,
+      });
+      void this.memberSignals.record({
+        memberUid,
+        action: 'job-interest',
+        entityType: 'JOB_OPENING',
+        entityUid: jobUid,
       });
     }
     this.atsPush.pushJobInterest(interest.uid);
@@ -84,6 +92,7 @@ export class JobOpeningsInterestService {
     });
     if (!existing) {
       trackTeamInterestRecorded(this.analytics, { interestUid: interest.uid, teamUid });
+      void this.memberSignals.record({ memberUid, action: 'team-interest', entityType: 'TEAM', entityUid: teamUid });
     }
     this.atsPush.pushTeamInterest(interest.uid);
 
@@ -96,9 +105,17 @@ export class JobOpeningsInterestService {
     const memberUid = await this.resolveMemberUid(memberEmail);
     await resolveVisibleJobOpening(this.prisma, jobUid);
 
-    await this.prisma.jobOpeningInterest.deleteMany({
+    const { count } = await this.prisma.jobOpeningInterest.deleteMany({
       where: { jobOpeningUid: jobUid, memberUid },
     });
+    if (count > 0) {
+      void this.memberSignals.record({
+        memberUid,
+        action: 'job-interest-removed',
+        entityType: 'JOB_OPENING',
+        entityUid: jobUid,
+      });
+    }
 
     return this.buildStatus(jobUid, false, null);
   }

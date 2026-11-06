@@ -5,14 +5,16 @@ import {
   ForbiddenException,
   NotFoundException,
   Param,
+  Query,
   Req,
+  Res,
   UnauthorizedException,
   UseGuards,
   UsePipes,
 } from '@nestjs/common';
 import { ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import { apiEvents } from 'libs/contracts/src/lib/contract-pl-events';
 import {
   CreatePLEventGuestSchemaDto,
@@ -39,6 +41,7 @@ import { ZodValidationPipe } from 'nestjs-zod';
 import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
 import { NoCache } from '../decorators/no-cache.decorator';
+import { parseUpcomingEventsQuery } from './upcoming-events-query';
 import { MembersService } from '../members/members.service';
 import { PLEventLocationsService } from './pl-event-locations.service';
 import { PLEventGuestsService } from './pl-event-guests.service';
@@ -318,8 +321,18 @@ export class PLEventsController {
   @Api(server.route.getAllUpcomingEvents)
   @UsePipes(ZodValidationPipe)
   @NoCache()
-  async getAllUpcomingEvents(): Promise<ResponseUpcomingEvents[]> {
-    return await this.eventService.getUpcomingPLEvents();
+  async getAllUpcomingEvents(
+    @Query() query: Record<string, unknown>,
+    @Res({ passthrough: true }) res: Response
+  ): Promise<ResponseUpcomingEvents[]> {
+    // LAB-3071: optional days / limit / sort=soonest for Home's events rail. The body stays an array, as the contract
+    // says; the count before `limit` goes in a header so existing clients see no change.
+    const options = parseUpcomingEventsQuery(query);
+    const { items, total } = await this.eventService.listUpcomingPLEvents(options);
+    if (options.limit) {
+      res.setHeader('X-Total-Count', String(total));
+    }
+    return items;
   }
 
   @Api(server.route.deleteEvent)

@@ -18,6 +18,7 @@ import { ResponseUpcomingEvents } from '@protocol-labs-network/contracts';
 import { EventsToolingService } from '../events/events-tooling.service';
 import { CacheService } from '../utils/cache/cache.service';
 import {IrlGatheringPushCandidatesService} from "./push/irl-gathering-push-candidates.service";
+import { UpcomingEventsOptions, toUpcomingEvent, upcomingEventsFindArgs } from './upcoming-events-query';
 
 
 @Injectable()
@@ -298,55 +299,50 @@ export class PLEventsService {
     }
   }
 
-  async getUpcomingPLEvents(): Promise<ResponseUpcomingEvents[]> {
+  async getUpcomingPLEvents(options: UpcomingEventsOptions = {}): Promise<ResponseUpcomingEvents[]> {
+    return (await this.listUpcomingPLEvents(options)).items;
+  }
+
+  /**
+   * Upcoming IRL events. With no options: every event that hasn't started, `startDate` descending (the member page's
+   * widget relies on this). `days`, `limit` and `sort: 'soonest'` narrow it for Home's events rail (LAB-3071); `total`
+   * counts every event in the window, before `limit`.
+   */
+  async listUpcomingPLEvents(
+    options: UpcomingEventsOptions = {},
+  ): Promise<{ items: ResponseUpcomingEvents[]; total: number }> {
     try {
-      const events = await this.prisma.pLEvent.findMany({
-        where: {
-          startDate: {
-            gte: new Date(),
-          },
-          isDeleted: false,
-        },
-        select: {
-          uid: true,
-          name: true,
-          websiteURL: true,
-          startDate: true,
-          endDate: true,
-          logo: {
-            select: {
-              url: true,
+      const { where, orderBy, take } = upcomingEventsFindArgs(options, new Date());
+      const [events, total] = await Promise.all([
+        this.prisma.pLEvent.findMany({
+          where,
+          select: {
+            uid: true,
+            name: true,
+            websiteURL: true,
+            startDate: true,
+            endDate: true,
+            logo: {
+              select: {
+                url: true,
+              },
+            },
+            location: {
+              select: {
+                location: true,
+                flag: true,
+                timezone: true,
+              },
             },
           },
-          location: {
-            select: {
-              location: true,
-              flag: true,
-              timezone: true,
-            },
-          },
-        },
-        orderBy: { startDate: 'desc' },
-      });
+          orderBy,
+          ...(take ? { take } : {}),
+        }),
+        take ? this.prisma.pLEvent.count({ where }) : Promise.resolve(undefined),
+      ]);
 
-      return events
-        .map((event) => {
-
-          const localStartDate = moment.utc(event.startDate).toISOString();
-          const localEndDate = moment.utc(event.endDate).toISOString();
-
-          return {
-            uid: event.uid,
-            name: event.name,
-            websiteUrl: event.websiteURL ?? null,
-            logo: event.logo?.url ?? null,
-            location: event.location?.location ?? null,
-            flag: event.location?.flag ?? null,
-            startDate: localStartDate,
-            endDate: localEndDate,
-          };
-        })
-        .filter((event) => moment.utc(event.startDate).isAfter(moment.utc()));
+      const items = events.map(toUpcomingEvent);
+      return { items, total: total ?? items.length };
     } catch (err) {
       return this.handleErrors(err);
     }

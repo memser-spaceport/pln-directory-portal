@@ -7,7 +7,7 @@ MCP agents reach LabOS only through a reviewed allowlist. Every tool belongs to 
 ## Requirements
 
 ### Requirement: Every MCP tool belongs to one scope
-The MCP server SHALL define, in one code registry, each scope (key, label, priority order, default admin maximum level) and, for each tool, its scope and level (`read` or `write`). `whoami` SHALL be the only tool outside the registry's scopes, and it SHALL always be listed. A tool not in the registry SHALL NOT be listed or callable. Member RBAC visibility (investor DB, forum read) SHALL still apply on top of scopes.
+The MCP server SHALL define, in one code registry, each scope (key, label, priority order, default admin maximum level) and, for each tool, its scope and level (`read` or `write`). `whoami` SHALL be the only tool outside the registry's scopes, and it SHALL always be listed. A tool not in the registry SHALL NOT be listed or callable. Member RBAC visibility (investor DB, forum read, forum write) SHALL still apply on top of scopes.
 
 #### Scenario: Unregistered tool is never exposed
 - **WHEN** a tool definition exists in code but has no registry entry
@@ -23,6 +23,25 @@ Each MCP authorization SHALL store one level per scope: `none`, `read` or `write
 #### Scenario: Two connections stay independent
 - **WHEN** a member sets `forum` to `none` on connection A
 - **THEN** connection B of the same member still lists the forum tools
+
+### Requirement: Only approved members can connect an agent
+
+`mcp.connect` SHALL be granted by the founder, unassigned, and investor policies, and by Directory Admin and PL Infra. `job_aspirant` SHALL NOT grant it. Effective access SHALL include `mcp.connect` only when the member's approval state is `APPROVED`. A member who is `PENDING`, `VERIFIED`, or `REJECTED` SHALL NOT see MCP in Settings and SHALL NOT be able to connect or call tools, even when a policy lists `mcp.connect`.
+
+#### Scenario: An approved founder
+
+- **WHEN** an approved member holds a founder policy
+- **THEN** Settings shows MCP connections and the member can approve an agent
+
+#### Scenario: LinkedIn Verified
+
+- **WHEN** a member's approval state is `VERIFIED` and the member holds a founder policy
+- **THEN** effective access does not include `mcp.connect`
+
+#### Scenario: Job Aspirant
+
+- **WHEN** a member holds only `job_aspirant`
+- **THEN** effective access does not include `mcp.connect`
 
 ### Requirement: New connections start read only
 On consent approval, the server SHALL store `read` for every scope, or `none` where the admin maximum is `none`, whatever `allowChanges` the request sends. When the approve request sends `acknowledgedContactDetails: true`, the server SHALL store `contactAckAt` on the authorization.
@@ -261,17 +280,120 @@ The `ai_apps` scope SHALL also offer `redeploy_ai_app`, `rename_ai_app` and `upd
 - **WHEN** an agent of a member who did not create the app, and is not a directory admin, calls `redeploy_ai_app`
 - **THEN** the call fails as not allowed and no deploy starts
 
-### Requirement: Agent writes are rate limited per member
+### Requirement: Agents read the forum, post, reply, upvote, add images, and edit or delete their own posts as the member
 
-Each write tool SHALL allow at most 10 calls per member per tool per hour. A call over the limit SHALL be refused with an error that names the limit, SHALL NOT run, SHALL NOT create an access request, and SHALL emit `mcp-tool-refused` with reason `rate_limited`. If the limit store is unavailable the call SHALL be allowed.
+The `forum` scope SHALL offer `search_forum_threads`, `get_forum_thread`, `list_forum_threads` and `list_forum_categories` at `read` and `start_forum_thread`, `reply_to_forum_thread`, `edit_forum_post`, `delete_forum_post`, `upvote_forum_post`, `remove_forum_post_upvote` and `upload_forum_image` at `write`. The posting tools SHALL be listed only to members with `forum.write`. Each call SHALL get a new one-time member proof with scope `forum` for the calling connection, audience `FORUM_MEMBER_PROOF_AUDIENCE`, and SHALL send it to NodeBB at `FORUM_API_URL` in `X-PL-Member-Proof` as the only credential, so NodeBB reads and posts under the member's own account and forum privileges. The read tools SHALL read from NodeBB, not from the OpenSearch `forum_thread` index, so an agent sees only what the member may read and a new thread is readable at once. A revoked connection, or one whose `forum` level does not allow the call, SHALL get no proof and SHALL NOT reach NodeBB. When either variable is unset, or the audience is not a live key, the tools SHALL refuse with "Agents cannot use the forum on this LabOS environment yet." without calling NodeBB. A NodeBB refusal SHALL reach the agent in NodeBB's words; a NodeBB 5xx, timeout or network failure SHALL tell the agent to try again later. `search_forum_threads` SHALL return one row per thread, best match first, leaving out deleted posts and threads. `get_forum_thread` SHALL take a numeric thread id and return the thread with its non-deleted posts as plain text, oldest first, one NodeBB page at most, with `truncated` set when the thread has more. Its `replyCount` SHALL leave out the deleted posts on that page, since NodeBB's post count keeps soft-deleted posts. A deleted thread SHALL be not found, even when NodeBB sends it to a member who may view deleted threads. `list_forum_threads` SHALL take a category id and an optional page and sort (`recently_created` by default, or `recently_replied`, `most_posts`, `most_votes`, `most_views`), SHALL return that one NodeBB page of the category's non-deleted threads with `page`, `pageCount` and `threadCount`, each with its opening post's `mainPid` and a snippet of its latest reply, or of its opening post when it has none (a failed read of that post leaves the snippet empty), and SHALL refuse a category id that is not a positive integer without calling NodeBB. `list_forum_categories` SHALL return only real, enabled categories (no links, no `uncategorized`). A post SHALL return its ids and its LabOS forum URL. `edit_forum_post` SHALL replace a post's content, and a thread's title when given for its opening post; `delete_forum_post` SHALL soft-delete a post through NodeBB (`DELETE /api/v3/posts/:pid/state`, restorable by moderators, never a purge). Both SHALL work only on the member's own posts, which NodeBB enforces for member-proof requests even when the member moderates the forum, and SHALL refuse a post id that is not a positive integer without calling NodeBB. Agents SHALL NOT restore or purge posts. `upvote_forum_post` SHALL upvote a post as the member through NodeBB (`PUT /api/v3/posts/:pid/vote` with `delta: 1`, the forum page's Like), and `remove_forum_post_upvote` SHALL take the member's vote back (`DELETE /api/v3/posts/:pid/vote`); both SHALL refuse a post id that is not a positive integer without calling NodeBB. NodeBB's own vote rules SHALL apply, including no vote on the member's own post. Agents SHALL NOT downvote: NodeBB refuses a member-proof vote with any `delta` other than a positive one before the proof is redeemed. `upload_forum_image` SHALL store an image the way the forum editor does (`ImagesService.upload`, the storage behind `POST /v1/images`; NodeBB is not called) and SHALL return its `url` and Markdown `![alt](url)` for the agent to put in a post. It SHALL take exactly one of `imageUrl`, a public https URL that LabOS downloads and keeps its own copy of (at most 5 MB), or `data`, the image as base64 (at most 2 MB). It SHALL accept only JPEG, PNG, WebP and GIF, decided from the file's bytes rather than any type the agent gives. It SHALL refuse a URL that is not https, has a port or an IP-literal host, is localhost, or resolves to any non-public address, and SHALL check every redirect the same way. Alt text SHALL NOT be able to break out of the Markdown image.
 
-#### Scenario: Eleventh post in an hour
+#### Scenario: Read a thread just posted
 
-- **WHEN** a connection calls `post_team_news` an eleventh time within the hour
-- **THEN** the call is refused with "LabOS limits agents to 10 post_team_news calls an hour. Try again later."
+- **WHEN** an agent with `forum: read` calls `get_forum_thread` with the `tid` of a thread posted a moment ago
+- **THEN** LabOS issues a forum proof for that connection, NodeBB returns the thread as the member sees it, and the agent gets its posts as plain text
+
+#### Scenario: Reply in a thread
+
+- **WHEN** an agent with `forum: write` calls `reply_to_forum_thread` with a `tid` and content
+- **THEN** LabOS issues a forum proof for that connection, NodeBB posts the reply as the member, and the agent gets the reply's `pid` and thread URL
+
+#### Scenario: Browse a category
+
+- **WHEN** an agent with `forum: read` calls `list_forum_threads` with a `cid` from `list_forum_categories`
+- **THEN** NodeBB returns the first page of that category as the member sees it, newest first, and the agent gets one row per thread with `page`, `pageCount` and `threadCount`
+
+#### Scenario: Edit or delete someone else's post
+
+- **WHEN** an agent with `forum: write` calls `edit_forum_post` or `delete_forum_post` with the `pid` of another member's post
+- **THEN** NodeBB refuses with 403 "Agents can only edit or delete the member's own posts" and the post is unchanged
+
+#### Scenario: Upvote a post and take it back
+
+- **WHEN** an agent with `forum: write` calls `upvote_forum_post` with the `pid` of another member's post, then `remove_forum_post_upvote` with the same `pid`
+- **THEN** NodeBB records the member's upvote and the post shows as liked by the member on the forum page; after the second call the upvote is gone
+
+#### Scenario: Upvote the member's own post
+
+- **WHEN** an agent calls `upvote_forum_post` with the `pid` of the member's own post
+- **THEN** NodeBB refuses with "You cannot vote on your own post" and the agent gets that reason
+
+#### Scenario: Post a thread with an image from a URL
+
+- **WHEN** an agent with `forum: write` calls `upload_forum_image` with the `imageUrl` of a public PNG, then `start_forum_thread` with the returned `markdown` in its content
+- **THEN** LabOS stores its own copy of the image, and the thread shows the image on the forum page
+
+#### Scenario: Image URL on an internal address
+
+- **WHEN** an agent calls `upload_forum_image` with an `imageUrl` whose host resolves to a private or link-local address, directly or after a redirect
+- **THEN** the call is refused as not a public https URL, and nothing is downloaded from that address
+
+#### Scenario: Read a thread after a delete
+
+- **WHEN** an agent deletes one of two replies in a thread with `delete_forum_post` and then calls `get_forum_thread` for that thread
+- **THEN** the thread shows the remaining reply and `replyCount` 1; after its opening post is deleted from a thread with no replies, `get_forum_thread` answers that the thread is not found
+
+#### Scenario: Member has no forum account
+
+- **WHEN** NodeBB answers 403 "No forum account for this member; sign in to the forum once first"
+- **THEN** the agent gets that message and nothing is posted
+
+#### Scenario: Environment not set up
+
+- **WHEN** `FORUM_MEMBER_PROOF_AUDIENCE` is unset
+- **THEN** `start_forum_thread` and `search_forum_threads` refuse with "Agents cannot use the forum on this LabOS environment yet." and no proof is issued
+
+### Requirement: Each MCP call type has a limit per member
+
+Each MCP tool SHALL belong to one call type: `read`, `contact_read`, `write` or `forum_post`. `get_member`, `get_team`, `get_project` and `get_event` SHALL be `contact_read`. Other reads and `whoami` SHALL be `read`. Write tools SHALL be `write`. A forum post SHALL count as `forum_post`: a Forum member proof with write access that an agent requests for itself, and a call to `start_forum_thread` or `reply_to_forum_thread`. The proofs the MCP forum tools mint for their own calls SHALL NOT count, since each tool call is already counted by its call type; other forum writes (edit, delete, upvote, image upload) SHALL be `write`. The limit numbers, the 80% warning ratio and the PL infra multiplier SHALL live in one config. The first numbers are drafts.
+
+Each call type SHALL have one limit per member, shared by every tool of that type and by every pod. A `contact_read` SHALL count each member in the response who has an email, Telegram, or LinkedIn value. The same member SHALL count once. A contact-read response with more such members than remain SHALL be refused and SHALL return none of those contact details. A call over the limit SHALL be refused, SHALL NOT run, and SHALL NOT create an access request. The refusal SHALL name the call type, the amount used, the limit and the reset time, and SHALL tell the agent to inform the member and point them to Settings → MCP connections. When usage reaches 80% of a limit, the tool result SHALL include that warning once in the window. If the limit store is unavailable, `contact_read`, `write` and `forum_post` SHALL be refused. `read` SHALL be allowed.
+
+#### Scenario: Writes share one limit
+
+- **WHEN** a member's agent uses the write limit on `post_team_news` and then calls `update_my_profile`
+- **THEN** the second call counts against the same write limit
+
+#### Scenario: At the limit
+
+- **WHEN** a call would pass the member's contact read limit
+- **THEN** the call is refused, the tool does not run, and the message names the limit, the reset time and Settings
+
+#### Scenario: Near the limit
+
+- **WHEN** a call reaches 80% of a limit and a later call in the same window stays under the limit
+- **THEN** only the first of those calls includes the warning
+
+#### Scenario: Store down
+
+- **WHEN** the limit store cannot be read
+- **THEN** a write, a contact read and a forum post are refused, and a read is allowed
+
+### Requirement: PL infra members have higher limits
+
+A member assigned the PL infra policy SHALL get 5 times the standard limit for each call type. Any other member SHALL get the standard limit.
+
+#### Scenario: PL infra tier
+
+- **WHEN** a PL infra member's agent passes the standard contact read limit
+- **THEN** the call is still allowed, up to 5 times that limit
+
+### Requirement: Directory admins can override one member's limit
+
+A directory admin SHALL set, change and remove a limit for one member and one call type, with an optional end date, through `/v1/admin/mcp/limits`. The route SHALL accept the same LabOS session as Settings and SHALL require `directory.admin.full`. A signed-in member without that permission SHALL get 403. After the end date the tier limit SHALL apply again. Each change SHALL be stored with the admin and the time. Admins SHALL be able to read a member's usage, members limited in the last 7 days, and the active overrides.
+
+#### Scenario: Override end date
+
+- **WHEN** an admin sets a write limit that ends in the current window
+- **THEN** the custom limit applies until that time, and the tier limit applies after it
+
+### Requirement: Members can read their MCP limits
+
+`GET /v1/mcp/limits` SHALL return each call type with the amount used, the limit, the reset time, any active override, and whether the limit was hit in the last 7 days.
+
+#### Scenario: Member reads limits
+
+- **WHEN** the member opens their MCP limits
+- **THEN** each call type shows usage, the limit, the reset time and any override
 
 ### Requirement: Each MCP tool call sends its own event
-Each MCP tool call SHALL send a PostHog event named `mcp-<tool name with dashes>-called`, with `result` `ok`, `error` (plus `errorKind`) or `refused` (plus `reason`), and `toolName`, `memberUid`, `authorizationUid`, `clientName`, `scope` and `operation`. Search and list tools SHALL add the query text, at most 200 characters, and filters. Write tools SHALL send only ids, field names and counts. `mcp-tool-invoked` SHALL still be sent. When `ANALYTICS_PROVIDER` is not `posthog`, the same MCP events SHALL still be sent to PostHog if `POSTHOG_API_KEY` and `POSTHOG_HOST` are set.
+Each MCP tool call SHALL send a PostHog event named `mcp-<tool name with dashes>-called`, with `result` `ok`, `error` (plus `errorKind`) or `refused` (plus `reason`), `callType`, and `toolName`, `memberUid`, `authorizationUid`, `clientName`, `scope` and `operation`. When a limit check runs, the event SHALL also send `limitResult` of `allowed`, `warned` or `limited`. Search and list tools SHALL add the query text, at most 200 characters, and filters. Write tools SHALL send only ids, field names and counts. `mcp-tool-invoked` SHALL still be sent. A forum post counted through a member proof SHALL send `mcp-forum-post-called` with `callType` `forum_post`.
 
 #### Scenario: Search call
 - **GIVEN** a connected agent
@@ -297,11 +419,11 @@ Each MCP tool call SHALL send a PostHog event named `mcp-<tool name with dashes>
 
 ### Requirement: Agents can do the remaining member actions
 
-The connected agent SHALL be able to do the member actions LabOS allows by hand, except sign-in, email change, forum writes, file uploads, deal redeem codes, and AI-app deploy keys. Each action SHALL be its own tool, SHALL call the same service as the page, and SHALL use that page's permission check. A call that names a field the tool does not accept SHALL change nothing.
+The connected agent SHALL be able to do the member actions LabOS allows by hand, except sign-in, email change, editing or deleting other members' forum posts, file uploads, deal redeem codes, AI-app deploy keys, and team delete (a directory admin deletes a team on its page). Each action SHALL be its own tool, SHALL call the same service as the page, and SHALL use that page's permission check. A call that names a field the tool does not accept SHALL change nothing.
 
 The `profile` scope SHALL offer investor profile, privacy, role on a team the member already belongs to, an existing project contribution, the profile role label, photo delete, recommendation notification settings, job apply and interest, guide comments, office hours, Demo Day and pitch actions that are not file uploads, deal submit and request, support, notification delete, and roadmap create, edit, pin and unpin when the member has that roadmap permission.
 
-The `directory` scope SHALL offer team fund profile, membership sources (directory admins only), community tags, roster edits, team create, team delete (directory admins only), enrichment review, project create and delete, and team and project asks.
+The `directory` scope SHALL offer team fund profile, membership sources (directory admins only), community tags, roster edits, team create, enrichment review, project create and delete, and team and project asks.
 
 The `events` scope SHALL offer event submit, an update of the member's own RSVP details, and a presence request.
 
@@ -325,3 +447,8 @@ The `investors` scope SHALL offer warm-intro regenerate, list membership, pathfi
 
 - **WHEN** an agent who is not a directory admin calls `update_team_membership_sources`
 - **THEN** the call fails and the team's sources are unchanged
+
+#### Scenario: No team delete
+
+- **WHEN** an agent with `directory: write`, for a directory admin too, lists tools or calls `delete_team`
+- **THEN** no `delete_team` tool is listed, the call is refused as an unknown tool, and the team is unchanged

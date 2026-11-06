@@ -232,6 +232,7 @@ describe('per-tool events (LAB-3050)', () => {
         limit: 5,
         resultCount: 2,
         query: 'a'.repeat(200),
+        callType: 'read',
       },
     });
   });
@@ -300,6 +301,7 @@ describe('per-tool events (LAB-3050)', () => {
         operation: 'write',
         result: 'refused',
         reason: 'needs_write',
+        callType: 'write',
       },
     });
   });

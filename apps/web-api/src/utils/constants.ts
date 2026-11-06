@@ -383,6 +383,7 @@ export const ANALYTICS_EVENTS = {
     TOOL_REFUSED: 'mcp-tool-refused',
     SCOPE_LEVELS_UPDATED: 'mcp-scope-levels-updated',
     ADMIN_SCOPE_UPDATED: 'mcp-admin-scope-updated',
+    LIMIT_OVERRIDE_CHANGED: 'mcp-limit-override-changed',
   },
   INVESTOR_DB: {
     MANUAL_FIELDS_PATCHED: 'investor-db-manual-fields-patched',
@@ -409,6 +410,12 @@ export const ANALYTICS_EVENTS = {
     SUGGESTED_CANDIDATES_EMAIL_SENT: 'suggested-candidates-email-sent',
     /** A lead turned the suggested-candidates email off through the email's unsubscribe link (LAB-2853). */
     SUGGESTED_CANDIDATES_EMAIL_UNSUBSCRIBED: 'suggested-candidates-email-unsubscribed',
+  },
+  PERSONALIZATION: {
+    /** One row added to the member signal log (LAB-3121, LAB-3123). */
+    MEMBER_SIGNAL_RECORDED: 'member-signal-recorded',
+    /** One member interest profile rebuild finished (LAB-3122). */
+    MEMBER_INTEREST_PROFILE_COMPUTED: 'member-interest-profile-computed',
   },
 };
 

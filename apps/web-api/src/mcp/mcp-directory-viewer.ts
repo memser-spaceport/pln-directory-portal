@@ -5,8 +5,6 @@ import { McpActorContext } from './mcp-tools';
 
 type Row = Record<string, unknown>;
 
-const SNIPPET_MAX_LENGTH = 240;
-
 function recordArg(value: unknown): Row | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   return value as Row;
@@ -55,21 +53,6 @@ export function compactEventRow(event: Row): Row {
     startDate: event.startDate ?? null,
     endDate: event.endDate ?? null,
     location: recordArg(event.location)?.location ?? null,
-  };
-}
-
-export function compactForumThreadRow(hit: Row): Row {
-  const rootPost = recordArg(hit.rootPost);
-  const content = typeof rootPost?.content === 'string' ? rootPost.content.trim() : '';
-  const snippet = content.length > SNIPPET_MAX_LENGTH ? `${content.slice(0, SNIPPET_MAX_LENGTH)}…` : content || null;
-  return {
-    uid: hit.tid != null ? String(hit.tid) : null,
-    topicTitle: hit.topicTitle ?? null,
-    topicSlug: hit.topicSlug ?? null,
-    topicUrl: hit.topicUrl ?? null,
-    replyCount: typeof hit.replyCount === 'number' ? hit.replyCount : 0,
-    cid: hit.cid ?? null,
-    snippet,
   };
 }
 
