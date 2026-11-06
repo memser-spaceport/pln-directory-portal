@@ -100,6 +100,17 @@ describe('forum images (LAB-3156)', () => {
     expect(result.uploaded.markdown).toBe('![a (javascript:x) b c](https://img.labos.example/abc.png)');
   });
 
+  it('does not pass storage error details (bucket, IAM role) to the agent', async () => {
+    const { images, tool } = build();
+    images.upload.mockRejectedValueOnce(
+      new Error('User: arn:aws:sts::1:assumed-role/node is not authorized to perform: s3:PutObject on bucket-x')
+    );
+
+    const failure = tool.execute(CTX, { data: PNG.toString('base64') });
+    await expect(failure).rejects.toThrow('The image could not be stored. Try again later.');
+    await expect(tool.execute(CTX, { data: PNG.toString('base64') })).resolves.toBeDefined();
+  });
+
   it('refuses what is not a JPEG, PNG, WebP or GIF without storing it', async () => {
     const { images, tool } = build();
 

@@ -35,6 +35,7 @@ export type ForumImageType = keyof typeof IMAGE_TYPES;
 
 const NOT_AN_IMAGE = 'Only JPEG, PNG, WebP or GIF images can be uploaded.';
 const BAD_URL = 'imageUrl must be a public https URL of an image.';
+const STORE_FAILED = 'The image could not be stored. Try again later.';
 
 const logger = new Logger('McpForumImageTools');
 
@@ -191,10 +192,15 @@ export function forumImageTools(images: ImageStore): McpToolDef[] {
           size: bytes.length,
           buffer: bytes,
         } as Express.Multer.File;
-        const { image } = await images.upload(file);
-        const url = image?.url;
+        // Storage errors carry bucket and IAM details: log them, give the agent a plain message.
+        let url: string | undefined;
+        try {
+          url = (await images.upload(file))?.image?.url;
+        } catch (error) {
+          logger.error(`Forum image store failed: ${String((error as Error)?.message ?? error)}`);
+        }
         if (!url) {
-          throw new BadRequestException('The image could not be stored. Try again.');
+          throw new BadRequestException(STORE_FAILED);
         }
         return {
           uploaded: {
