@@ -722,44 +722,95 @@ export type SentSuggestedEmail = { kind: SuggestedEmailKind; memberUids: readonl
 
 export type SuggestedEmailKind = 'first' | 'new' | 'reminder';
 
-export type SuggestedEmailPick<T> =
-  | { kind: 'first'; candidates: T[] }
-  | { kind: 'new'; candidates: T[]; alreadySeenCount: number }
-  | { kind: 'reminder'; candidates: T[] };
+/** Roles one weekly email covers: the team's most recently published (LAB-3139). */
+export const MAX_EMAIL_ROLES = 3;
+
+/** People a role section draws as cards (LAB-3139); "All N matches" links the rest. */
+export const MAX_ROLE_CARDS = 2;
+
+/** One live role of the team, as `pickTeamSuggestedEmail` reads it. */
+export type TeamEmailRole<T> = {
+  roleUid: string;
+  publishedAt: Date | null;
+  /** What the Suggested tab lists for the role from this run, in rank order. */
+  listed: readonly T[];
+  /** This lead's earlier emails for the role, newest first. A row that names nobody is not history. */
+  history: readonly SentSuggestedEmail[];
+  /** Who a lead of the team has already contacted about the role. */
+  contacted: ReadonlySet<string>;
+};
+
+export type TeamEmailSection<T> = {
+  roleUid: string;
+  /** Everyone counted for the role ("N matches"), in rank order; recorded as seen once the email goes out. */
+  matches: T[];
+  /** Matches this lead was never emailed about for the role; all of them on a first email. */
+  fresh: T[];
+  /** At most `MAX_ROLE_CARDS`: fresh people first, then the rest in rank order (a reminder: the not contacted). */
+  cards: T[];
+};
+
+export type TeamEmailPick<T> = {
+  kind: SuggestedEmailKind;
+  sections: TeamEmailSection<T>[];
+  /** Distinct fresh people across the sections. */
+  newCount: number;
+};
 
 /**
- * Which weekly suggested-candidates email a lead gets for a role, and who it names (LAB-2837 feedback). `listed` is
- * what the Suggested tab lists for the role from this run, in rank order; "Not looking" members are never named or
- * counted. `history` is this lead's earlier emails for the role, newest first; `contacted` is who a lead of the team
- * has already contacted about the role.
+ * The weekly suggested-candidates email to one lead of a team (LAB-3139): one email per team, covering the team's
+ * `MAX_EMAIL_ROLES` most recently published roles that have someone to suggest, each with up to `MAX_ROLE_CARDS`
+ * cards. "Not looking" members are never named or counted.
  *
- * - No history: `first`, everyone listed.
- * - Someone listed was never named in any earlier email to this lead: `new`, only them, plus how many listed people
- *   the lead has already seen (contacted ones included — they are still on the page).
- * - Nobody new: a `reminder` of who is listed and not yet contacted — once: not after a reminder, and not when
- *   nobody is left to remind about.
+ * - Someone in a section was never in an earlier email to this lead for that role: `first` when the lead has had no
+ *   email for any of these roles, else `new`. Every section shows, with its fresh people first.
+ * - Nobody new anywhere: a `reminder` of who is still waiting (not contacted) — once: not when this lead's last
+ *   email for the team (`lastKind`) was a reminder, and not when nobody is left to remind about.
  *
  * Null means no email.
  */
-export function pickSuggestedEmail<T extends { memberUid: string }>(args: {
-  listed: readonly T[];
+export function pickTeamSuggestedEmail<T extends { memberUid: string }>(args: {
+  roles: readonly TeamEmailRole<T>[];
   notLooking: ReadonlySet<string>;
-  history: readonly SentSuggestedEmail[];
-  contacted: ReadonlySet<string>;
-}): SuggestedEmailPick<T> | null {
-  const eligible = args.listed.filter((item) => !args.notLooking.has(item.memberUid));
-  if (!eligible.length) return null;
-  if (!args.history.length) return { kind: 'first', candidates: eligible };
+  lastKind: SuggestedEmailKind | null;
+}): TeamEmailPick<T> | null {
+  const roles = args.roles
+    .map((role) => ({ role, matches: role.listed.filter((item) => !args.notLooking.has(item.memberUid)) }))
+    .filter(({ matches }) => matches.length > 0)
+    .sort((a, b) => (b.role.publishedAt?.getTime() ?? 0) - (a.role.publishedAt?.getTime() ?? 0))
+    .slice(0, MAX_EMAIL_ROLES);
+  if (!roles.length) return null;
 
-  const seen = new Set(args.history.flatMap((email) => email.memberUids));
-  const fresh = eligible.filter((item) => !seen.has(item.memberUid));
-  if (fresh.length) {
-    return { kind: 'new', candidates: fresh, alreadySeenCount: eligible.length - fresh.length };
+  const withFresh = roles.map(({ role, matches }) => {
+    const seen = new Set(role.history.flatMap((email) => email.memberUids));
+    return { role, matches, fresh: matches.filter((item) => !seen.has(item.memberUid)) };
+  });
+  const newCount = new Set(withFresh.flatMap(({ fresh }) => fresh.map((item) => item.memberUid))).size;
+
+  if (newCount > 0) {
+    const anyHistory = roles.some(({ role }) => role.history.length > 0);
+    return {
+      kind: anyHistory ? 'new' : 'first',
+      newCount,
+      sections: withFresh.map(({ role, matches, fresh }) => ({
+        roleUid: role.roleUid,
+        matches,
+        fresh,
+        cards: [...fresh, ...matches.filter((item) => !fresh.includes(item))].slice(0, MAX_ROLE_CARDS),
+      })),
+    };
   }
 
-  if (args.history[0].kind === 'reminder') return null;
-  const waiting = eligible.filter((item) => !args.contacted.has(item.memberUid));
-  return waiting.length ? { kind: 'reminder', candidates: waiting } : null;
+  if (args.lastKind === 'reminder') return null;
+  const sections = withFresh
+    .map(({ role, matches }) => ({
+      roleUid: role.roleUid,
+      matches,
+      fresh: [] as T[],
+      cards: matches.filter((item) => !role.contacted.has(item.memberUid)).slice(0, MAX_ROLE_CARDS),
+    }))
+    .filter((section) => section.cards.length > 0);
+  return sections.length ? { kind: 'reminder', newCount: 0, sections } : null;
 }
 
 /** `JOB_MATCH_EMAIL_TEAM_UIDS` entry that lets every team's leads be emailed. */
