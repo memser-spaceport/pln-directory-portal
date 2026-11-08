@@ -107,7 +107,7 @@ export function jobMatchBlocker({ ignoreEnabledFlag = false }: JobMatchBlockerOp
   code: 'disabled' | 'misconfigured';
   message: string;
 } | null {
-  if (!ignoreEnabledFlag && (process.env.IS_JOB_MATCH_ENABLED ?? '').toLowerCase() !== 'true') {
+  if (!ignoreEnabledFlag && (process.env.IS_JOB_MATCH_ENABLED ?? 'false').toLowerCase() !== 'true') {
     return { code: 'disabled', message: 'Job match is disabled' };
   }
   if (!process.env.VERCEL_AI_KEY) {
