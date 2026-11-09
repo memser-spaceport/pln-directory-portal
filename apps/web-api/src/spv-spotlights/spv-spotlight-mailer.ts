@@ -8,8 +8,6 @@ import {
 } from '../team-pitches/team-pitch.utils';
 import { EmailTemplate, mergeTemplate, normalizeEmail } from './spv-spotlight.utils';
 
-const LOGIN_TOKEN_TTL_SECONDS = 864000;
-
 export type SpotlightMailContext = {
   uid: string;
   slug: string;
@@ -30,7 +28,7 @@ export class SpvSpotlightMailer {
 
   async loginLink(slug: string, email: string): Promise<string> {
     const normalized = normalizeEmail(email);
-    const loginToken = await this.authService.issueLoginToken(normalized, LOGIN_TOKEN_TTL_SECONDS);
+    const loginToken = await this.authService.issueLoginToken(normalized);
     const webBase = process.env.WEB_UI_BASE_URL || '';
     return `${webBase}/spv-spotlight/${slug}?prefillEmail=${encodeURIComponent(
       normalized
