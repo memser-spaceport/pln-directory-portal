@@ -70,6 +70,13 @@ export class MemberController {
     private logger: LogService
   ) {}
 
+  // Declared before `getMember` so `crawl-index` isn't taken for a member uid.
+  @Api(server.route.getMemberCrawlIndex)
+  @NoCache()
+  async getMemberCrawlIndex() {
+    return this.membersService.listCrawlIndex();
+  }
+
   /**
    * Retrieves a list of members based on query parameters.
    * Builds a Prisma query from the queryable fields and adds filters for names, roles, and recent members.

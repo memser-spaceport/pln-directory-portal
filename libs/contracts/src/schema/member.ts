@@ -102,6 +102,15 @@ export const SimpleMemberSchema = ResponseMemberSchema.pick({
   email: true,
 });
 
+export const MemberCrawlIndexItemSchema = z.object({
+  uid: z.string(),
+  updatedAt: z.string(),
+});
+
+export const MemberCrawlIndexResponseSchema = z.object({
+  members: z.array(MemberCrawlIndexItemSchema),
+});
+
 export const MembersByIdsRequestSchema = z.object({
   memberIds: z.array(z.string()).min(1, 'At least one member ID is required'),
 });
