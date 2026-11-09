@@ -192,22 +192,18 @@ export class JobMatchRunner {
       });
       return;
     }
-    if (teamUids?.length) {
-      await this.prisma.jobMatchRun.update({
-        where: { uid: runUid },
-        data: { lockedUntil: null, error: null },
-      });
-      this.logger.log(`job match run ${runUid} finished ${teams.length} requested teams`);
-      return;
-    }
     const finishedAt = new Date();
     await this.prisma.jobMatchRun.update({
       where: { uid: runUid },
       data: { status: 'COMPLETED', lockedUntil: null, finishedAt, error: null },
     });
-    this.logger.log(`job match run ${runUid} completed`);
-    // Only a full run that just reached COMPLETED starts the suggested-candidates email (LAB-2850). The listener
-    // runs async and swallows its own errors, so the email can neither fail the run nor hold its lock.
+    this.logger.log(
+      teamUids?.length
+        ? `job match run ${runUid} completed ${teams.length} requested teams`
+        : `job match run ${runUid} completed`
+    );
+    // A run that just reached COMPLETED starts the suggested-candidates email (LAB-2850), including a team-scoped
+    // run. The listener runs async and swallows its own errors, so the email can neither fail the run nor hold its lock.
     const completed: JobMatchRunCompletedPayload = {
       runUid,
       runDate: this.heldRunDate ?? formatRunDate(utcRunDate()),
