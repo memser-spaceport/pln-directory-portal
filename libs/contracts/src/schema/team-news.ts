@@ -543,6 +543,7 @@ export const LabosDigestNewsQuerySchema = z.object({
   from: z.string().optional(),
   to: z.string().optional(),
   tags: ListParam,
+  q: z.string().optional(),
 });
 
 export const LabosDigestTopStoryHistorySchema = z.object({

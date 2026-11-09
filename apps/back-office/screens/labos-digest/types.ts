@@ -58,4 +58,5 @@ export type LabosDigestNewsFilters = {
   from?: string;
   to?: string;
   tags?: string;
+  q?: string;
 };

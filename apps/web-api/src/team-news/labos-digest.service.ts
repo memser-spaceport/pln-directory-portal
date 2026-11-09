@@ -387,6 +387,14 @@ function newsWhere(query: LabosDigestNewsQuery): Prisma.TeamNewsItemWhereInput {
   const where: Prisma.TeamNewsItemWhereInput = {};
   if (from || to) where.eventDate = { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) };
   if (query.tags.length > 0) where.tags = { hasSome: query.tags };
+  const q = query.q?.trim();
+  if (q) {
+    where.OR = [
+      { title: { contains: q, mode: 'insensitive' } },
+      { summary: { contains: q, mode: 'insensitive' } },
+      { contentHtml: { contains: q, mode: 'insensitive' } },
+    ];
+  }
   return where;
 }
 

@@ -175,6 +175,15 @@ A directory admin SHALL read and replace one ordered list of 1 to 3 found news i
 - **WHEN** a member who is not a directory admin reads or changes the list
 - **THEN** the API returns 403
 
+### Requirement: Found news search
+
+The found news list SHALL accept `q`. A non-empty `q` SHALL keep a story whose title, summary, or HTML content contains that text, ignoring case. An empty `q` SHALL leave the list unfiltered by text.
+
+#### Scenario: Title or content match
+
+- **WHEN** an admin searches for a word that appears in a story title or in its content
+- **THEN** the list contains that story
+
 ### Requirement: Admin picks last until the next real send
 
 An admin list SHALL stay until the next successful daily or weekly forum digest that sends. A test send SHALL NOT clear it. A run that finds nothing to send SHALL NOT clear it. The send SHALL delete the list only when it used the admin picks and the list version still matches the version read at the start of that send. A newer save during the send SHALL stay. After the delete, the next digest SHALL use the AI picks again. The send SHALL record the ordered stories, and found news SHALL show when a story was in a past digest, with the date, frequency, position, and whether it was the email lead.

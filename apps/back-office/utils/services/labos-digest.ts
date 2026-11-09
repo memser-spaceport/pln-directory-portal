@@ -46,6 +46,7 @@ export async function fetchLabosDigestNews(
       from: params.from || undefined,
       to: params.to || undefined,
       tags: params.tags || undefined,
+      q: params.q || undefined,
     },
   });
   return response.data;

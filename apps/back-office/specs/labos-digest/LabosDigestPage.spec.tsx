@@ -173,4 +173,16 @@ describe('LabOS Digest page', () => {
     fireEvent.click(screen.getByText('Reset'));
     await waitFor(() => expect(mockReset).toHaveBeenCalledWith({ authToken: 'token-1' }));
   });
+
+  it('searches found news by title or content', async () => {
+    asAdmin(true);
+    renderWithClient(<LabosDigestPage />);
+
+    expect(await screen.findByText('Gamma')).toBeTruthy();
+    fireEvent.change(screen.getByPlaceholderText('Search title or content'), { target: { value: 'Gamma' } });
+
+    await waitFor(() => expect(mockNews).toHaveBeenCalledWith(expect.objectContaining({ q: 'Gamma' })), {
+      timeout: 1500,
+    });
+  });
 });

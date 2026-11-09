@@ -225,6 +225,16 @@ describe('LabosDigestService', () => {
     expect(page.items[1].wasTopStory).toBe(false);
   });
 
+  it('searches title, summary, and content', async () => {
+    await service.listFoundNews({ page: 1, limit: 20, from: undefined, to: undefined, tags: [], q: ' fundraise ' });
+
+    expect(newsFindMany.mock.calls[0][0].where.OR).toEqual([
+      { title: { contains: 'fundraise', mode: 'insensitive' } },
+      { summary: { contains: 'fundraise', mode: 'insensitive' } },
+      { contentHtml: { contains: 'fundraise', mode: 'insensitive' } },
+    ]);
+  });
+
   it('says the next AI email skips a lead that frequency already sent', async () => {
     newsFindMany.mockImplementation(async (args: { where?: { editorialRank?: unknown; uid?: unknown } }) => {
       if (args.where?.editorialRank) return [{ uid: 'lead' }];
