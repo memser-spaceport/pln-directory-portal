@@ -31,7 +31,7 @@ A member profile SHALL be indexable when the member has a profile image, or thei
 
 ### Requirement: Crawl index lists indexable public members
 
-The system SHALL serve `GET /v1/members/crawl-index` without authentication and without caching. It SHALL return `{ members: [{ uid, updatedAt }] }`, where `updatedAt` is an ISO 8601 string, ordered by `updatedAt` descending. The list SHALL contain every member the public member list shows (approved members) whose profile is indexable, and no other member.
+The system SHALL serve `GET /v1/members/crawl-index` without authentication and without caching. It SHALL return `{ members: [{ uid, updatedAt }] }`, where `updatedAt` is an ISO 8601 string, ordered by `updatedAt` descending. The list SHALL contain every member the public member list shows a logged-out visitor (approved and verified members: `GET /v1/members` defaults to `isVerified=true`) whose profile is indexable, and no other member.
 
 #### Scenario: Empty profiles are left out
 
@@ -45,6 +45,12 @@ The system SHALL serve `GET /v1/members/crawl-index` without authentication and 
 - **GIVEN** a member with a photo whose approval is pending
 - **WHEN** `GET /v1/members/crawl-index` is called
 - **THEN** the response does not list that member
+
+#### Scenario: Unverified members are left out
+
+- **GIVEN** an approved member with a photo who is not verified
+- **WHEN** `GET /v1/members/crawl-index` is called
+- **THEN** the response does not list that member, as the public member list does not
 
 #### Scenario: The path is not taken for a member uid
 

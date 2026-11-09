@@ -1,4 +1,13 @@
-import { isMemberIndexable, memberBioText, toMemberCrawlIndex } from './member-crawl-index';
+import { isMemberIndexable, memberBioText, memberCrawlIndexWhere, toMemberCrawlIndex } from './member-crawl-index';
+import { directoryListedMemberWhere } from './member-visibility';
+
+describe('memberCrawlIndexWhere', () => {
+  // The public list gets isVerified=true from IsVerifiedMemberInterceptor; without it, 442 unverified prod members who
+  // were never in the listing or the sitemap would join the sitemap.
+  it('starts from the public list: approved and verified members', () => {
+    expect(memberCrawlIndexWhere()).toEqual({ AND: [directoryListedMemberWhere(), { isVerified: true }] });
+  });
+});
 
 describe('memberBioText', () => {
   it('returns the readable text of an HTML bio', () => {
