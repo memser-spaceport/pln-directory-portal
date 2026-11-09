@@ -4,6 +4,8 @@ import { MembersModule } from '../members/members.module';
 import { AccessControlV2Module } from '../access-control-v2/access-control-v2.module';
 import { PushNotificationsModule } from '../push-notifications/push-notifications.module';
 import { FollowsModule } from '../follows/follows.module';
+import { AdminAuthGuard } from '../guards/admin-auth.guard';
+import { JwtService } from '../utils/jwt/jwt.service';
 import { TeamNewsController } from './team-news.controller';
 import { TeamNewsServiceController } from './team-news-service.controller';
 import { LabosDigestAdminController } from './labos-digest-admin.controller';
@@ -35,6 +37,8 @@ import { NewsTagVocabularyService } from './news-tag-vocabulary.service';
     LabosDigestServiceController,
   ],
   providers: [
+    AdminAuthGuard,
+    JwtService,
     LabosDigestService,
     TeamNewsService,
     TeamNewsQueryService,
