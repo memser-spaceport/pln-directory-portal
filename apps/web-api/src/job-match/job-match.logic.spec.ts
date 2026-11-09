@@ -24,7 +24,9 @@ import {
   jobMatchBlocker,
   labelFor,
   mapPool,
-  pickSuggestedEmail,
+  pickTeamSuggestedEmail,
+  MAX_EMAIL_ROLES,
+  MAX_ROLE_CARDS,
   normalizeTeamUids,
   parseCandidateNotes,
   normalizeCriterionGroup,
@@ -251,10 +253,9 @@ describe('job match logic', () => {
   });
 
   it('repairs an unescaped quote and a trailing comma in model JSON', () => {
-    const notes = parseCandidateNotes(
-      '[{"memberUid":"m1","blurb":"Knows "Go".","matched":[true,false,true,true,],}]',
-      [{ memberUid: 'm1', criteriaCount: 4 }]
-    );
+    const notes = parseCandidateNotes('[{"memberUid":"m1","blurb":"Knows "Go".","matched":[true,false,true,true,],}]', [
+      { memberUid: 'm1', criteriaCount: 4 },
+    ]);
     expect(notes.get('m1')).toEqual({ blurb: 'Knows "Go".', matched: [true, false, true, true] });
   });
 
@@ -576,100 +577,143 @@ describe('structured criteria (LAB-2854)', () => {
   });
 });
 
-describe('pickSuggestedEmail (LAB-2837 feedback)', () => {
-  const listed = ['a', 'b', 'c', 'd'].map((memberUid, index) => ({ memberUid, rank: index + 1 }));
-  const none = new Set<string>();
-  const uids = (items: { memberUid: string }[]) => items.map((item) => item.memberUid);
+describe('pickTeamSuggestedEmail (LAB-3139)', () => {
+  const p = (memberUid: string) => ({ memberUid });
+  const uids = (items: readonly { memberUid: string }[]) => items.map((item) => item.memberUid);
+  const day = (n: number) => new Date(Date.UTC(2026, 10, n));
+  const role = (
+    roleUid: string,
+    listed: string[],
+    over: Partial<{
+      publishedAt: Date | null;
+      history: { kind: 'first' | 'new' | 'reminder'; memberUids: string[] }[];
+      contacted: string[];
+    }> = {}
+  ) => ({
+    roleUid,
+    publishedAt: over.publishedAt === undefined ? day(1) : over.publishedAt,
+    listed: listed.map(p),
+    history: over.history ?? [],
+    contacted: new Set(over.contacted ?? []),
+  });
   const pick = (
-    history: { kind: 'first' | 'new' | 'reminder'; memberUids: string[] }[],
-    extra: { notLooking?: Set<string>; contacted?: Set<string>; list?: typeof listed } = {}
+    roles: ReturnType<typeof role>[],
+    over: Partial<{ notLooking: string[]; lastKind: 'first' | 'new' | 'reminder' | null }> = {}
   ) =>
-    pickSuggestedEmail({
-      listed: extra.list ?? listed,
-      notLooking: extra.notLooking ?? none,
-      history,
-      contacted: extra.contacted ?? none,
+    pickTeamSuggestedEmail({
+      roles,
+      notLooking: new Set(over.notLooking ?? []),
+      lastKind: over.lastKind ?? null,
     });
 
-  it('first: everyone listed, in rank order, when the lead was never emailed about the role', () => {
-    const result = pick([]);
+  it('sends a first email covering every role, two cards each, when the lead has had none', () => {
+    const result = pick([role('r1', ['A', 'B', 'C']), role('r2', ['D'])]);
     expect(result?.kind).toBe('first');
-    expect(uids(result!.candidates)).toEqual(['a', 'b', 'c', 'd']);
-  });
-
-  it('never names or counts a "Not looking" member, and sends nothing when nobody else is listed', () => {
-    expect(uids(pick([], { notLooking: new Set(['b']) })!.candidates)).toEqual(['a', 'c', 'd']);
-    const result = pick([{ kind: 'first', memberUids: ['a'] }], { notLooking: new Set(['c']) });
-    expect(result).toEqual({ kind: 'new', candidates: [listed[1], listed[3]], alreadySeenCount: 1 });
-    expect(pick([], { notLooking: new Set(['a', 'b', 'c', 'd']) })).toBeNull();
-  });
-
-  it('new: only the people never named in any earlier email, plus how many seen ones are listed', () => {
-    const result = pick([
-      { kind: 'new', memberUids: ['c'] },
-      { kind: 'first', memberUids: ['a', 'z'] },
+    expect(result?.newCount).toBe(4);
+    expect(result?.sections.map((section) => [section.roleUid, uids(section.cards), uids(section.matches)])).toEqual([
+      ['r1', ['A', 'B'], ['A', 'B', 'C']],
+      ['r2', ['D'], ['D']],
     ]);
-    expect(result?.kind).toBe('new');
-    expect(uids(result!.candidates)).toEqual(['b', 'd']);
-    expect(result).toMatchObject({ alreadySeenCount: 2 });
   });
 
-  it('new: someone named weeks ago who drops out and comes back is not new again', () => {
-    // b was in the first email, dropped out the week c and d were new, and is listed again now.
+  it(`covers only the ${MAX_EMAIL_ROLES} most recently published roles that have someone to suggest`, () => {
     const result = pick([
-      { kind: 'new', memberUids: ['c', 'd'] },
-      { kind: 'first', memberUids: ['a', 'b'] },
+      role('old', ['A'], { publishedAt: day(1) }),
+      role('newest', ['B'], { publishedAt: day(9) }),
+      role('empty', [], { publishedAt: day(10) }),
+      role('mid', ['C'], { publishedAt: day(5) }),
+      role('undated', ['D'], { publishedAt: null }),
+      role('recent', ['E'], { publishedAt: day(7) }),
     ]);
-    expect(result?.kind).toBe('reminder');
-    expect(uids(result!.candidates)).toEqual(['a', 'b', 'c', 'd']);
+    expect(result?.sections.map((section) => section.roleUid)).toEqual(['newest', 'recent', 'mid']);
   });
 
-  it('new: counts contacted people among the already seen — they are still on the page', () => {
-    const result = pick([{ kind: 'first', memberUids: ['a', 'b'] }], { contacted: new Set(['a']) });
-    expect(result).toMatchObject({ kind: 'new', alreadySeenCount: 2 });
-    expect(uids(result!.candidates)).toEqual(['c', 'd']);
+  it(`draws at most ${MAX_ROLE_CARDS} cards per role`, () => {
+    expect(pick([role('r1', ['A', 'B', 'C', 'D'])])?.sections[0].cards).toHaveLength(MAX_ROLE_CARDS);
   });
 
-  it('reminder: nobody new, after a first or new email, naming who is listed and not contacted', () => {
-    for (const kind of ['first', 'new'] as const) {
-      const result = pick([{ kind, memberUids: ['a', 'b', 'c', 'd'] }], { contacted: new Set(['b']) });
-      expect(result?.kind).toBe('reminder');
-      expect(uids(result!.candidates)).toEqual(['a', 'c', 'd']);
-    }
+  it('never names or counts a "Not looking" member, and drops a role left with nobody', () => {
+    const result = pick([role('r1', ['A', 'B']), role('r2', ['C'])], { notLooking: ['A', 'C'] });
+    expect(result?.sections.map((section) => [section.roleUid, uids(section.matches)])).toEqual([['r1', ['B']]]);
   });
 
-  it('reminder: once — nothing after a reminder until someone new appears', () => {
-    const all = ['a', 'b', 'c', 'd'];
-    expect(
-      pick([
-        { kind: 'reminder', memberUids: all },
-        { kind: 'first', memberUids: all },
-      ])
-    ).toBeNull();
-    const back = pick(
+  it('sends nothing when every role is empty', () => {
+    expect(pick([role('r1', ['A'])], { notLooking: ['A'] })).toBeNull();
+    expect(pick([])).toBeNull();
+  });
+
+  it('sends a new email with fresh people first, keeping roles with nobody new', () => {
+    const result = pick(
       [
-        { kind: 'reminder', memberUids: all },
-        { kind: 'first', memberUids: all },
+        role('r1', ['A', 'B', 'C'], { publishedAt: day(5), history: [{ kind: 'first', memberUids: ['A', 'B'] }] }),
+        role('r2', ['D'], { publishedAt: day(3), history: [{ kind: 'first', memberUids: ['D'] }] }),
       ],
-      { list: [...listed, { memberUid: 'e', rank: 5 }] }
+      { lastKind: 'first' }
     );
-    expect(back?.kind).toBe('new');
-    expect(uids(back!.candidates)).toEqual(['e']);
+    expect(result?.kind).toBe('new');
+    expect(result?.newCount).toBe(1);
+    expect(result?.sections.map((section) => [section.roleUid, uids(section.fresh), uids(section.cards)])).toEqual([
+      ['r1', ['C'], ['C', 'A']],
+      ['r2', [], ['D']],
+    ]);
   });
 
-  it('reminder: nothing when everyone listed has been contacted', () => {
+  it('counts everyone in a role the lead was never emailed about as new', () => {
+    const result = pick(
+      [role('r1', ['A'], { history: [{ kind: 'first', memberUids: ['A'] }] }), role('r2', ['B', 'C'])],
+      { lastKind: 'first' }
+    );
+    expect(result?.kind).toBe('new');
+    expect(result?.newCount).toBe(2);
+  });
+
+  it('counts a person new to two roles once', () => {
+    expect(pick([role('r1', ['A']), role('r2', ['A'])])?.newCount).toBe(1);
+  });
+
+  it('judges new against every earlier email, not just the last', () => {
+    const result = pick(
+      [
+        role('r1', ['A', 'B'], {
+          history: [
+            { kind: 'new', memberUids: ['B'] },
+            { kind: 'first', memberUids: ['A'] },
+          ],
+        }),
+      ],
+      { lastKind: 'new' }
+    );
+    expect(result?.kind).toBe('reminder');
+  });
+
+  it('reminds once, with only the people not yet contacted, when nobody is new', () => {
+    const roles = [
+      role('r1', ['A', 'B', 'C'], { history: [{ kind: 'first', memberUids: ['A', 'B', 'C'] }], contacted: ['A'] }),
+      role('r2', ['D'], { history: [{ kind: 'first', memberUids: ['D'] }], contacted: ['D'] }),
+    ];
+    const result = pick(roles, { lastKind: 'new' });
+    expect(result?.kind).toBe('reminder');
+    expect(result?.newCount).toBe(0);
+    expect(result?.sections.map((section) => [section.roleUid, uids(section.cards), uids(section.matches)])).toEqual([
+      ['r1', ['B', 'C'], ['A', 'B', 'C']],
+    ]);
+    expect(pick(roles, { lastKind: 'reminder' })).toBeNull();
+  });
+
+  it('sends no reminder when everyone has been contacted', () => {
     expect(
-      pick([{ kind: 'first', memberUids: ['a', 'b', 'c', 'd'] }], { contacted: new Set(['a', 'b', 'c', 'd']) })
+      pick([role('r1', ['A'], { history: [{ kind: 'first', memberUids: ['A'] }], contacted: ['A'] })], {
+        lastKind: 'first',
+      })
     ).toBeNull();
   });
 
-  it('reads only the newest email for the reminder rule, whatever came before', () => {
-    const result = pick([
-      { kind: 'new', memberUids: ['d'] },
-      { kind: 'reminder', memberUids: ['a'] },
-      { kind: 'first', memberUids: ['a', 'b', 'c'] },
-    ]);
-    expect(result?.kind).toBe('reminder');
+  it('sends a new email again after a reminder once someone new appears', () => {
+    const result = pick([role('r1', ['A', 'B'], { history: [{ kind: 'reminder', memberUids: ['A'] }] })], {
+      lastKind: 'reminder',
+    });
+    expect(result?.kind).toBe('new');
+    expect(uids(result?.sections[0].cards ?? [])).toEqual(['B', 'A']);
   });
 });
 

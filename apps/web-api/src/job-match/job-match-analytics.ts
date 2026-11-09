@@ -14,11 +14,13 @@ export function trackSuggestedCandidatesEmailSent(
   logger: Logger,
   args: {
     recipientUid: string;
-    roleUid: string;
+    /** The roles the email covers, in its order (LAB-3139: one email per team). */
+    roleUids: string[];
     teamUid: string;
     runUid: string;
     /** first | new | reminder (LAB-2837 feedback). */
     kind: string;
+    /** Distinct members across the roles' matches. */
     candidateCount: number;
   }
 ): void {
@@ -26,7 +28,10 @@ export function trackSuggestedCandidatesEmailSent(
     name: ANALYTICS_EVENTS.JOB_BOARD.SUGGESTED_CANDIDATES_EMAIL_SENT,
     distinctId: args.recipientUid,
     properties: {
-      role_uid: args.roleUid,
+      /* The first role, so insights built on `role_uid` before LAB-3139 keep a value. */
+      role_uid: args.roleUids[0] ?? null,
+      role_uids: args.roleUids,
+      role_count: args.roleUids.length,
       team_uid: args.teamUid,
       run_uid: args.runUid,
       email_kind: args.kind,
