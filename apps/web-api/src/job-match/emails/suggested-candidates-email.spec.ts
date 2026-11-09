@@ -141,11 +141,16 @@ describe('renderSuggestedCandidatesEmail', () => {
       expect(visible).toContain('Kofi Mensah Strong match Infrastructure Engineer · Filebase, Toronto, Canada');
     });
 
-    it('marks only a Strong match, with a solid pill and no gradient', () => {
+    it('marks every card: Strong solid blue, Good a light tint, no gradient', () => {
       expect(html.match(/>Strong match<\/span>/g)).toHaveLength(4);
-      expect(html).not.toContain('>Good match<');
+      expect(html.match(/>Good match<\/span>/g)).toHaveLength(2);
       expect(html).not.toContain('gradient');
-      expect(html).toMatch(/background-color: #1b4dff; padding: 2px 6px; border-radius: 26px;[^>]*>Strong match</);
+      expect(html).toMatch(
+        /background-color: #1b4dff; padding: 2px 6px; border-radius: 26px;[^>]*color: #ffffff;[^>]*>Strong match</
+      );
+      expect(html).toMatch(
+        /background-color: #e8edff; padding: 2px 6px; border-radius: 26px;[^>]*color: #1b4dff;[^>]*>Good match</
+      );
     });
 
     it('ends each role with "All N matches for this role" and the email with one Review all button', () => {
@@ -167,7 +172,7 @@ describe('renderSuggestedCandidatesEmail', () => {
       expect(text).toContain(
         'Inês Carvalho · Strong match\nSenior Engineer · Saturn, Porto, Portugal\nRuns Saturn’s retrieval path; four years on Cloudflare’s edge cache.\n5 of 5 requirements\nView profile: '
       );
-      expect(text).toContain('Tomás Rivera\n');
+      expect(text).toContain('Tomás Rivera · Good match\n');
       expect(text).toContain(`Review all 12 candidates: ${BASE}/teams/team-1/applicants?role=role-1&tab=suggested&`);
     });
   });
@@ -449,6 +454,10 @@ describe('renderSuggestedCandidatesEmail', () => {
     expect(html.startsWith('<!DOCTYPE html>')).toBe(true);
     expect(html).toContain('<table role="presentation"');
     expect(html).toMatch(/class="email-container" role="presentation" width="640"/);
+    // Intro, role sections and button share one 520px column on desktop (Figma, widened 2026-11-09).
+    expect(html.match(/class="email-fluid" role="presentation" width="(\d+)"/g)).toEqual(
+      Array(3).fill('class="email-fluid" role="presentation" width="520"')
+    );
     expect(html).toContain('@media only screen and (max-width: 640px)');
     expect(html).not.toMatch(/display:\s*(flex|grid)/);
     expect(html.match(/<link /g)).toHaveLength(1);

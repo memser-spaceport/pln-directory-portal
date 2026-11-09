@@ -42,7 +42,7 @@ Each week, a team lead SHALL get at most one suggested-candidates email per team
 
 ### Requirement: Role sections and cards
 
-Each role section SHALL show the role title with a "View role" link to the public posting, and "N matches · none have applied" (or "1 has applied" / "N have applied", counting matched members who applied to the role). It SHALL then show up to two cards and an "All N matches for this role" link to the role's Suggested tab. A card SHALL show the member's photo, or initials when they have none, their name, a solid "Strong match" pill for a Strong match only, "role · company, location", one "Why" line (the run's blurb), "N of M requirements", and "View profile". The email SHALL end with one "Review all N candidates" button that opens the first role's Suggested tab, then email preferences and unsubscribe. It SHALL have no Edit criteria link.
+Each role section SHALL show the role title with a "View role" link to the public posting, and "N matches · none have applied" (or "1 has applied" / "N have applied", counting matched members who applied to the role). It SHALL then show up to two cards and an "All N matches for this role" link to the role's Suggested tab. A card SHALL show the member's photo, or initials when they have none, their name, a match pill ("Strong match" in solid brand blue, "Good match" in a light brand tint), "role · company, location", one "Why" line (the run's blurb), "N of M requirements", and "View profile". The email SHALL end with one "Review all N candidates" button that opens the first role's Suggested tab, then email preferences and unsubscribe. It SHALL have no Edit criteria link.
 
 #### Scenario: A lead reads a card
 

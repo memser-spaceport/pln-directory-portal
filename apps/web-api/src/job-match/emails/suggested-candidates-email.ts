@@ -88,10 +88,19 @@ type RoleUrls = { role: string; all: string; profile: (memberUid: string) => str
 
 const EMAIL = 'renderSuggestedCandidatesEmail';
 
-/** The Strong match pill (LAB-3139): a solid fill, since some clients drop gradients. Only Strong is marked. */
-const isStrong = (candidate: Candidate) => candidate.label === 'Strong match';
+/**
+ * The match pill (LAB-3139, Figma 13252:1368): Strong is solid brand blue with white text, Good is a light brand
+ * tint with blue text. Solid fills only, since some clients drop gradients.
+ */
+const PILL: Record<Candidate['label'], { background: string; color: string }> = {
+  'Strong match': { background: COLORS.link, color: '#ffffff' },
+  'Good match': { background: '#e8edff', color: COLORS.link },
+};
 
 /** Initials-avatar tints from the Figma (blue, green, peach), picked by name so a person keeps theirs. */
+/** Desktop width of the intro, the role sections and the button (Figma 13252:1368, widened by Polina 2026-11-09); fluid on a phone. */
+export const CONTENT_WIDTH = 520;
+
 const AVATAR_TINTS = ['#dee8ff', '#dcf4e7', '#faeadc'] as const;
 
 type UtmContent = 'profile' | 'all' | 'role' | 'review_all';
@@ -167,15 +176,15 @@ export function renderSuggestedCandidatesEmail(input: SuggestedCandidatesEmailIn
             'margin: 4px 0 0 0; text-align: center;'
           ),
         ].join('\n'),
-        { padding: '24px', width: 418, align: 'center' }
+        { padding: '24px', width: CONTENT_WIDTH, align: 'center' }
       ),
       row(roles.map((role) => roleSection(role, urls(role))).join(`\n${spacer(40)}\n`), {
         padding: '0 24px',
-        width: 386,
+        width: CONTENT_WIDTH,
       }),
       row(button(reviewAllUrl, reviewAllText, { fullOnPhone: true }), {
         padding: '24px 24px 24px 24px',
-        width: 386,
+        width: CONTENT_WIDTH,
         align: 'center',
       }),
     ],
@@ -299,7 +308,7 @@ function roleText(role: Role, url: RoleUrls): string[] {
       const why = oneLine(candidate.blurb);
       const requirements = requirementsText(candidate.requirements);
       return [
-        isStrong(candidate) ? `${oneLine(candidate.name)} · ${candidate.label}` : oneLine(candidate.name),
+        `${oneLine(candidate.name)} · ${candidate.label}`,
         ...(line ? [line] : []),
         ...(why ? [why] : []),
         ...(requirements ? [requirements] : []),
@@ -379,14 +388,15 @@ function card(candidate: Candidate, profileUrl: string): string {
   const why = oneLine(candidate.blurb);
   const requirements = requirementsText(candidate.requirements);
 
-  const badge = isStrong(candidate)
+  const pill = PILL[candidate.label];
+  const badge = pill
     ? `<td valign="top" align="right" style="padding-left: 10px; padding-top: 1px; white-space: nowrap;"><span style="display: inline-block; background-color: ${
-        COLORS.link
+        pill.background
       }; padding: 2px 6px; border-radius: 26px; ${font({
         size: 12,
         line: 16,
         weight: 500,
-        color: '#ffffff',
+        color: pill.color,
         tracking: -0.2,
       })} white-space: nowrap;">${escapeHtml(candidate.label)}</span></td>`
     : '';

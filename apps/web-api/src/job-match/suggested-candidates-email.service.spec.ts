@@ -460,8 +460,10 @@ describe('SuggestedCandidatesEmailService', () => {
     expect(rust).toBeLessThan(backend);
     expect(backend).toBeLessThan(old);
     // In role-1, Bob is new and comes before Ada, whom L1 has already seen.
-    expect(at('\nBob\n', backend)).toBeLessThan(at('\nAda · Strong match\n', backend));
-    const cardLine = (name: string) => new RegExp(`^${name}( · Strong match)?$`, 'm');
+    const bob = at('\nBob · Good match\n', backend);
+    expect(bob).toBeGreaterThan(backend);
+    expect(bob).toBeLessThan(at('\nAda · Strong match\n', backend));
+    const cardLine = (name: string) => new RegExp(`^${name}( · (Strong|Good) match)?$`, 'm');
     for (const name of ['Cy', 'Ed', 'Di']) expect(text).not.toMatch(cardLine(name));
     expect(text).not.toMatch(/NOT_LOOKING|ACTIVELY_LOOKING|looking/i);
     expect(text).toContain('Hi Lead,');
@@ -474,9 +476,9 @@ describe('SuggestedCandidatesEmailService', () => {
     await service.sendForRun('run-1');
     const { text, html } = emails(aws)[0];
     expect(text).toContain(
-      '\nBob\nEngineer · Saturn, Boston, United States\nB blurb\n1 of 2 requirements\nView profile: '
+      '\nBob · Good match\nEngineer · Saturn, Boston, United States\nB blurb\n1 of 2 requirements\nView profile: '
     );
-    expect(text).toContain('\nGus\nEngineer · Germany\nG blurb\n1 of 2 requirements\nView profile: ');
+    expect(text).toContain('\nGus · Good match\nEngineer · Germany\nG blurb\n1 of 2 requirements\nView profile: ');
     expect(text).toContain('\nHal · Strong match\nEngineer\nH blurb\n');
     expect(html).toContain('src="https://img/B"');
     // The newer CRITERIA row belongs to an older posting (another hash): its label is never used.
