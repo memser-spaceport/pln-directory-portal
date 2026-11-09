@@ -1,0 +1,4 @@
+export const LabosDigestQueryKeys = {
+  GET_LABOS_DIGEST: 'GET_LABOS_DIGEST',
+  GET_LABOS_DIGEST_NEWS: 'GET_LABOS_DIGEST_NEWS',
+};

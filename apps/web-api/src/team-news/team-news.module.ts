@@ -6,6 +6,9 @@ import { PushNotificationsModule } from '../push-notifications/push-notification
 import { FollowsModule } from '../follows/follows.module';
 import { TeamNewsController } from './team-news.controller';
 import { TeamNewsServiceController } from './team-news-service.controller';
+import { LabosDigestAdminController } from './labos-digest-admin.controller';
+import { LabosDigestServiceController } from './labos-digest-service.controller';
+import { LabosDigestService } from './labos-digest.service';
 import { TeamNewsService } from './team-news.service';
 import { TeamNewsQueryService } from './team-news-query.service';
 import { TeamNewsEnrichmentService } from './team-news-enrichment.service';
@@ -25,8 +28,14 @@ import { NewsTagVocabularyService } from './news-tag-vocabulary.service';
     PushNotificationsModule,
     FollowsModule,
   ],
-  controllers: [TeamNewsController, TeamNewsServiceController],
+  controllers: [
+    TeamNewsController,
+    TeamNewsServiceController,
+    LabosDigestAdminController,
+    LabosDigestServiceController,
+  ],
   providers: [
+    LabosDigestService,
     TeamNewsService,
     TeamNewsQueryService,
     TeamNewsEnrichmentService,

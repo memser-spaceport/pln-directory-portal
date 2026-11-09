@@ -427,7 +427,13 @@ export const TeamNewsDigestPicksRequestSchema = z.object({
   sinceCreatedAt: z.string().optional(),
   untilCreatedAt: z.string().optional(),
   limit: z.number().int().min(1).max(3).optional().default(3),
+  // The forum digest job reports which frequency is about to send, and the lead
+  // that frequency already showed. Older callers omit both.
+  frequency: z.enum(['daily', 'weekly']).optional(),
+  lastShownLeadUid: z.string().nullable().optional(),
 });
+
+export const LabosDigestPickSourceSchema = z.enum(['admin', 'ai']);
 
 export const TeamNewsDigestPicksResponseSchema = z.object({
   generatedAt: z.string(),
@@ -435,9 +441,15 @@ export const TeamNewsDigestPicksResponseSchema = z.object({
   until: z.string(),
   windowCount: z.number().int().min(0),
   picks: z.record(z.string(), z.array(TeamNewsItemSchema)),
-  // Lead of the home feed's Top Stories band (editorialRank 1, last 14 days),
-  // shown as the digest's "Top story" card. Null when there is none.
+  // Lead shown as the digest's "Top story" card. The first admin pick when an
+  // override is set, otherwise editorial rank 1. Null when there is none.
   topStory: TeamNewsItemSchema.nullable(),
+  topStorySource: LabosDigestPickSourceSchema,
+  // Ordered Top stories (up to 3). The email highlights topStory only.
+  topStories: z.array(TeamNewsItemSchema),
+  // Set when topStorySource is admin. A digest send deletes the override only
+  // when this value still matches the row.
+  overrideUpdatedAt: z.string().nullable(),
 });
 
 // GET /v1/team-news/latest — ingestion time of the newest news item the public
@@ -479,6 +491,154 @@ export type TeamNewsRecentQuery = z.infer<typeof TeamNewsRecentQueryParams>;
 export type TeamNewsRecentResponse = z.infer<typeof TeamNewsRecentResponseSchema>;
 export type TeamNewsDigestPicksRequest = z.infer<typeof TeamNewsDigestPicksRequestSchema>;
 export type TeamNewsDigestPicksResponse = z.infer<typeof TeamNewsDigestPicksResponseSchema>;
+
+export const LabosDigestFrequencySchema = z.enum(['daily', 'weekly']);
+
+const PageParam = z
+  .preprocess((v) => (v === undefined || v === '' ? undefined : Number(v)), z.number().int().min(1))
+  .optional()
+  .default(1);
+
+const LimitParam = z
+  .preprocess((v) => (v === undefined || v === '' ? undefined : Number(v)), z.number().int().min(1).max(100))
+  .optional()
+  .default(50);
+
+export const LabosDigestStorySchema = z.object({
+  position: z.number().int().min(1),
+  source: LabosDigestPickSourceSchema,
+  uid: z.string(),
+  title: z.string(),
+  summary: z.string().nullable(),
+  sourceDomain: z.string().nullable(),
+  sourceUrl: z.string(),
+  eventDate: z.string(),
+  tags: z.array(z.string()),
+  teamUid: z.string(),
+  teamName: z.string(),
+});
+
+export const LabosDigestFrequencyPreviewSchema = z.object({
+  frequency: LabosDigestFrequencySchema,
+  leadIncluded: z.boolean(),
+  leadUid: z.string().nullable(),
+  lastLeadNewsItemUid: z.string().nullable(),
+});
+
+export const LabosDigestViewSchema = z.object({
+  source: LabosDigestPickSourceSchema,
+  stories: z.array(LabosDigestStorySchema),
+  daily: LabosDigestFrequencyPreviewSchema,
+  weekly: LabosDigestFrequencyPreviewSchema,
+  overrideUpdatedAt: z.string().nullable(),
+});
+
+export const SaveLabosDigestPicksSchema = z.object({
+  newsItemUids: z.array(z.string().min(1)).min(1).max(3),
+});
+
+export const LabosDigestNewsQuerySchema = z.object({
+  page: PageParam,
+  limit: LimitParam,
+  from: z.string().optional(),
+  to: z.string().optional(),
+  tags: ListParam,
+});
+
+export const LabosDigestTopStoryHistorySchema = z.object({
+  frequency: LabosDigestFrequencySchema,
+  sentAt: z.string(),
+  position: z.number().int().min(1),
+  isLead: z.boolean(),
+});
+
+export const LabosDigestFoundNewsSchema = z.object({
+  uid: z.string(),
+  title: z.string(),
+  source: z.string().nullable(),
+  date: z.string(),
+  tags: z.array(z.string()),
+  wasTopStory: z.boolean(),
+  topStoryHistory: z.array(LabosDigestTopStoryHistorySchema),
+});
+
+export const LabosDigestFoundNewsResponseSchema = z.object({
+  page: z.number().int(),
+  limit: z.number().int(),
+  total: z.number().int(),
+  items: z.array(LabosDigestFoundNewsSchema),
+});
+
+export const LabosDigestServiceNewsSchema = z.object({
+  uid: z.string(),
+  title: z.string(),
+  summary: z.string().nullable(),
+  source: z.string().nullable(),
+  link: z.string(),
+  date: z.string(),
+  tags: z.array(z.string()),
+  team: z.object({
+    uid: z.string(),
+    name: z.string(),
+  }),
+});
+
+export const LabosDigestServiceNewsResponseSchema = z.object({
+  page: z.number().int(),
+  limit: z.number().int(),
+  total: z.number().int(),
+  items: z.array(LabosDigestServiceNewsSchema),
+});
+
+export const LabosDigestSendSchema = z.object({
+  uid: z.string(),
+  frequency: LabosDigestFrequencySchema,
+  sentAt: z.string(),
+  source: LabosDigestPickSourceSchema,
+  channel: z.string(),
+  stories: z.array(LabosDigestStorySchema),
+});
+
+export const LabosDigestSendListSchema = z.object({
+  page: z.number().int(),
+  limit: z.number().int(),
+  total: z.number().int(),
+  items: z.array(LabosDigestSendSchema),
+});
+
+export const LabosDigestSendsQuerySchema = z.object({
+  page: PageParam,
+  limit: LimitParam,
+  frequency: LabosDigestFrequencySchema.optional(),
+});
+
+export const RecordLabosDigestSendSchema = z.object({
+  frequency: LabosDigestFrequencySchema,
+  sentAt: z.string(),
+  source: LabosDigestPickSourceSchema,
+  leadNewsItemUid: z.string().nullable(),
+  lastShownLeadUid: z.string().nullable(),
+  storyUids: z.array(z.string()).max(3),
+  overrideUpdatedAt: z.string().nullable(),
+});
+
+export const RecordLabosDigestSendResponseSchema = z.object({
+  uid: z.string(),
+  clearedOverride: z.boolean(),
+});
+
+export type LabosDigestView = z.infer<typeof LabosDigestViewSchema>;
+export type LabosDigestStory = z.infer<typeof LabosDigestStorySchema>;
+export type SaveLabosDigestPicks = z.infer<typeof SaveLabosDigestPicksSchema>;
+export type LabosDigestNewsQuery = z.infer<typeof LabosDigestNewsQuerySchema>;
+export type LabosDigestFoundNewsResponse = z.infer<typeof LabosDigestFoundNewsResponseSchema>;
+export type LabosDigestServiceNewsResponse = z.infer<typeof LabosDigestServiceNewsResponseSchema>;
+export type LabosDigestSendList = z.infer<typeof LabosDigestSendListSchema>;
+export type LabosDigestSendsQuery = z.infer<typeof LabosDigestSendsQuerySchema>;
+export type RecordLabosDigestSend = z.infer<typeof RecordLabosDigestSendSchema>;
+export type RecordLabosDigestSendResponse = z.infer<typeof RecordLabosDigestSendResponseSchema>;
+export type LabosDigestFrequency = z.infer<typeof LabosDigestFrequencySchema>;
+export type LabosDigestPickSource = z.infer<typeof LabosDigestPickSourceSchema>;
 export type TeamNewsLatestResponse = z.infer<typeof TeamNewsLatestResponseSchema>;
 export type TeamNewsDiscussion = z.infer<typeof TeamNewsDiscussionSchema>;
 export type CreateTeamNewsDiscussionRequest = z.infer<typeof CreateTeamNewsDiscussionRequestSchema>;

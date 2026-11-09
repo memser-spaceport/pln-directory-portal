@@ -6,6 +6,7 @@ import { IrlGatheringMenu } from './components/IrlGatheringMenu/IrlGatheringMenu
 import { DealsMenu } from './components/DealsMenu/DealsMenu';
 import { FounderGuidesMenu } from './components/FounderGuidesMenu/FounderGuidesMenu';
 import { AiAppResourcesMenu } from './components/AiAppResourcesMenu/AiAppResourcesMenu';
+import { LabosDigestMenu } from './components/LabosDigestMenu/LabosDigestMenu';
 import { canManageAiAppResources } from '../../screens/ai-app-resources/utils';
 
 export function Menu() {
@@ -20,6 +21,7 @@ export function Menu() {
       {canViewDemoDays && <DemoDaysMenu />}
       {isDirectoryAdmin && <IrlGatheringMenu />}
       {isDirectoryAdmin && <DealsMenu />}
+      {isDirectoryAdmin && <LabosDigestMenu />}
       {isDirectoryAdmin && <FounderGuidesMenu />}
       {canManageAiAppResources(hasPermission) && <AiAppResourcesMenu />}
     </ul>
