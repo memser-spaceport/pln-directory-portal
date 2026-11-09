@@ -288,7 +288,7 @@ export class LabosDigestService {
     stories: LabosDigestStory[],
     source: LabosDigestPickSourceName,
     states: Array<{ frequency: LabosDigestFrequency; lastLeadNewsItemUid: string | null }>
-  ) {
+  ): LabosDigestView['daily'] {
     const state = states.find((row) => row.frequency === toFrequency(frequency));
     const first = stories[0] ?? null;
     const lastLeadNewsItemUid = state?.lastLeadNewsItemUid ?? null;
@@ -350,7 +350,7 @@ const sendInclude = {
 
 type SendRow = Prisma.LabosDigestSendGetPayload<{ include: typeof sendInclude }>;
 
-function toSend(row: SendRow) {
+function toSend(row: SendRow): LabosDigestSendList['items'][number] {
   const source = fromSource(row.source);
   return {
     uid: row.id,
