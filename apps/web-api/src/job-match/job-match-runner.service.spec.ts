@@ -733,11 +733,15 @@ describe('JobMatchRunner', () => {
       expect(events.emit.mock.invocationCallOrder[0]).toBeGreaterThan(completedOrder);
     });
 
-    it('does not emit for a team-limited run', async () => {
-      const { runner, events, settle } = runnerFor();
+    it('emits after a team-limited run is marked COMPLETED', async () => {
+      const { runner, events, jobMatchRun, settle } = runnerFor();
       await runner.start(['team-1']);
       await settle();
-      expect(events.emit).not.toHaveBeenCalled();
+      expect(jobMatchRun.update).toHaveBeenLastCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: 'COMPLETED' }) })
+      );
+      expect(events.emit).toHaveBeenCalledTimes(1);
+      expect(events.emit).toHaveBeenCalledWith('job-match.run-completed', expect.objectContaining({ runUid: 'run-1' }));
     });
 
     it('does not emit for a failed run', async () => {
