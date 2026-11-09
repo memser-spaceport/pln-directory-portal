@@ -1,14 +1,17 @@
 # suggested-candidates-email Specification
 
 ## Purpose
+
 The suggested-candidates email tells a team lead about job-match candidates for a live role.
 
 ## Requirements
 
 ### Requirement: BCC LabOS on the team-lead email
+
 When `LABOS_EMAIL` is set, each suggested-candidates email to a team lead SHALL also go to that address as BCC. The BCC address SHALL NOT appear in the message headers. When `LABOS_EMAIL` is empty or unset, the email SHALL have no BCC.
 
 #### Scenario: LabOS is copied
+
 - **GIVEN** `LABOS_EMAIL` is `labos@example.com`
 - **WHEN** a suggested-candidates email is sent to a team lead
 - **THEN** the lead is the To address
@@ -16,6 +19,54 @@ When `LABOS_EMAIL` is set, each suggested-candidates email to a team lead SHALL 
 - **AND** the message headers have no Bcc line
 
 #### Scenario: LabOS address is not set
+
 - **GIVEN** `LABOS_EMAIL` is empty or unset
 - **WHEN** a suggested-candidates email is sent to a team lead
 - **THEN** the email has no BCC
+
+### Requirement: One weekly email per team
+
+Each week, a team lead SHALL get at most one suggested-candidates email per team they lead. It SHALL cover at most the team's three most recently published live roles that have someone to suggest. Roles SHALL appear newest first, and each SHALL show at most two candidates. "Not looking" members SHALL never be named or counted.
+
+#### Scenario: Team with two roles
+
+- **GIVEN** a team has 2 live roles with suggested candidates
+- **WHEN** the weekly email runs
+- **THEN** each opted-in lead of the team gets one email covering both roles
+
+#### Scenario: Team with five roles
+
+- **GIVEN** a team has 5 live roles with suggested candidates
+- **WHEN** the weekly email runs
+- **THEN** the email covers only the 3 most recently published roles
+
+### Requirement: Role sections and cards
+
+Each role section SHALL show the role title with a "View role" link to the public posting, and "N matches · none have applied" (or "1 has applied" / "N have applied", counting matched members who applied to the role). It SHALL then show up to two cards and an "All N matches for this role" link to the role's Suggested tab. A card SHALL show the member's photo, or initials when they have none, their name, a match pill ("Strong match" in solid brand blue, "Good match" in a light brand tint), "role · company, location", one "Why" line (the run's blurb), "N of M requirements", and "View profile". The email SHALL end with one "Review all N candidates" button that opens the first role's Suggested tab, then email preferences and unsubscribe. It SHALL have no Edit criteria link.
+
+#### Scenario: A lead reads a card
+
+- **GIVEN** a suggested member with a blurb who meets 4 of the role's 5 requirements
+- **WHEN** the lead reads the email
+- **THEN** the card shows the blurb as one line and "4 of 5 requirements"
+
+### Requirement: First, new or reminder
+
+Which email a lead gets SHALL be judged against the members already emailed to that lead for each role.
+
+- When the lead has had no email for any of the roles, the email SHALL be a first email naming everyone.
+- When any role has someone the lead was never emailed about, the email SHALL be a new email. Its subject and intro SHALL count only the new people, and the new people SHALL come first in their role.
+- When nobody is new, the email SHALL be a reminder. It SHALL say "No new members matched your open roles at <team> since last week. Here are your strongest matches." and show the people not yet contacted, each with their "Why" line. A reminder SHALL NOT follow a reminder, and SHALL NOT be sent when everyone has been contacted.
+
+#### Scenario: No new candidates since last week
+
+- **GIVEN** the lead was emailed about everyone now suggested, and their last email was not a reminder
+- **WHEN** the weekly email runs
+- **THEN** the lead gets a reminder showing each waiting candidate with a "Why" line
+- **AND** the next week, with still nobody new, the lead gets no email
+
+#### Scenario: Some roles have new people
+
+- **GIVEN** one role has 1 new person and another has nobody new
+- **WHEN** the weekly email runs
+- **THEN** the lead gets one new email covering both roles, counting 1 new member
