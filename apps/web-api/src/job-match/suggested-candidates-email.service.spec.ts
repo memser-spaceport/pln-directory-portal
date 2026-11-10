@@ -468,17 +468,16 @@ describe('SuggestedCandidatesEmailService', () => {
     expect(text).not.toMatch(/NOT_LOOKING|ACTIVELY_LOOKING|looking/i);
     expect(text).toContain('Hi Lead,');
     expect(text).toContain('at Acme Labs since last week');
-    expect(text).toContain('Review all 4 candidates: ');
+    expect(text).not.toContain('Review all');
   });
 
-  it('gives each card the person line, the Why line and the requirements count', async () => {
+  it('gives each card the person line and the Why line, with no requirements count (LAB-3195)', async () => {
     const { service, aws } = world();
     await service.sendForRun('run-1');
     const { text, html } = emails(aws)[0];
-    expect(text).toContain(
-      '\nBob · Good match\nEngineer · Saturn, Boston, United States\nB blurb\n1 of 2 requirements\nView profile: '
-    );
-    expect(text).toContain('\nGus · Good match\nEngineer · Germany\nG blurb\n1 of 2 requirements\nView profile: ');
+    expect(text).toContain('\nBob · Good match\nEngineer · Saturn, Boston, United States\nB blurb\nView profile: ');
+    expect(text).toContain('\nGus · Good match\nEngineer · Germany\nG blurb\nView profile: ');
+    expect(`${html}\n${text}`).not.toMatch(/\d+ of \d+ requirements?/);
     expect(text).toContain('\nHal · Strong match\nEngineer\nH blurb\n');
     expect(html).toContain('src="https://img/B"');
     // The newer CRITERIA row belongs to an older posting (another hash): its label is never used.

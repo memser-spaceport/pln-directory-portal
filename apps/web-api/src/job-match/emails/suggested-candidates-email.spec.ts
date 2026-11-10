@@ -134,9 +134,9 @@ describe('renderSuggestedCandidatesEmail', () => {
       expect(visible).toContain('5 matches · none have applied');
     });
 
-    it('draws each card: name, Strong match, role · company and location, the Why line, the count, View profile', () => {
+    it('draws each card: name, Strong match, role · company and location, the Why line, View profile', () => {
       expect(visible).toContain(
-        'Inês Carvalho Strong match Senior Engineer · Saturn, Porto, Portugal Runs Saturn’s retrieval path; four years on Cloudflare’s edge cache. 5 of 5 requirements View profile'
+        'Inês Carvalho Strong match Senior Engineer · Saturn, Porto, Portugal Runs Saturn’s retrieval path; four years on Cloudflare’s edge cache. View profile'
       );
       expect(visible).toContain('Kofi Mensah Strong match Infrastructure Engineer · Filebase, Toronto, Canada');
     });
@@ -153,11 +153,25 @@ describe('renderSuggestedCandidatesEmail', () => {
       );
     });
 
-    it('ends each role with "All N matches for this role" and the email with one Review all button', () => {
-      expect(visible).toContain('All 5 matches for this role');
-      expect(visible).toContain('All 4 matches for this role');
-      expect(visible).toContain('All 3 matches for this role');
-      expect(html.match(/>Review all 12 candidates<\/a>/g)).toHaveLength(1);
+    it('shows no "N of M requirements" line on any card (LAB-3195)', () => {
+      expect(`${html}\n${text}`).not.toMatch(/\d+ of \d+ requirements?/);
+    });
+
+    it('ends each role with an "All N matches for this role" button, and has no Review all button (LAB-3195)', () => {
+      const buttons = html.match(/class="email-button-full"[\s\S]*?<\/table>/g) ?? [];
+      expect(buttons).toHaveLength(3);
+      expect(buttons[0]).toContain('>All 5 matches for this role</a>');
+      expect(buttons[1]).toContain('>All 4 matches for this role</a>');
+      expect(buttons[2]).toContain('>All 3 matches for this role</a>');
+      for (const button of buttons) expect(button).toContain('bgcolor="#1b4dff"');
+      expect(`${html}\n${text}`).not.toMatch(/Review all/);
+    });
+
+    it('puts each role’s button at the end of its section, with no button after the last role (LAB-3195)', () => {
+      const lastButton = visible.lastIndexOf('All 3 matches for this role');
+      expect(lastButton).toBeGreaterThan(visible.indexOf('Yuki Tanaka'));
+      expect(visible.indexOf('Product Designer')).toBeGreaterThan(visible.indexOf('All 5 matches for this role'));
+      expect(visible.slice(lastButton + 'All 3 matches for this role'.length)).not.toMatch(/matches? for this role/);
     });
 
     it('has no Edit criteria and no "Why we suggested" checklist', () => {
@@ -170,10 +184,14 @@ describe('renderSuggestedCandidatesEmail', () => {
       );
       expect(text).toContain('Senior Engineer\nView role: ');
       expect(text).toContain(
-        'Inês Carvalho · Strong match\nSenior Engineer · Saturn, Porto, Portugal\nRuns Saturn’s retrieval path; four years on Cloudflare’s edge cache.\n5 of 5 requirements\nView profile: '
+        'Inês Carvalho · Strong match\nSenior Engineer · Saturn, Porto, Portugal\nRuns Saturn’s retrieval path; four years on Cloudflare’s edge cache.\nView profile: '
       );
       expect(text).toContain('Tomás Rivera · Good match\n');
-      expect(text).toContain(`Review all 12 candidates: ${BASE}/teams/team-1/applicants?role=role-1&tab=suggested&`);
+      expect(text).toContain(
+        `All 5 matches for this role: ${BASE}/teams/team-1/applicants?role=role-1&tab=suggested&${UTM('all', 'role-1')}`
+      );
+      expect(text).toContain(`All 3 matches for this role: ${BASE}/teams/team-1/applicants?role=role-3&tab=suggested&`);
+      expect(text).not.toContain('Review all');
     });
   });
 
@@ -193,14 +211,12 @@ describe('renderSuggestedCandidatesEmail', () => {
       expect(html).toContain(attr(`${BASE}/teams/team-1/applicants?role=role-3&tab=suggested&${UTM('all', 'role-3')}`));
     });
 
-    it('opens the first role’s Suggested tab from Review all', () => {
-      const { html } = renderSuggestedCandidatesEmail(baseInput());
-      expect(html).toContain(
-        attr(`${BASE}/teams/team-1/applicants?role=role-1&tab=suggested&${UTM('review_all', 'role-1')}`)
-      );
+    it('has no Review all link (LAB-3195)', () => {
+      const { html, text } = renderSuggestedCandidatesEmail(baseInput());
+      expect(`${html}\n${text}`).not.toContain('review_all');
     });
 
-    it('stretches Review all to the column on a phone', () => {
+    it('stretches each role’s button to the column on a phone', () => {
       const { html } = renderSuggestedCandidatesEmail(baseInput());
       expect(html).toContain('.email-button-full { width: 100% !important; }');
       expect(html).toContain('<table role="presentation" class="email-button-full"');
@@ -239,7 +255,7 @@ describe('renderSuggestedCandidatesEmail', () => {
       expect(visibleText(html)).toContain(
         '3 new members of the Protocol Labs network matched your open roles at Acme since last week. Here are the strongest for each. None have applied yet.'
       );
-      expect(visibleText(html)).toContain('Review all 12 candidates');
+      expect(visibleText(html)).toContain('All 5 matches for this role');
     });
 
     it('new: one person, one role of several', () => {
@@ -261,6 +277,11 @@ describe('renderSuggestedCandidatesEmail', () => {
       );
       expect(visible).toContain('Runs Saturn’s retrieval path');
       expect(html.match(/>View profile<\/a>/g)).toHaveLength(6);
+      // Left-aligned under the Why line since LAB-3195 dropped the requirements count from its left (Polina).
+      const profileCells =
+        html.match(/<td valign="middle" align="(\w+)"[^>]*>(?:(?!<\/td>)[\s\S])*>View profile</g) ?? [];
+      expect(profileCells).toHaveLength(6);
+      for (const cell of profileCells) expect(cell).toContain('align="left"');
     });
 
     it('names the role when the email covers one', () => {
@@ -304,6 +325,17 @@ describe('renderSuggestedCandidatesEmail', () => {
         'Saturn, Porto, Portugal'
       );
       expect(personLine({ role: null, company: null, location: null })).toBe('');
+    });
+
+    it('reads "View 1 match" on the button of a role with one match (LAB-3195)', () => {
+      const { html, text } = renderSuggestedCandidatesEmail(
+        baseInput({ roles: [role({ matchCount: 1, candidates: [candidate()] })], memberCount: 1 })
+      );
+      const buttons = html.match(/class="email-button-full"[\s\S]*?<\/table>/g) ?? [];
+      expect(buttons).toHaveLength(1);
+      expect(buttons[0]).toContain('>View 1 match</a>');
+      expect(text).toContain('\nView 1 match: ');
+      expect(`${html}\n${text}`).not.toMatch(/All 1 match/);
     });
 
     it('draws no Why line and no count when the run had none', () => {
@@ -454,9 +486,9 @@ describe('renderSuggestedCandidatesEmail', () => {
     expect(html.startsWith('<!DOCTYPE html>')).toBe(true);
     expect(html).toContain('<table role="presentation"');
     expect(html).toMatch(/class="email-container" role="presentation" width="640"/);
-    // Intro, role sections and button share one 520px column on desktop (Figma, widened 2026-11-09).
+    // Intro and role sections (each with its button, LAB-3195) share one 520px column on desktop (Figma, widened 2026-11-09).
     expect(html.match(/class="email-fluid" role="presentation" width="(\d+)"/g)).toEqual(
-      Array(3).fill('class="email-fluid" role="presentation" width="520"')
+      Array(2).fill('class="email-fluid" role="presentation" width="520"')
     );
     expect(html).toContain('@media only screen and (max-width: 640px)');
     expect(html).not.toMatch(/display:\s*(flex|grid)/);
