@@ -3,7 +3,7 @@
 A stored, per-member profile of topics, entities and expertise (LAB-3122), built daily from the member signal log
 ([MEMBER_SIGNALS.md](./MEMBER_SIGNALS.md)) and the interests members declare. v0 only collects: **no member-facing
 endpoint returns it, and one feature reads it, behind a flag that is off by default**
-([News starting tags](#news-starting-tags)), until the LAB-3124 pilot passes. Spec: `openspec/specs/member-interest-profile`.
+([News starting tags](#news-starting-tags)). Spec: `openspec/specs/member-interest-profile`.
 
 Code: `apps/web-api/src/member-interest-profile/`. All tunables are in `member-interest-profile.constants.ts`; all
 scoring rules are in the pure `build-profile.ts`.
@@ -64,8 +64,7 @@ current team's focus areas at a low weight, so they compete for those 5 places w
   tag picks (`NEWS_TAG_PICKS_ENABLED`) match on. They are never stored.
 - A saved list, an empty one too, always wins: the profile is not read for that member.
 - Saved tags feed the profile as declared topics (see Sources); starting tags do not.
-- The flag is read on every call; anything but `true` is off, and then the profile table is not queried. It stays off
-  in an environment until the LAB-3124 pilot passes.
+- The flag is read on every call; anything but `true` is off, and then the profile table is not queried.
 
 Code: `NewsTagVocabularyService.seedTagsForMembers` in `apps/web-api/src/team-news/news-tag-vocabulary.service.ts`.
 
