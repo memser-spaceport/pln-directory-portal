@@ -42,7 +42,7 @@ The team-news seed ranks a 14-day window into Top stories and Popular this week.
 
 ### Requirement: A short suitable list is stored as-is
 
-When fewer than 3 stories remain for Top stories, the system SHALL store only those ranks and SHALL log a warning. The system SHALL NOT invent the missing ranks from excluded stories. When fewer than 5 stories remain for Popular this week, the system SHALL store only those seed upvotes and SHALL log a warning.
+When fewer than 5 stories remain for Top stories, the system SHALL store only those ranks and SHALL log a warning. The system SHALL NOT invent the missing ranks from excluded stories. When fewer than 5 stories remain for Popular this week, the system SHALL store only those seed upvotes and SHALL log a warning.
 
 #### Scenario: One suitable top story
 
@@ -156,14 +156,14 @@ When news tag picks are enabled, a member's digest picks SHALL be stories from t
 
 ### Requirement: Admin top stories for the next digest
 
-A directory admin SHALL read and replace one ordered list of 1 to 3 found news items. That list SHALL be the top stories for both the next daily digest and the next weekly digest. With no list, the top stories SHALL be the current editorial ranks 1 to 3 in the 14-day window, and the digest lead SHALL stay editorial rank 1. With a list, the digest lead SHALL be the first item, including a story outside that window. The home feed editorial ranks SHALL stay unchanged. A signed-in non-admin SHALL receive 403. A call with no admin token SHALL receive 401.
+A directory admin SHALL read and replace one ordered list of 1 to 5 found news items. That list SHALL be the top stories for both the next daily digest and the next weekly digest. With no list, the top stories SHALL be the current editorial ranks 1 to 5 in the 14-day window, and the digest lead SHALL stay editorial rank 1. With a list, the digest lead SHALL be the first item, including a story outside that window. The digest email SHALL show one highlighted lead, the first top story, then up to 4 of that member's own picks. When the member has fewer than 4 picks, the email SHALL fill the remaining cards from the other top stories, up to 5 news cards. The home feed editorial ranks SHALL stay unchanged by an admin save. A signed-in non-admin SHALL receive 403. A call with no admin token SHALL receive 401.
 
 #### Scenario: Admin order
 
 - **WHEN** an admin saves stories B then A
 - **THEN** the next digest lead is B
 - **AND** the ordered top stories are B then A
-- **AND** each member's other news cards stay as they are today
+- **AND** the email shows that lead, then up to 4 of the member's own picks, and fills any missing picks from the other top stories
 
 #### Scenario: No admin change
 

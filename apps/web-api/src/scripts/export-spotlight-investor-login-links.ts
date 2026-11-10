@@ -11,7 +11,7 @@
  *   npx ts-node apps/web-api/src/scripts/export-spotlight-investor-login-links.ts --slug=my-spotlight --dry-run
  *   npx ts-node apps/web-api/src/scripts/export-spotlight-investor-login-links.ts --slug=my-spotlight --unique-email
  *
- * Tokens expire in 10 days from mint time. Treat the CSV as credentials.
+ * Tokens expire 72 hours after mint time. Treat the CSV as credentials.
  */
 import * as dotenv from 'dotenv';
 dotenv.config();
@@ -20,8 +20,8 @@ import axios from 'axios';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
 import { PrismaClient } from '@prisma/client';
+import { LOGIN_TOKEN_TTL_SECONDS } from '../auth/auth.constants';
 
-const LOGIN_TOKEN_TTL_SECONDS = 864000; // 10 days
 const DELAY_MS = 50;
 
 const prisma = new PrismaClient();
@@ -185,7 +185,7 @@ async function main(): Promise<void> {
 
   writeFileSync(outPath, csvLines.join('\n') + '\n', 'utf8');
   console.log(`Done. ok=${ok} failed=${failed} → ${outPath}`);
-  console.log(`Note: login tokens expire in ${LOGIN_TOKEN_TTL_SECONDS / 86400} days from mint time.`);
+  console.log(`Note: login tokens expire ${LOGIN_TOKEN_TTL_SECONDS / 3600} hours after mint time.`);
 }
 
 main()

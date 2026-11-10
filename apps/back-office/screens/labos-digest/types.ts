@@ -39,6 +39,7 @@ export type LabosDigestTopStoryHistory = {
 export type LabosDigestFoundNews = {
   uid: string;
   title: string;
+  summary: string | null;
   source: string | null;
   date: string;
   tags: string[];
