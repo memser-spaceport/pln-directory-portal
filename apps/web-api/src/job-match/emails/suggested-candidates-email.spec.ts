@@ -277,6 +277,11 @@ describe('renderSuggestedCandidatesEmail', () => {
       );
       expect(visible).toContain('Runs Saturn’s retrieval path');
       expect(html.match(/>View profile<\/a>/g)).toHaveLength(6);
+      // Left-aligned under the Why line since LAB-3195 dropped the requirements count from its left (Polina).
+      const profileCells =
+        html.match(/<td valign="middle" align="(\w+)"[^>]*>(?:(?!<\/td>)[\s\S])*>View profile</g) ?? [];
+      expect(profileCells).toHaveLength(6);
+      for (const cell of profileCells) expect(cell).toContain('align="left"');
     });
 
     it('names the role when the email covers one', () => {

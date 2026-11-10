@@ -421,7 +421,7 @@ function card(candidate: Candidate, profileUrl: string): string {
 
   const footerRow = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 8px;">
           <tr>
-            <td valign="middle" align="right" style="white-space: nowrap; ${font({
+            <td valign="middle" align="left" style="white-space: nowrap; ${font({
               size: 14,
               line: 20,
               weight: 500,
