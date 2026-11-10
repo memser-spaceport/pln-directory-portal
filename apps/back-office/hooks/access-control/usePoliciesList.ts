@@ -22,9 +22,10 @@ export type Policy = {
 
 interface QueryParams {
   authToken: string | undefined;
+  enabled?: boolean;
 }
 
-export function usePoliciesList({ authToken }: QueryParams) {
+export function usePoliciesList({ authToken, enabled = true }: QueryParams) {
   return useQuery({
     queryKey: ['POLICIES_LIST', authToken],
     queryFn: async () => {
@@ -33,6 +34,6 @@ export function usePoliciesList({ authToken }: QueryParams) {
       });
       return data;
     },
-    enabled: !!authToken,
+    enabled: !!authToken && enabled,
   });
 }

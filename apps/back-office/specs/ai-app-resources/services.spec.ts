@@ -1,8 +1,10 @@
 import api from '../../utils/api';
 import {
+  fetchAiAppAudience,
   fetchAiAppResources,
   fetchAiAppsList,
   resetAiAppResources,
+  updateAiAppAudience,
   updateAiAppResources,
 } from '../../utils/services/ai-app-resources';
 
@@ -54,5 +56,35 @@ describe('ai-app-resources service', () => {
       deleted: true,
     });
     expect(mockedApi.delete).toHaveBeenCalledWith(`${BASE}/a`, { headers, params: { environment: 'dev' } });
+  });
+
+  it('reads the audience of one app', async () => {
+    const audience = {
+      appUid: 'cm1',
+      appId: 'playbook',
+      name: 'PLaybook',
+      policyCodes: ['investor_pl'],
+      directLinkGateReady: true,
+    };
+    mockedApi.get.mockResolvedValue({ data: audience });
+    await expect(fetchAiAppAudience({ authToken: 'token-1', appId: 'playbook' })).resolves.toEqual(audience);
+    expect(mockedApi.get).toHaveBeenCalledWith('/v1/admin/ai-app-audience/playbook', { headers });
+  });
+
+  it('saves the audience as a list of policy codes with PUT, and an empty list to unpublish', async () => {
+    mockedApi.put.mockResolvedValue({ data: {} });
+    await updateAiAppAudience({ authToken: 'token-1', appId: 'app/1', policyCodes: ['investor_pl', 'founder_pl'] });
+    expect(mockedApi.put).toHaveBeenCalledWith(
+      '/v1/admin/ai-app-audience/app%2F1',
+      { policyCodes: ['investor_pl', 'founder_pl'] },
+      { headers }
+    );
+
+    await updateAiAppAudience({ authToken: 'token-1', appId: 'playbook', policyCodes: [] });
+    expect(mockedApi.put).toHaveBeenLastCalledWith(
+      '/v1/admin/ai-app-audience/playbook',
+      { policyCodes: [] },
+      { headers }
+    );
   });
 });

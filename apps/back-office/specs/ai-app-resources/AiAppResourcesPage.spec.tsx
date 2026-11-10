@@ -5,7 +5,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AiAppResourcesPage from '../../pages/ai-app-resources';
 import { Menu } from '../../components/menu/menu';
 import { useAuth } from '../../context/auth-context';
-import { fetchAiAppResources, fetchAiAppsList } from '../../utils/services/ai-app-resources';
+import api from '../../utils/api';
+import { fetchAiAppAudience, fetchAiAppResources, fetchAiAppsList } from '../../utils/services/ai-app-resources';
 
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
@@ -30,11 +31,15 @@ jest.mock('../../utils/services/ai-app-resources', () => ({
   fetchAiAppResources: jest.fn(),
   updateAiAppResources: jest.fn(),
   resetAiAppResources: jest.fn(),
+  fetchAiAppAudience: jest.fn(),
+  updateAiAppAudience: jest.fn(),
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
 const mockList = fetchAiAppsList as jest.Mock;
 const mockGet = fetchAiAppResources as jest.Mock;
+const mockAudience = fetchAiAppAudience as jest.Mock;
+const mockApiGet = api.get as jest.Mock;
 
 function asUser(permissions: string[]) {
   mockUseAuth.mockReturnValue({
@@ -126,6 +131,43 @@ describe('AI Apps Resources page', () => {
     expect(await screen.findByText('Using default resources')).toBeTruthy();
     expect(mockGet).toHaveBeenCalledWith({ authToken: 'token-1', appId: 'pl-marketing-os', environment: 'preview' });
     expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('hides the Audience action from an admin who can manage resources but is not a Directory admin', async () => {
+    asUser(['ai_apps.resources.manage', 'ai_apps.read']);
+    mockList.mockResolvedValue(apps);
+    renderWithClient(<AiAppResourcesPage />);
+
+    expect(await screen.findAllByText('Edit resources')).toHaveLength(2);
+    expect(screen.queryByText('Audience')).toBeNull();
+    expect(mockAudience).not.toHaveBeenCalled();
+    expect(mockApiGet).not.toHaveBeenCalled();
+  });
+
+  it('lets a Directory admin open the audience of an app', async () => {
+    asUser(['directory.admin.full']);
+    mockList.mockResolvedValue(apps);
+    mockAudience.mockResolvedValue({
+      appUid: 'cm1',
+      appId: 'pl-marketing-os',
+      name: 'PL Marketing OS',
+      policyCodes: ['investor_pl'],
+      directLinkGateReady: true,
+    });
+    mockApiGet.mockResolvedValue({
+      data: [{ code: 'investor_pl', name: 'Investor / PL', role: 'Investor', group: 'PL' }],
+    });
+    renderWithClient(<AiAppResourcesPage />);
+
+    expect(await screen.findAllByText('Edit resources')).toHaveLength(2);
+    expect(mockAudience).not.toHaveBeenCalled();
+    expect(mockApiGet).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getAllByText('Audience')[0]);
+    expect(await screen.findByText('Published to 1 policy')).toBeTruthy();
+    expect(screen.getByText('Investor / PL')).toBeTruthy();
+    expect(mockAudience).toHaveBeenCalledWith({ authToken: 'token-1', appId: 'pl-marketing-os' });
+    expect(mockGet).not.toHaveBeenCalled();
   });
 
   it('shows an empty state when there are no apps', async () => {

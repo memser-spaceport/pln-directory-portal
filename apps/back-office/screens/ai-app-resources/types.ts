@@ -35,3 +35,13 @@ export interface AiAppTarget {
   appId: string;
   environment: string;
 }
+
+export interface AiAppAudienceResponse {
+  appUid: string;
+  appId: string;
+  name: string;
+  /** RBAC policy codes whose holders can open the app. Empty means not published. */
+  policyCodes: string[];
+  /** False when the app's deployed auth sidecar is too old to enforce per-app access. */
+  directLinkGateReady: boolean;
+}
