@@ -17,7 +17,7 @@ export const TRENDING_LIKE_RANGES: ReadonlyArray<readonly [number, number]> = [
 export const TRENDING_LIKED_LIMIT = 5;
 
 /** Fixed count of editorial Top Stories picks. */
-export const EDITORIAL_RANK_LIMIT = 3;
+export const EDITORIAL_RANK_LIMIT = 5;
 
 /** Max likes needed for rank 1 — size of the bot member pool. */
 export const TRENDING_SEED_BOT_COUNT = 10;

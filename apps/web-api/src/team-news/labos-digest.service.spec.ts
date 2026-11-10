@@ -82,7 +82,7 @@ describe('LabosDigestService', () => {
     const selection = await service.selectForDigest();
 
     expect(selection).toEqual({ source: 'ai', uids: ['lead', 'second'], overrideUpdatedAt: null });
-    expect(newsFindMany.mock.calls[0][0].where.editorialRank).toEqual({ not: null, lte: 3 });
+    expect(newsFindMany.mock.calls[0][0].where.editorialRank).toEqual({ not: null, lte: 5 });
     expect(newsFindMany.mock.calls[0][0].orderBy).toEqual({ editorialRank: 'asc' });
   });
 
@@ -191,6 +191,7 @@ describe('LabosDigestService', () => {
       {
         uid: 'a',
         title: 'Alpha',
+        summary: 'Alpha raised a round.',
         sourceDomain: 'a.example',
         eventDate: new Date('2026-11-02T00:00:00.000Z'),
         tags: ['ai'],
@@ -220,6 +221,7 @@ describe('LabosDigestService', () => {
     expect(page.items[0]).toEqual(
       expect.objectContaining({
         uid: 'a',
+        summary: 'Alpha raised a round.',
         wasTopStory: true,
         topStoryHistory: [expect.objectContaining({ frequency: 'daily', position: 1, isLead: true })],
       })

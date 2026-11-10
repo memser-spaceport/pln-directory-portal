@@ -77,9 +77,9 @@ export const TeamNewsItemSchema = z.object({
   // True when the authenticated caller has upvoted this item. Always false
   // for anonymous requests.
   viewerHasUpvoted: z.boolean(),
-  // 1 = Top Stories lead, 2–3 = runners-up; null when not featured.
+  // 1 = Top Stories lead, 2–5 = runners-up; null when not featured.
   // Set by seed-trending; independent of upvoteCount.
-  editorialRank: z.number().int().min(1).max(3).nullable(),
+  editorialRank: z.number().int().min(1).max(5).nullable(),
   // Raw feed-card impression count. Not deduplicated by user, session, or
   // repeat viewing, and includes anonymous visitors. Incremented via
   // POST /v1/team-news/impressions.
@@ -149,7 +149,7 @@ export const SeedTeamNewsTrendingRankedItemSchema = z.object({
 
 export const SeedTeamNewsTrendingEditorialItemSchema = z.object({
   uid: z.string(),
-  rank: z.number().int().min(1).max(3),
+  rank: z.number().int().min(1).max(5),
 });
 
 export const SeedTeamNewsTrendingResponseSchema = z.object({
@@ -426,7 +426,7 @@ export const TeamNewsDigestPicksRequestSchema = z.object({
   memberUids: z.array(z.string()).min(1).max(200),
   sinceCreatedAt: z.string().optional(),
   untilCreatedAt: z.string().optional(),
-  limit: z.number().int().min(1).max(3).optional().default(3),
+  limit: z.number().int().min(1).max(4).optional().default(3),
   // The forum digest job reports which frequency is about to send, and the lead
   // that frequency already showed. Older callers omit both.
   frequency: z.enum(['daily', 'weekly']).optional(),
@@ -445,7 +445,7 @@ export const TeamNewsDigestPicksResponseSchema = z.object({
   // override is set, otherwise editorial rank 1. Null when there is none.
   topStory: TeamNewsItemSchema.nullable(),
   topStorySource: LabosDigestPickSourceSchema,
-  // Ordered Top stories (up to 3). The email highlights topStory only.
+  // Ordered Top stories (up to 5). The email highlights the first. The other four cards are the member's picks, filled from these stories when the member has fewer than four.
   topStories: z.array(TeamNewsItemSchema),
   // Set when topStorySource is admin. A digest send deletes the override only
   // when this value still matches the row.
@@ -534,7 +534,7 @@ export const LabosDigestViewSchema = z.object({
 });
 
 export const SaveLabosDigestPicksSchema = z.object({
-  newsItemUids: z.array(z.string().min(1)).min(1).max(3),
+  newsItemUids: z.array(z.string().min(1)).min(1).max(5),
 });
 
 export const LabosDigestNewsQuerySchema = z.object({
@@ -556,6 +556,7 @@ export const LabosDigestTopStoryHistorySchema = z.object({
 export const LabosDigestFoundNewsSchema = z.object({
   uid: z.string(),
   title: z.string(),
+  summary: z.string().nullable(),
   source: z.string().nullable(),
   date: z.string(),
   tags: z.array(z.string()),
@@ -650,7 +651,7 @@ export const RecordLabosDigestSendSchema = z.object({
   source: LabosDigestPickSourceSchema,
   leadNewsItemUid: z.string().nullable(),
   lastShownLeadUid: z.string().nullable(),
-  storyUids: z.array(z.string()).max(3),
+  storyUids: z.array(z.string()).max(5),
   overrideUpdatedAt: z.string().nullable(),
 });
 

@@ -162,7 +162,7 @@ export class LabosDigestService {
         orderBy: [{ eventDate: 'desc' }, { createdAt: 'desc' }],
         skip,
         take: query.limit,
-        select: { uid: true, title: true, sourceDomain: true, eventDate: true, tags: true },
+        select: { uid: true, title: true, summary: true, sourceDomain: true, eventDate: true, tags: true },
       }),
     ]);
     const history = await this.historyByItem(rows.map((row) => row.uid));
@@ -175,6 +175,7 @@ export class LabosDigestService {
         return {
           uid: row.uid,
           title: row.title,
+          summary: row.summary,
           source: row.sourceDomain,
           date: row.eventDate.toISOString(),
           tags: row.tags,

@@ -94,6 +94,7 @@ const newsPage = {
     {
       uid: 'c',
       title: 'Gamma',
+      summary: 'Gamma shipped a product.',
       source: 'g.example',
       date: '2026-11-04T00:00:00.000Z',
       tags: ['launch'],
@@ -187,6 +188,7 @@ describe('LabOS Digest page', () => {
 
     expect(await screen.findByText('Admin picks')).toBeTruthy();
     expect(await screen.findByText('Gamma')).toBeTruthy();
+    expect(screen.queryByText('Gamma shipped a product.')).toBeNull();
     expect(screen.getByText(/daily lead 2026-10-01/)).toBeTruthy();
 
     fireEvent.click(screen.getAllByText('Replace')[0]);
