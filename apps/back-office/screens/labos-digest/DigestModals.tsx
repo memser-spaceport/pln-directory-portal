@@ -1,9 +1,13 @@
 import React, { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import Modal from '../../components/modal/modal';
 import { fetchTeamsForAutocomplete } from '../../utils/services/team';
 import { usePostLabosDigestNews, useUpdateLabosDigestNews } from '../../hooks/labos-digest/useLabosDigest';
 import type { LabosDigestNewsDetail } from './types';
 import s from './LabosDigestPage.module.scss';
+
+const RichTextEditor = dynamic(() => import('../../components/common/rich-text-editor'), { ssr: false });
+const NEWS_BODY_MAX_LENGTH = 2000;
 
 const day = (value: string) => value.slice(0, 10);
 
@@ -182,10 +186,16 @@ export function PostNewsModal({ authToken, onClose }: { authToken: string | unde
           Headline
           <input className={s.field} value={title} onChange={(event) => setTitle(event.target.value)} />
         </label>
-        <label className={s.fieldLabel}>
-          Body
-          <textarea className={s.textarea} value={body} onChange={(event) => setBody(event.target.value)} />
-        </label>
+        <div>
+          <p className={s.fieldLabel}>Body</p>
+          <RichTextEditor
+            id="labos-digest-post-body"
+            value={body}
+            onChange={setBody}
+            maxLength={NEWS_BODY_MAX_LENGTH}
+            placeholder="Write the story"
+          />
+        </div>
         <label className={s.fieldLabel}>
           Link
           <input className={s.field} value={url} placeholder="https://" onChange={(event) => setUrl(event.target.value)} />
