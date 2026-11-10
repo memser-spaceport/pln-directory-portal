@@ -1,6 +1,12 @@
 import { BadRequestException } from '@nestjs/common';
 import { buildNewsTagVocabulary } from '../news-tag-vocabulary.service';
-import { isNewsTagPicksEnabled, parseNewsTags, readStoredNewsTags, resolveNewsTags } from './news-tags';
+import {
+  isNewsProfileStartingTagsEnabled,
+  isNewsTagPicksEnabled,
+  parseNewsTags,
+  readStoredNewsTags,
+  resolveNewsTags,
+} from './news-tags';
 
 /** LAB-2998: a member's news tags, stored as focus-area slugs in `Member.preferences.newsTags`. */
 const vocabulary = buildNewsTagVocabulary([
@@ -74,5 +80,21 @@ describe('isNewsTagPicksEnabled (LAB-2999)', () => {
     [undefined, false],
   ])('reads %p as %p', (value, expected) => {
     expect(isNewsTagPicksEnabled({ NEWS_TAG_PICKS_ENABLED: value } as NodeJS.ProcessEnv)).toBe(expected);
+  });
+});
+
+describe('isNewsProfileStartingTagsEnabled (LAB-3199)', () => {
+  it.each([
+    ['true', true],
+    ['TRUE', true],
+    [' true ', true],
+    ['false', false],
+    ['1', false],
+    ['', false],
+    [undefined, false],
+  ])('reads %p as %p', (value, expected) => {
+    expect(isNewsProfileStartingTagsEnabled({ NEWS_PROFILE_STARTING_TAGS_ENABLED: value } as NodeJS.ProcessEnv)).toBe(
+      expected
+    );
   });
 });
