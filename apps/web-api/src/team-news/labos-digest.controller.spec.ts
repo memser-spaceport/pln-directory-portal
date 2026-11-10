@@ -7,6 +7,8 @@ import { JwtService } from '../utils/jwt/jwt.service';
 import { LabosDigestAdminController } from './labos-digest-admin.controller';
 import { LabosDigestServiceController } from './labos-digest-service.controller';
 
+jest.mock('./team-news.service', () => ({ TeamNewsService: class TeamNewsService {} }));
+
 const httpContext = (authorization?: string) =>
   ({
     switchToHttp: () => ({

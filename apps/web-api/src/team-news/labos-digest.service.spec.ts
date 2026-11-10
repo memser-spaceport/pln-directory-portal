@@ -3,7 +3,7 @@ import { LabosDigestService } from './labos-digest.service';
 import { TeamNewsQueryService } from './team-news-query.service';
 import { PrismaService } from '../shared/prisma.service';
 
-// Follows pulls PostHog in through member signals. This spec does not use it.
+jest.mock('./team-news.service', () => ({ TeamNewsService: class TeamNewsService {} }));
 jest.mock('../analytics/service/analytics.service', () => ({ AnalyticsService: class AnalyticsService {} }));
 
 const updatedAt = new Date('2026-11-09T12:00:00.000Z');
