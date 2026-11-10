@@ -89,11 +89,13 @@ describe('TeamNewsTrendingSeedService', () => {
       candidate('e', 't5', 'Epsilon', '2026-07-24T00:00:00.000Z'),
       candidate('f', 't6', 'Zeta', '2026-07-23T00:00:00.000Z'),
       candidate('g', 't7', 'Eta', '2026-07-22T00:00:00.000Z'),
+      candidate('h', 't8', 'Theta', '2026-07-21T00:00:00.000Z'),
+      candidate('i', 't9', 'Iota', '2026-07-20T00:00:00.000Z'),
     ];
     // First call = new batch, second = window.
     findMany.mockResolvedValueOnce(candidates).mockResolvedValueOnce(candidates);
     (generateText as jest.Mock).mockResolvedValue(
-      rankingText({ likedUids: ['a', 'b', 'c', 'd', 'x-invalid'], editorialUids: ['e', 'f', 'g'] }, true)
+      rankingText({ likedUids: ['a', 'b', 'c', 'd', 'x-invalid'], editorialUids: ['e', 'f', 'g', 'h', 'i'] }, true)
     );
 
     const result = await service.seedTrending({
@@ -106,7 +108,7 @@ describe('TeamNewsTrendingSeedService', () => {
       providerOverride: 'anthropic',
       modelOverride: 'claude-opus-5-5',
     });
-    expect(result.candidateCount).toBe(8);
+    expect(result.candidateCount).toBe(10);
     expect(result.protocolLabsIncluded).toBe(true);
     expect(result.ranked).toHaveLength(5);
     expect(result.ranked.map((r) => r.uid)).toContain('pl');
@@ -115,6 +117,8 @@ describe('TeamNewsTrendingSeedService', () => {
       { uid: 'e', rank: 1 },
       { uid: 'f', rank: 2 },
       { uid: 'g', rank: 3 },
+      { uid: 'h', rank: 4 },
+      { uid: 'i', rank: 5 },
     ]);
     const likedSet = new Set(result.ranked.map((r) => r.uid));
     for (const row of result.editorial) {
@@ -127,7 +131,7 @@ describe('TeamNewsTrendingSeedService', () => {
       where: { editorialRank: { not: null } },
       data: { editorialRank: null },
     });
-    expect(update).toHaveBeenCalledTimes(3);
+    expect(update).toHaveBeenCalledTimes(5);
     expect(upvoteCreateMany).toHaveBeenCalledTimes(5);
   });
 
@@ -141,6 +145,8 @@ describe('TeamNewsTrendingSeedService', () => {
       candidate('f', 't6', 'Zeta', '2026-07-24T00:00:00.000Z'),
       candidate('g', 't7', 'Eta', '2026-07-23T00:00:00.000Z'),
       candidate('h', 't8', 'Theta', '2026-07-22T00:00:00.000Z'),
+      candidate('i', 't9', 'Iota', '2026-07-21T00:00:00.000Z'),
+      candidate('j', 't10', 'Kappa', '2026-07-20T00:00:00.000Z'),
     ];
     findMany.mockResolvedValueOnce(candidates).mockResolvedValueOnce(candidates);
     findFirst.mockResolvedValue(null);
@@ -153,7 +159,7 @@ describe('TeamNewsTrendingSeedService', () => {
       limit: 5,
     });
 
-    expect(result.editorial.map((r) => r.uid)).toEqual(['a', 'b', 'f']);
+    expect(result.editorial.map((r) => r.uid)).toEqual(['a', 'b', 'f', 'c', 'd']);
     const likedUids = result.ranked.map((r) => r.uid);
     expect(likedUids).not.toContain('a');
     expect(likedUids).not.toContain('b');
@@ -182,7 +188,7 @@ describe('TeamNewsTrendingSeedService', () => {
       limit: 5,
     });
 
-    expect(result.editorial).toHaveLength(3);
+    expect(result.editorial).toHaveLength(5);
     expect(result.editorial[0].uid).toBe('new1');
     const editorialSet = new Set(result.editorial.map((e) => e.uid));
     expect(editorialSet.has('w2')).toBe(true);
@@ -191,7 +197,7 @@ describe('TeamNewsTrendingSeedService', () => {
       expect(editorialSet.has(row.uid)).toBe(false);
     }
     expect(result.ranked.length).toBeGreaterThanOrEqual(1);
-    expect(update).toHaveBeenCalledTimes(3);
+    expect(update).toHaveBeenCalledTimes(5);
   });
 
   it('does not pad an excluded newest story into editorial or liked', async () => {
