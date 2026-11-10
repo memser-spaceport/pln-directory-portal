@@ -8,7 +8,7 @@ export interface AiAppAudienceSettings {
   appUid: string;
   appId: string;
   name: string;
-  /** Policy codes the app is published to. Empty = not published. */
+  /** Policy codes the app is published to. Empty = PL Infra only. */
   policyCodes: string[];
   /** False while the app still runs a sidecar that predates per-app decisions; group members are refused until a redeploy. */
   directLinkGateReady: boolean;

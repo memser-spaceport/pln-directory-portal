@@ -417,7 +417,9 @@ Being whitelisted never bypasses the PL Infra permission. The rule lives in
 
 A directory admin can open one app to members outside PL Infra. The app gets an
 **audience**: a list of policy codes in `AiApp.audiencePolicyCodes`. An empty
-list means the app is not published.
+list means the app is open to PL Infra only (Back Office shows "PL Infra only").
+Publishing is separate from deploying: it does not build or restart anything,
+and PL Infra members keep their access either way.
 
 **Who is in the audience.** A member with approval state `APPROVED` who holds at
 least one of the listed policies. The rule lives in

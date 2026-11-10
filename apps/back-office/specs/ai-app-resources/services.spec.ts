@@ -71,7 +71,7 @@ describe('ai-app-resources service', () => {
     expect(mockedApi.get).toHaveBeenCalledWith('/v1/admin/ai-app-audience/playbook', { headers });
   });
 
-  it('saves the audience as a list of policy codes with PUT, and an empty list to unpublish', async () => {
+  it('saves the audience as a list of policy codes with PUT, and an empty list to limit the app to PL Infra', async () => {
     mockedApi.put.mockResolvedValue({ data: {} });
     await updateAiAppAudience({ authToken: 'token-1', appId: 'app/1', policyCodes: ['investor_pl', 'founder_pl'] });
     expect(mockedApi.put).toHaveBeenCalledWith(

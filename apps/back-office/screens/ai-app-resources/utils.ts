@@ -7,7 +7,7 @@ export function canManageAiAppResources(hasPermission: (permission: string) => b
   return hasPermission(ADMIN_PERMISSIONS.DIRECTORY_FULL) || hasPermission(AI_APPS_PERMISSIONS.RESOURCES_MANAGE);
 }
 
-/** Mirrors the ai-app-audience admin endpoints: only full Directory admins can publish an app. */
+/** Mirrors the ai-app-audience admin endpoints: only full Directory admins can open an app to members. */
 export function canManageAiAppAudience(hasPermission: (permission: string) => boolean): boolean {
   return hasPermission(ADMIN_PERMISSIONS.DIRECTORY_FULL);
 }
@@ -96,8 +96,8 @@ export function isSamePolicyCodes(a: string[], b: string[]): boolean {
 }
 
 export function getAudienceStatusLabel(policyCodes: string[]): string {
-  if (policyCodes.length === 0) return 'Not published';
-  return `Published to ${policyCodes.length} ${policyCodes.length === 1 ? 'policy' : 'policies'}`;
+  if (policyCodes.length === 0) return 'PL Infra only';
+  return `Open to ${policyCodes.length} ${policyCodes.length === 1 ? 'policy' : 'policies'}`;
 }
 
 /** States plainly what saving this audience does; shown in the confirmation step. */

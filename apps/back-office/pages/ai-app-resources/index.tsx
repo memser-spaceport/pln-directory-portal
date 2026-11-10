@@ -47,7 +47,7 @@ const AiAppResourcesPage = () => {
   const [audienceAppId, setAudienceAppId] = useState<string | null>(null);
 
   const canManage = canManageAiAppResources(hasPermission);
-  // Publishing an app to a member group is for full Directory admins only.
+  // Opening an app to a member group is for full Directory admins only.
   const canManageAudience = canManageAiAppAudience(hasPermission);
 
   const {

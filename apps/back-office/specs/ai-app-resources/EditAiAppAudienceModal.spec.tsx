@@ -66,7 +66,7 @@ describe('EditAiAppAudienceModal', () => {
     mockFetch.mockResolvedValue(audience({ policyCodes: ['investor_pl'] }));
     renderModal();
 
-    expect(await screen.findByText('Published to 1 policy')).toBeTruthy();
+    expect(await screen.findByText('Open to 1 policy')).toBeTruthy();
     expect(mockFetch).toHaveBeenCalledWith({ authToken: 'token-1', appId: 'playbook' });
     expect(mockApiGet).toHaveBeenCalledWith('/v2/admin/access-control-v2/policies', {
       headers: { authorization: 'Bearer token-1' },
@@ -77,11 +77,11 @@ describe('EditAiAppAudienceModal', () => {
     expect((screen.getByText('Save') as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it('shows an app without an audience as not published', async () => {
+  it('shows an app without an audience as PL Infra only', async () => {
     mockFetch.mockResolvedValue(audience());
     renderModal();
 
-    expect(await screen.findByText('Not published')).toBeTruthy();
+    expect(await screen.findByText('PL Infra only')).toBeTruthy();
     expect(screen.getByText('No policies selected')).toBeTruthy();
     expect(selectedPolicies()).toEqual([]);
   });
@@ -89,7 +89,7 @@ describe('EditAiAppAudienceModal', () => {
   it('lists the policies grouped by role in the picker', async () => {
     mockFetch.mockResolvedValue(audience());
     renderModal();
-    await screen.findByText('Not published');
+    await screen.findByText('PL Infra only');
 
     fireEvent.click(screen.getByText('No policies selected'));
     const options = await screen.findAllByRole('checkbox');
@@ -102,7 +102,7 @@ describe('EditAiAppAudienceModal', () => {
   it('selects every Founder, Investor and Unassigned policy with "Select all member policies"', async () => {
     mockFetch.mockResolvedValue(audience({ policyCodes: ['advisor_pl'] }));
     renderModal();
-    await screen.findByText('Published to 1 policy');
+    await screen.findByText('Open to 1 policy');
 
     fireEvent.click(screen.getByText('Select all member policies'));
     expect(selectedPolicies()).toEqual(['Advisor / PL', ...MEMBER_POLICY_NAMES]);
@@ -117,7 +117,7 @@ describe('EditAiAppAudienceModal', () => {
     mockFetch.mockResolvedValueOnce(audience()).mockResolvedValue(audience({ policyCodes: saved }));
     mockUpdate.mockResolvedValue(audience({ policyCodes: saved }));
     renderModal();
-    await screen.findByText('Not published');
+    await screen.findByText('PL Infra only');
 
     fireEvent.click(screen.getByText('Select all member policies'));
     fireEvent.click(screen.getByText('Save'));
@@ -129,16 +129,16 @@ describe('EditAiAppAudienceModal', () => {
       expect(mockUpdate).toHaveBeenCalledWith({ authToken: 'token-1', appId: 'playbook', policyCodes: saved })
     );
     expect(mockUpdate).toHaveBeenCalledTimes(1);
-    expect(await screen.findByText('Published to 3 policies')).toBeTruthy();
+    expect(await screen.findByText('Open to 3 policies')).toBeTruthy();
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(screen.queryByText('Yes, save')).toBeNull();
   });
 
-  it('unpublishes with an empty list after confirming that nobody outside PL Infra keeps access', async () => {
+  it('limits the app to PL Infra with an empty list after confirming that nobody outside PL Infra keeps access', async () => {
     mockFetch.mockResolvedValueOnce(audience({ policyCodes: ['investor_pl'] })).mockResolvedValue(audience());
     mockUpdate.mockResolvedValue(audience());
     renderModal();
-    await screen.findByText('Published to 1 policy');
+    await screen.findByText('Open to 1 policy');
 
     fireEvent.click(screen.getByText('Clear'));
     fireEvent.click(screen.getByText('Save'));
@@ -148,13 +148,13 @@ describe('EditAiAppAudienceModal', () => {
     await waitFor(() =>
       expect(mockUpdate).toHaveBeenCalledWith({ authToken: 'token-1', appId: 'playbook', policyCodes: [] })
     );
-    expect(await screen.findByText('Not published')).toBeTruthy();
+    expect(await screen.findByText('PL Infra only')).toBeTruthy();
   });
 
   it('does not save when the confirmation is cancelled', async () => {
     mockFetch.mockResolvedValue(audience());
     renderModal();
-    await screen.findByText('Not published');
+    await screen.findByText('PL Infra only');
 
     fireEvent.click(screen.getByText('Select all member policies'));
     fireEvent.click(screen.getByText('Save'));
@@ -174,12 +174,12 @@ describe('EditAiAppAudienceModal', () => {
     );
   });
 
-  it('explains that an app the Directory does not track cannot be published', async () => {
+  it('explains that an app the Directory does not track cannot be opened to members', async () => {
     mockFetch.mockRejectedValue({ response: { status: 404, data: { message: 'AI App not found' } } });
     renderModal();
 
     expect(
-      await screen.findByText('This app is not tracked by the Directory, so it cannot be published.')
+      await screen.findByText('This app is not tracked by the Directory, so it cannot be opened to members.')
     ).toBeTruthy();
     expect(screen.queryByText('Save')).toBeNull();
     expect(screen.queryByText('Retry')).toBeNull();
@@ -191,7 +191,7 @@ describe('EditAiAppAudienceModal', () => {
     mockFetch.mockResolvedValue(audience());
     mockUpdate.mockRejectedValue({ response: { status: 400, data: { message: 'Unknown policy code: investor_pl' } } });
     renderModal();
-    await screen.findByText('Not published');
+    await screen.findByText('PL Infra only');
 
     fireEvent.click(screen.getByText('Select all member policies'));
     fireEvent.click(screen.getByText('Save'));
@@ -209,6 +209,6 @@ describe('EditAiAppAudienceModal', () => {
 
     expect(await screen.findByText('Forbidden')).toBeTruthy();
     fireEvent.click(screen.getByText('Retry'));
-    expect(await screen.findByText('Not published')).toBeTruthy();
+    expect(await screen.findByText('PL Infra only')).toBeTruthy();
   });
 });

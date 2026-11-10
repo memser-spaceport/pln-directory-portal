@@ -164,7 +164,7 @@ describe('AI Apps Resources page', () => {
     expect(mockApiGet).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getAllByText('Audience')[0]);
-    expect(await screen.findByText('Published to 1 policy')).toBeTruthy();
+    expect(await screen.findByText('Open to 1 policy')).toBeTruthy();
     expect(screen.getByText('Investor / PL')).toBeTruthy();
     expect(mockAudience).toHaveBeenCalledWith({ authToken: 'token-1', appId: 'pl-marketing-os' });
     expect(mockGet).not.toHaveBeenCalled();

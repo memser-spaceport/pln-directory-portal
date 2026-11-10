@@ -89,7 +89,7 @@ export const EditAiAppAudienceModal: React.FC<EditAiAppAudienceModalProps> = ({ 
     try {
       await updateMutation.mutateAsync({ authToken, appId, policyCodes: codes });
       setConfirmSave(false);
-      toast.success(codes.length > 0 ? 'Audience saved' : 'App unpublished');
+      toast.success(codes.length > 0 ? 'Audience saved' : 'Access limited to PL Infra');
     } catch (err) {
       const message = getApiErrorMessage(err, 'Failed to save the audience. Please try again.');
       setConfirmSave(false);
@@ -101,7 +101,9 @@ export const EditAiAppAudienceModal: React.FC<EditAiAppAudienceModalProps> = ({ 
   const renderBody = () => {
     if (isNotTracked) {
       return (
-        <p className="text-sm text-gray-700">This app is not tracked by the Directory, so it cannot be published.</p>
+        <p className="text-sm text-gray-700">
+          This app is not tracked by the Directory, so it cannot be opened to members.
+        </p>
       );
     }
 
@@ -128,6 +130,10 @@ export const EditAiAppAudienceModal: React.FC<EditAiAppAudienceModalProps> = ({ 
 
     return (
       <div className="space-y-4">
+        <p className="text-sm text-gray-600">
+          Choose which members outside PL Infra can open this app. It also appears for them under More in LabOS. The
+          deployment is not affected, and PL Infra members keep their access either way.
+        </p>
         <div
           className={clsx(
             'rounded-md px-3 py-2 text-sm',
@@ -176,7 +182,7 @@ export const EditAiAppAudienceModal: React.FC<EditAiAppAudienceModalProps> = ({ 
           />
           <p className="mt-1 text-xs text-gray-500">
             {codes.length} selected. An approved member who holds any selected policy can open the production app. Leave
-            empty to keep the app unpublished.
+            empty to keep it for PL Infra only.
           </p>
         </div>
 

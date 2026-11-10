@@ -36,9 +36,9 @@ describe('ai-app-resources utils', () => {
     });
 
     it('describes the current state', () => {
-      expect(getAudienceStatusLabel([])).toBe('Not published');
-      expect(getAudienceStatusLabel(['a'])).toBe('Published to 1 policy');
-      expect(getAudienceStatusLabel(['a', 'b', 'c'])).toBe('Published to 3 policies');
+      expect(getAudienceStatusLabel([])).toBe('PL Infra only');
+      expect(getAudienceStatusLabel(['a'])).toBe('Open to 1 policy');
+      expect(getAudienceStatusLabel(['a', 'b', 'c'])).toBe('Open to 3 policies');
     });
 
     it('states plainly what saving does', () => {
