@@ -34,6 +34,7 @@ import { forumTools } from './mcp-forum-tools';
 import { forumImageTools } from './mcp-forum-image-tools';
 import { portfolioTools } from './mcp-portfolio-tools';
 import { newsTools } from './mcp-news-tools';
+import { digestAdminNewsTools } from './mcp-digest-tools';
 import { directoryWriteTools, eventWriteTools, membershipTools, newsWriteTools, profileTools } from './mcp-write-tools';
 import { profileCoverageTools } from './mcp-profile-coverage-tools';
 import { directoryCoverageTools } from './mcp-directory-coverage-tools';
@@ -175,6 +176,7 @@ describe('scope registry', () => {
     ...aiAppWriteTools(stub),
     ...portfolioTools(stub),
     ...newsTools(stub, stub),
+    ...digestAdminNewsTools(stub),
     ...newsWriteTools(stub, stub, stub),
     ...profileTools(stub, stub, stub),
     ...membershipTools(stub, stub, stub),

@@ -39,6 +39,10 @@ export const MCP_TOOL_SCOPES: Readonly<Record<string, McpToolScope>> = {
 
   list_news: { scope: 'news', level: 'read' },
   get_news_item: { scope: 'news', level: 'read' },
+  list_all_news: { scope: 'news', level: 'read' },
+  get_digest_top_stories: { scope: 'news', level: 'read' },
+  list_digest_sends: { scope: 'news', level: 'read' },
+  get_digest_send: { scope: 'news', level: 'read' },
   post_team_news: { scope: 'news', level: 'write' },
 
   get_member: { scope: 'directory', level: 'read' },

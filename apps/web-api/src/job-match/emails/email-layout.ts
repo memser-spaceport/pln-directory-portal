@@ -33,7 +33,7 @@ export const INTER = 'Inter, Arial, Helvetica, sans-serif';
 export const MONTSERRAT = 'Montserrat, Arial, Helvetica, sans-serif';
 
 const FONTS_HREF =
-  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500&amp;family=Montserrat:wght@400;600&amp;display=swap';
+  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Montserrat:wght@400;600&amp;display=swap';
 
 /**
  * Served from the directory's own domain (frontend `public/images/email/`), as 2x PNGs drawn at 1x CSS size:
@@ -94,6 +94,8 @@ export function emailShell(args: {
         .email-container { width: 100% !important; max-width: 100% !important; }
         .email-fluid { width: 100% !important; max-width: 100% !important; }
         .email-pad { padding-left: 16px !important; padding-right: 16px !important; }
+        .email-button-full { width: 100% !important; }
+        .email-button-full a { display: block !important; }
       }
     </style>
   </head>
@@ -214,9 +216,14 @@ export function link(
   })} ${decoration}">${rawInner}</a>`;
 }
 
-/** The design's primary button, bulletproof: the cell paints the colour where a client drops the link's padding. */
-export function button(href: string, text: string): string {
-  return `<table role="presentation" align="center" cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto;">
+/**
+ * The design's primary button, bulletproof: the cell paints the colour where a client drops the link's padding.
+ * `fullOnPhone` stretches it to the column on a phone (LAB-3139 mobile design).
+ */
+export function button(href: string, text: string, args: { fullOnPhone?: boolean } = {}): string {
+  return `<table role="presentation"${
+    args.fullOnPhone ? ' class="email-button-full"' : ''
+  } align="center" cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto;">
   <tr>
     <td align="center" bgcolor="${COLORS.link}" style="background-color: ${
     COLORS.link

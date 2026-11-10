@@ -37,6 +37,7 @@ import { directoryTools } from './mcp-directory-tools';
 import { McpOAuthService } from './mcp-oauth.service';
 import { portfolioTools } from './mcp-portfolio-tools';
 import { newsTools } from './mcp-news-tools';
+import { digestAdminNewsTools } from './mcp-digest-tools';
 import { directoryWriteTools, eventWriteTools, membershipTools, newsWriteTools, profileTools } from './mcp-write-tools';
 import { profileCoverageTools } from './mcp-profile-coverage-tools';
 import { directoryCoverageTools } from './mcp-directory-coverage-tools';
@@ -105,6 +106,7 @@ import { McpLimitService } from './mcp-limit.service';
 import { contactPageRefusalText, limitRefusalText, limitWarningText } from './mcp-limit.messages';
 import { McpLimitDecision } from './mcp-limits.config';
 import { TeamNewsService } from '../team-news/team-news.service';
+import { LabosDigestService } from '../team-news/labos-digest.service';
 import { MembersHooksService } from '../members/members.hooks.service';
 import { PrismaService } from '../shared/prisma.service';
 import { TeamNewsQueryService } from '../team-news/team-news-query.service';
@@ -185,7 +187,8 @@ export class McpController {
     private readonly pitches: TeamPitchesService,
     private readonly pitchEngagement: TeamPitchEngagementService,
     private readonly memberProofs: McpMemberProofService,
-    private readonly images: ImagesService
+    private readonly images: ImagesService,
+    private readonly labosDigest: LabosDigestService
   ) {}
 
   private readonly logger = new Logger(McpController.name);
@@ -230,6 +233,7 @@ export class McpController {
         ...aiAppWriteTools(this.aiApps),
         ...portfolioTools(this.portfolio),
         ...newsTools(this.newsQuery, this.newsSuggestions),
+        ...digestAdminNewsTools(this.labosDigest),
         ...newsWriteTools(this.teamNews, this.newsQuery, this.members),
         ...profileTools(this.members, this.memberHooks, this.prisma),
         ...membershipTools(this.members, this.memberHooks, this.prisma),

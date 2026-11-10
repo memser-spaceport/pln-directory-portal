@@ -39,6 +39,7 @@ import { OpenSearchService } from '../opensearch/opensearch.service';
 import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { assignJobSearchStatusFromInput, omitJobSearchStatus } from './job-search-status';
 import { directoryListedMemberWhere } from './member-visibility';
+import { memberCrawlIndexWhere, toMemberCrawlIndex } from './member-crawl-index';
 
 /**
  * Interface for member search match result (used by entity association)
@@ -97,6 +98,21 @@ export class MembersService {
     } catch (error) {
       return this.handleErrors(error);
     }
+  }
+
+  /**
+   * Every member profile a search engine should index, as `{ uid, updatedAt }`, for the frontend sitemap (LAB-3096).
+   *
+   * The public member list (approved, verified members), minus profiles with no photo and no bio text: see
+   * `member-crawl-index`.
+   */
+  async listCrawlIndex() {
+    const rows = await this.prisma.member.findMany({
+      where: memberCrawlIndexWhere(),
+      select: { uid: true, updatedAt: true, imageUid: true, bio: true },
+      orderBy: { updatedAt: 'desc' },
+    });
+    return toMemberCrawlIndex(rows);
   }
 
   /**

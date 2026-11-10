@@ -6,6 +6,9 @@ import { PrismaService } from '../shared/prisma.service';
 // would turn every editorial change to the list into a failing unit test.
 import { TEAM_NEWS_EXCLUDED_TEAM_NAMES } from './team-news-public-list.config';
 
+// Follows pulls PostHog in through member signals. This spec does not use it.
+jest.mock('../analytics/service/analytics.service', () => ({ AnalyticsService: class AnalyticsService {} }));
+
 describe('TeamNewsQueryService.listTeamNewsByTeam', () => {
   let service: TeamNewsQueryService;
 

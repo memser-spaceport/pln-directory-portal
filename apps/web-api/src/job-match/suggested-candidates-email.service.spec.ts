@@ -97,7 +97,15 @@ function world() {
   ]);
 
   const jobs = [
-    { uid: 'role-1', roleTitle: 'Backend Engineer', companyName: 'Acme', teamUid: 'team-1', ...POSTING, ...LIVE },
+    {
+      uid: 'role-1',
+      roleTitle: 'Backend Engineer',
+      companyName: 'Acme',
+      teamUid: 'team-1',
+      ...POSTING,
+      ...LIVE,
+      publishedAt: day(3),
+    },
     { uid: 'role-2', roleTitle: 'Designer', companyName: 'Other', teamUid: 'team-2', ...POSTING, ...LIVE },
     {
       uid: 'role-3',
@@ -109,7 +117,15 @@ function world() {
       publishedAt: day(1),
     },
     { uid: 'role-4', roleTitle: 'Old news', companyName: 'Acme', teamUid: 'team-1', ...POSTING, ...LIVE },
-    { uid: 'role-5', roleTitle: 'Rust Engineer', companyName: 'Acme', teamUid: 'team-1', ...POSTING, ...LIVE },
+    {
+      uid: 'role-5',
+      roleTitle: 'Rust Engineer',
+      companyName: 'Acme',
+      teamUid: 'team-1',
+      ...POSTING,
+      ...LIVE,
+      publishedAt: day(5),
+    },
   ];
 
   // The role's current criteria (labelled), and an older posting's row whose labels must not be used.
@@ -135,6 +151,7 @@ function world() {
       jobSearchStatus?: string;
       email: string | null;
       location?: { city: string | null; country: string | null } | null;
+      currentCompany?: string | null;
     }
   > = {
     A: { name: 'Ada', deletedAt: null, email: 'a@x' },
@@ -144,6 +161,7 @@ function world() {
       jobSearchStatus: 'ACTIVELY_LOOKING',
       email: 'b@x',
       location: { city: 'Boston', country: 'United States' },
+      currentCompany: 'Saturn',
     },
     C: { name: 'Cy', deletedAt: null, jobSearchStatus: 'NOT_LOOKING', email: 'c@x' },
     D: { name: 'Di', deletedAt: null, email: 'd@x' },
@@ -171,6 +189,7 @@ function world() {
     uid: string;
     runUid: string;
     roleUid: string;
+    teamUid: string;
     recipientUid: string;
     kind: 'FIRST' | 'NEW' | 'REMINDER';
     memberUids: string[];
@@ -183,6 +202,7 @@ function world() {
       uid: 'send-0a',
       runUid: 'run-0',
       roleUid: 'role-1',
+      teamUid: 'team-1',
       recipientUid: 'L1',
       kind: 'FIRST',
       memberUids: ['A'],
@@ -192,6 +212,7 @@ function world() {
       uid: 'send-0b',
       runUid: 'run-0',
       roleUid: 'role-4',
+      teamUid: 'team-1',
       recipientUid: 'L1',
       kind: 'FIRST',
       memberUids: ['B'],
@@ -200,6 +221,8 @@ function world() {
   ];
   /** Who a lead of the team already contacted, per role. */
   const contacts: { roleUid: string; memberUid: string }[] = [];
+  /** Who applied to which role. */
+  const applications: { jobOpeningUid: string; memberUid: string }[] = [];
   let sendSeq = 0;
 
   const prisma = {
@@ -243,6 +266,7 @@ function world() {
             uid,
             name: members[uid].name,
             role: 'Engineer',
+            currentCompany: members[uid].currentCompany ?? null,
             image: { url: `https://img/${uid}` },
             location: members[uid].location ?? null,
           }))
@@ -274,7 +298,7 @@ function world() {
     },
     jobMatchEmailSend: {
       findMany: jest.fn(async ({ where, orderBy }) => {
-        const list = sends.filter((send) => send.roleUid === where.roleUid);
+        const list = sends.filter((send) => send.teamUid === where.teamUid);
         // Newest first is what the service asks for; returning them oldest first otherwise catches a dropped orderBy.
         return orderBy?.sentAt === 'desc'
           ? [...list].sort((a, b) => b.sentAt.getTime() - a.sentAt.getTime())
@@ -293,12 +317,30 @@ function world() {
         sends.push(row);
         return { uid: row.uid };
       }),
-      delete: jest.fn(async ({ where }) => {
-        const index = sends.findIndex((send) => send.uid === where.uid);
-        if (index >= 0) sends.splice(index, 1);
-        return {};
+      deleteMany: jest.fn(async ({ where }) => {
+        const before = sends.length;
+        sends.splice(0, sends.length, ...sends.filter((send) => !where.uid.in.includes(send.uid)));
+        return { count: before - sends.length };
       }),
     },
+    jobApplication: {
+      findMany: jest.fn(async ({ where }) =>
+        applications.filter(
+          (row) => row.jobOpeningUid === where.jobOpeningUid && where.memberUid.in.includes(row.memberUid)
+        )
+      ),
+    },
+    // All or nothing, like Prisma's: a failed create rolls the others back.
+    $transaction: jest.fn(async (ops: Promise<{ uid: string }>[]) => {
+      const settled = await Promise.allSettled(ops);
+      const failed = settled.find((result) => result.status === 'rejected') as PromiseRejectedResult | undefined;
+      if (failed) {
+        const created = settled.flatMap((result) => (result.status === 'fulfilled' ? [result.value.uid] : []));
+        sends.splice(0, sends.length, ...sends.filter((send) => !created.includes(send.uid)));
+        throw failed.reason;
+      }
+      return settled.map((result) => (result as PromiseFulfilledResult<{ uid: string }>).value);
+    }),
   };
   const aws = {
     isEmailServiceEnabled: jest.fn(() => true),
@@ -311,7 +353,7 @@ function world() {
     new SuggestedCandidatesEmailPreferenceService(prisma as never),
     analytics as never
   );
-  return { service, prisma, aws, sends, settings, analytics, contacts };
+  return { service, prisma, aws, sends, settings, analytics, contacts, applications };
 }
 
 describe('SuggestedCandidatesEmailService', () => {
@@ -343,11 +385,6 @@ describe('SuggestedCandidatesEmailService', () => {
     emails(aws)
       .map((args) => `${args.to[0]}:${args.subject}`)
       .sort();
-  const emailFor = (aws: { sendHtmlEmail: jest.Mock<Promise<unknown>, [SentEmail]> }, title: string) => {
-    const found = emails(aws).find((args) => args.subject.includes(title));
-    if (!found) throw new Error(`no email about ${title}`);
-    return found;
-  };
 
   it('sends nothing and says so when the allowlist is empty', async () => {
     for (const value of [undefined, '', ' , ']) {
@@ -366,30 +403,29 @@ describe('SuggestedCandidatesEmailService', () => {
     expect(log).toHaveBeenCalledWith('suggested-candidates email: no allowlisted teams');
   });
 
-  it('emails only current, opted-in leads of live allowlisted roles, one email per role, of the kind each needs', async () => {
+  /* LAB-3139: one email per team. For L1 on team-1 this run: role-5 is new to them (G, H), role-1 has B new (A was
+     emailed last run; C is "Not looking", E deleted, D below the threshold), role-4 has nobody new (B was emailed). */
+  it('emails each current, opted-in lead once per allowlisted team, covering its live roles newest first', async () => {
     const { service, aws, sends } = world();
     const result = await service.sendForRun('run-1');
 
-    // L1: role-1 "new" (B; A was emailed last run), role-4 a reminder (B was emailed, nobody new), role-5 "first".
-    // L2 opted out (skipped thrice). L3 former, L4 deleted, L5 no email, M1 not a lead. role-2 (team-2, not
-    // allowlisted) and role-3 (closed) send nothing.
-    expect(recipients(aws)).toEqual([
-      'l1@x:1 new match for Backend Engineer',
-      'l1@x:Top matches for your Rust Engineer role',
-      'l1@x:Your top matches for Old news are waiting',
-    ]);
-    expect(result).toEqual({ runUid: 'run-1', dryRun: false, sent: 3, skipped: 3 });
+    // L2 opted out. L3 former, L4 deleted, L5 no email, M1 not a lead. role-2 (team-2, not allowlisted) and
+    // role-3 (closed) are in no email.
+    expect(recipients(aws)).toEqual(['l1@x:3 new members match 2 of your roles']);
+    expect(result).toEqual({ runUid: 'run-1', dryRun: false, sent: 1, skipped: 1 });
+    // One claim row per role, naming everyone the role counted.
     expect(
       sends
         .filter((send) => send.runUid === 'run-1')
         .map(
           (send) =>
-            `${send.roleUid}:${send.recipientUid}:${send.kind}:${send.memberUids.join(',')}:${send.candidateCount}`
+            `${send.roleUid}:${send.teamUid}:${send.recipientUid}:${send.kind}:${send.memberUids.join(',')}:${
+              send.candidateCount
+            }`
         )
-        .sort()
-    ).toEqual(['role-1:L1:NEW:B:1', 'role-4:L1:REMINDER:B:1', 'role-5:L1:FIRST:G,H:2']);
+    ).toEqual(['role-5:team-1:L1:NEW:G,H:2', 'role-1:team-1:L1:NEW:A,B:2', 'role-4:team-1:L1:NEW:B:1']);
     expect(emails(aws)[0].from).toBe('directory@example.com');
-    expect(emails(aws).every((sent) => sent.bcc?.length === 0)).toBe(true);
+    expect(emails(aws)[0].bcc).toEqual([]);
     expect(log).toHaveBeenCalledWith(expect.stringContaining('suggested-candidates email done: run run-1'));
   });
 
@@ -397,91 +433,166 @@ describe('SuggestedCandidatesEmailService', () => {
     process.env.LABOS_EMAIL = 'labos@example.com';
     const { service, aws } = world();
     await service.sendForRun('run-1');
-    expect(emails(aws).map((sent) => sent.bcc)).toEqual([
-      ['labos@example.com'],
-      ['labos@example.com'],
-      ['labos@example.com'],
-    ]);
+    expect(emails(aws).map((sent) => sent.bcc)).toEqual([['labos@example.com']]);
   });
 
   it('emails leads of every team when the allowlist is *', async () => {
     process.env.JOB_MATCH_EMAIL_TEAM_UIDS = '*';
     const { service, aws } = world();
     const result = await service.sendForRun('run-1');
-
-    // As above, plus role-2: team-2 is not listed by uid, but * lets it through. role-3 is still closed.
+    // Plus team-2's role-2, which L1 also leads. role-3 is still closed.
     expect(recipients(aws)).toEqual([
-      'l1@x:1 new match for Backend Engineer',
-      'l1@x:Top matches for your Designer role',
-      'l1@x:Top matches for your Rust Engineer role',
-      'l1@x:Your top matches for Old news are waiting',
+      'l1@x:1 member matches your Designer role',
+      'l1@x:3 new members match 2 of your roles',
     ]);
-    expect(result).toEqual({ runUid: 'run-1', dryRun: false, sent: 4, skipped: 3 });
+    expect(result).toEqual({ runUid: 'run-1', dryRun: false, sent: 2, skipped: 1 });
   });
 
-  it('names only new, listed, looking candidates in rank order', async () => {
+  it('lists the roles newest first, fresh people first in each, never a "Not looking" or deleted member', async () => {
     const { service, aws } = world();
     await service.sendForRun('run-1');
-    const role1 = emailFor(aws, 'Backend');
-    // A was emailed to L1 last run, C is "Not looking", E is deleted, D is below the threshold: only B is new.
-    expect(role1.text).toContain('Bob');
-    // Each candidate opens a line of their name, then " · Strong match" for a Strong one (LAB-2837 feedback);
-    // a bare substring check would trip on "Edit criteria".
-    const cardLine = (name: string) => new RegExp(`^${name}( · Strong match)?$`, 'm');
-    expect(role1.text).toMatch(cardLine('Bob'));
-    for (const name of ['Ada', 'Cy', 'Ed', 'Di']) expect(role1.text).not.toMatch(cardLine(name));
-    expect(role1.text).toContain('All top matches for this role');
-    expect(role1.text).not.toMatch(/NOT_LOOKING|ACTIVELY_LOOKING|looking/i);
-    // A is listed and was already seen; C is listed but "Not looking", so it is not counted.
-    expect(role1.text).toContain("Plus 1 match you've already seen is still on the list.");
-
-    const role5 = emailFor(aws, 'Rust');
-    expect(role5.text.indexOf('Gus')).toBeLessThan(role5.text.indexOf('Hal'));
-    expect(role5.text).toContain('Hi Lead,');
-    expect(role5.text).toContain('Acme Labs');
+    const { text } = emails(aws)[0];
+    const at = (piece: string, from = 0) => text.indexOf(piece, from);
+    const rust = at('Rust Engineer\nView role: ');
+    const backend = at('Backend Engineer\nView role: ');
+    const old = at('Old news\nView role: ');
+    expect(rust).toBeGreaterThanOrEqual(0);
+    expect(rust).toBeLessThan(backend);
+    expect(backend).toBeLessThan(old);
+    // In role-1, Bob is new and comes before Ada, whom L1 has already seen.
+    const bob = at('\nBob · Good match\n', backend);
+    expect(bob).toBeGreaterThan(backend);
+    expect(bob).toBeLessThan(at('\nAda · Strong match\n', backend));
+    const cardLine = (name: string) => new RegExp(`^${name}( · (Strong|Good) match)?$`, 'm');
+    for (const name of ['Cy', 'Ed', 'Di']) expect(text).not.toMatch(cardLine(name));
+    expect(text).not.toMatch(/NOT_LOOKING|ACTIVELY_LOOKING|looking/i);
+    expect(text).toContain('Hi Lead,');
+    expect(text).toContain('at Acme Labs since last week');
+    expect(text).not.toContain('Review all');
   });
 
-  /* LAB-2837 feedback: the kind is judged against what each lead was already emailed for the role. */
+  it('gives each card the person line and the Why line, with no requirements count (LAB-3195)', async () => {
+    const { service, aws } = world();
+    await service.sendForRun('run-1');
+    const { text, html } = emails(aws)[0];
+    expect(text).toContain('\nBob · Good match\nEngineer · Saturn, Boston, United States\nB blurb\nView profile: ');
+    expect(text).toContain('\nGus · Good match\nEngineer · Germany\nG blurb\nView profile: ');
+    expect(`${html}\n${text}`).not.toMatch(/\d+ of \d+ requirements?/);
+    expect(text).toContain('\nHal · Strong match\nEngineer\nH blurb\n');
+    expect(html).toContain('src="https://img/B"');
+    // The newer CRITERIA row belongs to an older posting (another hash): its label is never used.
+    expect(html).not.toContain('Stale label');
+  });
+
+  it('says how many of a role’s matches have applied', async () => {
+    const { service, aws, applications } = world();
+    applications.push({ jobOpeningUid: 'role-1', memberUid: 'A' }, { jobOpeningUid: 'role-4', memberUid: 'Z' });
+    await service.sendForRun('run-1');
+    const { text } = emails(aws)[0];
+    expect(text).toContain('Backend Engineer\nView role: ');
+    expect(text).toContain('\n2 matches · 1 has applied\n');
+    expect(text).toContain('\n1 match · none have applied\n');
+    expect(text).not.toContain('None have applied yet.');
+  });
+
+  it('links each role to its public posting and its Suggested tab', async () => {
+    const { service, aws } = world();
+    await service.sendForRun('run-1');
+    const { text } = emails(aws)[0];
+    expect(text).toContain(
+      'View role: https://directory.example/jobs/openings/role-5?utm_source=job_suggested_candidates_email'
+    );
+    expect(text).toContain(
+      'All 2 matches for this role: https://directory.example/teams/team-1/applicants?role=role-1&tab=suggested&'
+    );
+    expect(text).toContain(
+      'View profile: https://directory.example/teams/team-1/applicants?role=role-1&tab=suggested&suggested=B&'
+    );
+  });
+
   describe('first, new or reminder', () => {
-    const sendsOf = (sends: { runUid: string; roleUid: string; recipientUid: string; kind: string }[]) =>
-      sends
-        .filter((send) => send.runUid === 'run-1')
-        .map((send) => `${send.roleUid}:${send.recipientUid}:${send.kind}`);
+    /** L1 has already been emailed about everyone listed now. */
+    const seenEverything = (sends: ReturnType<typeof world>['sends']) =>
+      sends.push(
+        {
+          uid: 'send-0c',
+          runUid: 'run-0',
+          roleUid: 'role-5',
+          teamUid: 'team-1',
+          recipientUid: 'L1',
+          kind: 'FIRST',
+          memberUids: ['G', 'H'],
+          sentAt: day(5),
+        },
+        {
+          uid: 'send-0d',
+          runUid: 'run-0',
+          roleUid: 'role-1',
+          teamUid: 'team-1',
+          recipientUid: 'L1',
+          kind: 'FIRST',
+          memberUids: ['B'],
+          sentAt: day(5),
+        }
+      );
+
+    it('reminds when nobody is new, showing everyone not yet contacted', async () => {
+      const { service, aws, sends } = world();
+      seenEverything(sends);
+      await service.sendForRun('run-1');
+      expect(recipients(aws)).toEqual(['l1@x:Your top matches for 3 roles are waiting']);
+      expect(emails(aws)[0].text).toContain('No new members matched your open roles at Acme Labs since last week.');
+      expect(sends.filter((send) => send.runUid === 'run-1').map((send) => send.kind)).toEqual([
+        'REMINDER',
+        'REMINDER',
+        'REMINDER',
+      ]);
+    });
 
     it('leaves contacted people out of a reminder, and sends none when everyone was contacted', async () => {
-      const { service, aws, contacts, sends } = world();
-      contacts.push({ roleUid: 'role-4', memberUid: 'B' });
-      await service.sendForRun('run-1');
-      expect(recipients(aws).some((r) => r.includes('Old news'))).toBe(false);
-      expect(sendsOf(sends)).not.toContain('role-4:L1:REMINDER');
+      const first = world();
+      seenEverything(first.sends);
+      first.contacts.push({ roleUid: 'role-4', memberUid: 'B' });
+      await first.service.sendForRun('run-1');
+      expect(recipients(first.aws)).toEqual(['l1@x:Your top matches for 2 roles are waiting']);
+
+      const second = world();
+      seenEverything(second.sends);
+      second.contacts.push(
+        ...['G', 'H'].map((memberUid) => ({ roleUid: 'role-5', memberUid })),
+        ...['A', 'B'].map((memberUid) => ({ roleUid: 'role-1', memberUid })),
+        { roleUid: 'role-4', memberUid: 'B' }
+      );
+      await second.service.sendForRun('run-1');
+      expect(second.aws.sendHtmlEmail).not.toHaveBeenCalled();
     });
 
     it('sends one reminder, then nothing until someone new appears', async () => {
       const { service, aws, sends } = world();
-      // Pushed after the first, so a service that forgot to sort newest first would read the first as latest.
+      seenEverything(sends);
+      // Pushed last, so a service that forgot to sort newest first would not read it as the latest.
       sends.push({
         uid: 'send-r',
         runUid: 'run-0b',
         roleUid: 'role-4',
+        teamUid: 'team-1',
         recipientUid: 'L1',
         kind: 'REMINDER',
         memberUids: ['B'],
         sentAt: day(8),
       });
       await service.sendForRun('run-1');
-      expect(recipients(aws).some((r) => r.includes('Old news'))).toBe(false);
+      expect(aws.sendHtmlEmail).not.toHaveBeenCalled();
     });
 
     it('judges each lead by their own emails: a co-lead never emailed gets a first', async () => {
       const { service, aws, settings } = world();
       settings.set('L2', true);
       await service.sendForRun('run-1');
-      expect(recipients(aws)).toEqual(
-        expect.arrayContaining([
-          'l1@x:1 new match for Backend Engineer',
-          'l2@x:Top matches for your Backend Engineer role',
-        ])
-      );
+      expect(recipients(aws)).toEqual([
+        'l1@x:3 new members match 2 of your roles',
+        'l2@x:4 members match 3 of your roles',
+      ]);
     });
 
     it('treats a send row from before kinds existed (no members) as no history', async () => {
@@ -490,45 +601,23 @@ describe('SuggestedCandidatesEmailService', () => {
         uid: 'legacy',
         runUid: 'run-0',
         roleUid: 'role-1',
+        teamUid: 'team-1',
         recipientUid: 'L1',
         kind: 'FIRST',
         memberUids: [],
         sentAt: day(5),
       });
       await service.sendForRun('run-1');
-      expect(recipients(aws)).toContain('l1@x:Top matches for your Backend Engineer role');
+      expect(recipients(aws)).toEqual(['l1@x:4 members match 3 of your roles']);
     });
   });
 
-  describe('card details (LAB-2865)', () => {
-    it("gives each card the member's location and the stored criteria, labelled from the role's current posting", async () => {
-      const { service, aws } = world();
-      await service.sendForRun('run-1');
-      const { text, html } = emailFor(aws, 'Backend');
-      expect(text).toContain(
-        '\nBob\nEngineer\nBoston, United States\nWhy we suggested:\n' +
-          '✓ Distributed systems: Has run a distributed system\n– Rust: Writes Rust in production (not met)\n'
-      );
-      // The newer CRITERIA row belongs to an older posting (another hash): its label is never used.
-      expect(html).not.toContain('Stale label');
-    });
-
-    it('shows unlabelled statements when the role has no criteria row, and skips blank location parts', async () => {
-      const { service, aws } = world();
-      await service.sendForRun('run-1');
-      const { text } = emailFor(aws, 'Rust');
-      expect(text).toContain('\nGus\nEngineer\nGermany\nWhy we suggested:\n');
-      expect(text).toContain('✓ Has run a distributed system\n– Writes Rust in production (not met)\n');
-      expect(text).toContain('Hal · Strong match\nEngineer\nWhy we suggested:');
-    });
-
-    it('reads no criteria in a dry run', async () => {
-      process.env.JOB_MATCH_EMAIL_DRY_RUN = 'true';
-      const { service, prisma } = world();
-      await service.sendForRun('run-1');
-      const kinds = prisma.jobMatchRow.findFirst.mock.calls.map(([args]) => args.where.kind);
-      expect(kinds).not.toContain('CRITERIA');
-    });
+  it('reads no criteria in a dry run', async () => {
+    process.env.JOB_MATCH_EMAIL_DRY_RUN = 'true';
+    const { service, prisma } = world();
+    await service.sendForRun('run-1');
+    const kinds = prisma.jobMatchRow.findFirst.mock.calls.map(([args]) => args.where.kind);
+    expect(kinds).not.toContain('CRITERIA');
   });
 
   describe('locationText', () => {
@@ -554,78 +643,60 @@ describe('SuggestedCandidatesEmailService', () => {
     expect(verifySuggestedCandidatesUnsubscribeToken(decodeURIComponent(match[1])).memberUid).toBe('L1');
   });
 
-  it('emails a lead without a settings row and skips one who opted out', async () => {
-    const { service, aws, settings } = world();
-    settings.set('L2', true);
-    await service.sendForRun('run-1');
-    // L2 was never emailed about any role, so each email is a "first".
-    expect(recipients(aws).filter((r) => r.startsWith('l2@x'))).toEqual([
-      'l2@x:Top matches for your Backend Engineer role',
-      'l2@x:Top matches for your Old news role',
-      'l2@x:Top matches for your Rust Engineer role',
-    ]);
-  });
-
-  it('does not repeat a send for the same run, role and lead', async () => {
+  it('does not repeat a send for the same run, team and lead', async () => {
     const { service, aws } = world();
     await service.sendForRun('run-1');
     aws.sendHtmlEmail.mockClear();
-    await expect(service.sendForRun('run-1')).resolves.toMatchObject({ sent: 0, skipped: 6 });
+    await expect(service.sendForRun('run-1')).resolves.toMatchObject({ sent: 0, skipped: 2 });
     expect(aws.sendHtmlEmail).not.toHaveBeenCalled();
   });
 
-  it('skips a lead whose claim another send already took (P2002)', async () => {
-    const { service, aws, prisma } = world();
+  it('skips a lead whose claim another send already took (P2002), and keeps none of its rows', async () => {
+    const { service, aws, prisma, sends } = world();
     prisma.jobMatchEmailSend.create.mockRejectedValueOnce(Object.assign(new Error('dup'), { code: 'P2002' }));
     const result = await service.sendForRun('run-1');
-    expect(aws.sendHtmlEmail).toHaveBeenCalledTimes(2);
-    expect(result).toMatchObject({ sent: 2, skipped: 4 });
+    expect(aws.sendHtmlEmail).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ sent: 0, skipped: 2 });
+    expect(sends.filter((send) => send.runUid === 'run-1')).toHaveLength(0);
   });
 
-  it('drops the claim when SES fails, so the next send retries', async () => {
+  it('drops every claim row when SES fails, so the next send retries', async () => {
     const { service, aws, sends } = world();
     aws.sendHtmlEmail.mockRejectedValueOnce(new Error('SES down'));
     const thisRun = () => sends.filter((send) => send.runUid === 'run-1');
-    const first = await service.sendForRun('run-1');
-    expect(first).toMatchObject({ sent: 2, skipped: 4 });
-    expect(thisRun()).toHaveLength(2);
+    await expect(service.sendForRun('run-1')).resolves.toMatchObject({ sent: 0, skipped: 2 });
+    expect(thisRun()).toHaveLength(0);
     expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('SES down'));
 
     aws.sendHtmlEmail.mockClear();
-    const second = await service.sendForRun('run-1');
-    expect(second.sent).toBe(1);
+    await expect(service.sendForRun('run-1')).resolves.toMatchObject({ sent: 1 });
     expect(aws.sendHtmlEmail).toHaveBeenCalledTimes(1);
     expect(thisRun()).toHaveLength(3);
   });
 
-  it('dry run logs each recipient and role, and sends and records nothing (no secret or base URL needed)', async () => {
+  it('dry run logs each recipient and team, and sends and records nothing (no secret or base URL needed)', async () => {
     process.env.JOB_MATCH_EMAIL_DRY_RUN = 'true';
     delete process.env.SUGGESTED_CANDIDATES_TOKEN_SECRET;
     delete process.env.WEB_UI_BASE_URL;
     delete process.env.APPLICATION_BASE_URL;
     const { service, aws, sends, prisma } = world();
-    await expect(service.sendForRun('run-1')).resolves.toEqual({ runUid: 'run-1', dryRun: true, sent: 3, skipped: 3 });
+    await expect(service.sendForRun('run-1')).resolves.toEqual({ runUid: 'run-1', dryRun: true, sent: 1, skipped: 1 });
     expect(aws.sendHtmlEmail).not.toHaveBeenCalled();
     expect(prisma.jobMatchEmailSend.create).not.toHaveBeenCalled();
     expect(sends.filter((send) => send.runUid === 'run-1')).toHaveLength(0);
     expect(log).toHaveBeenCalledWith(
-      'DRY RUN would email L1 l1@x about role role-1 "Backend Engineer" (team team-1): new, 1 named of 3 listed'
-    );
-    expect(log).toHaveBeenCalledWith(
-      'DRY RUN would email L1 l1@x about role role-4 "Old news" (team team-1): reminder, 1 named of 1 listed'
-    );
-    expect(log).toHaveBeenCalledWith(
-      'DRY RUN would email L1 l1@x about role role-5 "Rust Engineer" (team team-1): first, 2 named of 2 listed'
+      'DRY RUN would email L1 l1@x about team team-1: new, "Rust Engineer" 2 of 2, "Backend Engineer" 2 of 2, "Old news" 1 of 1'
     );
   });
 
   it('writes a preview and records nothing when IS_EMAIL_ENABLED is off', async () => {
     const { service, aws, sends } = world();
     aws.isEmailServiceEnabled.mockReturnValue(false);
-    await expect(service.sendForRun('run-1')).resolves.toMatchObject({ sent: 3, dryRun: false });
+    await expect(service.sendForRun('run-1')).resolves.toMatchObject({ sent: 1, dryRun: false });
     expect(aws.sendHtmlEmail).not.toHaveBeenCalled();
     expect(sends.filter((send) => send.runUid === 'run-1')).toHaveLength(0);
-    expect(writeFile).toHaveBeenCalledTimes(3);
+    expect(writeFile).toHaveBeenCalledTimes(1);
+    expect(String(writeFile.mock.calls[0][0])).toContain('suggested-candidates-team-1-L1-');
     expect(String(writeFile.mock.calls[0][1])).toContain('/settings/email/unsubscribed?token=');
   });
 
@@ -646,26 +717,26 @@ describe('SuggestedCandidatesEmailService', () => {
     expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('suggested-candidates email for run run-1 failed'));
   });
 
-  describe('analytics (LAB-2853)', () => {
-    const sentEvent = (recipientUid: string, roleUid: string, kind: string, candidateCount: number) => ({
+  describe('analytics (LAB-2853, per team since LAB-3139)', () => {
+    const SENT = {
       name: 'suggested-candidates-email-sent',
-      distinctId: recipientUid,
+      distinctId: 'L1',
       properties: {
-        role_uid: roleUid,
+        role_uid: 'role-5',
+        role_uids: ['role-5', 'role-1', 'role-4'],
+        role_count: 3,
         team_uid: 'team-1',
         run_uid: 'run-1',
-        email_kind: kind,
-        candidate_count: candidateCount,
+        email_kind: 'new',
+        candidate_count: 4,
       },
-    });
+    };
 
-    it('tracks one suggested-candidates-email-sent per delivered email, to the lead, with its kind', async () => {
+    it('tracks one suggested-candidates-email-sent per delivered email, with its roles and kind', async () => {
       const { service, analytics } = world();
       await service.sendForRun('run-1');
-      expect(analytics.trackEvent).toHaveBeenCalledTimes(3);
-      expect(analytics.trackEvent).toHaveBeenCalledWith(sentEvent('L1', 'role-1', 'new', 1));
-      expect(analytics.trackEvent).toHaveBeenCalledWith(sentEvent('L1', 'role-4', 'reminder', 1));
-      expect(analytics.trackEvent).toHaveBeenCalledWith(sentEvent('L1', 'role-5', 'first', 2));
+      expect(analytics.trackEvent).toHaveBeenCalledTimes(1);
+      expect(analytics.trackEvent).toHaveBeenCalledWith(SENT);
     });
 
     it('tracks nothing for a dry run or a preview', async () => {
@@ -682,25 +753,27 @@ describe('SuggestedCandidatesEmailService', () => {
     });
 
     it('tracks nothing for a failed or already-claimed send', async () => {
-      const { service, aws, analytics, prisma } = world();
-      aws.sendHtmlEmail.mockRejectedValueOnce(new Error('SES down'));
-      prisma.jobMatchEmailSend.create.mockRejectedValueOnce(Object.assign(new Error('dup'), { code: 'P2002' }));
-      // role-1's claim is taken, role-4's send fails: only role-5 is delivered and tracked.
-      await expect(service.sendForRun('run-1')).resolves.toMatchObject({ sent: 1, skipped: 5 });
-      expect(analytics.trackEvent).toHaveBeenCalledTimes(1);
-      expect(analytics.trackEvent).toHaveBeenCalledWith(sentEvent('L1', 'role-5', 'first', 2));
+      const failed = world();
+      failed.aws.sendHtmlEmail.mockRejectedValueOnce(new Error('SES down'));
+      await failed.service.sendForRun('run-1');
+      expect(failed.analytics.trackEvent).not.toHaveBeenCalled();
+
+      const claimed = world();
+      claimed.prisma.jobMatchEmailSend.create.mockRejectedValueOnce(Object.assign(new Error('dup'), { code: 'P2002' }));
+      await claimed.service.sendForRun('run-1');
+      expect(claimed.analytics.trackEvent).not.toHaveBeenCalled();
     });
 
-    it('still sends and counts every email when tracking throws or rejects, and logs the failure', async () => {
-      const { service, aws, analytics, sends } = world();
+    it('still sends and counts the email when tracking throws or rejects, and logs the failure', async () => {
+      process.env.JOB_MATCH_EMAIL_TEAM_UIDS = '*';
+      const { service, aws, analytics } = world();
       analytics.trackEvent
         .mockImplementationOnce(() => {
           throw new Error('posthog exploded');
         })
         .mockRejectedValueOnce(new Error('posthog unreachable'));
-      await expect(service.sendForRun('run-1')).resolves.toMatchObject({ sent: 3, skipped: 3 });
-      expect(aws.sendHtmlEmail).toHaveBeenCalledTimes(3);
-      expect(sends.filter((send) => send.runUid === 'run-1')).toHaveLength(3);
+      await expect(service.sendForRun('run-1')).resolves.toMatchObject({ sent: 2, skipped: 1 });
+      expect(aws.sendHtmlEmail).toHaveBeenCalledTimes(2);
       await new Promise((resolve) => setImmediate(resolve));
       expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('posthog exploded'));
       expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('posthog unreachable'));

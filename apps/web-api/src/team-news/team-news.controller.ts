@@ -112,7 +112,10 @@ export class TeamNewsController {
   @NoCache()
   @UseGuards(ServiceAuthGuard)
   async getTeamNewsDigestPicks(@Body() body: unknown) {
-    const { memberUids, sinceCreatedAt, untilCreatedAt, limit } = this.parse(TeamNewsDigestPicksRequestSchema, body);
+    const { memberUids, sinceCreatedAt, untilCreatedAt, limit, frequency, lastShownLeadUid } = this.parse(
+      TeamNewsDigestPicksRequestSchema,
+      body
+    );
     const toDate = (value?: string): Date | undefined => {
       if (!value) return undefined;
       const d = new Date(value);
@@ -123,6 +126,8 @@ export class TeamNewsController {
       sinceCreatedAt: toDate(sinceCreatedAt),
       untilCreatedAt: toDate(untilCreatedAt),
       limit,
+      frequency,
+      lastShownLeadUid,
     });
   }
 

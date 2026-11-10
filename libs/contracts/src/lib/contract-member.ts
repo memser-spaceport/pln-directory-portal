@@ -1,5 +1,6 @@
 import { initContract } from '@ts-rest/core';
 import {
+  MemberCrawlIndexResponseSchema,
   MemberDetailQueryParams,
   MemberQueryParams,
   PreferenceSchema,
@@ -61,6 +62,14 @@ export const apiMembers = contract.router({
       200: contract.response<unknown>(),
     },
     summary: 'Get member filter values',
+  },
+  getMemberCrawlIndex: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/members/crawl-index`,
+    responses: {
+      200: MemberCrawlIndexResponseSchema,
+    },
+    summary: 'Flat uid/updatedAt list of member profiles to index, for sitemaps',
   },
   getMember: {
     method: 'GET',
