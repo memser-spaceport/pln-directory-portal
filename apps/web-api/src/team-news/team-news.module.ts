@@ -57,6 +57,7 @@ import { NewsTagVocabularyService } from './news-tag-vocabulary.service';
     TeamNewsEnrichmentService,
     TeamNewsSuggestionsService,
     TeamNewsUpvotesService,
+    LabosDigestService,
   ],
 })
 export class TeamNewsModule {}

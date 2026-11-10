@@ -1,11 +1,15 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { LabosDigestFrequency, LabosDigestPickSource, Prisma } from '@prisma/client';
 import { EDITORIAL_RANK_LIMIT } from './team-news-trending-seed.util';
 import { TEAM_NEWS_EXCLUDED_TEAM_NAMES } from './team-news-public-list.config';
+import { extractDomain } from './utils/url-normalize';
+import { isSafeHttpUrl } from './team-news-body-html.util';
+import { TeamNewsService } from './team-news.service';
 import { PrismaService } from '../shared/prisma.service';
 import type {
   LabosDigestFoundNewsResponse,
   LabosDigestFrequency as LabosDigestFrequencyName,
+  LabosDigestNewsDetail,
   LabosDigestNewsQuery,
   LabosDigestPickSource as LabosDigestPickSourceName,
   LabosDigestSendList,
@@ -13,8 +17,10 @@ import type {
   LabosDigestServiceNewsResponse,
   LabosDigestStory,
   LabosDigestView,
+  PostLabosDigestNews,
   RecordLabosDigestSend,
   RecordLabosDigestSendResponse,
+  UpdateLabosDigestNews,
 } from 'libs/contracts/src/schema/team-news';
 
 export const LABOS_DIGEST_OVERRIDE_ID = 'current';
@@ -33,6 +39,22 @@ const STORY_SELECT = {
   team: { select: { uid: true, name: true } },
 } as const;
 
+const NEWS_DETAIL_SELECT = {
+  uid: true,
+  title: true,
+  summary: true,
+  contentHtml: true,
+  sourceUrl: true,
+  sourceUrls: true,
+  sourceDomain: true,
+  imageUrl: true,
+  eventDate: true,
+  tags: true,
+  team: { select: { uid: true, name: true } },
+} as const;
+
+type NewsDetailRow = Prisma.TeamNewsItemGetPayload<{ select: typeof NEWS_DETAIL_SELECT }>;
+
 type StoryRow = Prisma.TeamNewsItemGetPayload<{ select: typeof STORY_SELECT }>;
 
 export type DigestTopSelection = {
@@ -43,7 +65,10 @@ export type DigestTopSelection = {
 
 @Injectable()
 export class LabosDigestService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly teamNews?: TeamNewsService
+  ) {}
 
   async getView(): Promise<LabosDigestView> {
     const [selection, states] = await Promise.all([
@@ -158,6 +183,46 @@ export class LabosDigestService {
         };
       }),
     };
+  }
+
+  async getNewsItem(uid: string): Promise<LabosDigestNewsDetail> {
+    const row = await this.prisma.teamNewsItem.findUnique({
+      where: { uid },
+      select: NEWS_DETAIL_SELECT,
+    });
+    if (!row) throw new NotFoundException('News item not found');
+    const history = await this.historyByItem([uid]);
+    return toNewsDetail(row, history.get(uid) ?? []);
+  }
+
+  async updateNewsItem(uid: string, input: UpdateLabosDigestNews): Promise<LabosDigestNewsDetail> {
+    const existing = await this.prisma.teamNewsItem.findUnique({ where: { uid }, select: { uid: true } });
+    if (!existing) throw new NotFoundException('News item not found');
+    const sourceUrls = uniqueHttpsUrls(input.sourceUrls);
+    const sourceUrl = sourceUrls[0];
+    await this.prisma.teamNewsItem.update({
+      where: { uid },
+      data: {
+        title: input.title.trim(),
+        summary: input.summary.trim() || null,
+        sourceUrl,
+        sourceUrls,
+        sourceDomain: extractDomain(sourceUrl),
+      },
+    });
+    return this.getNewsItem(uid);
+  }
+
+  async postNews(input: PostLabosDigestNews, memberUid: string): Promise<LabosDigestNewsDetail> {
+    if (!this.teamNews) {
+      throw new BadRequestException('News posting is not available');
+    }
+    const { uid } = await this.teamNews.createTeamPostedNews(
+      input.teamUid,
+      { title: input.title, body: input.body, url: input.url },
+      { uid: memberUid, isDirectoryAdmin: true }
+    );
+    return this.getNewsItem(uid);
   }
 
   async listServiceNews(query: LabosDigestNewsQuery): Promise<LabosDigestServiceNewsResponse> {
@@ -360,6 +425,35 @@ function toSend(row: SendRow): LabosDigestSendList['items'][number] {
     channel: row.channel,
     stories: row.stories.map((story) => toStory(story.newsItem, story.position, source)),
   };
+}
+
+function toNewsDetail(
+  row: NewsDetailRow,
+  topStoryHistory: LabosDigestNewsDetail['topStoryHistory']
+): LabosDigestNewsDetail {
+  const sourceUrls = row.sourceUrls.length > 0 ? row.sourceUrls : [row.sourceUrl];
+  return {
+    uid: row.uid,
+    title: row.title,
+    summary: row.summary,
+    contentHtml: row.contentHtml,
+    sourceUrl: row.sourceUrl,
+    sourceUrls,
+    sourceDomain: row.sourceDomain,
+    imageUrl: row.imageUrl,
+    eventDate: row.eventDate.toISOString(),
+    tags: row.tags,
+    team: { uid: row.team.uid, name: row.team.name },
+    topStoryHistory,
+  };
+}
+
+function uniqueHttpsUrls(urls: string[]): string[] {
+  const unique = [...new Set(urls.map((url) => url.trim()).filter(Boolean))];
+  if (unique.length === 0 || unique.some((url) => !isSafeHttpUrl(url))) {
+    throw new BadRequestException('Each source must be a full http or https link');
+  }
+  return unique;
 }
 
 function toStory(row: StoryRow, position: number, source: LabosDigestPickSourceName): LabosDigestStory {

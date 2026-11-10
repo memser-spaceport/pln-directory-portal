@@ -37,6 +37,8 @@ describe('LabosDigestService', () => {
   const stateFindMany = jest.fn();
   const newsFindMany = jest.fn();
   const newsCount = jest.fn();
+  const newsFindUnique = jest.fn();
+  const newsUpdate = jest.fn();
   const sendCreate = jest.fn();
   const sendFindMany = jest.fn();
   const sendCount = jest.fn();
@@ -58,7 +60,7 @@ describe('LabosDigestService', () => {
       findUnique: sendFindUnique,
     },
     labosDigestSendStory: { findMany: storyFindMany },
-    teamNewsItem: { findMany: newsFindMany, count: newsCount },
+    teamNewsItem: { findMany: newsFindMany, count: newsCount, findUnique: newsFindUnique, update: newsUpdate },
   } as unknown as PrismaService;
 
   const service = new LabosDigestService(prisma);
@@ -233,6 +235,74 @@ describe('LabosDigestService', () => {
       { summary: { contains: 'fundraise', mode: 'insensitive' } },
       { contentHtml: { contains: 'fundraise', mode: 'insensitive' } },
     ]);
+  });
+
+  it('updates the real title, description, and sources', async () => {
+    const detail = {
+      uid: 'a',
+      title: 'New title',
+      summary: 'New description',
+      contentHtml: '<p>Body</p>',
+      sourceUrl: 'https://news.example/a',
+      sourceUrls: ['https://news.example/a', 'https://other.example/a'],
+      sourceDomain: 'news.example',
+      imageUrl: null,
+      eventDate: new Date('2026-11-01T00:00:00.000Z'),
+      tags: ['ai'],
+      team: { uid: 'team-1', name: 'Acme' },
+    };
+    newsFindUnique.mockResolvedValueOnce({ uid: 'a' }).mockResolvedValueOnce(detail);
+    newsUpdate.mockResolvedValue({});
+    storyFindMany.mockResolvedValue([]);
+
+    const saved = await service.updateNewsItem('a', {
+      title: 'New title',
+      summary: 'New description',
+      sourceUrls: ['https://news.example/a', 'https://other.example/a'],
+    });
+
+    expect(newsUpdate).toHaveBeenCalledWith({
+      where: { uid: 'a' },
+      data: {
+        title: 'New title',
+        summary: 'New description',
+        sourceUrl: 'https://news.example/a',
+        sourceUrls: ['https://news.example/a', 'https://other.example/a'],
+        sourceDomain: 'news.example',
+      },
+    });
+    expect(saved.title).toBe('New title');
+    expect(saved.summary).toBe('New description');
+  });
+
+  it('posts news for a team as a directory admin', async () => {
+    const createTeamPostedNews = jest.fn().mockResolvedValue({ uid: 'posted' });
+    const posting = new LabosDigestService(prisma, { createTeamPostedNews } as any);
+    newsFindUnique.mockResolvedValue({
+      uid: 'posted',
+      title: 'Headline',
+      summary: null,
+      contentHtml: '<p>Body</p>',
+      sourceUrl: 'https://news.example/post',
+      sourceUrls: ['https://news.example/post'],
+      sourceDomain: 'news.example',
+      imageUrl: null,
+      eventDate: new Date('2026-11-01T00:00:00.000Z'),
+      tags: [],
+      team: { uid: 'team-1', name: 'Acme' },
+    });
+
+    const created = await posting.postNews(
+      { teamUid: 'team-1', title: 'Headline', body: 'Body', url: 'https://news.example/post' },
+      'admin-1'
+    );
+
+    expect(createTeamPostedNews).toHaveBeenCalledWith(
+      'team-1',
+      { title: 'Headline', body: 'Body', url: 'https://news.example/post' },
+      { uid: 'admin-1', isDirectoryAdmin: true }
+    );
+    expect(created.uid).toBe('posted');
   });
 
   it('says the next AI email skips a lead that frequency already sent', async () => {

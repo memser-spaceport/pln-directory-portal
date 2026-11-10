@@ -7,9 +7,11 @@ import { useAuth } from '../../context/auth-context';
 import {
   useLabosDigest,
   useLabosDigestNews,
+  useLabosDigestNewsItem,
   useResetLabosDigestPicks,
   useSaveLabosDigestPicks,
 } from '../../hooks/labos-digest/useLabosDigest';
+import { NewsDetailModal, PostNewsModal } from './DigestModals';
 import type { LabosDigestFoundNews, LabosDigestStory, LabosDigestView } from './types';
 import s from './LabosDigestPage.module.scss';
 
@@ -74,6 +76,9 @@ export function LabosDigestPage() {
   const reset = useResetLabosDigestPicks();
   const [order, setOrder] = useState<LabosDigestStory[]>([]);
   const [replaceIndex, setReplaceIndex] = useState<number | null>(null);
+  const [detailUid, setDetailUid] = useState<string | null>(null);
+  const [postOpen, setPostOpen] = useState(false);
+  const detail = useLabosDigestNewsItem(authToken, detailUid);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), DEBOUNCE_MS);
@@ -154,9 +159,9 @@ export function LabosDigestPage() {
                   {order.map((story, index) => (
                     <li key={story.uid} className={s.story}>
                       <div>
-                        <p className={s.storyTitle}>
+                        <button type="button" className={s.titleButton} onClick={() => setDetailUid(story.uid)}>
                           {index + 1}. {story.title}
-                        </p>
+                        </button>
                         <p className={s.storyMeta}>
                           {story.sourceDomain || 'Unknown source'} · {day(story.eventDate)} ·{' '}
                           {story.tags.join(', ') || 'No tags'}
@@ -216,7 +221,12 @@ export function LabosDigestPage() {
 
         <section className={s.panel}>
           <div className={s.panelBody}>
-            <h2 className={s.sectionTitle}>Found news</h2>
+            <div className={s.header}>
+              <h2 className={s.sectionTitle}>Found news</h2>
+              <button type="button" className={s.primaryButton} onClick={() => setPostOpen(true)}>
+                Post news
+              </button>
+            </div>
             <div className={s.toolbar}>
               <div className={s.searchWrapper}>
                 <span className={s.searchIcon}>
@@ -294,7 +304,11 @@ export function LabosDigestPage() {
                     )}
                     {news.data.items.map((item) => (
                       <tr key={item.uid}>
-                        <td>{item.title}</td>
+                        <td>
+                          <button type="button" className={s.titleButton} onClick={() => setDetailUid(item.uid)}>
+                            {item.title}
+                          </button>
+                        </td>
                         <td>{item.source || '—'}</td>
                         <td>{day(item.date)}</td>
                         <td>
@@ -349,6 +363,16 @@ export function LabosDigestPage() {
             )}
           </div>
         </section>
+        {detailUid && (
+          <NewsDetailModal
+            authToken={authToken}
+            item={detail.data}
+            isLoading={detail.isLoading}
+            isError={detail.isError}
+            onClose={() => setDetailUid(null)}
+          />
+        )}
+        {postOpen && <PostNewsModal authToken={authToken} onClose={() => setPostOpen(false)} />}
       </div>
     </ApprovalLayout>
   );

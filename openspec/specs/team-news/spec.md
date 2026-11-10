@@ -184,6 +184,34 @@ The found news list SHALL accept `q`. A non-empty `q` SHALL keep a story whose t
 - **WHEN** an admin searches for a word that appears in a story title or in its content
 - **THEN** the list contains that story
 
+### Requirement: Admin edit and post change the real news item
+
+A directory admin SHALL open one news item and change its title, description, and source links. The description is the summary. The change SHALL be stored on the news item, so the feed, the team page, and the digest show it. A directory admin SHALL post a news item for a team with a headline, a body, and one link, using the same rules as Post news on the team page.
+
+#### Scenario: Edit the title
+
+- **WHEN** an admin saves a new title for a story
+- **THEN** the stored news item has that title
+
+#### Scenario: Post for a team
+
+- **WHEN** an admin posts a headline, body, and link for a team
+- **THEN** the story is created for that team as a team post
+
+### Requirement: Directory admins can read all news through MCP
+
+The MCP tools `list_all_news`, `get_digest_top_stories`, `list_digest_sends`, and `get_digest_send` SHALL be visible only to a directory admin, in the news scope at read. `list_all_news` SHALL return the same found-news fields as the service news list. A member who is not a directory admin SHALL NOT see or call these tools. `list_news` and `post_team_news` SHALL stay unchanged.
+
+#### Scenario: Admin list
+
+- **WHEN** a directory admin calls `list_all_news`
+- **THEN** the tool returns the found news for the requested filters
+
+#### Scenario: Member
+
+- **WHEN** a member who is not a directory admin lists MCP tools
+- **THEN** the digest admin tools are absent
+
 ### Requirement: Admin picks last until the next real send
 
 An admin list SHALL stay until the next successful daily or weekly forum digest that sends. A test send SHALL NOT clear it. A run that finds nothing to send SHALL NOT clear it. The send SHALL delete the list only when it used the admin picks and the list version still matches the version read at the start of that send. A newer save during the send SHALL stay. After the delete, the next digest SHALL use the AI picks again. The send SHALL record the ordered stories, and found news SHALL show when a story was in a past digest, with the date, frequency, position, and whether it was the email lead.

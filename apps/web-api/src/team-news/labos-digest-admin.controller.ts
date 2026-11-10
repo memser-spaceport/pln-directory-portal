@@ -1,12 +1,15 @@
-import { BadRequestException, Body, Controller, Delete, Get, Put, Query, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { applyDecorators } from '@nestjs/common';
 import { ZodType, ZodTypeDef } from 'zod';
 import {
   LabosDigestFoundNewsResponseSchema,
+  LabosDigestNewsDetailSchema,
   LabosDigestNewsQuerySchema,
   LabosDigestViewSchema,
+  PostLabosDigestNewsSchema,
   SaveLabosDigestPicksSchema,
+  UpdateLabosDigestNewsSchema,
 } from 'libs/contracts/src/schema/team-news';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
 import { NoCache } from '../decorators/no-cache.decorator';
@@ -53,6 +56,29 @@ export class LabosDigestAdminController {
   @adminDocs(LabosDigestFoundNewsResponseSchema)
   listNews(@Query() query: Record<string, unknown>) {
     return this.labosDigest.listFoundNews(parseInput(LabosDigestNewsQuerySchema, query));
+  }
+
+  @Get('news/:uid')
+  @NoCache()
+  @adminDocs(LabosDigestNewsDetailSchema)
+  getNews(@Param('uid') uid: string) {
+    return this.labosDigest.getNewsItem(uid);
+  }
+
+  @Patch('news/:uid')
+  @adminDocs(LabosDigestNewsDetailSchema)
+  updateNews(@Param('uid') uid: string, @Body() body: unknown) {
+    return this.labosDigest.updateNewsItem(uid, parseInput(UpdateLabosDigestNewsSchema, body));
+  }
+
+  @Post('news')
+  @adminDocs(LabosDigestNewsDetailSchema)
+  postNews(@Body() body: unknown, @Req() request: AdminRequest) {
+    const memberUid = request.user?.memberUid;
+    if (!memberUid) {
+      throw new BadRequestException('Admin token has no member');
+    }
+    return this.labosDigest.postNews(parseInput(PostLabosDigestNewsSchema, body), memberUid);
   }
 }
 

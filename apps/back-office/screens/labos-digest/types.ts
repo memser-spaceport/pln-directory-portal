@@ -60,3 +60,18 @@ export type LabosDigestNewsFilters = {
   tags?: string;
   q?: string;
 };
+
+export type LabosDigestNewsDetail = {
+  uid: string;
+  title: string;
+  summary: string | null;
+  contentHtml: string | null;
+  sourceUrl: string;
+  sourceUrls: string[];
+  sourceDomain: string | null;
+  imageUrl: string | null;
+  eventDate: string;
+  tags: string[];
+  team: { uid: string; name: string };
+  topStoryHistory: LabosDigestTopStoryHistory[];
+};

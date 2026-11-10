@@ -563,6 +563,37 @@ export const LabosDigestFoundNewsSchema = z.object({
   topStoryHistory: z.array(LabosDigestTopStoryHistorySchema),
 });
 
+export const LabosDigestNewsDetailSchema = z.object({
+  uid: z.string(),
+  title: z.string(),
+  summary: z.string().nullable(),
+  contentHtml: z.string().nullable(),
+  sourceUrl: z.string(),
+  sourceUrls: z.array(z.string()),
+  sourceDomain: z.string().nullable(),
+  imageUrl: z.string().nullable(),
+  eventDate: z.string(),
+  tags: z.array(z.string()),
+  team: z.object({
+    uid: z.string(),
+    name: z.string(),
+  }),
+  topStoryHistory: z.array(LabosDigestTopStoryHistorySchema),
+});
+
+export const UpdateLabosDigestNewsSchema = z.object({
+  title: z.string().trim().min(1).max(500),
+  summary: z.string().trim().max(8000),
+  sourceUrls: z.array(z.string().trim().min(1)).min(1).max(20),
+});
+
+export const PostLabosDigestNewsSchema = z.object({
+  teamUid: z.string().trim().min(1),
+  title: z.string().trim().min(1).max(150),
+  body: z.string().optional(),
+  url: z.string().trim().min(1),
+});
+
 export const LabosDigestFoundNewsResponseSchema = z.object({
   page: z.number().int(),
   limit: z.number().int(),
@@ -633,6 +664,9 @@ export type LabosDigestStory = z.infer<typeof LabosDigestStorySchema>;
 export type SaveLabosDigestPicks = z.infer<typeof SaveLabosDigestPicksSchema>;
 export type LabosDigestNewsQuery = z.infer<typeof LabosDigestNewsQuerySchema>;
 export type LabosDigestFoundNewsResponse = z.infer<typeof LabosDigestFoundNewsResponseSchema>;
+export type LabosDigestNewsDetail = z.infer<typeof LabosDigestNewsDetailSchema>;
+export type UpdateLabosDigestNews = z.infer<typeof UpdateLabosDigestNewsSchema>;
+export type PostLabosDigestNews = z.infer<typeof PostLabosDigestNewsSchema>;
 export type LabosDigestServiceNewsResponse = z.infer<typeof LabosDigestServiceNewsResponseSchema>;
 export type LabosDigestSendList = z.infer<typeof LabosDigestSendListSchema>;
 export type LabosDigestSendsQuery = z.infer<typeof LabosDigestSendsQuerySchema>;

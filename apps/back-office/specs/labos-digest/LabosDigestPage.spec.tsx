@@ -7,8 +7,10 @@ import { useAuth } from '../../context/auth-context';
 import {
   fetchLabosDigest,
   fetchLabosDigestNews,
+  fetchLabosDigestNewsItem,
   resetLabosDigestPicks,
   saveLabosDigestPicks,
+  updateLabosDigestNews,
 } from '../../utils/services/labos-digest';
 
 const mockReplace = jest.fn();
@@ -31,8 +33,14 @@ jest.mock('../../layout/approval-layout', () => ({
 jest.mock('../../utils/services/labos-digest', () => ({
   fetchLabosDigest: jest.fn(),
   fetchLabosDigestNews: jest.fn(),
+  fetchLabosDigestNewsItem: jest.fn(),
   saveLabosDigestPicks: jest.fn(),
   resetLabosDigestPicks: jest.fn(),
+  updateLabosDigestNews: jest.fn(),
+  postLabosDigestNews: jest.fn(),
+}));
+jest.mock('../../utils/services/team', () => ({
+  fetchTeamsForAutocomplete: jest.fn(),
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
@@ -40,6 +48,8 @@ const mockDigest = fetchLabosDigest as jest.Mock;
 const mockNews = fetchLabosDigestNews as jest.Mock;
 const mockSave = saveLabosDigestPicks as jest.Mock;
 const mockReset = resetLabosDigestPicks as jest.Mock;
+const mockItem = fetchLabosDigestNewsItem as jest.Mock;
+const mockUpdate = updateLabosDigestNews as jest.Mock;
 
 const view = {
   source: 'ai' as const,
@@ -118,6 +128,21 @@ describe('LabOS Digest page', () => {
     mockNews.mockResolvedValue(newsPage);
     mockSave.mockResolvedValue({ ...view, source: 'admin' });
     mockReset.mockResolvedValue(view);
+    mockItem.mockResolvedValue({
+      uid: 'a',
+      title: 'Alpha',
+      summary: 'A summary',
+      contentHtml: '<p>Body</p>',
+      sourceUrl: 'https://a.example',
+      sourceUrls: ['https://a.example'],
+      sourceDomain: 'a.example',
+      imageUrl: null,
+      eventDate: '2026-11-01T00:00:00.000Z',
+      tags: ['ai'],
+      team: { uid: 't1', name: 'Acme' },
+      topStoryHistory: [],
+    });
+    mockUpdate.mockResolvedValue({});
   });
 
   it('sends a non-admin to the access denied page', () => {
@@ -184,5 +209,21 @@ describe('LabOS Digest page', () => {
     await waitFor(() => expect(mockNews).toHaveBeenCalledWith(expect.objectContaining({ q: 'Gamma' })), {
       timeout: 1500,
     });
+  });
+
+  it('opens a story and saves a new title', async () => {
+    asAdmin(true);
+    renderWithClient(<LabosDigestPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '1. Alpha' }));
+    expect(await screen.findByDisplayValue('Alpha')).toBeTruthy();
+    fireEvent.change(screen.getByDisplayValue('Alpha'), { target: { value: 'Alpha edited' } });
+    fireEvent.click(screen.getAllByText('Save').at(-1) as HTMLElement);
+
+    await waitFor(() =>
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ uid: 'a', title: 'Alpha edited', sourceUrls: ['https://a.example'] })
+      )
+    );
   });
 });
