@@ -180,6 +180,62 @@ describe('JobMatchRunner', () => {
     });
   });
 
+  it('saves the role without blurbs when the blurb JSON keeps failing', async () => {
+    jest.setTimeout(25000);
+    const prisma = prismaMock();
+    prisma.jobMatchRow.findUnique.mockResolvedValue(null);
+    prisma.$queryRaw.mockImplementation(async (strings: TemplateStringsArray) => {
+      const sql = Array.from(strings).join(' ');
+      if (sql.includes('"JobOpening"')) return [jobRow];
+      return [memberRow];
+    });
+    prisma.findMany.mockImplementation(async (args: { where: { kind: string } }) => {
+      if (args.where.kind === 'SCORE') {
+        return [
+          {
+            memberUid: 'member-1',
+            payload: {
+              profileHash: profileTextHash(
+                profileText({
+                  uid: memberRow.uid,
+                  name: memberRow.name,
+                  role: memberRow.role,
+                  currentCompany: memberRow.currentCompany,
+                  bio: memberRow.bio,
+                  aboutYou: memberRow.aboutYou,
+                  customSkills: [],
+                  city: null,
+                  country: null,
+                  skills: ['Go'],
+                  experiences: [],
+                  teams: [],
+                })
+              ),
+              fits: { 'role-1': { fit: 90, roleTextHash: roleTextHash(rolePosting(jobRow)) } },
+            },
+          },
+        ];
+      }
+      return [];
+    });
+    prisma.jobMatchRow.findFirst.mockResolvedValue({ payload: labelled(criteria) });
+    generateTextMock.mockRejectedValue(new Error('Expected \',\' or \'}\' after property value in JSON'));
+
+    const runner = new JobMatchRunner(
+      prisma as never,
+      { getResponsesModel: () => 'model' } as never,
+      { emit: jest.fn() } as never
+    );
+    await expect(runner.processTeam('run-1', { uid: 'team-1', name: 'Prime Intellect' })).resolves.toBeUndefined();
+
+    expect(prisma.suggestionCreateMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ memberUid: 'member-1', fit: 90, blurb: null })],
+    });
+    expect(prisma.jobMatchRow.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ kind: 'ROLE', roleUid: 'role-1' }),
+    });
+  });
+
   it('marks a member interested in the role or its team and ranks them first on a tie (LAB-2788)', async () => {
     const prisma = prismaMock();
     prisma.jobMatchRow.findUnique.mockResolvedValue(null);
