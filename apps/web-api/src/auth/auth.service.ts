@@ -23,6 +23,7 @@ import { AuthMetrics, extractErrorCode, statusClassOf } from '../metrics/auth.me
 import { TeamsService } from '../teams/teams.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { applyDemoDayParticipantPolicyAssignments } from '../demo-days/demo-day-investor-policy.util';
+import { LOGIN_TOKEN_TTL_SECONDS } from './auth.constants';
 
 @Injectable()
 export class AuthService implements OnModuleInit {
@@ -100,7 +101,7 @@ export class AuthService implements OnModuleInit {
    * Issues a short-lived login JWT from auth-service for an existing Directory member.
    * Fails if no member exists for the email.
    */
-  async issueLoginToken(email: string, expiresIn = 864000): Promise<string> {
+  async issueLoginToken(email: string, expiresIn = LOGIN_TOKEN_TTL_SECONDS): Promise<string> {
     const normalizedEmail = email.trim().toLowerCase();
     const member = await this.membersService.findMemberByEmail(normalizedEmail);
     if (!member || member.deletedAt) {

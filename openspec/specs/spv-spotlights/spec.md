@@ -96,3 +96,19 @@ Removing a participant from a spotlight or changing their access SHALL NOT chang
 
 - **WHEN** an admin removes an investor whose email is in a saved list
 - **THEN** the list still contains that email
+
+### Requirement: Invite login links expire after 72 hours
+
+A login token that the system puts in an SPV spotlight or team pitch invite link SHALL expire 72 hours after it is issued. Every place that issues such a token SHALL use the same lifetime: spotlight emails, team pitch invites, and the investor login-link export script.
+
+#### Scenario: An investor opens an invite after it expired
+
+- **GIVEN** an invite link whose login token was issued more than 72 hours ago
+- **WHEN** the investor opens the link
+- **THEN** the token is not redeemed and the investor signs in through the normal sign-in
+
+#### Scenario: An investor opens an invite in time
+
+- **GIVEN** an invite link whose login token was issued less than 72 hours ago
+- **WHEN** the investor opens the link
+- **THEN** the investor is signed in from the link

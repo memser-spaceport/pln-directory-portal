@@ -13,8 +13,6 @@ import { InvestorBulkProvisionService } from '../investors/investor-bulk-provisi
 import { InvestorBulkRowResult, InvestorBulkSummary } from '../investors/investor-bulk.types';
 import { AuthService } from '../auth/auth.service';
 
-const LOGIN_TOKEN_TTL_SECONDS = 864000; // 10 days
-
 @Injectable()
 export class TeamPitchParticipantsService {
   constructor(
@@ -320,7 +318,7 @@ export class TeamPitchParticipantsService {
     }
 
     const webBase = process.env.WEB_UI_BASE_URL || '';
-    const loginToken = await this.authService.issueLoginToken(participant.member.email, LOGIN_TOKEN_TTL_SECONDS);
+    const loginToken = await this.authService.issueLoginToken(participant.member.email);
     const pitchLink = `${webBase}/spotlight/${participant.teamPitch.slug}?prefillEmail=${encodeURIComponent(
       participant.member.email
     )}&loginToken=${encodeURIComponent(loginToken)}`;
@@ -509,7 +507,7 @@ export class TeamPitchParticipantsService {
     }
 
     const webBase = process.env.WEB_UI_BASE_URL || '';
-    const loginToken = await this.authService.issueLoginToken(participant.member.email, LOGIN_TOKEN_TTL_SECONDS);
+    const loginToken = await this.authService.issueLoginToken(participant.member.email);
     const pitchLink = `${webBase}/spotlight/${participant.teamPitch.slug}?prefillEmail=${encodeURIComponent(
       participant.member.email
     )}&loginToken=${encodeURIComponent(loginToken)}`;
