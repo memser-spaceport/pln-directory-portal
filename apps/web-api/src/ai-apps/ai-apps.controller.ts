@@ -44,6 +44,7 @@ import { AiAppsStarterKitService } from './ai-apps-starter-kit.service';
 import { AiAppTokenGuard } from './guards/ai-app-token.guard';
 import { AiAppMemberContextGuard } from './guards/ai-app-member-context.guard';
 import { AiAppMeRbacGuard } from './guards/ai-app-me-rbac.guard';
+import { AiAppReadOrAudienceGuard } from './guards/ai-app-read-or-audience.guard';
 import { DeployAppDto } from './dto/deploy-app.dto';
 import { RegisterDraftDto } from './dto/register-draft.dto';
 import { CreateAiAppDeployKeyDto, DeployDraftDto } from './dto/deploy-draft.dto';
@@ -161,7 +162,7 @@ export class AiAppsController {
    */
   @NoCache()
   @Post('sessions/code')
-  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @UseGuards(UserTokenCheckGuard, AiAppReadOrAudienceGuard)
   @RequirePermissions(READ)
   @UsePipes(ZodValidationPipe)
   async issueAppSessionCode(@Body() body: AppSessionRequestDto, @Req() req: any) {
@@ -187,7 +188,7 @@ export class AiAppsController {
   // Called by every app's auth gate from the cluster's shared egress IPs, like access-check.
   @Throttle(AI_APPS_SIDECAR_THROTTLE_LIMIT, AI_APPS_SIDECAR_THROTTLE_TTL_SECONDS)
   @Post('sessions/exchange-token')
-  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @UseGuards(UserTokenCheckGuard, AiAppReadOrAudienceGuard)
   @RequirePermissions(READ)
   @UsePipes(ZodValidationPipe)
   async exchangeAppSessionToken(@Body() body: AppSessionRequestDto, @Req() req: any) {
@@ -418,6 +419,19 @@ export class AiAppsController {
     await validateUserAccessToken(req);
     const memberUid = await this.resolveMemberUid(req);
     return this.accessService.checkAccess(memberUid, query.appId, query.method, { app }, query.target ?? 'prod');
+  }
+
+  /**
+   * Apps published to the signed-in member (LAB-3200): what LabOS lists under More for a member in an app's
+   * audience. Needs no AI Apps permission and never returns the catalog. Declared before `:uid` so the literal
+   * path wins.
+   */
+  @NoCache()
+  @Get('published')
+  @UseGuards(UserTokenCheckGuard)
+  async listPublishedApps(@Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return { apps: await this.accessService.listPublishedApps(memberUid) };
   }
 
   /** Single AI App detail (includes `canManage` for the requesting member). */

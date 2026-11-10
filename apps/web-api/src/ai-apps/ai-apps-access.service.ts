@@ -7,6 +7,7 @@ import { AccessControlV2Service } from '../access-control-v2/services/access-con
 import { AI_APPS_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { memberHasAnyPermission } from '../rbac/rbac-permission-check';
 import { AiAppsService } from './ai-apps.service';
+import { AiAppsAudienceService, PublishedAiApp } from './ai-apps-audience.service';
 import { AiAppsTestingUsersService } from './ai-apps-testing-users.service';
 import { AI_APPS_ACCESS_CANDIDATES_LIMIT } from './ai-apps.constants';
 import { assertValidPublicPaths, matchesPublicPath, samePublicPaths } from './ai-apps-public-paths';
@@ -45,10 +46,13 @@ export interface AiAppPublicPathsSettings {
   publicPathsGateReady: boolean;
 }
 
-export type AiAppAccessCheckResult = { allowed: true; reason?: 'untracked' | 'public' };
+export type AiAppAccessCheckResult = { allowed: true; reason?: 'untracked' | 'public' | 'audience' };
 
 /** The app row the sidecar decision needs, fetched once per `access-check` request. */
-export type AiAppAccessCheckApp = Pick<AiApp, 'uid' | 'memberUid' | 'access' | 'publicPaths' | 'previewAccess'>;
+export type AiAppAccessCheckApp = Pick<
+  AiApp,
+  'uid' | 'memberUid' | 'access' | 'publicPaths' | 'previewAccess' | 'audiencePolicyCodes'
+>;
 
 /** Either permission grants AI Apps visibility — the same `anyOf` the dashboard routes use. */
 const READ_PERMISSIONS = [AI_APPS_PERMISSIONS.READ, AI_APPS_PERMISSIONS.WRITE];
@@ -68,7 +72,8 @@ export class AiAppsAccessService {
     private readonly aiAppsService: AiAppsService,
     private readonly rbacService: RbacService,
     private readonly accessControlV2Service: AccessControlV2Service,
-    @Optional() private readonly testingUsersService?: AiAppsTestingUsersService
+    @Optional() private readonly testingUsersService?: AiAppsTestingUsersService,
+    @Optional() private readonly audienceService?: AiAppsAudienceService
   ) {}
 
   async getAccess(requesterUid: string, uid: string): Promise<AiAppAccessSettings> {
@@ -215,7 +220,14 @@ export class AiAppsAccessService {
   findAppForAccessCheck(appId: string): Promise<AiAppAccessCheckApp | null> {
     return this.prisma.aiApp.findFirst({
       where: { appId, status: { not: 'DELETED' } },
-      select: { uid: true, memberUid: true, access: true, publicPaths: true, previewAccess: true },
+      select: {
+        uid: true,
+        memberUid: true,
+        access: true,
+        publicPaths: true,
+        previewAccess: true,
+        audiencePolicyCodes: true,
+      },
     });
   }
 
@@ -252,10 +264,14 @@ export class AiAppsAccessService {
       requesterUid,
       readOnly ? READ_PERMISSIONS : WRITE_PERMISSIONS
     );
+    const app = prefetched ? prefetched.app : await this.findAppForAccessCheck(appId);
     if (!hasPermission) {
+      // A member in the audience of a published app may use it (every method) without the PL Infra permission.
+      if (await this.isInProdAudience(requesterUid, app, target)) {
+        return { allowed: true, reason: 'audience' };
+      }
       throw new ForbiddenException({ allowed: false, reason: 'permission' });
     }
-    const app = prefetched ? prefetched.app : await this.findAppForAccessCheck(appId);
     if (!app) {
       return { allowed: true, reason: 'untracked' };
     }
@@ -264,9 +280,29 @@ export class AiAppsAccessService {
         ? await this.aiAppsService.canViewPreview(requesterUid, app)
         : await this.aiAppsService.canViewApp(requesterUid, app);
     if (!allowed) {
+      if (await this.isInProdAudience(requesterUid, app, target)) {
+        return { allowed: true, reason: 'audience' };
+      }
       throw new ForbiddenException({ allowed: false, reason: 'private' });
     }
     return { allowed: true };
+  }
+
+  /** Live apps published to the member (LAB-3200); empty for a member in no app's audience. */
+  async listPublishedApps(memberUid: string): Promise<PublishedAiApp[]> {
+    return this.audienceService ? this.audienceService.listPublishedFor(memberUid) : [];
+  }
+
+  /** Publishing covers the production app only; preview keeps its own rule. */
+  private async isInProdAudience(
+    requesterUid: string,
+    app: AiAppAccessCheckApp | null,
+    target: AiAppTargetEnvironment
+  ): Promise<boolean> {
+    if (target !== 'prod' || !app || !this.audienceService) {
+      return false;
+    }
+    return this.audienceService.isInAudience(requesterUid, app);
   }
 
   private async findManageableApp(requesterUid: string, uid: string, setting = 'access'): Promise<AiApp> {
@@ -331,7 +367,7 @@ export class AiAppsAccessService {
     const directLinkGateReady =
       environment === 'preview' ? await this.previewGateReady(app.uid) : app.directLinkGateReady;
     return {
-      access: environment === 'preview' ? (app.previewAccess ?? 'PRIVATE') : app.access,
+      access: environment === 'preview' ? app.previewAccess ?? 'PRIVATE' : app.access,
       directLinkGateReady,
       members: rows.flatMap((row) => {
         const member = byUid.get(row.memberUid);

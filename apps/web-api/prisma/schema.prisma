@@ -3971,6 +3971,11 @@ model AiApp {
   /// request path to the Directory. Apps last deployed before that ignore
   /// `publicPaths` until a redeploy.
   publicPathsGateReady Boolean @default(false)
+  /// Policy codes the app is published to. An approved member holding any of
+  /// them may open the production app without AI Apps access, and sees it
+  /// under More in LabOS. Empty = not published. Set by directory admins in
+  /// Back Office; no deploy or upload touches it.
+  audiencePolicyCodes String[] @default([])
   /// Coarse progress of the current deploy attempt: queued | building |
   /// injecting_runtime_config | done | failed. The background deploy job
   /// resumes from it after a web-api restart. Written mid-deploy via raw SQL
@@ -4345,6 +4350,7 @@ enum AiAppEventType {
   DELETE_SUCCEEDED
   DELETE_FAILED
   PUBLIC_PATHS_UPDATED
+  AUDIENCE_UPDATED
 }
 
 /// Append-only audit log of AI Apps activity: who downloaded the kit and every

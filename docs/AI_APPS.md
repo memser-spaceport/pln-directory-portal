@@ -413,6 +413,46 @@ Being whitelisted never bypasses the PL Infra permission. The rule lives in
   warns about this and offers a one-click redeploy through
   `POST /v1/ai-apps/:uid/deploy`.
 
+## Publishing an app to members (LAB-3200)
+
+A directory admin can open one app to members outside PL Infra. The app gets an
+**audience**: a list of policy codes in `AiApp.audiencePolicyCodes`. An empty
+list means the app is not published.
+
+**Who is in the audience.** A member with approval state `APPROVED` who holds at
+least one of the listed policies. The rule lives in
+`AiAppsAudienceService.isInAudience`.
+
+**What the audience gets.** The production app only, with every HTTP method:
+- `GET /v1/ai-apps/access-check` answers `200 { allowed: true, reason: 'audience' }`
+  for a member without `ai_apps.read`/`write`, and for a PL Infra member a
+  `PRIVATE` app would refuse.
+- App sign-in (`POST sessions/code`, `sessions/exchange-token`) and
+  `GET /v1/ai-apps/me` accept the member for that app
+  (`AiAppReadOrAudienceGuard`, `AiAppMeRbacGuard`).
+- `GET /v1/ai-apps/published` (any signed-in member) returns the live apps
+  published to the requester: `{ apps: [{ uid, appId, name, description, url }] }`.
+  LabOS shows them under More.
+
+**What it does not get.** The AI Apps catalog, any other app, the preview target,
+feedback, logs, settings, the starter kit and deploys. Those routes still need
+`ai_apps.read`/`write`.
+
+**Managing it** (Back Office, directory admins only, `AdminAuthGuard`):
+- `GET /v1/admin/ai-app-audience/:appId` returns
+  `{ appUid, appId, name, policyCodes, directLinkGateReady }`.
+- `PUT /v1/admin/ai-app-audience/:appId` with `{ policyCodes }` replaces the list.
+  `[]` takes the app back. An unknown policy code is rejected with 400 and
+  nothing is saved.
+- Every change appends an `AUDIENCE_UPDATED` event with the admin and the
+  resulting list. Saving the same list is a no-op.
+
+Decisions are not cached, so publishing and taking back apply on the next
+request, including for members who already hold an app session. No deploy or
+upload touches the audience. An app with `directLinkGateReady = false` needs one
+redeploy first: its sidecar does not ask for a per-app decision and refuses
+members without the PL Infra permission.
+
 ## Public endpoints (paths without LabOS auth)
 
 An owner or directory admin can make selected paths of a deployed app public —
@@ -959,6 +999,8 @@ Apps are **lazy-created on first deploy** — there is no registration form. (A 
 
 - `ai_apps.read` — view the dashboard (list/detail) and submit feedback on an app. Private apps additionally require being the owner, a directory admin, or whitelisted (see "Per-app access").
 - `ai_apps.write` — download the starter kit and deploy.
+
+A member in the audience of a published app can open that one app without either permission (see "Publishing an app to members").
 
 Reading an app's feedback list additionally requires being the app's creator or a
 directory admin (`isDirectoryAdmin`) — enforced in `AiAppsService.listFeedback`,
