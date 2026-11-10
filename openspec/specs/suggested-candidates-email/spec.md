@@ -67,7 +67,7 @@ Each role section SHALL show its title with a "View role" link to the public pos
 
 ### Requirement: Per-role primary button and email end
 
-The "All N matches for this role" button of each role SHALL use the primary button style and be full width on a phone. After the last role, the email SHALL show email preferences and unsubscribe. It SHALL have no "Review all" button and no Edit criteria link.
+The "All N matches for this role" button of each role (or "View 1 match" when the role has one match) SHALL use the primary button style and be full width on a phone. After the last role, the email SHALL show email preferences and unsubscribe. It SHALL have no "Review all" button and no Edit criteria link.
 
 #### Scenario: Each role ends with its button
 
@@ -80,7 +80,7 @@ The "All N matches for this role" button of each role SHALL use the primary butt
 
 - **GIVEN** a role with exactly 1 match
 - **WHEN** the lead reads the email
-- **THEN** the role's button reads "All 1 match for this role"
+- **THEN** the role's button reads "View 1 match"
 
 ### Requirement: First, new or reminder
 

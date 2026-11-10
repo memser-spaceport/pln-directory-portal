@@ -253,6 +253,11 @@ function kindCopy(input: SuggestedCandidatesEmailInput, teamName: string): { sub
   }
 }
 
+/** The role's button: "All 5 matches for this role", or "View 1 match" for one (agreed with Polina, LAB-3195). */
+export function allMatchesText(matchCount: number): string {
+  return matchCount === 1 ? 'View 1 match' : `All ${matchCount} matches for this role`;
+}
+
 /** "5 matches · none have applied" / "· 1 has applied" / "· 2 have applied". */
 export function roleMeta(role: Pick<Role, 'matchCount' | 'appliedCount'>): string {
   const applied = Math.max(role.appliedCount, 0);
@@ -305,7 +310,7 @@ function roleText(role: Role, url: RoleUrls): string[] {
         '',
       ];
     }),
-    `All ${role.matchCount} ${plural(role.matchCount, 'match', 'matches')} for this role: ${url.all}`,
+    `${allMatchesText(role.matchCount)}: ${url.all}`,
     '',
   ];
 }
@@ -342,9 +347,7 @@ ${rawText(
     .map((candidate) => card(candidate, url.profile(candidate.memberUid)))
     .join(`\n${spacer(8)}\n`);
   /* The role's primary button (LAB-3195): the style of the old "Review all" button, full width on a phone. */
-  const all = button(url.all, `All ${role.matchCount} ${plural(role.matchCount, 'match', 'matches')} for this role`, {
-    fullOnPhone: true,
-  });
+  const all = button(url.all, allMatchesText(role.matchCount), { fullOnPhone: true });
   return [header, spacer(12), cards, spacer(16), all].join('\n');
 }
 

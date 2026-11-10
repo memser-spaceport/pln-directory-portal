@@ -322,14 +322,15 @@ describe('renderSuggestedCandidatesEmail', () => {
       expect(personLine({ role: null, company: null, location: null })).toBe('');
     });
 
-    it('reads "All 1 match for this role" on the button of a role with one match (LAB-3195)', () => {
+    it('reads "View 1 match" on the button of a role with one match (LAB-3195)', () => {
       const { html, text } = renderSuggestedCandidatesEmail(
         baseInput({ roles: [role({ matchCount: 1, candidates: [candidate()] })], memberCount: 1 })
       );
       const buttons = html.match(/class="email-button-full"[\s\S]*?<\/table>/g) ?? [];
       expect(buttons).toHaveLength(1);
-      expect(buttons[0]).toContain('>All 1 match for this role</a>');
-      expect(text).toContain('All 1 match for this role: ');
+      expect(buttons[0]).toContain('>View 1 match</a>');
+      expect(text).toContain('\nView 1 match: ');
+      expect(`${html}\n${text}`).not.toMatch(/All 1 match/);
     });
 
     it('draws no Why line and no count when the run had none', () => {
