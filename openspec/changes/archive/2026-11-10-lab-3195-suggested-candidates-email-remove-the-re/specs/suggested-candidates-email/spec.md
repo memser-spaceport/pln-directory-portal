@@ -2,7 +2,7 @@
 
 ### Requirement: Role sections and cards
 
-Each role section SHALL show its title, a "View role" link to the public posting, and "N matches · none have applied" (or "1 has applied" / "N have applied"), then up to two cards, then an "All N matches for this role" button to the role's Suggested tab. A card SHALL show the photo or initials, name, match pill, "role · company, location", one "Why" line and "View profile". The email SHALL have no requirements count, no "Review all" button and no Edit criteria link.
+Each role section SHALL show its title with a "View role" link to the public posting, and "N matches · none have applied" (or "1 has applied" / "N have applied", counting matched members who applied). It SHALL then show up to two cards and end with an "All N matches for this role" button to the role's Suggested tab. A card SHALL show the photo or initials, name, match pill, "role · company, location", one "Why" line (the run's blurb) and "View profile", and no requirements count.
 
 #### Scenario: A lead reads a card
 
@@ -10,6 +10,13 @@ Each role section SHALL show its title, a "View role" link to the public posting
 - **WHEN** the lead reads the email
 - **THEN** the card shows the blurb as one line
 - **AND** the card does not show "4 of 5 requirements"
+- **AND** a "Strong match" pill is solid brand blue, and a "Good match" pill is a light brand tint
+
+## ADDED Requirements
+
+### Requirement: Per-role primary button and email end
+
+The "All N matches for this role" button of each role SHALL use the primary button style and be full width on a phone. After the last role, the email SHALL show email preferences and unsubscribe. It SHALL have no "Review all" button and no Edit criteria link.
 
 #### Scenario: Each role ends with its button
 
