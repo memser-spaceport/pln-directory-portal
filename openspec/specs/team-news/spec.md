@@ -103,19 +103,55 @@ A member's chosen news tags SHALL be stored as a list of focus-area slugs. Savin
 
 ### Requirement: Starting tags
 
-When a member has never saved news tags, reading their preferences SHALL return the slugs of the focus areas of the teams they belong to, and `newsTagsSeeded: true`. Reading SHALL NOT store anything. Once the member saves any list, including an empty one, that list SHALL be returned without the seeded marker.
+When a member has never saved news tags, reading their preferences SHALL return starting tags and `newsTagsSeeded: true`. When profile starting tags are enabled and the member's interest profile has topics with a positive score that are news tags, the starting tags SHALL be the 5 highest-scored of those topics. Otherwise the starting tags SHALL be the slugs of the focus areas of the teams they belong to. Reading SHALL NOT store anything. Once the member saves any list, including an empty one, that list SHALL be returned without the seeded marker.
 
 #### Scenario: Never saved
 
-- **GIVEN** a member of a team with the focus areas DeSci and AI, who never saved news tags
+- **GIVEN** a member of a team with the focus areas DeSci and AI, who never saved news tags, and profile starting tags are disabled
 - **WHEN** their preferences are read
 - **THEN** `newsTags` is `["desci", "ai"]` (in any order) and `newsTagsSeeded` is `true`
 
 #### Scenario: No team
 
-- **GIVEN** a member on no team, who never saved news tags
+- **GIVEN** a member on no team, who never saved news tags, and profile starting tags are disabled
 - **WHEN** their preferences are read
 - **THEN** `newsTags` is `[]` and `newsTagsSeeded` is `true`
+
+#### Scenario: Profile topics, no team
+
+- **GIVEN** profile starting tags are enabled and a member on no team, who never saved news tags, has the profile topics `ai` and `desci`
+- **WHEN** their preferences are read
+- **THEN** `newsTags` is `["ai", "desci"]` (in any order) and `newsTagsSeeded` is `true`
+
+#### Scenario: More than five profile topics
+
+- **GIVEN** profile starting tags are enabled and a member who never saved news tags has seven profile topics that are news tags
+- **WHEN** their preferences are read
+- **THEN** `newsTags` is the five with the highest scores, highest first
+
+#### Scenario: No usable profile topic
+
+- **GIVEN** profile starting tags are enabled and a member who never saved news tags has no profile, or only profile topics that are not news tags
+- **WHEN** their preferences are read
+- **THEN** `newsTags` is the focus areas of their teams and `newsTagsSeeded` is `true`
+
+#### Scenario: Saved tags win over the profile
+
+- **GIVEN** profile starting tags are enabled and a member saved the tags `defi`, or saved an empty list
+- **WHEN** their profile later gains the topic `ai` and their preferences are read
+- **THEN** `newsTags` is the saved list unchanged, with no seeded marker
+
+#### Scenario: Reading does not store
+
+- **GIVEN** profile starting tags are enabled and a member who never saved news tags
+- **WHEN** their preferences are read twice
+- **THEN** the member still has no saved news tags
+
+#### Scenario: Same starting tags everywhere
+
+- **GIVEN** profile starting tags are enabled and a member who never saved news tags has the profile topic `ai`
+- **WHEN** they load the grouped home feed, or their digest picks are built with news tag picks enabled
+- **THEN** their effective tags are `ai` and the focus areas under it, the same starting tags the preferences read returns
 
 ### Requirement: For You tag fields
 
