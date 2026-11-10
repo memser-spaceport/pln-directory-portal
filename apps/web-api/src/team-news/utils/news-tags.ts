@@ -57,3 +57,12 @@ export async function resolveNewsTags(
 export function isNewsTagPicksEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   return (env.NEWS_TAG_PICKS_ENABLED ?? '').trim().toLowerCase() === 'true';
 }
+
+/**
+ * Whether starting tags come from the member interest profile first (LAB-3199).
+ * Read on every call; anything but "true" is off. Stays off in an environment
+ * until the LAB-3124 pilot passes.
+ */
+export function isNewsProfileStartingTagsEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return (env.NEWS_PROFILE_STARTING_TAGS_ENABLED ?? '').trim().toLowerCase() === 'true';
+}

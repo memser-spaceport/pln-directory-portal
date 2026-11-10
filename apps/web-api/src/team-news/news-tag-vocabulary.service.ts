@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
 import { slugify } from '../utils/helper/helper';
-import { readStoredNewsTags } from './utils/news-tags';
+import { isNewsProfileStartingTagsEnabled, readStoredNewsTags } from './utils/news-tags';
 
 /**
  * News tags are focus-area slugs (LAB-2969): the enrichment producer tags news
@@ -21,6 +21,9 @@ export type NewsTagVocabulary = ReadonlyMap<string, NewsTag>;
 type FocusAreaRow = { uid: string; title: string; parentUid: string | null };
 
 const CACHE_MS = 10 * 60 * 1000;
+
+/** How many interest-profile topics become starting tags (LAB-3199). */
+export const PROFILE_STARTING_TAGS_LIMIT = 5;
 
 /**
  * Slug → tag for every focus area. Titles are unique, but two could still
@@ -142,20 +145,23 @@ export class NewsTagVocabularyService {
   }
 
   /**
-   * Starting tags for a member who never saved news tags: the focus areas of
-   * the teams they belong to (each team focus area itself, child or top level),
-   * as vocabulary slugs. Reads only; nothing is stored.
+   * Starting tags for a member who never saved news tags, as vocabulary slugs.
+   * With profile starting tags enabled (LAB-3199): the member's highest-scored
+   * interest-profile topics, at most PROFILE_STARTING_TAGS_LIMIT. Otherwise, or
+   * when the profile has no such topic: the focus areas of the teams they
+   * belong to (each team focus area itself, child or top level). Reads only;
+   * nothing is stored.
    */
   async seedTagsForMember(memberUid: string): Promise<string[]> {
     return (await this.seedTagsForMembers([memberUid])).get(memberUid) ?? [];
   }
 
-  /** seedTagsForMember for many members in one query, for the digest (LAB-2999). */
+  /** seedTagsForMember for many members, one query per source, for the digest (LAB-2999). */
   async seedTagsForMembers(memberUids: string[]): Promise<Map<string, string[]>> {
     const uniqueMemberUids = [...new Set(memberUids)];
     const result = new Map<string, string[]>(uniqueMemberUids.map((uid) => [uid, []]));
     if (uniqueMemberUids.length === 0) return result;
-    const [vocabulary, roles] = await Promise.all([
+    const [vocabulary, roles, profileTopics] = await Promise.all([
       this.getVocabulary(),
       this.prisma.teamMemberRole.findMany({
         where: { memberUid: { in: uniqueMemberUids } },
@@ -164,6 +170,12 @@ export class NewsTagVocabularyService {
           team: { select: { teamFocusAreas: { select: { focusArea: { select: { title: true } } } } } },
         },
       }),
+      isNewsProfileStartingTagsEnabled()
+        ? this.prisma.memberInterestProfileEntry.findMany({
+            where: { memberUid: { in: uniqueMemberUids }, kind: 'TOPIC', score: { gt: 0 } },
+            select: { memberUid: true, key: true, score: true },
+          })
+        : [],
     ]);
     for (const role of roles) {
       const slugs = result.get(role.memberUid);
@@ -172,6 +184,21 @@ export class NewsTagVocabularyService {
         const slug = slugify(tfa.focusArea.title);
         if (vocabulary.has(slug) && !slugs.includes(slug)) slugs.push(slug);
       }
+    }
+    const topicsByMember = new Map<string, { key: string; score: number }[]>();
+    for (const topic of profileTopics) {
+      if (!vocabulary.has(topic.key)) continue;
+      topicsByMember.set(topic.memberUid, [...(topicsByMember.get(topic.memberUid) ?? []), topic]);
+    }
+    for (const [memberUid, topics] of topicsByMember) {
+      if (!result.has(memberUid)) continue;
+      result.set(
+        memberUid,
+        topics
+          .sort((a, b) => b.score - a.score || a.key.localeCompare(b.key))
+          .slice(0, PROFILE_STARTING_TAGS_LIMIT)
+          .map((topic) => topic.key)
+      );
     }
     return result;
   }
