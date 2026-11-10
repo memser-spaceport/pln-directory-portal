@@ -12,11 +12,14 @@ import {
 } from './dto/ingest-team-news.dto';
 import {
   BatchUpdateTeamNewsEnrichmentResponse,
+  RecordLabosDigestSendResponse,
+  RecordLabosDigestSendSchema,
   SeedTeamNewsTrendingDtoSchema,
   SeedTeamNewsTrendingResponse,
   TeamNewsPerTeamResponse,
   TeamsWithNewsEnrichmentResponse,
 } from 'libs/contracts/src/schema/team-news';
+import { LabosDigestService } from './labos-digest.service';
 
 @ApiTags('Team News - Service')
 @Controller('v1/service')
@@ -27,8 +30,18 @@ export class TeamNewsServiceController {
   constructor(
     private readonly teamNewsService: TeamNewsService,
     private readonly enrichmentService: TeamNewsEnrichmentService,
-    private readonly trendingSeedService: TeamNewsTrendingSeedService
+    private readonly trendingSeedService: TeamNewsTrendingSeedService,
+    private readonly labosDigestService: LabosDigestService
   ) {}
+
+  @Post('team-news/digest-sends')
+  async recordDigestSend(@Body() body: unknown): Promise<RecordLabosDigestSendResponse> {
+    const parsed = RecordLabosDigestSendSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.flatten());
+    }
+    return this.labosDigestService.recordSend(parsed.data);
+  }
 
   @Post('team-news/seed-trending')
   async seedTrending(@Body() body: unknown): Promise<SeedTeamNewsTrendingResponse> {

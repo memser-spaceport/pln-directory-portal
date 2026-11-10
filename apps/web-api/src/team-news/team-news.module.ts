@@ -4,8 +4,13 @@ import { MembersModule } from '../members/members.module';
 import { AccessControlV2Module } from '../access-control-v2/access-control-v2.module';
 import { PushNotificationsModule } from '../push-notifications/push-notifications.module';
 import { FollowsModule } from '../follows/follows.module';
+import { AdminAuthGuard } from '../guards/admin-auth.guard';
+import { JwtService } from '../utils/jwt/jwt.service';
 import { TeamNewsController } from './team-news.controller';
 import { TeamNewsServiceController } from './team-news-service.controller';
+import { LabosDigestAdminController } from './labos-digest-admin.controller';
+import { LabosDigestServiceController } from './labos-digest-service.controller';
+import { LabosDigestService } from './labos-digest.service';
 import { TeamNewsService } from './team-news.service';
 import { TeamNewsQueryService } from './team-news-query.service';
 import { TeamNewsEnrichmentService } from './team-news-enrichment.service';
@@ -25,8 +30,16 @@ import { NewsTagVocabularyService } from './news-tag-vocabulary.service';
     PushNotificationsModule,
     FollowsModule,
   ],
-  controllers: [TeamNewsController, TeamNewsServiceController],
+  controllers: [
+    TeamNewsController,
+    TeamNewsServiceController,
+    LabosDigestAdminController,
+    LabosDigestServiceController,
+  ],
   providers: [
+    AdminAuthGuard,
+    JwtService,
+    LabosDigestService,
     TeamNewsService,
     TeamNewsQueryService,
     TeamNewsEnrichmentService,
@@ -44,6 +57,7 @@ import { NewsTagVocabularyService } from './news-tag-vocabulary.service';
     TeamNewsEnrichmentService,
     TeamNewsSuggestionsService,
     TeamNewsUpvotesService,
+    LabosDigestService,
   ],
 })
 export class TeamNewsModule {}

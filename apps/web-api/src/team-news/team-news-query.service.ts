@@ -25,6 +25,7 @@ import { selectForYouNewsItems, selectNewsItemsByTagsAndTeams } from './select-f
 import { narrowsNews, readNewsCategories } from './utils/news-categories';
 import { groupUsedNewsTags, NewsTagVocabularyService } from './news-tag-vocabulary.service';
 import { isNewsTagPicksEnabled } from './utils/news-tags';
+import { DigestTopSelection, LabosDigestService } from './labos-digest.service';
 
 const EMPTY_DISCUSSION: TeamNewsDiscussion = { count: 0, latestTopicUrl: null };
 const POPULAR_WINDOW_DAYS = 14;
@@ -79,7 +80,8 @@ export class TeamNewsQueryService {
   constructor(
     private readonly prisma: PrismaService,
     @Optional() private readonly suggestionsService?: TeamNewsSuggestionsService,
-    @Optional() private readonly tagVocabulary?: NewsTagVocabularyService
+    @Optional() private readonly tagVocabulary?: NewsTagVocabularyService,
+    @Optional() private readonly labosDigest?: LabosDigestService
   ) {}
 
   /**
@@ -567,12 +569,17 @@ export class TeamNewsQueryService {
     sinceCreatedAt?: Date;
     untilCreatedAt?: Date;
     limit?: number;
+    frequency?: 'daily' | 'weekly';
+    lastShownLeadUid?: string | null;
   }): Promise<TeamNewsDigestPicksResponse> {
     const until = opts.untilCreatedAt ?? new Date();
     const since = opts.sinceCreatedAt ?? new Date(until.getTime() - 24 * 60 * 60 * 1000);
     const limit = opts.limit ?? 3;
 
-    const [{ items }, topStory] = await Promise.all([this.loadWatermarkWindow(since, until), this.loadTopStory()]);
+    const [{ items }, top] = await Promise.all([
+      this.loadWatermarkWindow(since, until),
+      this.resolveDigestTop(opts.frequency, opts.lastShownLeadUid),
+    ]);
     const fallback = items.slice(0, limit);
     const uniqueMemberUids = [...new Set(opts.memberUids)];
 
@@ -583,7 +590,7 @@ export class TeamNewsQueryService {
         until: until.toISOString(),
         windowCount: items.length,
         picks: await this.pickDigestNewsByTags(items, uniqueMemberUids, limit),
-        topStory,
+        ...top,
       };
     }
 
@@ -613,7 +620,57 @@ export class TeamNewsQueryService {
       until: until.toISOString(),
       windowCount: items.length,
       picks,
+      ...top,
+    };
+  }
+
+  /**
+   * Without LabosDigestService the lead stays editorial rank 1, as before this
+   * feature. With it, an admin override replaces that lead and the ordered list.
+   */
+  private async resolveDigestTop(
+    frequency?: 'daily' | 'weekly',
+    lastShownLeadUid?: string | null
+  ): Promise<Pick<TeamNewsDigestPicksResponse, 'topStory' | 'topStorySource' | 'topStories' | 'overrideUpdatedAt'>> {
+    if (!this.labosDigest) {
+      const topStory = await this.loadTopStory();
+      return {
+        topStory,
+        topStorySource: 'ai',
+        topStories: topStory ? [topStory] : [],
+        overrideUpdatedAt: null,
+      };
+    }
+    const selection = await this.labosDigest.selectForDigest(
+      frequency ? { frequency, lastShownLeadUid: lastShownLeadUid ?? null } : undefined
+    );
+    return this.loadTopStoriesFromSelection(selection);
+  }
+
+  private async loadTopStoriesFromSelection(
+    selection: DigestTopSelection
+  ): Promise<Pick<TeamNewsDigestPicksResponse, 'topStory' | 'topStorySource' | 'topStories' | 'overrideUpdatedAt'>> {
+    const rows =
+      selection.uids.length === 0
+        ? []
+        : await this.prisma.teamNewsItem.findMany({
+            where: { uid: { in: selection.uids } },
+            include: TEAM_NEWS_TEAM_INCLUDE,
+          });
+    const byUid = new Map(rows.map((row) => [row.uid, row]));
+    const ordered = selection.uids.map((uid) => byUid.get(uid)).filter((row): row is NonNullable<typeof row> => !!row);
+    const itemUids = ordered.map((row) => row.uid);
+    const [discussions, upvotes] = await Promise.all([this.loadDiscussions(itemUids), this.loadUpvotes(itemUids)]);
+    const topStories = ordered.map((row) => this.toDto(row, discussions.get(row.uid), new Set(), upvotes));
+    const topStory =
+      selection.source === 'admin'
+        ? topStories[0] ?? null
+        : topStories.find((item) => item.editorialRank === 1) ?? null;
+    return {
       topStory,
+      topStorySource: selection.source,
+      topStories,
+      overrideUpdatedAt: selection.overrideUpdatedAt,
     };
   }
 

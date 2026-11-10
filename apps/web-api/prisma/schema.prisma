@@ -2815,11 +2815,12 @@ model TeamNewsItem {
   imageCheckedAt    DateTime?
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
-  forumLinks        TeamNewsForumLink[]
-  upvotes           TeamNewsUpvote[]
-  feedComments      FeedComment[]
-  feedLikes         FeedNewsLike[]
-  networkOverviews  NetworkOverview[]
+  forumLinks             TeamNewsForumLink[]
+  upvotes                TeamNewsUpvote[]
+  feedComments           FeedComment[]
+  feedLikes              FeedNewsLike[]
+  networkOverviews       NetworkOverview[]
+  labosDigestSendStories LabosDigestSendStory[]
 
   @@index([teamUid])
   @@index([eventDate])
@@ -2831,6 +2832,60 @@ model TeamNewsItem {
   /// Without this it is a sequential scan on the hottest path in the app.
   @@index([createdAt])
   @@index([postedByMemberUid])
+}
+
+enum LabosDigestFrequency {
+  DAILY
+  WEEKLY
+}
+
+enum LabosDigestPickSource {
+  ADMIN
+  AI
+}
+
+/// The one admin override for the next daily and weekly digest. No row means the AI picks.
+/// `updatedAt` is the version a digest send must match before it deletes this row.
+model LabosDigestOverride {
+  id             String   @id
+  newsItemUids   String[]
+  setByMemberUid String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+/// Last digest lead each frequency already sent. The LabOS Digest page uses it
+/// to say whether the next AI lead will be skipped.
+model LabosDigestFrequencyState {
+  frequency           LabosDigestFrequency @id
+  lastLeadNewsItemUid String?
+  updatedAt           DateTime             @updatedAt
+}
+
+/// One real forum-digest send. `channel` stays `forum-digest` until a later caller needs another value.
+model LabosDigestSend {
+  id        String                 @id @default(cuid())
+  frequency LabosDigestFrequency
+  sentAt    DateTime
+  source    LabosDigestPickSource
+  channel   String                 @default("forum-digest")
+  stories   LabosDigestSendStory[]
+  createdAt DateTime               @default(now())
+
+  @@index([frequency, sentAt])
+}
+
+model LabosDigestSendStory {
+  id          String          @id @default(cuid())
+  sendId      String
+  send        LabosDigestSend @relation(fields: [sendId], references: [id], onDelete: Cascade)
+  newsItemUid String
+  newsItem    TeamNewsItem    @relation(fields: [newsItemUid], references: [uid], onDelete: Cascade)
+  position    Int
+  isLead      Boolean
+
+  @@unique([sendId, position])
+  @@index([newsItemUid])
 }
 
 /// Per-member "I'm interested" signal on a team news item. One upvote per
