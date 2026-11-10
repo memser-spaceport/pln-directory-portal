@@ -44,7 +44,7 @@ export interface SuggestedCandidatesEmailCandidate {
   label: 'Strong match' | 'Good match';
   /** The one "Why" line: the run's sentence on why this person fits. */
   blurb: string | null;
-  /** How many of the role's requirements the person meets; null when the role has none. */
+  /** How many of the role's requirements the person meets; null when the role has none. Not shown (LAB-3195). */
   requirements: { met: number; total: number } | null;
 }
 
@@ -71,7 +71,7 @@ export interface SuggestedCandidatesEmailInput {
   teamName: string;
   /** Most recently published first. */
   roles: SuggestedCandidatesEmailRole[];
-  /** Distinct members across the roles' matches ("Review all N candidates"). */
+  /** Distinct members across the roles' matches (the `first` subject and intro). */
   memberCount: number;
   /** Distinct members new to this lead (the `new` intro and subject). */
   newCount: number;
@@ -98,20 +98,21 @@ const PILL: Record<Candidate['label'], { background: string; color: string }> = 
 };
 
 /** Initials-avatar tints from the Figma (blue, green, peach), picked by name so a person keeps theirs. */
-/** Desktop width of the intro, the role sections and the button (Figma 13252:1368, widened by Polina 2026-11-09); fluid on a phone. */
+/** Desktop width of the intro and the role sections (Figma 13252:1368, widened by Polina 2026-11-09); fluid on a phone. */
 export const CONTENT_WIDTH = 520;
 
 const AVATAR_TINTS = ['#dee8ff', '#dcf4e7', '#faeadc'] as const;
 
-type UtmContent = 'profile' | 'all' | 'role' | 'review_all';
+type UtmContent = 'profile' | 'all' | 'role';
 
 /**
  * The founder email (LAB-3139, Figma "Email templates | Protocol Labs" 13252:1368 / 13253:1187): a greeting and one
  * intro line, then per role its title with View role, "N matches · none have applied", up to two cards (avatar,
- * name, Strong match, role · company and location, the Why line, "N of M requirements", View profile) and "All N
- * matches for this role", then one "Review all N candidates" button and the sign-off with email preferences and
- * unsubscribe. Candidates-page links open `/teams/<teamUid>/applicants?role=<roleUid>&tab=suggested` (plus
- * `&suggested=<memberUid>` on a card), UTM-tagged; View role opens the public posting.
+ * name, Strong match, role · company and location, the Why line, View profile) and an "All N matches for this role"
+ * button, then the sign-off with email preferences and unsubscribe. LAB-3195 removed the "N of M requirements" line
+ * and the closing "Review all N candidates" button, and made the per-role link the primary button. Candidates-page
+ * links open `/teams/<teamUid>/applicants?role=<roleUid>&tab=suggested` (plus `&suggested=<memberUid>` on a card),
+ * UTM-tagged; View role opens the public posting.
  *
  * Pure: renders, never sends. All input text is HTML-escaped. Throws, so nothing is sent with a broken link, when
  * there is no role, a role has no candidate, or a uid is missing.
@@ -147,9 +148,6 @@ export function renderSuggestedCandidatesEmail(input: SuggestedCandidatesEmailIn
     profile: (memberUid: string) =>
       teamSuggestedCandidateEmailUrl(teamUid, utm('profile', role.roleUid), { memberUid }),
   });
-  const reviewAllUrl = teamSuggestedCandidateEmailUrl(teamUid, utm('review_all', roles[0].roleUid));
-  const memberCount = Math.max(input.memberCount, 1);
-  const reviewAllText = `Review all ${memberCount} ${memberCount === 1 ? 'candidate' : 'candidates'}`;
 
   const { subject, intro } = kindCopy(input, teamName);
   const preheader = `${roles
@@ -179,13 +177,8 @@ export function renderSuggestedCandidatesEmail(input: SuggestedCandidatesEmailIn
         { padding: '24px', width: CONTENT_WIDTH, align: 'center' }
       ),
       row(roles.map((role) => roleSection(role, urls(role))).join(`\n${spacer(40)}\n`), {
-        padding: '0 24px',
+        padding: '0 24px 24px 24px',
         width: CONTENT_WIDTH,
-      }),
-      row(button(reviewAllUrl, reviewAllText, { fullOnPhone: true }), {
-        padding: '24px 24px 24px 24px',
-        width: CONTENT_WIDTH,
-        align: 'center',
       }),
     ],
   });
@@ -196,8 +189,6 @@ export function renderSuggestedCandidatesEmail(input: SuggestedCandidatesEmailIn
     intro,
     '',
     ...roles.flatMap((role) => roleText(role, urls(role))),
-    `${reviewAllText}: ${reviewAllUrl}`,
-    '',
     'Cheers,',
     'The LabOS Team',
     '',
@@ -275,7 +266,7 @@ export function personLine(candidate: Pick<Candidate, 'role' | 'company' | 'loca
   return [oneLine(candidate.role), where].filter(Boolean).join(' · ');
 }
 
-/** "5 of 5 requirements"; '' when the role has none. */
+/** "5 of 5 requirements"; '' when the role has none. The email no longer shows it (LAB-3195). */
 export function requirementsText(requirements: Candidate['requirements']): string {
   if (!requirements || !(requirements.total > 0)) return '';
   return `${requirements.met} of ${requirements.total} ${plural(requirements.total, 'requirement', 'requirements')}`;
@@ -306,12 +297,10 @@ function roleText(role: Role, url: RoleUrls): string[] {
     ...role.candidates.flatMap((candidate) => {
       const line = personLine(candidate);
       const why = oneLine(candidate.blurb);
-      const requirements = requirementsText(candidate.requirements);
       return [
         `${oneLine(candidate.name)} · ${candidate.label}`,
         ...(line ? [line] : []),
         ...(why ? [why] : []),
-        ...(requirements ? [requirements] : []),
         `View profile: ${url.profile(candidate.memberUid)}`,
         '',
       ];
@@ -352,12 +341,11 @@ ${rawText(
   const cards = role.candidates
     .map((candidate) => card(candidate, url.profile(candidate.memberUid)))
     .join(`\n${spacer(8)}\n`);
-  const all = rawText(
-    arrowLink(url.all, `All ${role.matchCount} ${plural(role.matchCount, 'match', 'matches')} for this role`),
-    linkStyle,
-    'margin: 0;'
-  );
-  return [header, spacer(12), cards, spacer(12), all].join('\n');
+  /* The role's primary button (LAB-3195): the style of the old "Review all" button, full width on a phone. */
+  const all = button(url.all, `All ${role.matchCount} ${plural(role.matchCount, 'match', 'matches')} for this role`, {
+    fullOnPhone: true,
+  });
+  return [header, spacer(12), cards, spacer(16), all].join('\n');
 }
 
 function avatar(candidate: Candidate): string {
@@ -386,7 +374,6 @@ function card(candidate: Candidate, profileUrl: string): string {
   const name = oneLine(candidate.name);
   const line = personLine(candidate);
   const why = oneLine(candidate.blurb);
-  const requirements = requirementsText(candidate.requirements);
 
   const pill = PILL[candidate.label];
   const badge = pill
@@ -431,12 +418,6 @@ function card(candidate: Candidate, profileUrl: string): string {
 
   const footerRow = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 8px;">
           <tr>
-            <td valign="middle" style="${font({
-              size: 12,
-              line: 18,
-              color: COLORS.meta,
-              tracking: -0.2,
-            })}">${escapeHtml(requirements)}</td>
             <td valign="middle" align="right" style="white-space: nowrap; ${font({
               size: 14,
               line: 20,
