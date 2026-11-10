@@ -289,7 +289,6 @@ export function LabosDigestPage() {
                   <thead>
                     <tr>
                       <th>Title</th>
-                      <th>Description</th>
                       <th>Source</th>
                       <th>Date</th>
                       <th>Tags</th>
@@ -300,7 +299,7 @@ export function LabosDigestPage() {
                   <tbody>
                     {news.data.items.length === 0 && (
                       <tr>
-                        <td colSpan={7}>No stories match these filters.</td>
+                        <td colSpan={6}>No stories match these filters.</td>
                       </tr>
                     )}
                     {news.data.items.map((item) => (
@@ -310,7 +309,6 @@ export function LabosDigestPage() {
                             {item.title}
                           </button>
                         </td>
-                        <td className={s.description}>{item.summary || '—'}</td>
                         <td>{item.source || '—'}</td>
                         <td>{day(item.date)}</td>
                         <td>

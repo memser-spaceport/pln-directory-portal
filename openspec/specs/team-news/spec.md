@@ -177,17 +177,12 @@ A directory admin SHALL read and replace one ordered list of 1 to 5 found news i
 
 ### Requirement: Found news search
 
-The found news list SHALL accept `q`. A non-empty `q` SHALL keep a story whose title, summary, or HTML content contains that text, ignoring case. An empty `q` SHALL leave the list unfiltered by text. Each row SHALL include the story description. The description is the summary, as plain text.
+The found news list SHALL accept `q`. A non-empty `q` SHALL keep a story whose title, summary, or HTML content contains that text, ignoring case. An empty `q` SHALL leave the list unfiltered by text.
 
 #### Scenario: Title or content match
 
 - **WHEN** an admin searches for a word that appears in a story title or in its content
 - **THEN** the list contains that story
-
-#### Scenario: Description on the row
-
-- **WHEN** an admin opens found news
-- **THEN** each row shows that story's summary as its description
 
 ### Requirement: Admin edit and post change the real news item
 

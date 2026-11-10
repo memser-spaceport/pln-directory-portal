@@ -1,10 +1,9 @@
 ## Why
 
-LAB-3202 (https://linear.app/protocollabs/issue/LAB-3202): after the LabOS Digest demo, admins need the story description in found news, and the digest top stories are 5, not 3.
+LAB-3202 (https://linear.app/protocollabs/issue/LAB-3202): after the LabOS Digest demo, the digest top stories are 5, not 3.
 
 ## What Changes
 
-- Found news shows each story's summary as a description.
 - News enrichment stores 5 editorial ranks. The daily digest, the weekly digest, and the LabOS Digest page use those 5 stories.
 - The digest email shows one highlighted lead, then up to 4 of the member's own picks. Other top stories fill the email to 5 cards when the member has fewer than 4 picks.
 - Post news with a team picker is already on the LabOS Digest page.

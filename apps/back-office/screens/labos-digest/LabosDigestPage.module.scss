@@ -334,15 +334,6 @@
   vertical-align: middle;
 }
 
-.description {
-  max-width: 360px;
-  color: #5e718d;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
 .table tr:last-child td {
   border-bottom: none;
 }

@@ -188,7 +188,7 @@ describe('LabOS Digest page', () => {
 
     expect(await screen.findByText('Admin picks')).toBeTruthy();
     expect(await screen.findByText('Gamma')).toBeTruthy();
-    expect(screen.getByText('Gamma shipped a product.')).toBeTruthy();
+    expect(screen.queryByText('Gamma shipped a product.')).toBeNull();
     expect(screen.getByText(/daily lead 2026-10-01/)).toBeTruthy();
 
     fireEvent.click(screen.getAllByText('Replace')[0]);
