@@ -319,6 +319,7 @@ export class PLEventsService {
           select: {
             uid: true,
             name: true,
+            externalId: true,
             websiteURL: true,
             startDate: true,
             endDate: true,
