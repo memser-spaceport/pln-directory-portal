@@ -471,13 +471,17 @@ export class JobMatchRunner {
         const member = byUid.get(row.memberUid);
         return member ? [{ member, fit: row.fit }] : [];
       });
-      notes = await withRetry(job.roleTitle, async () => {
-        const text = await this.claude(blurbPrompt(job, criteria, people, leadPrompt), 2000);
-        return parseCandidateNotes(
-          text,
-          people.map((row) => ({ memberUid: row.member.uid, criteriaCount: criteria.length }))
-        );
-      });
+      try {
+        notes = await withRetry(job.roleTitle, async () => {
+          const text = await this.claude(blurbPrompt(job, criteria, people, leadPrompt), 2000);
+          return parseCandidateNotes(
+            text,
+            people.map((row) => ({ memberUid: row.member.uid, criteriaCount: criteria.length }))
+          );
+        });
+      } catch (error) {
+        this.logger.warn(`job match blurbs for role ${job.uid} failed: ${errorText(error)}`);
+      }
     }
 
     const suggestions = ranked.map((row, index) => {
