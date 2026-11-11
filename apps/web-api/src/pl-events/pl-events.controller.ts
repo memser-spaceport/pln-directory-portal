@@ -31,6 +31,7 @@ import {
   UpdatePLEventLocationSchemaDto,
   UpdateIRLAggregatedPriorityDto,
 } from 'libs/contracts/src/schema';
+import { SyncPLEventsBodySchema } from 'libs/contracts/src/schema/pl-event-details';
 import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
 import { PLEventsService } from './pl-events.service';
@@ -290,7 +291,15 @@ export class PLEventsController {
   @Api(server.route.syncPLEventsByLocation)
   @UseGuards(InternalAuthGuard)
   async syncPLEventsByLocation(@Body() body) {
-    const { selectedEventUids } = body;
+    // @Api does not validate the body (see contract-pl-events), so it is parsed here.
+    const parsed = SyncPLEventsBodySchema.safeParse(body ?? {});
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.issues.map((issue) => issue.message).join('; '));
+    }
+    const { selectedEventUids, detailsOnly } = parsed.data;
+    if (detailsOnly) {
+      return await this.eventSyncService.syncEventDetailsOnly({ selectedEventUids });
+    }
     return await this.eventSyncService.syncEvents({ selectedEventUids });
   }
 
