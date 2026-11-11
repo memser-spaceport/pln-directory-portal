@@ -108,3 +108,5 @@ export const PLEventAggregatedDataQueryParams = z.object({
 export class CreatePLEventSchemaDto extends createZodDto(PLCreateEventSchema) {}
 
 export class ResponseUpcomingEvents extends createZodDto(ResponseUpcomingEventSchema) {}
+
+export * from './pl-event-details';

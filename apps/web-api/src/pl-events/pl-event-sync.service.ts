@@ -7,6 +7,7 @@ import { isEmpty } from 'lodash';
 import { EventsService } from '../events/events.service';
 import { PLEventType } from '@prisma/client';
 import {IrlGatheringPushCandidatesService} from "./push/irl-gathering-push-candidates.service";
+import { mapEventDetails, withEventDetails } from './pl-event-details.mapper';
 
 @Injectable()
 export class PLEventSyncService {
@@ -41,7 +42,8 @@ export class PLEventSyncService {
           uid: true,
           name: true,
           externalId: true,
-          syncedAt: true
+          syncedAt: true,
+          additionalInfo: true,
         },
       });
 
@@ -68,6 +70,56 @@ export class PLEventSyncService {
     }
   }
 
+
+  /**
+   * Backfills `additionalInfo.details` on events we already have (LAB-3214, design D8).
+   * It fetches the same APPROVED events as the full sync, matches them by `externalId`
+   * and writes only the details. It never creates or deletes an event and never touches
+   * `slugURL`, name, dates or type (the full sync rewrites `slugURL` and skips events
+   * whose `updatedAt` did not change, so it cannot be used for a backfill).
+   * @returns how many events were updated.
+   */
+  async syncEventDetailsOnly(body): Promise<{ updated: number }> {
+    try {
+      const { selectedEventUids } = body ?? {};
+      const events = await this.fetchEventsFromService({ selectedEventUids });
+      if (!events) return { updated: 0 };
+
+      const existingEvents = await this.prisma.pLEvent.findMany({
+        where: {
+          externalId: { in: events.map((event) => event.event_id).filter(Boolean) },
+          isDeleted: false,
+        },
+        select: { uid: true, externalId: true, additionalInfo: true },
+      });
+      const eventMap = new Map(existingEvents.map((event) => [event.externalId, event]));
+
+      let updated = 0;
+      for (const event of events) {
+        const existingEvent = eventMap.get(event.event_id);
+        if (!existingEvent) continue;
+        await this.prisma.pLEvent.update({
+          where: { uid: existingEvent.uid },
+          data: { additionalInfo: withEventDetails(existingEvent.additionalInfo, this.detailsOf(event)) },
+        });
+        updated += 1;
+      }
+
+      this.cacheService.reset({ service: 'PLEventGuest' });
+      this.logger.log(`Event details backfill completed: ${updated} of ${events.length} fetched events updated.`);
+      return { updated };
+    } catch (error) {
+      this.logger.error('Error in event details backfill:', error);
+      throw error;
+    }
+  }
+
+  /** Event details from one events-service event; unreadable fields are logged and left empty. */
+  private detailsOf(event) {
+    return mapEventDetails(event, (field, reason) =>
+      this.logger.warn(`Event ${event?.event_id}: details field "${field}" ignored (${reason}).`)
+    );
+  }
 
   /**
    * Fetches events from an external service.
@@ -125,7 +177,7 @@ export class PLEventSyncService {
           }
           await this.prisma.pLEvent.update({
             where: { uid: existingEvent.uid },
-            data: await this.mapEventData(event),
+            data: await this.mapEventData(event, existingEvent.additionalInfo),
           });
 
           touchedEventUids.push(existingEvent.uid);
@@ -182,7 +234,7 @@ export class PLEventSyncService {
    * @param locationUid - Unique identifier for the location.
    * @returns Mapped event object ready for database insertion/update.
    */
-  private async mapEventData(event) {
+  private async mapEventData(event, existingAdditionalInfo?) {
     const logo = await this.createLogo(this.prisma, event.event_logo);
     const resources: Array<{
       name: string;
@@ -220,6 +272,7 @@ export class PLEventSyncService {
       locationUid: event.locationUid,
       logoUid: logo?.uid,
       resources,
+      additionalInfo: withEventDetails(existingAdditionalInfo, this.detailsOf(event)),
       isDeleted: false,
     };
   }
