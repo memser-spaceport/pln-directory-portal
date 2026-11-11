@@ -27,6 +27,24 @@ The system SHALL serve `GET /v1/irl/events/:uid` with an optional user token, wi
 - **WHEN** `GET /v1/irl/events/upcoming` or `GET /v1/irl/events/contributors` is called
 - **THEN** each returns what it returned before this change
 
+### Requirement: The event read includes the gathering's events and the viewer's attendance
+
+The event read SHALL also include `slugURL` and `shortDescription`; on the gathering, `city` (its name up to the first comma) and `events`, the gathering's non-deleted events the viewer may see under the attendee list's invite-only rule; and `viewer`, the signed-in viewer's own `showOnProfile` and `roles` (`Host`, `Speaker`, `Sponsor`) when they are going, otherwise null. Host and face `image` SHALL be an image URL or null.
+
+#### Scenario: A signed-out viewer and an invite-only sibling
+
+- **GIVEN** gathering "Lisbon, Portugal" with an `IN_PERSON` event A and an `INVITE_ONLY` event B
+- **WHEN** a signed-out viewer reads A
+- **THEN** `location.city` is `Lisbon`
+- **AND** `location.events` lists A but not B
+- **AND** `viewer` is null
+
+#### Scenario: A going viewer who hid the event
+
+- **GIVEN** the viewer is going to A as a speaker, with A hidden from their profile
+- **WHEN** they read A
+- **THEN** `viewer` is `{ showOnProfile: false, roles: ["Speaker"] }`
+
 ### Requirement: The event read includes the synced details
 
 The event read SHALL include `details`, taken from the events service:

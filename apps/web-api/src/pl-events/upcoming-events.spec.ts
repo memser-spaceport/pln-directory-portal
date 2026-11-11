@@ -47,12 +47,13 @@ describe('upcomingEventsFindArgs and toUpcomingEvent (LAB-3071)', () => {
     });
   });
 
-  it('maps a row to the shape the endpoint has always returned', () => {
+  it('maps a row to the shape the endpoint has always returned, plus the gathering uid (LAB-3213)', () => {
     expect(
       toUpcomingEvent({
         uid: 'e1',
         name: 'FIL Lisbon',
         externalId: 'JdkJYigZLBTL',
+        locationUid: 'loc-lisbon',
         websiteURL: null,
         startDate: new Date('2026-11-07T09:00:00Z'),
         endDate: new Date('2026-11-08T18:00:00Z'),
@@ -66,6 +67,7 @@ describe('upcomingEventsFindArgs and toUpcomingEvent (LAB-3071)', () => {
       websiteUrl: null,
       logo: 'https://img/x.png',
       location: 'Lisbon',
+      locationUid: 'loc-lisbon',
       flag: 'PT',
       startDate: '2026-11-07T09:00:00.000Z',
       endDate: '2026-11-08T18:00:00.000Z',
@@ -84,5 +86,6 @@ describe('upcomingEventsFindArgs and toUpcomingEvent (LAB-3071)', () => {
       location: null,
     });
     expect(row.externalId).toBeNull();
+    expect(row.locationUid).toBeNull();
   });
 });

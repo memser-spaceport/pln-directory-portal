@@ -4,7 +4,11 @@ import {
   PLEventAggregatedDataQueryParams,
   ResponsePLEventSchemaWithRelationsSchema,
   PLEventLocationQueryParams,
-  ResponsePLEventLocationWithRelationsSchema, ResponseUpcomingEventSchema
+  ResponsePLEventLocationWithRelationsSchema, ResponseUpcomingEventSchema,
+  ResponsePLEventDetailSchema,
+  UpdateMyEventVisibilitySchema,
+  UpdateMyGuestPlansSchema,
+  DeletePLEventGuestsSchema
 } from '../schema';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
@@ -56,10 +60,20 @@ export const apiEvents = contract.router({
     },
     summary: 'Modify guests in pl events',
   },
+  updateMyGuestPlansByLocation: {
+    method: 'PATCH',
+    path: `${getAPIVersionAsPath('1')}/irl/locations/:uid/guests/me`,
+    body: UpdateMyGuestPlansSchema,
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: "Update the caller's plans at a gathering in place (roles of kept events, shared details)",
+  },
   deletePLEventGuestsByLocation: {
     method: 'POST',
     path: `${getAPIVersionAsPath('1')}/irl/locations/:uid/events/guests`,
-    body: contract.body<unknown>(),
+    // `events: [A]` deletes only A; `events: []` deletes every row of that member at the gathering.
+    body: DeletePLEventGuestsSchema,
     responses: {
       200: contract.response<unknown>(),
     },
@@ -86,6 +100,8 @@ export const apiEvents = contract.router({
   getPLEventGuestsByLocation: {
     method: 'GET',
     path: `${getAPIVersionAsPath('1')}/irl/locations/:uid/guests`,
+    // Untyped on purpose (many filters). `eventUid` (LAB-3213) narrows the list to that event's guests only: guests of
+    // the whole gathering are left out, and members who hid the event from their profile are still listed.
     query: contract.query,
     responses: {
       200:  contract.response<unknown>(),
@@ -156,6 +172,23 @@ export const apiEvents = contract.router({
     responses: {
       200: ResponseUpcomingEventSchema.array(),
     },
+  },
+  getPLEventByUid: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/irl/events/:uid`,
+    responses: {
+      200: ResponsePLEventDetailSchema,
+    },
+    summary: 'Get one event with its gathering, hosts and attendance summary',
+  },
+  updateMyEventVisibility: {
+    method: 'PATCH',
+    path: `${getAPIVersionAsPath('1')}/irl/events/:uid/me`,
+    body: UpdateMyEventVisibilitySchema,
+    responses: {
+      200: contract.response<{ eventUid: string; showOnProfile: boolean }>(),
+    },
+    summary: "Show or hide the caller's attendance at an event on their profile",
   },
   deleteEvent: {
     method: 'DELETE',

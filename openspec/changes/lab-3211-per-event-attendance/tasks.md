@@ -8,8 +8,8 @@ Each section is one subtask PR into `lab-3211`. Its branch is `lab-3211-<sub#>`,
 
 ## 1. LAB-3213: per-event attendance API
 
-- [ ] 1.1 Add `showOnProfile Boolean @default(true)` to `PLEventGuest`. Create the migration `<timestamp>_pl_event_guest_show_on_profile` (`ALTER TABLE "PLEventGuest" ADD COLUMN "showOnProfile" BOOLEAN NOT NULL DEFAULT true`) and run `prisma generate`. Verify that `prisma migrate deploy` applies it on a local DB and that existing rows read `true`.
-- [ ] 1.2 Contracts:
+- [x] 1.1 Add `showOnProfile Boolean @default(true)` to `PLEventGuest`. Create the migration `<timestamp>_pl_event_guest_show_on_profile` (`ALTER TABLE "PLEventGuest" ADD COLUMN "showOnProfile" BOOLEAN NOT NULL DEFAULT true`) and run `prisma generate`. Verify that `prisma migrate deploy` applies it on a local DB and that existing rows read `true`.
+- [x] 1.2 Contracts:
   - Add optional `showOnProfile` to `CreatePLEventGuestSchema` and make `teamUid` optional.
   - Replace `DeletePLEventGuestsSchema` with `{ membersAndEvents: [{ memberUid, events: string[] }] }` (min 1 entry).
   - Add `eventUid` to the guests query schema.
@@ -17,23 +17,23 @@ Each section is one subtask PR into `lab-3211`. Its branch is `lab-3211-<sub#>`,
   - Add the `PATCH /v1/irl/locations/:uid/guests/me` route (D12 body).
 
   Verify that the contracts lib compiles under the type-check gate.
-- [ ] 1.3 Guest create:
+- [x] 1.3 Guest create:
   - `formatInputToEventGuests` sets `showOnProfile` (default true) and `teamUid || null`.
   - `updateGuestTopicsAndReason` and the modify path also use `teamUid || null`.
 
   Verify with a jest test: an `events: [{uid: B}]` create leaves the existing row for A, `teamUid: ''` produces `null`, and `showOnProfile: false` is stored.
-- [ ] 1.4 Toggle: a service method plus a controller handler for `PATCH /v1/irl/events/:uid/me` (`UserTokenValidation`; `updateMany` on the caller's own row; 404 when count is 0; 400 via `safeParse`). It resets the `PLEventGuest` cache. Verify with jest: the owner hides, a non-guest gets 404, and an invalid body gets 400.
-- [ ] 1.4a Plans update (D12): a service method plus a controller handler for `PATCH /v1/irl/locations/:uid/guests/me` (`UserTokenValidation` + `irlg.going.write` or directory admin; `safeParse`; shared fields on all the caller's rows at the location in one transaction; roles per `events[]` entry; 400 for an event the caller has no row for; 404 when the caller has no rows). It resets the `PLEventGuest` cache. Verify with jest: roles change on A only, shared fields reach A and B, `showOnProfile` stays false on a hidden row, an unknown event gets 400 and creates nothing.
-- [ ] 1.5 Strict attendee list: with `eventUid`, `getPLEventGuestsByLocationAndType` narrows events to that event (after viewer filtering) and passes `includeLocationOnlyGuests: false` after the `...query` spread. Verify with jest: a gathering-level guest is left out, a hidden-from-profile guest is kept, and a signed-out viewer of an `INVITE_ONLY` event gets an empty list. Without `eventUid` the existing calls are unchanged.
-- [ ] 1.6 Delete body: the controller runs `safeParse` on the new schema and throws `BadRequestException` before any delete. Verify with jest that a `{ memberUid, eventUid }` entry gets 400 and deletes nothing, `events: [A]` deletes only A, and `events: []` still deletes all of that member's rows at the location. Grep the back-office (`apps/back-office`) and the FE repo for other callers of `/events/guests`, and record them in the PR.
-- [ ] 1.7 `GET /v1/irl/events/:uid` (D6):
+- [x] 1.4 Toggle: a service method plus a controller handler for `PATCH /v1/irl/events/:uid/me` (`UserTokenValidation`; `updateMany` on the caller's own row; 404 when count is 0; 400 via `safeParse`). It resets the `PLEventGuest` cache. Verify with jest: the owner hides, a non-guest gets 404, and an invalid body gets 400.
+- [x] 1.4a Plans update (D12): a service method plus a controller handler for `PATCH /v1/irl/locations/:uid/guests/me` (`UserTokenValidation` + `irlg.going.write` or directory admin; `safeParse`; shared fields on all the caller's rows at the location in one transaction; roles per `events[]` entry; 400 for an event the caller has no row for; 404 when the caller has no rows). It resets the `PLEventGuest` cache. Verify with jest: roles change on A only, shared fields reach A and B, `showOnProfile` stays false on a hidden row, an unknown event gets 400 and creates nothing.
+- [x] 1.5 Strict attendee list: with `eventUid`, `getPLEventGuestsByLocationAndType` narrows events to that event (after viewer filtering) and passes `includeLocationOnlyGuests: false` after the `...query` spread. Verify with jest: a gathering-level guest is left out, a hidden-from-profile guest is kept, and a signed-out viewer of an `INVITE_ONLY` event gets an empty list. Without `eventUid` the existing calls are unchanged.
+- [x] 1.6 Delete body: the controller runs `safeParse` on the new schema and throws `BadRequestException` before any delete. Verify with jest that a `{ memberUid, eventUid }` entry gets 400 and deletes nothing, `events: [A]` deletes only A, and `events: []` still deletes all of that member's rows at the location. Grep the back-office (`apps/back-office`) and the FE repo for other callers of `/events/guests`, and record them in the PR.
+- [x] 1.7 `GET /v1/irl/events/:uid` (D6):
   - Add `getPLEventDetail(uid, viewer)` with event, gathering, `details` (empty until LAB-3214), hosts, `goingCount`, three `faces` and `viewerGoing`.
   - Signed-out viewers of `INVITE_ONLY` events get count 0 and no faces, and private resources are filtered.
   - Declare the handler after the static `/irl/events/*` handlers, with `OptionalUserTokenCheckGuard` + `@NoCache()`.
 
   Verify with jest: a deleted event gets 404, `viewerGoing` is true for a going viewer, and a controller test proves `/v1/irl/events/upcoming` and `/v1/irl/events/contributors` still reach their handlers.
-- [ ] 1.8 Upcoming events: add `locationUid` to the select, to `toUpcomingEvent` and to `ResponseUpcomingEventSchema`. Verify that `upcoming-events.spec.ts` is extended to assert `locationUid` and still passes.
-- [ ] 1.9 Run the type-check gate, ESLint on the touched files (`npx eslint <files>`), and the touched jest specs. Verify that there are no new type errors, no new lint errors versus `develop`, and that the specs are green.
+- [x] 1.8 Upcoming events: add `locationUid` to the select, to `toUpcomingEvent` and to `ResponseUpcomingEventSchema`. Verify that `upcoming-events.spec.ts` is extended to assert `locationUid` and still passes.
+- [x] 1.9 Run the type-check gate, ESLint on the touched files (`npx eslint <files>`), and the touched jest specs. Verify that there are no new type errors, no new lint errors versus `develop`, and that the specs are green.
 
 ## 2. LAB-3214: keep event details from the sync
 
