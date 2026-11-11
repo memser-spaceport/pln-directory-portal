@@ -34,7 +34,7 @@ describe('MemberController — member update authorization', () => {
       updateMemberInvestorSetting: jest.fn().mockResolvedValue({ uid: 'member-1' }),
     };
     const logger = { info: jest.fn(), error: jest.fn() };
-    const controller = new MemberController(membersService as any, {} as any, logger as any);
+    const controller = new MemberController(membersService as any, {} as any, logger as any, {} as any);
     return { controller, membersService, logger };
   }
 

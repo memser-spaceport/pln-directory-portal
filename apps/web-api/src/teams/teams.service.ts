@@ -2072,6 +2072,7 @@ export class TeamsService {
             shortDescription: true,
             tier: true,
             priority: true,
+            accessLevel: true,
             website: true,
             logo: {
               select: {
