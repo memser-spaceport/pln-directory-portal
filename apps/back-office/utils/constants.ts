@@ -86,6 +86,7 @@ export const API_ROUTE = {
   ADMIN_RBAC_ROLES: `${APP_CONSTANTS.V1}admin/rbac/roles`,
   ADMIN_RBAC_PERMISSIONS: `${APP_CONSTANTS.V1}admin/rbac/permissions`,
   ADMIN_AI_APP_RESOURCES: `${APP_CONSTANTS.V1}admin/ai-app-resources`,
+  ADMIN_AI_APP_AUDIENCE: `${APP_CONSTANTS.V1}admin/ai-app-audience`,
   ADMIN_LABOS_DIGEST: `${APP_CONSTANTS.V1}admin/labos-digest`,
 };
 

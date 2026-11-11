@@ -7,8 +7,14 @@ import { ApprovalLayout } from '../../layout/approval-layout';
 import { useAuth } from '../../context/auth-context';
 import { useAiAppsList } from '../../hooks/ai-app-resources/useAiAppsList';
 import { EditAiAppResourcesModal } from '../../components/ai-app-resources/EditAiAppResourcesModal';
+import { EditAiAppAudienceModal } from '../../components/ai-app-resources/EditAiAppAudienceModal';
 import { AiAppDeployment, AiAppTarget } from '../../screens/ai-app-resources/types';
-import { canManageAiAppResources, getApiErrorMessage, getHostUrl } from '../../screens/ai-app-resources/utils';
+import {
+  canManageAiAppAudience,
+  canManageAiAppResources,
+  getApiErrorMessage,
+  getHostUrl,
+} from '../../screens/ai-app-resources/utils';
 
 const STATUS_STYLES: Record<string, string> = {
   success: 'bg-green-100 text-green-800',
@@ -38,8 +44,11 @@ const AiAppResourcesPage = () => {
   const { hasPermission, isLoading } = useAuth();
   const [authToken] = useCookie('plnadmin');
   const [editTarget, setEditTarget] = useState<AiAppTarget | null>(null);
+  const [audienceAppId, setAudienceAppId] = useState<string | null>(null);
 
   const canManage = canManageAiAppResources(hasPermission);
+  // Opening an app to a member group is for full Directory admins only.
+  const canManageAudience = canManageAiAppAudience(hasPermission);
 
   const {
     data: apps,
@@ -140,7 +149,7 @@ const AiAppResourcesPage = () => {
                   )}
                 </td>
                 <td className="px-4 py-3 text-gray-600">{formatDate(app.updated_at)}</td>
-                <td className="px-4 py-3">
+                <td className="whitespace-nowrap px-4 py-3">
                   <button
                     type="button"
                     onClick={() => setEditTarget({ appId: app.app_id, environment: app.environment })}
@@ -148,6 +157,15 @@ const AiAppResourcesPage = () => {
                   >
                     Edit resources
                   </button>
+                  {canManageAudience && (
+                    <button
+                      type="button"
+                      onClick={() => setAudienceAppId(app.app_id)}
+                      className="ml-2 rounded-lg border border-gray-300 bg-white px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      Audience
+                    </button>
+                  )}
                 </td>
               </tr>
             );
@@ -169,6 +187,9 @@ const AiAppResourcesPage = () => {
         <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">{renderBody()}</div>
       </div>
       <EditAiAppResourcesModal target={editTarget} authToken={authToken} onClose={() => setEditTarget(null)} />
+      {canManageAudience && (
+        <EditAiAppAudienceModal appId={audienceAppId} authToken={authToken} onClose={() => setAudienceAppId(null)} />
+      )}
     </ApprovalLayout>
   );
 };

@@ -1,6 +1,7 @@
 import api from '../api';
 import { API_ROUTE } from '../constants';
 import type {
+  AiAppAudienceResponse,
   AiAppDeployment,
   AiAppDeploymentsResponse,
   AiAppResourcesResponse,
@@ -15,6 +16,8 @@ interface AuthParams {
 const authHeaders = (authToken: string | undefined) => ({ authorization: `Bearer ${authToken}` });
 
 const resourceUrl = (appId: string) => `${API_ROUTE.ADMIN_AI_APP_RESOURCES}/${encodeURIComponent(appId)}`;
+
+const audienceUrl = (appId: string) => `${API_ROUTE.ADMIN_AI_APP_AUDIENCE}/${encodeURIComponent(appId)}`;
 
 export async function fetchAiAppsList(params: AuthParams): Promise<AiAppDeployment[]> {
   const response = await api.get<AiAppDeploymentsResponse>(API_ROUTE.ADMIN_AI_APP_RESOURCES, {
@@ -46,5 +49,23 @@ export async function resetAiAppResources(params: AuthParams & AiAppTarget): Pro
     headers: authHeaders(params.authToken),
     params: { environment: params.environment },
   });
+  return response.data;
+}
+
+export async function fetchAiAppAudience(params: AuthParams & { appId: string }): Promise<AiAppAudienceResponse> {
+  const response = await api.get<AiAppAudienceResponse>(audienceUrl(params.appId), {
+    headers: authHeaders(params.authToken),
+  });
+  return response.data;
+}
+
+export async function updateAiAppAudience(
+  params: AuthParams & { appId: string; policyCodes: string[] }
+): Promise<AiAppAudienceResponse> {
+  const response = await api.put<AiAppAudienceResponse>(
+    audienceUrl(params.appId),
+    { policyCodes: params.policyCodes },
+    { headers: authHeaders(params.authToken) }
+  );
   return response.data;
 }

@@ -44,6 +44,8 @@ export class AiAppMemberContextGuard implements CanActivate {
         return true;
       }
       req.memberUid = session.memberUid;
+      // The app the session is bound to; the RBAC guard that follows checks its audience for members without AI Apps access.
+      req.aiAppSessionAppId = session.appId;
       if (session.isAgent) {
         req.aiAppAgent = { agentAccess: session.agentAccess ?? 'write' };
       }
