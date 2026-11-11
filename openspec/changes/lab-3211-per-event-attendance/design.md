@@ -81,7 +81,7 @@ A new `PLEventsService.getPLEventDetail(uid, viewer)` does:
 ### D7. Event details live in `PLEvent.additionalInfo.details`, normalized by one mapper
 
 The `details` shape:
-- `tags: { name; color }[]`
+- `tags: { name; color }[]` (the events service sends tags as plain strings and has no colours; the PL events app derives them on the client, so `color` is `null` unless a source sends one)
 - `accessType`, `accessOption`, `format`: `string | null`
 - `host: { name; logo } | null`
 - `coHosts: { name; logo }[]`

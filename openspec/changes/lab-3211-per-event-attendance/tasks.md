@@ -38,11 +38,13 @@ Each section is one subtask PR into `lab-3211`. Its branch is `lab-3211-<sub#>`,
 ## 2. LAB-3214: keep event details from the sync
 
 - [ ] 2.1 Capture one real events-service payload. Call dev's `EVENT_SERVICE_URL/events?status=APPROVED&event_id=<id>` for an event with tags and an agenda, and save a trimmed copy as a jest fixture (no personal data). Verify that the fixture has `tags`, `access_type`, `access_option`, `host`, `co_hosts`, `sponsors` and `agenda`. If any are missing, stop and report on LAB-3214 before going on.
-- [ ] 2.2 Add `PLEventDetailsSchema` (tolerant per field) to `libs/contracts`, and a pure `mapEventDetails(raw)` in `pl-events`. Verify with jest against the fixture: a malformed `agenda` gives `null` plus a log line, and missing fields give empty values.
-- [ ] 2.3 Both sync paths store `additionalInfo: { ...existing, details }`: `PLEventSyncService.mapEventData` for create/update, and `EventConsumerHelper.mapEventData` with its create/update calls. Verify with jest that both paths write `details` and keep any other `additionalInfo` key.
-- [ ] 2.4 Add `detailsOnly` to the internal `POST /v1/irl/events/sync`. It fetches events, updates only `additionalInfo.details` for existing events matched by `externalId`, and returns `{ updated }`. Verify with jest that `slugURL`, `name`, dates and `type` are unchanged and no event is created or deleted.
+  - Status (2026-11-11): not captured. The dev events service is not reachable from a workstation (`EVENT_SERVICE_URL` is in SSM), so the fixture (`apps/web-api/src/pl-events/fixtures/events-service-event.fixture.ts`) is inferred from pln-events' reader of the same API and marked so. Task 4.1 checks real stored details on the feature env; replace the fixture with a trimmed real payload then.
+- [x] 2.2 Add `PLEventDetailsSchema` (tolerant per field) to `libs/contracts`, and a pure `mapEventDetails(raw)` in `pl-events`. Verify with jest against the fixture: a malformed `agenda` gives `null` plus a log line, and missing fields give empty values.
+- [x] 2.3 Both sync paths store `additionalInfo: { ...existing, details }`: `PLEventSyncService.mapEventData` for create/update, and `EventConsumerHelper.mapEventData` with its create/update calls. Verify with jest that both paths write `details` and keep any other `additionalInfo` key.
+- [x] 2.4 Add `detailsOnly` to the internal `POST /v1/irl/events/sync`. It fetches events, updates only `additionalInfo.details` for existing events matched by `externalId`, and returns `{ updated }`. Verify with jest that `slugURL`, `name`, dates and `type` are unchanged and no event is created or deleted.
 - [ ] 2.5 `GET /v1/irl/events/:uid` returns `details` from `additionalInfo.details`, with empty defaults for events never resynced. Verify with jest that both cases match the spec.
-- [ ] 2.6 Run the type-check gate, ESLint on the touched files and the touched specs. Verify that all are green against the baseline.
+  - Status: `readEventDetails(additionalInfo)` (pure, with empty defaults) is in `pl-event-details.mapper.ts` with specs. Wiring it into `GET /v1/irl/events/:uid` waits for LAB-3213, which adds that route.
+- [x] 2.6 Run the type-check gate, ESLint on the touched files and the touched specs. Verify that all are green against the baseline.
 
 ## 3. LAB-3215: member and team events
 

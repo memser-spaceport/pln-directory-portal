@@ -6,6 +6,7 @@ import {
   PLEventLocationQueryParams,
   ResponsePLEventLocationWithRelationsSchema, ResponseUpcomingEventSchema
 } from '../schema';
+import { SyncPLEventsBodySchema } from '../schema';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
 const contract = initContract();
@@ -112,11 +113,11 @@ export const apiEvents = contract.router({
   syncPLEventsByLocation: {
     method: 'POST',
     path: `${getAPIVersionAsPath('1')}/irl/events/sync`,
-    body: contract.body<unknown>(),
+    body: SyncPLEventsBodySchema,
     responses: {
       200: contract.response<unknown>(),
     },
-    summary: 'sync pl events from events service by location'
+    summary: 'sync pl events from events service; detailsOnly backfills event details only'
   },
   getAllPLEventGuests: {
     method: 'GET',
