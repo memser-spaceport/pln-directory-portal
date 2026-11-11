@@ -77,6 +77,8 @@ export const ResponseUpcomingEventSchema = z.object({
   websiteUrl: z.string().nullable(),
   logo: z.string().nullable(),
   location: z.string().nullable(),
+  /** The event's gathering uid, so any event list can open the event (LAB-3213). Null when it has none. */
+  locationUid: z.string().nullable(),
   flag: z.string().nullable(),
   startDate: z.string(),
   endDate: z.string(),

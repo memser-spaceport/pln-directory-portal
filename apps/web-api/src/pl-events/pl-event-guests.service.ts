@@ -12,6 +12,8 @@ import { Prisma, Member, Team } from '@prisma/client';
 import { MembersService } from '../members/members.service';
 import { PLEventLocationsService } from './pl-event-locations.service';
 import { CreatePLEventGuestSchemaDto, UpdatePLEventGuestSchemaDto } from 'libs/contracts/src/schema';
+import type { z } from 'zod';
+import type { UpdateMyGuestPlansSchema } from 'libs/contracts/src/schema/pl-event-attendance';
 import { FormattedLocationWithEvents, PLEvent } from './pl-event-locations.types';
 import { CacheService } from '../utils/cache/cache.service';
 import { CREATE, EventInvitationToMember, UPDATE, isIRLNotificationsEnabled } from '../utils/constants';
@@ -220,7 +222,7 @@ export class PLEventGuestsService {
               telegramId: data.telegramId || null,
               officeHours: data.officeHours || null,
               reason: data.reason || null,
-              teamUid: data.teamUid,
+              teamUid: data.teamUid || null,
               topics: data.topics || [],
               additionalInfo: data.additionalInfo ?? null,
             },
@@ -230,7 +232,7 @@ export class PLEventGuestsService {
             await tx.pLEventGuest.create({
               data: {
                 memberUid: targetMemberUid,
-                teamUid: data.teamUid,
+                teamUid: data.teamUid || null,
                 locationUid: location.uid,
                 eventUid: null,
                 telegramId: data.telegramId || null,
@@ -422,6 +424,9 @@ export class PLEventGuestsService {
     try {
       let events: PLEvent[];
       const { type, filteredEvents } = query;
+      // LAB-3213: `eventUid` asks for the guests of exactly one event, without gathering-level guests.
+      const strictEventUid =
+        typeof query?.eventUid === 'string' && query.eventUid.trim() ? query.eventUid.trim() : null;
 
       if (type === 'upcoming') {
         events = await this.eventLocationsService.getUpcomingEventsByLocation(locationUid);
@@ -432,6 +437,15 @@ export class PLEventGuestsService {
       }
 
       events = await this.filterEventsByAttendanceAndAdminStatus(filteredEvents, events, member);
+
+      if (strictEventUid) {
+        // After the viewer filter, so an invite-only event the viewer can't see gives an empty list.
+        events = (events ?? []).filter((event) => event.uid === strictEventUid);
+        if (!events.length) {
+          // fetchAttendees with no event uids would list every guest at the gathering.
+          return [];
+        }
+      }
 
       const window = this.getEventsWindow(events);
 
@@ -449,7 +463,8 @@ export class PLEventGuestsService {
             sortBy: query?.sortBy ?? null,
             sortDirection: query?.sortDirection ?? null,
             search: query?.search ?? null,
-            includeLocationOnlyGuests: true,
+            strictEventUid,
+            includeLocationOnlyGuests: !strictEventUid,
             windowStart: window?.start ?? null,
             windowEnd: window?.end ?? null,
           })
@@ -462,6 +477,8 @@ export class PLEventGuestsService {
         windowEnd: window?.end ?? null,
         includeLocationOnlyGuests: true,
         ...query,
+        // Set after the spread so a query string can't widen a strict list.
+        ...(strictEventUid ? { eventUids: [strictEventUid], includeLocationOnlyGuests: false } : {}),
         loggedInMemberUid: member ? member?.uid : null,
       });
 
@@ -603,7 +620,7 @@ export class PLEventGuestsService {
           officeHours: input.officeHours || null,
           reason: input.reason || null,
           memberUid: input.memberUid,
-          teamUid: input.teamUid,
+          teamUid: input.teamUid || null,
           locationUid,
           eventUid: null,
           additionalInfo: input.additionalInfo ?? null,
@@ -611,6 +628,7 @@ export class PLEventGuestsService {
           isHost: false,
           isSpeaker: false,
           isSponsor: false,
+          showOnProfile: input.showOnProfile ?? true,
         },
       ];
     }
@@ -627,7 +645,7 @@ export class PLEventGuestsService {
         officeHours: input.officeHours || null,
         reason: input.reason || null,
         memberUid: input.memberUid,
-        teamUid: input.teamUid,
+        teamUid: input.teamUid || null,
         locationUid,
         eventUid: event.uid,
         additionalInfo: additionalInfo,
@@ -635,6 +653,7 @@ export class PLEventGuestsService {
         isHost: event.isHost || false,
         isSpeaker: event.isSpeaker || false,
         isSponsor: event.isSponsor || false,
+        showOnProfile: input.showOnProfile ?? true,
       };
     });
   }
@@ -1665,10 +1684,130 @@ export class PLEventGuestsService {
       data: {
         topics: data.topics,
         reason: data.reason,
-        teamUid: data.teamUid,
+        teamUid: data.teamUid === undefined ? undefined : data.teamUid || null,
         officeHours: data.officeHours,
       },
     });
+  }
+
+  /**
+   * Shows or hides the caller's attendance at one event on their profile (LAB-3213, `PATCH /v1/irl/events/:uid/me`).
+   * Only the caller's own row changes. Hiding narrows who sees it on the profile; it is still attendance.
+   */
+  async updateMyEventVisibility(eventUid: string, memberUid: string, showOnProfile: boolean) {
+    const result = await this.prisma.pLEventGuest.updateMany({
+      where: { eventUid, memberUid },
+      data: { showOnProfile },
+    });
+    if (!result.count) {
+      throw new NotFoundException(`No attendance found for event ${eventUid}`);
+    }
+    await this.cacheService.reset({ service: 'PLEventGuest' });
+    return { eventUid, showOnProfile };
+  }
+
+  /**
+   * Updates the caller's plans at a gathering in place (LAB-3213, `PATCH /v1/irl/locations/:uid/guests/me`).
+   *
+   * Shared fields (team, topics, reason, Telegram, office hours, stay dates) go to every row the caller has at the
+   * gathering; each `events[]` entry sets the roles on the caller's row for that event. It never creates or deletes
+   * rows and never touches `showOnProfile` or `createdAt`; adding or removing events is create / delete.
+   */
+  async updateMyPlansAtLocation(locationUid: string, member: Member, body: z.infer<typeof UpdateMyGuestPlansSchema>) {
+    const rows = await this.prisma.pLEventGuest.findMany({
+      where: { locationUid, memberUid: member.uid },
+      select: { uid: true, eventUid: true, additionalInfo: true },
+    });
+    if (!rows.length) {
+      throw new NotFoundException(`No attendance found at location ${locationUid}`);
+    }
+
+    const rowsByEvent = new Map(rows.filter((row) => row.eventUid).map((row) => [row.eventUid as string, row]));
+    const notGoing = (body.events ?? []).map((event) => event.uid).filter((uid) => !rowsByEvent.has(uid));
+    if (notGoing.length) {
+      throw new BadRequestException(`Not going to event(s): ${notGoing.join(', ')}. Use create to add an event.`);
+    }
+
+    const stay = body.additionalInfo;
+    if (stay) {
+      this.assertValidStayRange(stay.checkInDate ?? undefined, stay.checkOutDate ?? undefined);
+    }
+
+    const shared: Prisma.PLEventGuestUncheckedUpdateInput = {};
+    if (body.teamUid !== undefined) shared.teamUid = body.teamUid || null;
+    if (body.topics !== undefined) shared.topics = body.topics;
+    if (body.reason !== undefined) shared.reason = body.reason || null;
+    if (body.telegramId !== undefined) shared.telegramId = body.telegramId || null;
+    if (body.officeHours !== undefined) shared.officeHours = body.officeHours || null;
+
+    const patchByEvent = new Map((body.events ?? []).map((event) => [event.uid, event]));
+
+    const updated = await this.prisma.$transaction(
+      rows.map((row) => {
+        const patch = row.eventUid ? patchByEvent.get(row.eventUid) : undefined;
+        const data: Prisma.PLEventGuestUncheckedUpdateInput = { ...shared };
+
+        const info: Record<string, unknown> = {
+          ...((row.additionalInfo as Record<string, unknown> | null) ?? {}),
+        };
+        let infoChanged = false;
+        if (stay && 'checkInDate' in stay) {
+          info.checkInDate = stay.checkInDate ?? null;
+          infoChanged = true;
+        }
+        if (stay && 'checkOutDate' in stay) {
+          info.checkOutDate = stay.checkOutDate ?? null;
+          infoChanged = true;
+        }
+
+        if (patch) {
+          if (patch.isHost !== undefined) data.isHost = patch.isHost;
+          if (patch.isSpeaker !== undefined) data.isSpeaker = patch.isSpeaker;
+          if (patch.isSponsor !== undefined) data.isSponsor = patch.isSponsor;
+          for (const key of ['hostSubEvents', 'speakerSubEvents', 'sponsorSubEvents'] as const) {
+            if (patch[key] !== undefined) {
+              info[key] = patch[key];
+              infoChanged = true;
+            }
+          }
+        }
+        if (infoChanged) data.additionalInfo = info as Prisma.InputJsonValue;
+
+        return this.prisma.pLEventGuest.update({
+          where: { uid: row.uid },
+          data,
+          select: {
+            uid: true,
+            eventUid: true,
+            locationUid: true,
+            teamUid: true,
+            topics: true,
+            reason: true,
+            telegramId: true,
+            officeHours: true,
+            additionalInfo: true,
+            isHost: true,
+            isSpeaker: true,
+            isSponsor: true,
+            showOnProfile: true,
+          },
+        });
+      })
+    );
+
+    if (typeof body.telegramId === 'string') {
+      await this.memberService.updateTelegramIfChanged(member, body.telegramId);
+    }
+    if (typeof body.officeHours === 'string') {
+      await this.memberService.updateOfficeHoursIfChanged(member, body.officeHours);
+    }
+
+    await this.cacheService.reset({ service: 'PLEventGuest' });
+    const eventUids = updated.map((row) => row.eventUid).filter((uid): uid is string => !!uid);
+    if (eventUids.length) {
+      await this.irlGatheringPushCandidatesService.refreshCandidatesForEventsAndUpdateNotifications(eventUids);
+    }
+    return updated;
   }
 
   /**

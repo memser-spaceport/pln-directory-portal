@@ -74,6 +74,8 @@ A new `PLEventsService.getPLEventDetail(uid, viewer)` does:
 - one query for three faces (newest rows first)
 - one `exists` check for `viewerGoing`
 
+Hosts, `goingCount` and faces count only members the attendee list shows: REJECTED members are left out, the rule `fetchAttendees` applies. The count then matches the strict attendee list.
+
 `getPLEventForViewer` stays as it is for MCP.
 - The route goes into `PLEventsController` after the static `/irl/events/upcoming` and `/irl/events/contributors` handlers. Express then matches the static paths first. A controller test asserts both static paths still reach their handlers.
 - `@UseGuards(OptionalUserTokenCheckGuard)` and `@NoCache()` apply.

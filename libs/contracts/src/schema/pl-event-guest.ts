@@ -3,15 +3,19 @@ import { createZodDto } from '@abitia/zod-dto';
 import { QueryParams } from './query-params';
 import { ResponseMemberSchema } from './member';
 import { ResponseTeamSchema  } from "./team";
+import { DeletePLEventGuestsSchema } from './pl-event-attendance';
 
 export const CreatePLEventGuestSchema = z.object({
-  teamUid: z.string(),
+  // Optional, and '' means no team (LAB-3213): a member without a team can still say they are going.
+  teamUid: z.string().optional(),
   memberUid: z.string(),
   telegramId: z.string().optional(),
   reason: z.string().optional(),
   additionalInfo: z.any(),
   topics: z.array(z.string()).optional(),
   officeHours: z.string(),
+  // Shown on the member's profile; defaults to true (LAB-3213).
+  showOnProfile: z.boolean().optional(),
   events: z.array(z.object({
     uid: z.string(),
     isHost: z.boolean().optional(),
@@ -55,6 +59,7 @@ export const PLEventGuestSchema = z.object({
   isHost: z.boolean().nullish(),
   isSpeaker: z.boolean().nullish(),
   isSponsor: z.boolean().nullish(),
+  showOnProfile: z.boolean().nullish(),
   priority: z.number().int().nullish()
 });
 
@@ -99,15 +104,6 @@ export const PLEventGuestQueryableFields = PLEventGuestRelationalFields.keyof();
 export const PLEventGuestQueryParams = QueryParams({
   queryableFields: PLEventGuestQueryableFields,
   relationalFields: PLEventGuestRelationalFields,
-});
-
-export const DeletePLEventGuestsSchema = z.object({
-  membersAndEvents: z.array(
-    z.object({
-      memberUid: z.string(),
-      eventUid: z.string()
-    }
-  ))
 });
 
 export class CreatePLEventGuestSchemaDto extends createZodDto(CreatePLEventGuestSchema) {}

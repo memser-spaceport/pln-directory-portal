@@ -19,6 +19,8 @@ import { EventsToolingService } from '../events/events-tooling.service';
 import { CacheService } from '../utils/cache/cache.service';
 import {IrlGatheringPushCandidatesService} from "./push/irl-gathering-push-candidates.service";
 import { UpcomingEventsOptions, toUpcomingEvent, upcomingEventsFindArgs } from './upcoming-events-query';
+import { listedGuestWhere, toPLEventDetail } from './pl-event-detail';
+import type { ResponsePLEventDetail } from 'libs/contracts/src/schema/pl-event-attendance';
 
 
 @Injectable()
@@ -275,6 +277,95 @@ export class PLEventsService {
   }
 
   /**
+   * One event for the event drawer (LAB-3213, `GET /v1/irl/events/:uid`): the event, its gathering and the gathering's
+   * other visible events, hosts, a going count with three faces, and the viewer's own attendance. Lean on purpose:
+   * `getPLEventForViewer` loads every guest with contact fields and stays as it is for MCP.
+   *
+   * A signed-out viewer of an `INVITE_ONLY` event gets no count and no faces. `showOnProfile` affects neither: hiding
+   * an event is about the profile, not about going.
+   */
+  async getPLEventDetail(uid: string, viewer: Member | null): Promise<ResponsePLEventDetail> {
+    const event = await this.prisma.pLEvent.findFirst({
+      where: { uid, isDeleted: false },
+      select: {
+        uid: true,
+        name: true,
+        slugURL: true,
+        type: true,
+        startDate: true,
+        endDate: true,
+        description: true,
+        shortDescription: true,
+        websiteURL: true,
+        externalId: true,
+        resources: true,
+        additionalInfo: true,
+        logo: { select: { url: true } },
+        banner: { select: { url: true } },
+        location: {
+          select: {
+            uid: true,
+            location: true,
+            flag: true,
+            timezone: true,
+            resources: true,
+            events: {
+              where: { isDeleted: false },
+              select: { uid: true, name: true, type: true, startDate: true, endDate: true },
+              orderBy: { startDate: 'asc' },
+            },
+          },
+        },
+      },
+    });
+    if (!event) {
+      throw new NotFoundException(`Event not found with uid: ${uid}.`);
+    }
+
+    const isUserLoggedIn = !!viewer;
+    const hideAttendance = !isUserLoggedIn && event.type === 'INVITE_ONLY';
+    const personSelect = { member: { select: { uid: true, name: true, image: { select: { url: true } } } } };
+
+    const [hostRows, goingGroups, faceRows, viewerRow, locationEvents] = await Promise.all([
+      this.prisma.pLEventGuest.findMany({
+        where: { ...listedGuestWhere(uid), isHost: true },
+        distinct: ['memberUid'],
+        orderBy: { createdAt: 'asc' },
+        select: personSelect,
+      }),
+      hideAttendance
+        ? Promise.resolve([])
+        : this.prisma.pLEventGuest.groupBy({ by: ['memberUid'], where: listedGuestWhere(uid) }),
+      hideAttendance
+        ? Promise.resolve([])
+        : this.prisma.pLEventGuest.findMany({
+            where: listedGuestWhere(uid),
+            distinct: ['memberUid'],
+            orderBy: { createdAt: 'desc' },
+            take: 3,
+            select: personSelect,
+          }),
+      viewer
+        ? this.prisma.pLEventGuest.findFirst({
+            where: { eventUid: uid, memberUid: viewer.uid },
+            select: { showOnProfile: true, isHost: true, isSpeaker: true, isSponsor: true },
+          })
+        : Promise.resolve(null),
+      // The same invite-only rule as the attendee list: hidden from signed-out viewers, and for members unless they go.
+      this.eventGuestsService.filterEventsByAttendanceAndAdminStatus(undefined, event.location?.events ?? [], viewer),
+    ]);
+
+    return toPLEventDetail(event as any, {
+      locationEvents,
+      hosts: hostRows.map((row) => row.member),
+      goingCount: goingGroups.length,
+      faces: faceRows.map((row) => row.member),
+      viewerRow,
+      isUserLoggedIn,
+    });
+  }
+
+  /**
    * This method retrieves events associated with a specific member.
    * @param member The member object, including the member UID
    * @param locationUid The unique identifier of the event location
@@ -320,6 +411,7 @@ export class PLEventsService {
             uid: true,
             name: true,
             externalId: true,
+            locationUid: true,
             websiteURL: true,
             startDate: true,
             endDate: true,
