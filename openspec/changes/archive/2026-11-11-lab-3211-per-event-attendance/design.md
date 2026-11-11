@@ -115,8 +115,8 @@ Add `locationUid: true` to the select, map it in `toUpcomingEvent`, and add `loc
 - Both routes use `OptionalUserTokenCheckGuard` and `@NoCache()`.
 - **Viewer:** `request['userEmail']` → `findMemberByEmail`. Signed-in means a viewer member was found. The owner is the viewer whose `uid` equals `:uid`.
 - **Upcoming vs past:** an event is upcoming while `endDate > now`, so an event in progress is still "going". This differs from `/events/upcoming` (`startDate > now`) on purpose, and is noted in the spec.
-- **Member groups:** two Prisma queries on `PLEventGuest` (`memberUid`, `eventUid not null`, event not deleted, upcoming/past window, `showOnProfile: true` unless owner), each with `count` + `skip/take`.
-  - Counts and faces for the page's events come from one `groupBy` and one raw query (`ROW_NUMBER() OVER (PARTITION BY "eventUid")` ≤ 3).
+- **Member groups:** one Prisma query per group on `PLEventGuest` (`memberUid`, `eventUid not null`, event not deleted, upcoming/past window, `showOnProfile: true` unless owner). Rows are merged per event in memory (the table has no unique `(memberUid, eventUid)`, so duplicates merge their roles), then paged; a member has tens of rows.
+  - Counts and faces are loaded only for the page's events, with the rule of `GET /v1/irl/events/:uid` (REJECTED members left out, nothing for signed-out viewers of `INVITE_ONLY` events): one `groupBy` on `[eventUid, memberUid]`, and the drawer's faces query (`facesFindArgs`) per event, at most `limit` small queries. No raw SQL (AGENTS.md).
   - `viewerGoing` comes from one `findMany` of the viewer's rows for those events.
 - **City:** `location.split(',')[0].trim() || null`.
 - **Team upcoming:**
@@ -124,10 +124,10 @@ Add `locationUid: true` to the select, map it in `toUpcomingEvent`, and add `loc
   - Rows are grouped by event in memory, then paged. A team's members' upcoming events are a small set; see Risks.
   - Roles come from member rows with `teamUid = team` (`isHost` / `isSpeaker` / `isSponsor`) and from `PLEventAssociation` (`entityType TEAM`, `HOST` / `CO_HOST` → Host, `SPEAKER` → Speaker, `SPONSOR` → Sponsor).
 - **Team past:**
-  - Guest rows with `teamUid = team` and a role, plus TEAM associations, past only, deduped by event.
+  - Guest rows with `teamUid = team` and a role, plus TEAM associations, past only, deduped by event. An event the team has no role in (an `ATTENDEE` association only) is left out.
   - Demo Days: `DemoDay` where `isDeleted false`, `endDate < now`, and `participants some { type FOUNDER, status ENABLED, teamUid, isDeleted false }`, newest first, prepended.
   - The list is built in memory, then paged. `past.total` includes Demo Days.
-- **Team visibility:** the same L0 + signed-out check as `GET /v1/teams/:uid` (team-public-visibility), via the existing teams service helper.
+- **Team visibility:** the same L0 + signed-out check as `GET /v1/teams/:uid`: `enforceTeamPublicVisibility` in `team-public-visibility.ts`, used by both `findTeamByUid` and `TeamsService.assertTeamVisibleToViewer`, which also returns 404 for an unknown team.
 - **Response:** `{ upcoming?: Group, past?: Group }`, with `Group = { page, limit, total, items }` (rule 18). Items carry `kind` (`event` | `demo-day`) so the FE can render the Demo Day tile.
 
 ### D11. Member detail filters hidden rows in the controller

@@ -19,7 +19,13 @@ import { EventsToolingService } from '../events/events-tooling.service';
 import { CacheService } from '../utils/cache/cache.service';
 import {IrlGatheringPushCandidatesService} from "./push/irl-gathering-push-candidates.service";
 import { UpcomingEventsOptions, toUpcomingEvent, upcomingEventsFindArgs } from './upcoming-events-query';
-import { listedGuestWhere, toPLEventDetail } from './pl-event-detail';
+import {
+  GUEST_PERSON_SELECT,
+  facesFindArgs,
+  hidesAttendance,
+  listedGuestWhere,
+  toPLEventDetail,
+} from './pl-event-detail';
 import type { ResponsePLEventDetail } from 'libs/contracts/src/schema/pl-event-attendance';
 
 
@@ -323,28 +329,19 @@ export class PLEventsService {
     }
 
     const isUserLoggedIn = !!viewer;
-    const hideAttendance = !isUserLoggedIn && event.type === 'INVITE_ONLY';
-    const personSelect = { member: { select: { uid: true, name: true, image: { select: { url: true } } } } };
+    const hideAttendance = hidesAttendance(event.type, isUserLoggedIn);
 
     const [hostRows, goingGroups, faceRows, viewerRow, locationEvents] = await Promise.all([
       this.prisma.pLEventGuest.findMany({
         where: { ...listedGuestWhere(uid), isHost: true },
         distinct: ['memberUid'],
         orderBy: { createdAt: 'asc' },
-        select: personSelect,
+        select: GUEST_PERSON_SELECT,
       }),
       hideAttendance
         ? Promise.resolve([])
         : this.prisma.pLEventGuest.groupBy({ by: ['memberUid'], where: listedGuestWhere(uid) }),
-      hideAttendance
-        ? Promise.resolve([])
-        : this.prisma.pLEventGuest.findMany({
-            where: listedGuestWhere(uid),
-            distinct: ['memberUid'],
-            orderBy: { createdAt: 'desc' },
-            take: 3,
-            select: personSelect,
-          }),
+      hideAttendance ? Promise.resolve([]) : this.prisma.pLEventGuest.findMany(facesFindArgs(uid)),
       viewer
         ? this.prisma.pLEventGuest.findFirst({
             where: { eventUid: uid, memberUid: viewer.uid },

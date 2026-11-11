@@ -10,8 +10,40 @@ import { readEventDetails } from './pl-event-details.mapper';
  * Guest rows whose member the attendee list shows: every member except REJECTED ones, the rule `fetchAttendees`
  * applies in SQL. Hosts, `goingCount` and faces use it, so the count matches the strict attendee list.
  */
+export const LISTED_GUEST_MEMBER_WHERE = { NOT: { memberApproval: { state: 'REJECTED' as const } } };
+
 export function listedGuestWhere(eventUid: string) {
-  return { eventUid, member: { NOT: { memberApproval: { state: 'REJECTED' as const } } } };
+  return { eventUid, member: LISTED_GUEST_MEMBER_WHERE };
+}
+
+/** The same rule for several events at once: the member and team profile cards (LAB-3215) count like the drawer. */
+export function listedGuestsWhereIn(eventUids: string[]) {
+  return { eventUid: { in: eventUids }, member: LISTED_GUEST_MEMBER_WHERE };
+}
+
+/** A guest row's member as a person: uid, name, image. */
+export const GUEST_PERSON_SELECT = { member: { select: { uid: true, name: true, image: { select: { url: true } } } } };
+
+/**
+ * The three faces shown for an event: the newest distinct listed members. The drawer (`GET /v1/irl/events/:uid`) and
+ * the profile cards (LAB-3215) both use these arguments, so they show the same people.
+ */
+export function facesFindArgs(eventUid: string) {
+  return {
+    where: listedGuestWhere(eventUid),
+    distinct: ['memberUid' as const],
+    orderBy: { createdAt: 'desc' as const },
+    take: 3,
+    select: GUEST_PERSON_SELECT,
+  };
+}
+
+/**
+ * Signed-out viewers of an `INVITE_ONLY` event see no attendance: count 0 and no faces, as on the drawer and the
+ * attendee list.
+ */
+export function hidesAttendance(eventType: string | null | undefined, isUserLoggedIn: boolean): boolean {
+  return !isUserLoggedIn && eventType === 'INVITE_ONLY';
 }
 
 /** "Lisbon, Portugal" → "Lisbon". Null when there is nothing before the first comma. */

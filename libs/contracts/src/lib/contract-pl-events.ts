@@ -8,7 +8,10 @@ import {
   ResponsePLEventDetailSchema,
   UpdateMyEventVisibilitySchema,
   UpdateMyGuestPlansSchema,
-  DeletePLEventGuestsSchema
+  DeletePLEventGuestsSchema,
+  ProfileEventsQuerySchema,
+  ResponseMemberEventsSchema,
+  ResponseTeamEventsSchema,
 } from '../schema';
 import { SyncPLEventsBodySchema } from '../schema';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
@@ -181,6 +184,24 @@ export const apiEvents = contract.router({
       200: ResponsePLEventDetailSchema,
     },
     summary: 'Get one event with its gathering, hosts and attendance summary',
+  },
+  getMemberEvents: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/members/:uid/events`,
+    query: ProfileEventsQuerySchema,
+    responses: {
+      200: ResponseMemberEventsSchema,
+    },
+    summary: "A member's upcoming and past events for their profile (upcoming for signed-in viewers only)",
+  },
+  getTeamEvents: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/teams/:uid/events`,
+    query: ProfileEventsQuerySchema,
+    responses: {
+      200: ResponseTeamEventsSchema,
+    },
+    summary: "A team's upcoming events (its members' attendance) and past events, Demo Days first",
   },
   updateMyEventVisibility: {
     method: 'PATCH',
