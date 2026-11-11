@@ -25,7 +25,7 @@ describe('MemberController — updateMemberByUid job search status', () => {
       updateMemberByUid,
     };
     const logger = { info: jest.fn(), error: jest.fn() };
-    const controller = new MemberController(membersService as any, {} as any, logger as any);
+    const controller = new MemberController(membersService as any, {} as any, logger as any, {} as any);
 
     return { controller, updateMemberByUid };
   }
