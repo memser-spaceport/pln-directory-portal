@@ -58,6 +58,29 @@ The system SHALL serve `PATCH /v1/irl/events/:uid/me` with body `{ showOnProfile
 - **WHEN** they call `PATCH /v1/irl/events/A/me`
 - **THEN** the response is 404
 
+### Requirement: A member updates their plans at a gathering in place
+
+The system SHALL serve `PATCH /v1/irl/locations/:uid/guests/me` for a member with `irlg.going.write` or directory admin. Shared details SHALL be written to all the caller's rows at that gathering, and each `events[]` entry SHALL update the roles on the caller's row for that event. It SHALL NOT create or delete rows, nor change `showOnProfile`.
+
+#### Scenario: A member becomes a speaker at an event they are going to
+
+- **GIVEN** a member going to events A and B at a gathering, with A hidden from their profile
+- **WHEN** they call `PATCH /v1/irl/locations/<gathering>/guests/me` with `events: [{ uid: A, isSpeaker: true }]` and `topics: ["AI"]`
+- **THEN** their row for A has `isSpeaker` true and still has `showOnProfile` false
+- **AND** their rows for A and B both have topics `["AI"]`
+
+#### Scenario: Plans cannot add an event
+
+- **GIVEN** a member going to event A only
+- **WHEN** they call the route with `events: [{ uid: B }]`
+- **THEN** the response is 400 and no row is created
+
+#### Scenario: A member with no rows at the gathering
+
+- **GIVEN** a member with no guest rows at a gathering
+- **WHEN** they call the route for that gathering
+- **THEN** the response is 404
+
 ### Requirement: Not going removes one event only
 
 `POST /v1/irl/locations/:uid/events/guests` SHALL take `{ membersAndEvents: [{ memberUid, events: string[] }] }` and validate it at the boundary. A non-empty `events` SHALL delete only those event rows for that member at that gathering. An empty `events` array SHALL keep its current meaning (all the member's rows at that gathering). An entry without an `events` array SHALL be rejected with 400, and nothing SHALL be deleted. Non-admins SHALL only delete their own rows.

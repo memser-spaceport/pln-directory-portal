@@ -132,6 +132,15 @@ Add `locationUid: true` to the select, map it in `toUpcomingEvent`, and add `loc
 
 `findOne` adds `showOnProfile` to the `eventGuests` select. `MembersController.findOne` drops rows with `showOnProfile === false` unless the viewer is that member. The response shape only gains a field. The old IRL contributions block (flag off) then respects "hide" too.
 
+### D12. Plans are updated in place with `PATCH /v1/irl/locations/:uid/guests/me`
+
+The drawer's plans step (FE D4) saves a diff: create for added events, per-event delete for removed ones. Events the member keeps can still change: their roles (host/speaker/sponsor and sub-events), and the details shared across the gathering (check-in/out dates in `additionalInfo`, topics, reason, Telegram, office hours, team). This route updates them without deleting rows.
+- Guard: `UserTokenValidation` + `irlg.going.write` or directory admin, same as create. It only touches the caller's own rows.
+- Body (all optional, validated with `safeParse`): `{ teamUid?, topics?, reason?, telegramId?, officeHours?, additionalInfo?: { checkInDate?, checkOutDate? }, events?: [{ uid, isHost?, isSpeaker?, isSponsor?, hostSubEvents?, speakerSubEvents?, sponsorSubEvents? }] }`.
+- Shared fields are written to every row the caller has at that location (event rows and a gathering-level row, if any). Each `events[]` entry updates the roles on the caller's existing row for that event. An entry for an event the caller has no row for is a 400; the route never creates or deletes rows.
+- `showOnProfile` and `createdAt` are untouched. Returns the caller's rows at the location. 404 when the caller has no rows there.
+- Alternatives: PUT replaces the set and resets `showOnProfile`; delete + recreate loses `createdAt` and races with the attendee list.
+
 ## Risks / Trade-offs
 
 - [In-memory grouping for team upcoming/past grows with team size] → Teams have tens of members and a handful of events. Log the row count, and move to SQL `GROUP BY` if any team exceeds ~500 rows.

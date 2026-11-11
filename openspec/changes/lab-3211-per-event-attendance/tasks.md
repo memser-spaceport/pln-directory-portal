@@ -14,6 +14,7 @@ Each section is one subtask PR into `lab-3211`. Its branch is `lab-3211-<sub#>`,
   - Replace `DeletePLEventGuestsSchema` with `{ membersAndEvents: [{ memberUid, events: string[] }] }` (min 1 entry).
   - Add `eventUid` to the guests query schema.
   - Add the `PATCH /v1/irl/events/:uid/me` route (body `{ showOnProfile: boolean }`).
+  - Add the `PATCH /v1/irl/locations/:uid/guests/me` route (D12 body).
 
   Verify that the contracts lib compiles under the type-check gate.
 - [ ] 1.3 Guest create:
@@ -22,6 +23,7 @@ Each section is one subtask PR into `lab-3211`. Its branch is `lab-3211-<sub#>`,
 
   Verify with a jest test: an `events: [{uid: B}]` create leaves the existing row for A, `teamUid: ''` produces `null`, and `showOnProfile: false` is stored.
 - [ ] 1.4 Toggle: a service method plus a controller handler for `PATCH /v1/irl/events/:uid/me` (`UserTokenValidation`; `updateMany` on the caller's own row; 404 when count is 0; 400 via `safeParse`). It resets the `PLEventGuest` cache. Verify with jest: the owner hides, a non-guest gets 404, and an invalid body gets 400.
+- [ ] 1.4a Plans update (D12): a service method plus a controller handler for `PATCH /v1/irl/locations/:uid/guests/me` (`UserTokenValidation` + `irlg.going.write` or directory admin; `safeParse`; shared fields on all the caller's rows at the location in one transaction; roles per `events[]` entry; 400 for an event the caller has no row for; 404 when the caller has no rows). It resets the `PLEventGuest` cache. Verify with jest: roles change on A only, shared fields reach A and B, `showOnProfile` stays false on a hidden row, an unknown event gets 400 and creates nothing.
 - [ ] 1.5 Strict attendee list: with `eventUid`, `getPLEventGuestsByLocationAndType` narrows events to that event (after viewer filtering) and passes `includeLocationOnlyGuests: false` after the `...query` spread. Verify with jest: a gathering-level guest is left out, a hidden-from-profile guest is kept, and a signed-out viewer of an `INVITE_ONLY` event gets an empty list. Without `eventUid` the existing calls are unchanged.
 - [ ] 1.6 Delete body: the controller runs `safeParse` on the new schema and throws `BadRequestException` before any delete. Verify with jest that a `{ memberUid, eventUid }` entry gets 400 and deletes nothing, `events: [A]` deletes only A, and `events: []` still deletes all of that member's rows at the location. Grep the back-office (`apps/back-office`) and the FE repo for other callers of `/events/guests`, and record them in the PR.
 - [ ] 1.7 `GET /v1/irl/events/:uid` (D6):
