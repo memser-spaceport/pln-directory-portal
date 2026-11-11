@@ -19,7 +19,7 @@ import { EventsToolingService } from '../events/events-tooling.service';
 import { CacheService } from '../utils/cache/cache.service';
 import {IrlGatheringPushCandidatesService} from "./push/irl-gathering-push-candidates.service";
 import { UpcomingEventsOptions, toUpcomingEvent, upcomingEventsFindArgs } from './upcoming-events-query';
-import { toPLEventDetail } from './pl-event-detail';
+import { listedGuestWhere, toPLEventDetail } from './pl-event-detail';
 import type { ResponsePLEventDetail } from 'libs/contracts/src/schema/pl-event-attendance';
 
 
@@ -299,6 +299,7 @@ export class PLEventsService {
         websiteURL: true,
         externalId: true,
         resources: true,
+        additionalInfo: true,
         logo: { select: { url: true } },
         banner: { select: { url: true } },
         location: {
@@ -327,18 +328,18 @@ export class PLEventsService {
 
     const [hostRows, goingGroups, faceRows, viewerRow, locationEvents] = await Promise.all([
       this.prisma.pLEventGuest.findMany({
-        where: { eventUid: uid, isHost: true },
+        where: { ...listedGuestWhere(uid), isHost: true },
         distinct: ['memberUid'],
         orderBy: { createdAt: 'asc' },
         select: personSelect,
       }),
       hideAttendance
         ? Promise.resolve([])
-        : this.prisma.pLEventGuest.groupBy({ by: ['memberUid'], where: { eventUid: uid } }),
+        : this.prisma.pLEventGuest.groupBy({ by: ['memberUid'], where: listedGuestWhere(uid) }),
       hideAttendance
         ? Promise.resolve([])
         : this.prisma.pLEventGuest.findMany({
-            where: { eventUid: uid },
+            where: listedGuestWhere(uid),
             distinct: ['memberUid'],
             orderBy: { createdAt: 'desc' },
             take: 3,

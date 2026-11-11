@@ -71,12 +71,12 @@ A field the events service did not send SHALL be null or an empty list, never an
 ### Requirement: The event read includes hosts and an attendance summary
 
 The event read SHALL include:
-- `hosts`: members with `isHost` on this event, with uid, name and image.
-- `goingCount`: the number of distinct members with a guest row for this event.
-- `faces`: up to three of those members, with uid, name and image.
+- `hosts`: members with `isHost` on this event (uid, name, image).
+- `goingCount`: the number of distinct members going to this event.
+- `faces`: up to three of those members (uid, name, image).
 - `viewerGoing`: true only when the signed-in viewer has a guest row for this event.
 
-For a signed-out viewer of an `INVITE_ONLY` event, `goingCount` SHALL be 0 and `faces` empty. `showOnProfile` SHALL NOT affect these values.
+For a signed-out viewer of an `INVITE_ONLY` event, `goingCount` SHALL be 0 and `faces` empty. REJECTED members SHALL be left out, as in the attendee list; `showOnProfile` SHALL NOT matter.
 
 #### Scenario: The viewer is going
 
@@ -84,6 +84,13 @@ For a signed-out viewer of an `INVITE_ONLY` event, `goingCount` SHALL be 0 and `
 - **WHEN** the viewer reads A
 - **THEN** `goingCount` is 3
 - **AND** `viewerGoing` is true
+
+#### Scenario: A rejected member is going
+
+- **GIVEN** three members going to event A, one of them REJECTED
+- **WHEN** A is read
+- **THEN** `goingCount` is 2
+- **AND** the rejected member is not in `faces` or `hosts`
 
 #### Scenario: A signed-out viewer
 

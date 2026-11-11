@@ -1,9 +1,10 @@
 import { z } from 'zod';
+import { PLEventDetailsSchema } from './pl-event-details';
 
 /**
  * Per-event attendance on the wire (LAB-3211 / LAB-3213).
  *
- * A leaf module on purpose: it imports only `zod`, so controller specs can import these schemas without pulling in
+ * A leaf module on purpose: it imports only `zod` (and the `pl-event-details` leaf), so controller specs can import these schemas without pulling in
  * the contracts barrel (see `job-search-status.ts` for why that matters). `pl-event-guest.ts` builds its DTOs from it.
  *
  * `@Api` and the zod DTOs do not validate bodies in this app, so controllers `safeParse` these themselves.
@@ -76,7 +77,7 @@ export const PLEventPersonSchema = z.object({
 
 export const PLEventRoleSchema = z.enum(['Host', 'Speaker', 'Sponsor']);
 
-/** `GET /v1/irl/events/:uid`. `details` is filled by the events sync (LAB-3214) and empty until then. */
+/** `GET /v1/irl/events/:uid`. `details` comes from the events sync (LAB-3214); empty for an event never resynced. */
 export const ResponsePLEventDetailSchema = z.object({
   uid: z.string(),
   name: z.string(),
@@ -112,7 +113,7 @@ export const ResponsePLEventDetailSchema = z.object({
       ),
     })
     .nullable(),
-  details: z.any(),
+  details: PLEventDetailsSchema,
   hosts: z.array(PLEventPersonSchema),
   goingCount: z.number().int(),
   faces: z.array(PLEventPersonSchema),

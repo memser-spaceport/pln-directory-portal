@@ -1,4 +1,5 @@
 import type { ResponsePLEventDetail } from 'libs/contracts/src/schema/pl-event-attendance';
+import { readEventDetails } from './pl-event-details.mapper';
 
 /**
  * `GET /v1/irl/events/:uid` (LAB-3213): pure helpers that turn the rows `PLEventsService.getPLEventDetail` loads into
@@ -6,20 +7,11 @@ import type { ResponsePLEventDetail } from 'libs/contracts/src/schema/pl-event-a
  */
 
 /**
- * The event details synced from the PL events service. LAB-3214 fills them from `additionalInfo.details`; until an
- * event is resynced every field is empty, never missing.
+ * Guest rows whose member the attendee list shows: every member except REJECTED ones, the rule `fetchAttendees`
+ * applies in SQL. Hosts, `goingCount` and faces use it, so the count matches the strict attendee list.
  */
-export function emptyPLEventDetails() {
-  return {
-    tags: [] as Array<{ name: string; color: string | null }>,
-    accessType: null as string | null,
-    accessOption: null as string | null,
-    format: null as string | null,
-    host: null as { name: string; logo: string | null } | null,
-    coHosts: [] as Array<{ name: string; logo: string | null }>,
-    sponsors: [] as Array<{ name: string; logo: string | null }>,
-    agenda: null as Record<string, unknown> | null,
-  };
+export function listedGuestWhere(eventUid: string) {
+  return { eventUid, member: { NOT: { memberApproval: { state: 'REJECTED' as const } } } };
 }
 
 /** "Lisbon, Portugal" → "Lisbon". Null when there is nothing before the first comma. */
@@ -42,6 +34,8 @@ export type PLEventDetailRow = {
   websiteURL: string | null;
   externalId: string | null;
   resources: unknown[];
+  /** Holds `details` once the events sync has stored them (LAB-3214). */
+  additionalInfo?: unknown;
   logo: { url: string } | null;
   banner: { url: string } | null;
   location: {
@@ -62,7 +56,6 @@ export type PLEventDetailParts = {
   /** The viewer's own guest row for this event, if they are going. */
   viewerRow: { showOnProfile: boolean; isHost: boolean; isSpeaker: boolean; isSponsor: boolean } | null;
   isUserLoggedIn: boolean;
-  details?: ResponsePLEventDetail['details'];
 };
 
 function toPerson(row: PersonRow) {
@@ -112,7 +105,8 @@ export function toPLEventDetail(event: PLEventDetailRow, parts: PLEventDetailPar
           })),
         }
       : null,
-    details: parts.details ?? emptyPLEventDetails(),
+    // Empty details for an event the sync has not stored them on yet, never missing fields.
+    details: readEventDetails(event.additionalInfo),
     hosts: parts.hosts.map(toPerson).filter((p): p is NonNullable<typeof p> => !!p),
     goingCount: parts.goingCount,
     faces: parts.faces.map(toPerson).filter((p): p is NonNullable<typeof p> => !!p),

@@ -12,7 +12,10 @@ jest.mock('../shared/log.service', () => ({ LogService: class {} }));
 
 import { NotFoundException } from '@nestjs/common';
 import { ResponsePLEventDetailSchema } from 'libs/contracts/src/schema/pl-event-attendance';
-import { cityOf, emptyPLEventDetails, visibleResources } from './pl-event-detail';
+import { emptyPLEventDetails } from 'libs/contracts/src/schema/pl-event-details';
+import { EVENTS_SERVICE_EVENT } from './fixtures/events-service-event.fixture';
+import { cityOf, visibleResources } from './pl-event-detail';
+import { mapEventDetails, withEventDetails } from './pl-event-details.mapper';
 import { PLEventsService } from './pl-events.service';
 
 /** LAB-3213: `GET /v1/irl/events/:uid`. */
@@ -61,15 +64,23 @@ function eventRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function makeService(event: any, guests: { going?: string[]; hosts?: string[]; viewerRow?: any } = {}) {
+function makeService(
+  event: any,
+  guests: { going?: string[]; hosts?: string[]; rejected?: string[]; viewerRow?: any } = {}
+) {
   const going = guests.going ?? ['m-1', 'm-2', 'm-3', 'm-4'];
+  // Stands in for the database: a where that excludes REJECTED members drops guests.rejected.
+  const listed = (where: any, uids: string[]) =>
+    where?.member?.NOT?.memberApproval?.state === 'REJECTED'
+      ? uids.filter((uid) => !(guests.rejected ?? []).includes(uid))
+      : uids;
   const prisma: any = {
     pLEvent: { findFirst: jest.fn(async () => event) },
     pLEventGuest: {
       findMany: jest.fn(async ({ where, take }: any) =>
-        where.isHost ? (guests.hosts ?? []).map(person) : going.slice(0, take).map(person)
+        where.isHost ? listed(where, guests.hosts ?? []).map(person) : listed(where, going).slice(0, take).map(person)
       ),
-      groupBy: jest.fn(async () => going.map((memberUid) => ({ memberUid }))),
+      groupBy: jest.fn(async ({ where }: any) => listed(where, going).map((memberUid) => ({ memberUid }))),
       findFirst: jest.fn(async () => guests.viewerRow ?? null),
     },
   };
@@ -154,6 +165,39 @@ describe('PLEventsService.getPLEventDetail (LAB-3213)', () => {
     const detail = await service.getPLEventDetail('ev-1', VIEWER);
     expect(detail.goingCount).toBe(4);
     expect(detail.faces).toHaveLength(3);
+  });
+
+  it('a resynced event returns the details the sync stored (LAB-3214)', async () => {
+    const stored = mapEventDetails(EVENTS_SERVICE_EVENT);
+    const { service } = makeService(
+      eventRow({ additionalInfo: withEventDetails({ irlLink: 'https://x.io' }, stored) })
+    );
+    const detail = await service.getPLEventDetail('ev-1', null);
+
+    expect(detail.details).toEqual(stored);
+    expect(detail.details.tags.length).toBeGreaterThan(0);
+    expect(detail.details.agenda).not.toBeNull();
+    expect(ResponsePLEventDetailSchema.safeParse(detail).success).toBe(true);
+  });
+
+  it('an event never resynced returns empty details, never missing fields (LAB-3214)', async () => {
+    for (const additionalInfo of [null, { irlLink: 'https://x.io' }]) {
+      const { service } = makeService(eventRow({ additionalInfo }));
+      const detail = await service.getPLEventDetail('ev-1', VIEWER);
+      expect(detail.details).toEqual(emptyPLEventDetails());
+    }
+  });
+
+  it('a guest whose member is REJECTED is not counted, not a face and not a host', async () => {
+    const { service } = makeService(eventRow(), {
+      going: ['m-bad', 'm-1', 'm-2', 'm-3'],
+      hosts: ['m-bad', 'm-1'],
+      rejected: ['m-bad'],
+    });
+    const detail = await service.getPLEventDetail('ev-1', VIEWER);
+    expect(detail.goingCount).toBe(3);
+    expect(detail.faces.map((f) => f.uid)).toEqual(['m-1', 'm-2', 'm-3']);
+    expect(detail.hosts.map((h) => h.uid)).toEqual(['m-1']);
   });
 
   it('an event without a gathering has location null', async () => {
