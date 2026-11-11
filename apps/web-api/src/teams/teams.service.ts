@@ -23,7 +23,7 @@ import { LogService } from '../shared/log.service';
 import { buildMultiRelationMapping, buildRelationMapping, copyObj } from '../utils/helper/helper';
 import { normalizeBlueskyHandler, normalizeCrunchbaseHandler } from './team-handle-normalizer';
 import { syncTeamLocations } from './team-locations';
-import { isTeamHiddenFromPublic, PUBLICLY_VISIBLE_TEAM_WHERE, toTeamCrawlIndex } from './team-public-visibility';
+import { enforceTeamPublicVisibility, PUBLICLY_VISIBLE_TEAM_WHERE, toTeamCrawlIndex } from './team-public-visibility';
 import { CacheService } from '../utils/cache/cache.service';
 import { AskService } from '../asks/asks.service';
 import { TeamsHooksService } from './teams.hooks.service';
@@ -325,18 +325,33 @@ export class TeamsService {
           investorProfile: true,
         },
       });
-      if (isTeamHiddenFromPublic(team.accessLevel)) {
-        if (!userEmail) {
-          throw new ForbiddenException('Team is inactive');
-        } else {
-          await this.validateRequestor(userEmail, team.uid);
-        }
-      }
+      await this.enforcePublicVisibility(team, userEmail);
       team.teamFocusAreas = this.removeDuplicateFocusAreas(team.teamFocusAreas);
       return team;
     } catch (err) {
       return this.handleErrors(err, uid);
     }
+  }
+
+  /**
+   * The visibility rule of `GET /v1/teams/:uid` (team-public-visibility), for other team reads such as
+   * `GET /v1/teams/:uid/events` (LAB-3215): 404 for an unknown team, and for an L0 team 403 "Team is inactive" when
+   * signed out, or the requestor check when signed in.
+   */
+  async assertTeamVisibleToViewer(uid: string, userEmail?: string): Promise<{ uid: string; name: string }> {
+    const team = await this.prisma.team.findUnique({
+      where: { uid },
+      select: { uid: true, name: true, accessLevel: true },
+    });
+    if (!team) {
+      throw new NotFoundException(`Team not found with uid ${uid}.`);
+    }
+    await this.enforcePublicVisibility(team, userEmail);
+    return { uid: team.uid, name: team.name };
+  }
+
+  private async enforcePublicVisibility(team: { uid: string; accessLevel?: string | null }, userEmail?: string) {
+    await enforceTeamPublicVisibility(team, userEmail, (email, teamUid) => this.validateRequestor(email, teamUid));
   }
 
   /**

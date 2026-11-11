@@ -48,8 +48,8 @@ Each section is one subtask PR into `lab-3211`. Its branch is `lab-3211-<sub#>`,
 
 ## 3. LAB-3215: member and team events
 
-- [ ] 3.1 Contracts: the `GET /v1/members/:uid/events` and `GET /v1/teams/:uid/events` routes in `contract-pl-events.ts`. The query takes `group?`, `page?`, `limit?` (default 4, max 50). The response is `{ upcoming?, past? }`, each `{ page, limit, total, items }`, with item schemas (`kind`, event fields, `locationUid`, `location`, `city`, `roles`, `showOnProfile`, `goingCount`, `faces`, `viewerGoing`; team items add `memberCount` and `members`; Demo Day items have `title`, `slug` and dates). Verify that the contracts compile.
-- [ ] 3.2 `ProfileEventsService.getMemberEvents(uid, viewer, query)`:
+- [x] 3.1 Contracts: the `GET /v1/members/:uid/events` and `GET /v1/teams/:uid/events` routes in `contract-pl-events.ts`. The query takes `group?`, `page?`, `limit?` (default 4, max 50). The response is `{ upcoming?, past? }`, each `{ page, limit, total, items }`, with item schemas (`kind`, event fields, `locationUid`, `location`, `city`, `roles`, `showOnProfile`, `goingCount`, `faces`, `viewerGoing`; team items add `memberCount` and `members`; Demo Day items have `title`, `slug` and dates). Verify that the contracts compile.
+- [x] 3.2 `ProfileEventsService.getMemberEvents(uid, viewer, query)`:
   - Upcoming means `endDate > now`, signed-in viewers only.
   - Hidden rows are shown only to the owner.
   - Counts and faces are batched for the page's events.
@@ -57,16 +57,17 @@ Each section is one subtask PR into `lab-3211`. Its branch is `lab-3211-<sub#>`,
   - It returns 404 for an unknown member.
 
   Verify with jest: the signed-out, other-member, owner, 9-past-events paging and `group=past` scenarios from the spec.
-- [ ] 3.3 `ProfileEventsService.getTeamEvents(uid, viewer, query)`:
+- [x] 3.3 `ProfileEventsService.getTeamEvents(uid, viewer, query)`:
   - Upcoming comes from current members' visible rows, grouped by event, with `memberCount`, `members` and team roles.
   - Past comes from team guest rows with a role plus TEAM associations (`ATTENDEE` gives no role), deduped.
   - The team's Demo Days (ended, non-deleted, an ENABLED non-deleted FOUNDER participant for the team) come first.
   - The L0 + signed-out check is the same as `GET /v1/teams/:uid`.
 
   Verify with jest: the teammates-grouped, hidden-row, former-member, Demo Day first, disabled-founder and L0 scenarios.
-- [ ] 3.4 `ProfileEventsController` in the `pl-events` module with both routes (`OptionalUserTokenCheckGuard`, `@NoCache()`, query parsed with `safeParse`). Register it in `pl-events.module.ts`. Verify that `yarn nx build web-api` passes and both routes answer locally with a seeded member and team.
-- [ ] 3.5 Member detail: add `showOnProfile` to the `eventGuests` select in `members.service.findOne`. `MembersController.findOne` drops hidden rows unless the viewer is the member. Verify with jest that another viewer does not get the hidden row and the owner does.
-- [ ] 3.6 Run the type-check gate, ESLint on the touched files and the touched specs. Verify that all are green against the baseline.
+- [x] 3.4 `ProfileEventsController` in the `pl-events` module with both routes (`OptionalUserTokenCheckGuard`, `@NoCache()`, query parsed with `safeParse`). Register it in `pl-events.module.ts`. Verify that `yarn nx build web-api` passes and both routes answer locally with a seeded member and team.
+  - Status (2026-11-11): `nx build web-api` fails with "Maximum call stack size exceeded" on `origin/lab-3211` too (the TS 4.7 overflow), so the type-check gate stands in for it. The local database has no migrations applied, so the routes were not run against a seeded DB: `profile-events.routes.spec.ts` runs both routes through Nest's router, and `profile-events.spec.ts` runs the service's real Prisma arguments against an in-memory evaluator. Check both routes on the `lab-3211` feature env with task 4.1.
+- [x] 3.5 Member detail: add `showOnProfile` to the `eventGuests` select in `members.service.findOne`. `MembersController.findOne` drops hidden rows unless the viewer is the member. Verify with jest that another viewer does not get the hidden row and the owner does.
+- [x] 3.6 Run the type-check gate, ESLint on the touched files and the touched specs. Verify that all are green against the baseline.
 
 ## 4. Goal integration (on `lab-3211`, after 1–3 merge)
 

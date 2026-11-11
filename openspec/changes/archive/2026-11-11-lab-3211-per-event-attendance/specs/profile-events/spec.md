@@ -17,6 +17,11 @@ The system SHALL serve `GET /v1/members/:uid/events` with an optional user token
 - **THEN** `upcoming.items` has the next-month event
 - **AND** `past.items` has last year's event
 
+#### Scenario: An unknown member
+
+- **WHEN** events are requested for a member uid that does not exist
+- **THEN** the response is 404
+
 #### Scenario: Gathering-level attendance is not an event
 
 - **GIVEN** a member going to a gathering with no specific event
@@ -38,6 +43,22 @@ Each member event item SHALL include:
 - **GIVEN** a member who is a host of event A in gathering "Berlin, Germany"
 - **WHEN** their events are requested
 - **THEN** A's item has `roles` `["Host"]` and `city` "Berlin"
+
+### Requirement: Profile event attendance counts like the event drawer
+
+On member and team event items, `goingCount` and `faces` SHALL follow `GET /v1/irl/events/:uid`: distinct members going, REJECTED members left out, and the newest three as faces. A signed-out viewer of an `INVITE_ONLY` event SHALL get count 0 and no faces.
+
+#### Scenario: A rejected member is not counted
+
+- **GIVEN** event A with two members going and one REJECTED member going
+- **WHEN** a signed-in member requests the events of one of them
+- **THEN** A's item has `goingCount` 2 and no face for the REJECTED member
+
+#### Scenario: An invite-only event for a signed-out visitor
+
+- **GIVEN** a member who went to an `INVITE_ONLY` event
+- **WHEN** a signed-out visitor requests their events
+- **THEN** that item has `goingCount` 0 and no faces
 
 ### Requirement: Member event groups are paged
 
@@ -95,6 +116,11 @@ The system SHALL serve `GET /v1/teams/:uid/events` with an optional user token, 
 - **WHEN** a signed-out visitor requests its events
 - **THEN** the response is 403
 
+#### Scenario: An unknown team
+
+- **WHEN** events are requested for a team uid that does not exist
+- **THEN** the response is 404
+
 ### Requirement: A team's upcoming events come from its members' attendance
 
 Team upcoming items SHALL be the upcoming events that the team's current members are going to with `showOnProfile` true, one item per event, soonest first. A current member has a role on the team with no end date, or an end date in the future. For a signed-out viewer, upcoming SHALL be empty.
@@ -139,6 +165,12 @@ Team past event items SHALL be the past events the team hosted, co-hosted, spoke
 - **GIVEN** team T with a `HOST` association on an event that ended last year
 - **WHEN** T's events are requested
 - **THEN** `past.items` has that event with `roles` `["Host"]`
+
+#### Scenario: Attendance alone is not a team event
+
+- **GIVEN** team T with only an `ATTENDEE` association on a past event
+- **WHEN** T's events are requested
+- **THEN** `past.items` does not list that event
 
 ### Requirement: A team's Demo Days come first among past events
 
