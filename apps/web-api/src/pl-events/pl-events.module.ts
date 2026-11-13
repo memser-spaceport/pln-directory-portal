@@ -23,9 +23,16 @@ import {IrlGatheringPushNotificationsController} from "./push/irl-gathering-push
 import { IrlGatheringPushNotificationsProcessor } from './push/irl-gathering-push-notifications.processor';
 import { RbacModule } from '../rbac/rbac.module';
 import { AccessControlV2Module } from '../access-control-v2/access-control-v2.module';
+import { ProfileEventsController } from './profile-events.controller';
+import { ProfileEventsService } from './profile-events.service';
 
 @Module({
-  controllers: [PLEventsController, IrlGatheringPushConfigController, IrlGatheringPushNotificationsController],
+  controllers: [
+    PLEventsController,
+    ProfileEventsController,
+    IrlGatheringPushConfigController,
+    IrlGatheringPushNotificationsController,
+  ],
   providers: [
     PLEventsService,
     PLEventLocationsService,
@@ -38,6 +45,7 @@ import { AccessControlV2Module } from '../access-control-v2/access-control-v2.mo
     IrlGatheringPushNotificationsJob,
     IrlGatheringPushNotificationsProcessor,
     PLEventAssociationService,
+    ProfileEventsService,
   ],
   exports: [
     PLEventsService,

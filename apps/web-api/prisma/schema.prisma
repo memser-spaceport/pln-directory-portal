@@ -773,6 +773,8 @@ model PLEventGuest {
   isSpeaker      Boolean  @default(false)
   isSponsor      Boolean  @default(false)
   isFeatured     Boolean  @default(false)
+  // Shown on the member's profile Events section (LAB-3211). Hiding affects the profile only, not attendance.
+  showOnProfile  Boolean  @default(true)
 }
 
 model PLEventAssociation {

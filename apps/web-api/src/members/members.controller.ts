@@ -57,6 +57,7 @@ import {
 } from './member-contact-sanitizer';
 import { assignJobSearchStatusFromInput, presentJobSearchStatusForViewer } from './job-search-status';
 import { presentEmailForViewer } from './inactive-email';
+import { presentEventGuestsForViewer } from './member-event-guests';
 import { parseMemberSelfUpdate } from './member-self-update';
 
 const server = initNestServer(apiMembers);
@@ -716,7 +717,12 @@ export class MemberController {
     const email = request.userEmail;
     const requestor = email ? await this.membersService.findMemberByEmail(email) : null;
     const canSee = !!requestor && (requestor.uid === memberUid || requestor.isDirectoryAdmin === true);
-    return presentEmailForViewer(presentJobSearchStatusForViewer({ ...member }, canSee), canSee);
+    // Hidden event rows are for the member only, not for admins (LAB-3215).
+    const isOwner = !!requestor && requestor.uid === memberUid;
+    return presentEventGuestsForViewer(
+      presentEmailForViewer(presentJobSearchStatusForViewer({ ...member }, canSee), canSee),
+      isOwner
+    );
   }
 
   /**

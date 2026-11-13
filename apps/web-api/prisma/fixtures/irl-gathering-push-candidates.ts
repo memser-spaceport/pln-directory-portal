@@ -137,6 +137,7 @@ export const irlGatheringPushEventGuests = async (): Promise<Array<Omit<PLEventG
         isSpeaker: false,
         isSponsor: false,
         isFeatured: false,
+        showOnProfile: true,
         createdAt: new Date(),
         updatedAt: new Date(),
       } as any);

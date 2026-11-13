@@ -1,4 +1,10 @@
-import { isTeamHiddenFromPublic, PUBLICLY_VISIBLE_TEAM_WHERE, toTeamCrawlIndex } from './team-public-visibility';
+import { ForbiddenException } from '@nestjs/common';
+import {
+  enforceTeamPublicVisibility,
+  isTeamHiddenFromPublic,
+  PUBLICLY_VISIBLE_TEAM_WHERE,
+  toTeamCrawlIndex,
+} from './team-public-visibility';
 
 describe('isTeamHiddenFromPublic', () => {
   it('hides L0 teams only', () => {
@@ -39,5 +45,37 @@ describe('toTeamCrawlIndex', () => {
 
   it('returns an empty list for no rows', () => {
     expect(toTeamCrawlIndex([])).toEqual({ teams: [] });
+  });
+});
+
+describe('enforceTeamPublicVisibility (GET /v1/teams/:uid and GET /v1/teams/:uid/events)', () => {
+  it('refuses a signed-out viewer of an L0 team with 403 "Team is inactive"', async () => {
+    const validate = jest.fn();
+    const result = enforceTeamPublicVisibility({ uid: 't1', accessLevel: 'L0' }, undefined, validate);
+    await expect(result).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(enforceTeamPublicVisibility({ uid: 't1', accessLevel: 'L0' }, undefined, validate)).rejects.toThrow(
+      'Team is inactive'
+    );
+    expect(validate).not.toHaveBeenCalled();
+  });
+
+  it('sends a signed-in viewer of an L0 team through the requestor check', async () => {
+    const validate = jest.fn(async () => {
+      throw new ForbiddenException('Requestor does not have permission');
+    });
+    await expect(enforceTeamPublicVisibility({ uid: 't1', accessLevel: 'L0' }, 'a@b.c', validate)).rejects.toThrow(
+      'Requestor does not have permission'
+    );
+    expect(validate).toHaveBeenCalledWith('a@b.c', 't1');
+  });
+
+  it('lets anyone through for other access levels, or none', async () => {
+    const validate = jest.fn();
+    for (const accessLevel of ['L1', 'L4', null, undefined]) {
+      await expect(
+        enforceTeamPublicVisibility({ uid: 't1', accessLevel }, undefined, validate)
+      ).resolves.toBeUndefined();
+    }
+    expect(validate).not.toHaveBeenCalled();
   });
 });
