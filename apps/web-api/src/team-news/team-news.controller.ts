@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   ForbiddenException,
+  HttpCode,
   Logger,
   NotFoundException,
   Param,
@@ -102,6 +103,7 @@ export class TeamNewsController {
   }
 
   @Api(server.route.approveTeamNewsDefaultTags)
+  @HttpCode(200)
   @UseGuards(UserTokenValidation)
   async approveTeamNewsDefaultTags(@Req() req: Request & { userEmail?: string }, @Body() body: unknown) {
     const parsed = ApproveTeamNewsDefaultTagsRequestSchema.safeParse(body ?? {});
