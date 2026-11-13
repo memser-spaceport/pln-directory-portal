@@ -26,6 +26,8 @@ import {
   CreateTeamNewsPostRequestSchema,
   TeamNewsItemSchema,
   TeamNewsTagsResponseSchema,
+  TeamNewsDefaultTagsResponseSchema,
+  ApproveTeamNewsDefaultTagsRequestSchema,
 } from '../schema/team-news';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
@@ -146,6 +148,25 @@ export const apiTeamNews = contract.router({
       200: TeamNewsTagsResponseSchema,
     },
     summary: 'News tags members can choose: focus areas used by news in the last 90 days, grouped by parent',
+  },
+  // Declared before `getTeamNewsItem`, like `getTeamNewsTags`.
+  getTeamNewsDefaultTags: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/team-news/default-tags`,
+    responses: {
+      200: TeamNewsDefaultTagsResponseSchema,
+    },
+    summary:
+      'The news tags the system uses for the signed-in member, their source and whether the member approved them',
+  },
+  approveTeamNewsDefaultTags: {
+    method: 'POST',
+    path: `${getAPIVersionAsPath('1')}/team-news/default-tags/approve`,
+    body: ApproveTeamNewsDefaultTagsRequestSchema,
+    responses: {
+      200: TeamNewsDefaultTagsResponseSchema,
+    },
+    summary: 'Approve the default news tags, or replace them with the given tags',
   },
   getTeamNewsItem: {
     method: 'GET',

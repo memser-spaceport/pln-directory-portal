@@ -411,6 +411,16 @@ export const ANALYTICS_EVENTS = {
     /** A lead turned the suggested-candidates email off through the email's unsubscribe link (LAB-2853). */
     SUGGESTED_CANDIDATES_EMAIL_UNSUBSCRIBED: 'suggested-candidates-email-unsubscribed',
   },
+  TEAM_NEWS: {
+    /** The job stored AI news tags for one member (LAB-3249). */
+    DEFAULT_TAGS_GENERATED: 'team-news-default-tags-generated',
+    /** One AI news tags generation failed or gave too few news tags. */
+    DEFAULT_TAGS_GENERATION_FAILED: 'team-news-default-tags-generation-failed',
+    /** The member approved their default news tags as shown. */
+    DEFAULT_TAGS_APPROVED: 'team-news-default-tags-approved',
+    /** The member replaced their default news tags with their own on the tag card. */
+    DEFAULT_TAGS_REPLACED: 'team-news-default-tags-replaced',
+  },
   PERSONALIZATION: {
     /** One row added to the member signal log (LAB-3121, LAB-3123). */
     MEMBER_SIGNAL_RECORDED: 'member-signal-recorded',

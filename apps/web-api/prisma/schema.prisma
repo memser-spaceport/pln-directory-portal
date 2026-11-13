@@ -314,6 +314,7 @@ model Member {
   cvImport          MemberCvImport?
   memberSignals     MemberSignal[]
   interestProfile   MemberInterestProfileEntry[]
+  newsTagSuggestion MemberNewsTagSuggestion?
 }
 
 model MemberApproval {
@@ -5025,6 +5026,32 @@ model MemberInterestProfileEntry {
 
   @@unique([memberUid, kind, key])
   @@index([kind, key])
+}
+
+/// A member's AI news tags and their answer to the Home tag card (LAB-3249).
+/// The hourly job writes `tags` for a member with no saved tags; they are the
+/// member's default tags until the member saves a list. One row per member.
+model MemberNewsTagSuggestion {
+  id             Int       @id @default(autoincrement())
+  memberUid      String    @unique
+  member         Member    @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  /// Focus-area slugs, best match first. Empty until the first generation.
+  tags           String[]  @default([])
+  /// Hash of the member data the last generation attempt read.
+  inputHash      String?
+  /// The model that picked the tags.
+  model          String?
+  generatedAt    DateTime?
+  /// When the job last looked at this member (also the job's claim on the row).
+  lastAttemptAt  DateTime?
+  /// Failed generations for the current inputHash.
+  failedAttempts Int       @default(0)
+  /// When the member answered the tag card. Does not freeze the tags.
+  approvedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([lastAttemptAt])
 }
 
 /// One member interest profile rebuild (LAB-3122). Also serializes rebuilds

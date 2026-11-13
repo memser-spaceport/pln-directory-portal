@@ -55,3 +55,31 @@ describe('TeamNewsController route ordering', () => {
     expect(declarationIndex(route)).toBeLessThan(declarationIndex('getTeamNewsItem'));
   });
 });
+
+describe('TeamNewsController default tags routes', () => {
+  const source = readFileSync(join(__dirname, 'team-news.controller.ts'), 'utf8');
+  const decoratorsOf = (route: string) => {
+    const handler = source.slice(source.indexOf(`@Api(server.route.${route})`));
+    return handler.slice(0, handler.indexOf('async '));
+  };
+  const routes = apiTeamNews as unknown as Record<string, { method: string; path: string; pathParams?: unknown }>;
+
+  it.each(['getTeamNewsDefaultTags', 'approveTeamNewsDefaultTags'])('%s requires a signed-in member', (route) => {
+    expect(decoratorsOf(route)).toContain('@UseGuards(UserTokenValidation)');
+    expect(routes[route].pathParams).toBeUndefined();
+  });
+
+  it('serves the read uncached at /v1/team-news/default-tags', () => {
+    expect(decoratorsOf('getTeamNewsDefaultTags')).toContain('@NoCache()');
+    expect(routes.getTeamNewsDefaultTags).toMatchObject({ method: 'GET', path: '/v1/team-news/default-tags' });
+  });
+
+  it('takes the answer at POST /v1/team-news/default-tags/approve and rejects a bad body with 400', () => {
+    expect(routes.approveTeamNewsDefaultTags).toMatchObject({
+      method: 'POST',
+      path: '/v1/team-news/default-tags/approve',
+    });
+    const handler = source.slice(source.indexOf('@Api(server.route.approveTeamNewsDefaultTags)'));
+    expect(handler.slice(0, handler.indexOf('@Api(', 5))).toContain('throw new BadRequestException(');
+  });
+});
