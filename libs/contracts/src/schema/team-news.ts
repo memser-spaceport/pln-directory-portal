@@ -252,6 +252,8 @@ export const TeamNewsGroupedResponseSchema = z.object({
   // expanded to children) and the teams they belong to or follow; [] signed out.
   forYouTags: z.array(z.string()).default([]),
   forYouOwnTeamUids: z.array(z.string()).default([]),
+  /** Categories the viewer picked on News preferences (LAB-3140). [] signed out or never saved. */
+  forYouCategories: z.array(NewsEventTypeSchema).default([]),
 });
 
 export const TeamNewsFacetItemSchema = z.object({

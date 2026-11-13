@@ -101,6 +101,32 @@ A member's chosen news tags SHALL be stored as a list of focus-area slugs. Savin
 - **WHEN** a member saves `[]`
 - **THEN** reading their preferences returns `newsTags` `[]` with no seeded marker
 
+### Requirement: Member news category tags
+
+A member's chosen news category tags SHALL be stored as `newsCategoryTags`. The only values SHALL be FUNDING, LAUNCH and ANNOUNCEMENT. Saving the list SHALL replace the previous list and leave every other preference unchanged. A value outside those three SHALL be rejected with 400, and nothing SHALL be stored. An empty list SHALL be stored as a valid choice. Reading a missing key SHALL return an empty list. The list SHALL NOT be seeded from teams or from `newsCategories`.
+
+#### Scenario: Save category tags
+
+- **GIVEN** a signed-in member
+- **WHEN** they save `["ANNOUNCEMENT", "FUNDING"]`
+- **THEN** reading their preferences returns `newsCategoryTags` `["FUNDING", "ANNOUNCEMENT"]`, and their other preferences are unchanged
+
+#### Scenario: Empty list
+
+- **WHEN** a member saves `[]`
+- **THEN** reading their preferences returns `newsCategoryTags` `[]`
+
+#### Scenario: Unknown category
+
+- **WHEN** a member saves `["FUNDING", "PARTNERSHIP"]`
+- **THEN** the request is rejected with 400 and their stored category tags are unchanged
+
+#### Scenario: Never saved
+
+- **GIVEN** a member who never saved category tags, including one who saved `newsCategories`
+- **WHEN** their preferences are read
+- **THEN** `newsCategoryTags` is `[]`
+
 ### Requirement: Starting tags
 
 When a member has never saved news tags, reading their preferences SHALL return starting tags and `newsTagsSeeded: true`. When profile starting tags are enabled and the member's interest profile has topics with a positive score that are news tags, the starting tags SHALL be the 5 highest-scored of those topics. Otherwise the starting tags SHALL be the slugs of the focus areas of the teams they belong to. Reading SHALL NOT store anything. Once the member saves any list, including an empty one, that list SHALL be returned without the seeded marker.
@@ -155,7 +181,7 @@ When a member has never saved news tags, reading their preferences SHALL return 
 
 ### Requirement: For You tag fields
 
-The home feed's grouped news response SHALL include, for a signed-in viewer, the viewer's effective news tags (their saved tags, or their starting tags when they never saved any, with every parent focus area expanded to the focus areas under it) and the uids of the teams they belong to or follow. For a signed-out viewer both SHALL be empty. The existing For You team list SHALL be unchanged.
+The home feed's grouped news response SHALL include, for a signed-in viewer, the viewer's effective news tags (their saved tags, or their starting tags when they never saved any, with every parent focus area expanded to the focus areas under it), the uids of the teams they belong to or follow, and the viewer's saved `newsCategoryTags` (`[]` when they never saved any). For a signed-out viewer the tags, own teams and category tags SHALL be empty. The existing For You team list SHALL be unchanged.
 
 #### Scenario: Signed-in viewer
 
@@ -166,17 +192,35 @@ The home feed's grouped news response SHALL include, for a signed-in viewer, the
 #### Scenario: Signed-out viewer
 
 - **WHEN** a visitor who is not signed in loads the grouped home feed
-- **THEN** the tags and own teams are empty, and the rest of the response is as before
+- **THEN** the tags, own teams and category tags are empty, and the rest of the response is as before
+
+#### Scenario: Picked categories
+
+- **GIVEN** a signed-in member who saved category tags FUNDING and LAUNCH
+- **WHEN** they load the grouped home feed
+- **THEN** `forYouCategories` is `["FUNDING", "LAUNCH"]`
 
 ### Requirement: Digest picks by news tags
 
-When news tag picks are enabled, a member's digest picks SHALL be stories from teams they belong to or follow plus stories sharing any of their effective tags, newest first, at most one per team, up to the limit, falling back to the newest network stories. News categories SHALL NOT narrow these picks. When disabled, picks SHALL be exactly as before. The top story SHALL be the same either way.
+When news tag picks are enabled, a member's digest picks SHALL be stories from teams they belong to or follow, plus stories sharing any of their effective tags, plus stories whose category is one of their `newsCategoryTags`, newest first, at most one per team, up to the limit, falling back to the newest network stories when that set is empty. An empty `newsCategoryTags` SHALL add no stories. The stored `newsCategories` list SHALL NOT narrow these picks. When disabled, picks SHALL be exactly as before. The top story SHALL be the same either way.
 
 #### Scenario: Tag match from an unrelated team
 
 - **GIVEN** news tag picks are enabled and a member with the tag `ai`
 - **WHEN** a story tagged `ai` from a team they neither belong to nor follow is in the window
 - **THEN** it can be picked for them
+
+#### Scenario: Category match from an unrelated team
+
+- **GIVEN** news tag picks are enabled and a member whose category tags are FUNDING
+- **WHEN** a Funding story from a team they neither belong to nor follow is in the window
+- **THEN** it can be picked for them
+
+#### Scenario: No category tags
+
+- **GIVEN** news tag picks are enabled and a member with no category tags
+- **WHEN** a Funding story from a team they neither belong to nor follow is in the window, and it shares none of their tags
+- **THEN** it is not picked because of its category
 
 #### Scenario: Legacy verb tag
 
