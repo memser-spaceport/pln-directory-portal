@@ -18,6 +18,10 @@ export type NewsTag = {
 
 export type NewsTagVocabulary = ReadonlyMap<string, NewsTag>;
 
+/** Where a member's starting tags came from (LAB-3249). */
+export type StartingTagsSource = 'interest-profile' | 'ai' | 'team';
+export type StartingTags = { tags: string[]; source: StartingTagsSource };
+
 type FocusAreaRow = { uid: string; title: string; parentUid: string | null };
 
 const CACHE_MS = 10 * 60 * 1000;
@@ -146,12 +150,13 @@ export class NewsTagVocabularyService {
 
   /**
    * Starting tags for a member with no saved news tags (never saved, or saved
-   * an empty list), as vocabulary slugs.
-   * With profile starting tags enabled (LAB-3199): the member's highest-scored
-   * interest-profile topics, at most PROFILE_STARTING_TAGS_LIMIT. Otherwise, or
-   * when the profile has no such topic: the focus areas of the teams they
-   * belong to (each team focus area itself, child or top level). Reads only;
-   * nothing is stored.
+   * an empty list), as vocabulary slugs, from the first source that has any:
+   * 1. with profile starting tags enabled (LAB-3199), the member's
+   *    highest-scored interest-profile topics, at most PROFILE_STARTING_TAGS_LIMIT;
+   * 2. the member's stored AI tags (LAB-3249);
+   * 3. the focus areas of the teams they belong to (each team focus area
+   *    itself, child or top level).
+   * Reads only; nothing is stored.
    */
   async seedTagsForMember(memberUid: string): Promise<string[]> {
     return (await this.seedTagsForMembers([memberUid])).get(memberUid) ?? [];
@@ -159,10 +164,16 @@ export class NewsTagVocabularyService {
 
   /** seedTagsForMember for many members, one query per source, for the digest (LAB-2999). */
   async seedTagsForMembers(memberUids: string[]): Promise<Map<string, string[]>> {
+    const starting = await this.startingTagsForMembers(memberUids);
+    return new Map([...starting].map(([uid, { tags }]) => [uid, tags]));
+  }
+
+  /** The starting tags of each member with the source they came from. Every member gets an entry. */
+  async startingTagsForMembers(memberUids: string[]): Promise<Map<string, StartingTags>> {
     const uniqueMemberUids = [...new Set(memberUids)];
-    const result = new Map<string, string[]>(uniqueMemberUids.map((uid) => [uid, []]));
+    const result = new Map<string, StartingTags>(uniqueMemberUids.map((uid) => [uid, { tags: [], source: 'team' }]));
     if (uniqueMemberUids.length === 0) return result;
-    const [vocabulary, roles, profileTopics] = await Promise.all([
+    const [vocabulary, roles, profileTopics, aiRows] = await Promise.all([
       this.getVocabulary(),
       this.prisma.teamMemberRole.findMany({
         where: { memberUid: { in: uniqueMemberUids } },
@@ -177,14 +188,22 @@ export class NewsTagVocabularyService {
             select: { memberUid: true, key: true, score: true },
           })
         : [],
+      this.prisma.memberNewsTagSuggestion.findMany({
+        where: { memberUid: { in: uniqueMemberUids } },
+        select: { memberUid: true, tags: true },
+      }),
     ]);
     for (const role of roles) {
-      const slugs = result.get(role.memberUid);
+      const slugs = result.get(role.memberUid)?.tags;
       if (!slugs) continue;
       for (const tfa of role.team.teamFocusAreas) {
         const slug = slugify(tfa.focusArea.title);
         if (vocabulary.has(slug) && !slugs.includes(slug)) slugs.push(slug);
       }
+    }
+    for (const row of aiRows) {
+      const tags = row.tags.filter((tag) => vocabulary.has(tag));
+      if (tags.length > 0 && result.has(row.memberUid)) result.set(row.memberUid, { tags, source: 'ai' });
     }
     const topicsByMember = new Map<string, { key: string; score: number }[]>();
     for (const topic of profileTopics) {
@@ -193,13 +212,13 @@ export class NewsTagVocabularyService {
     }
     for (const [memberUid, topics] of topicsByMember) {
       if (!result.has(memberUid)) continue;
-      result.set(
-        memberUid,
-        topics
+      result.set(memberUid, {
+        tags: topics
           .sort((a, b) => b.score - a.score || a.key.localeCompare(b.key))
           .slice(0, PROFILE_STARTING_TAGS_LIMIT)
-          .map((topic) => topic.key)
-      );
+          .map((topic) => topic.key),
+        source: 'interest-profile',
+      });
     }
     return result;
   }

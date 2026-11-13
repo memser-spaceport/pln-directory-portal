@@ -21,6 +21,8 @@ import { TeamNewsImpressionsService } from './team-news-impressions.service';
 import { TeamNewsPostSummaryService } from './team-news-post-summary.service';
 import { TeamNewsImageService } from './team-news-image.service';
 import { NewsTagVocabularyService } from './news-tag-vocabulary.service';
+import { NewsDefaultTagsService } from './news-default-tags.service';
+import { NewsDefaultTagsJob } from './news-default-tags.job';
 
 @Module({
   imports: [
@@ -50,6 +52,8 @@ import { NewsTagVocabularyService } from './news-tag-vocabulary.service';
     TeamNewsPostSummaryService,
     TeamNewsImageService,
     NewsTagVocabularyService,
+    NewsDefaultTagsService,
+    NewsDefaultTagsJob,
   ],
   exports: [
     TeamNewsService,

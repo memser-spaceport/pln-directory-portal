@@ -277,6 +277,25 @@ export const TeamNewsTagGroupSchema = TeamNewsTagSchema.extend({
 
 export const TeamNewsTagsResponseSchema = z.array(TeamNewsTagGroupSchema);
 
+/**
+ * The news tags the system uses for the signed-in member (LAB-3249), for the
+ * Home tag card. `source` says where they come from: the member's saved list,
+ * their interest profile, stored AI tags, or the focus areas of their teams.
+ * `approved` is true for a saved list, or once the member answered the card.
+ */
+export const TeamNewsDefaultTagsResponseSchema = z.object({
+  tags: z.array(TeamNewsTagSchema),
+  source: z.enum(['member-set', 'interest-profile', 'ai', 'team']),
+  approved: z.boolean(),
+  approvedAt: z.string().nullable(),
+  generatedAt: z.string().nullable(),
+});
+
+/** Omit `tags` to approve the tags as shown; send 1 or more slugs to save them as the member's own. */
+export const ApproveTeamNewsDefaultTagsRequestSchema = z.object({
+  tags: z.array(z.string()).min(1).optional(),
+});
+
 // Service ingest. The producer (e.g. pln-data-enrichment) is responsible for
 // noise filtering, classification, and source-URL liveness checks before
 // posting here. The directory just persists what it's told, idempotently.
@@ -475,6 +494,7 @@ export type TeamNewsListResponse = z.infer<typeof TeamNewsListResponseSchema>;
 export type TeamNewsGroupedResponse = z.infer<typeof TeamNewsGroupedResponseSchema>;
 export type TeamNewsFiltersResponse = z.infer<typeof TeamNewsFiltersResponseSchema>;
 export type TeamNewsTagsResponse = z.infer<typeof TeamNewsTagsResponseSchema>;
+export type TeamNewsDefaultTagsResponse = z.infer<typeof TeamNewsDefaultTagsResponseSchema>;
 export type TeamNewsIngestItem = z.infer<typeof TeamNewsIngestItemSchema>;
 export type IngestTeamNewsDto = z.infer<typeof IngestTeamNewsDtoSchema>;
 export type IngestTeamNewsResponse = z.infer<typeof IngestTeamNewsResponseSchema>;

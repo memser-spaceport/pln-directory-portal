@@ -14,6 +14,7 @@ import { Request } from 'express';
 import { ZodError, ZodType } from 'zod';
 import { apiTeamNews } from 'libs/contracts/src/lib/contract-team-news';
 import {
+  ApproveTeamNewsDefaultTagsRequestSchema,
   CreateTeamNewsDiscussionRequestSchema,
   RecordTeamNewsImpressionsRequestSchema,
   CreateTeamNewsPostRequestSchema,
@@ -38,6 +39,7 @@ import { TeamNewsService } from './team-news.service';
 import { TeamNewsUpvotesService } from './team-news-upvotes.service';
 import { TeamNewsSuggestionsService } from './team-news-suggestions.service';
 import { TeamNewsImpressionsService } from './team-news-impressions.service';
+import { NewsDefaultTagsService } from './news-default-tags.service';
 
 const server = initNestServer(apiTeamNews);
 
@@ -51,6 +53,7 @@ export class TeamNewsController {
     private readonly teamNewsUpvotesService: TeamNewsUpvotesService,
     private readonly teamNewsSuggestionsService: TeamNewsSuggestionsService,
     private readonly teamNewsImpressionsService: TeamNewsImpressionsService,
+    private readonly newsDefaultTagsService: NewsDefaultTagsService,
     private readonly membersService: MembersService,
     private readonly accessControl: AccessControlV2Service,
     private readonly followsService: FollowsService
@@ -87,6 +90,28 @@ export class TeamNewsController {
   @NoCache()
   async getTeamNewsTags() {
     return this.teamNewsQueryService.listNewsTags();
+  }
+
+  // Above `getTeamNewsItem`, for the same reason as `getTeamNewsTags`.
+  @Api(server.route.getTeamNewsDefaultTags)
+  @NoCache()
+  @UseGuards(UserTokenValidation)
+  async getTeamNewsDefaultTags(@Req() req: Request & { userEmail?: string }) {
+    const member = await this.resolveMember(req);
+    return this.newsDefaultTagsService.getDefaultTags(member.uid);
+  }
+
+  @Api(server.route.approveTeamNewsDefaultTags)
+  @UseGuards(UserTokenValidation)
+  async approveTeamNewsDefaultTags(@Req() req: Request & { userEmail?: string }, @Body() body: unknown) {
+    const parsed = ApproveTeamNewsDefaultTagsRequestSchema.safeParse(body ?? {});
+    if (!parsed.success) {
+      throw new BadRequestException('tags must be a list of 1 or more news tag slugs');
+    }
+    const member = await this.resolveMember(req);
+    return this.newsDefaultTagsService.answer(member.uid, parsed.data.tags, (tags) =>
+      this.membersService.updatePreference(member.uid, { newsTags: tags })
+    );
   }
 
   // The notification service pulls this at digest-cron time
