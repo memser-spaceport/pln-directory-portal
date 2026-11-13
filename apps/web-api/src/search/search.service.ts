@@ -129,11 +129,14 @@ export class SearchService {
     ]);
 
     const teamLevels = new Map<string, string | null>(
-      teams.map((team: { uid: string; accessLevel: string | null }) => [team.uid, team.accessLevel ?? null])
+      teams.map((team: { uid: string; accessLevel: string | null }): [string, string | null] => [
+        team.uid,
+        team.accessLevel ?? null,
+      ])
     );
     // Same default as the member profile: a member without an approval row counts as PENDING.
     const memberStates = new Map<string, MemberState>(
-      members.map((member: { uid: string; memberApproval: { state: MemberState } | null }) => [
+      members.map((member: { uid: string; memberApproval: { state: MemberState } | null }): [string, MemberState] => [
         member.uid,
         member.memberApproval?.state ?? 'PENDING',
       ])
