@@ -5,6 +5,9 @@ import { PrismaService } from '../shared/prisma.service';
 import { directoryVisibleMemberWhere } from '../members/member-visibility';
 import { truncate } from '../utils/formatters';
 import { SearchMetrics, classifyError } from '../metrics/search.metrics';
+import { JOB_ASPIRANT_POLICY_CODE } from '../access-control-v2/access-control-v2.constants';
+
+type MemberState = NonNullable<SearchResultItem['memberState']>;
 
 const MAX_SEARCH_RESULTS_PER_INDEX = 50;
 const AUTOMCOMPLETE_MAX_LENGTH = 50;
@@ -93,6 +96,66 @@ export class SearchService {
       item.availableToConnect = Boolean(officeHoursUrl);
       return item;
     });
+  }
+
+  /**
+   * Adds the admin-only access fields to team and member results (LAB-3252):
+   * `accessLevel` on teams, `memberState` and `isJobAspirant` on members.
+   * Call it only for a directory admin. Values come from Postgres, not the search index.
+   */
+  async addAdminAccessFields(result: SearchResult): Promise<SearchResult> {
+    const teamUids = [...new Set((result.teams ?? []).map((item) => item.uid))];
+    const memberUids = [...new Set((result.members ?? []).map((item) => item.uid))];
+    if (teamUids.length === 0 && memberUids.length === 0) {
+      return result;
+    }
+
+    const [teams, members, aspirants] = await Promise.all([
+      teamUids.length
+        ? this.prisma.team.findMany({ where: { uid: { in: teamUids } }, select: { uid: true, accessLevel: true } })
+        : [],
+      memberUids.length
+        ? this.prisma.member.findMany({
+            where: { uid: { in: memberUids } },
+            select: { uid: true, memberApproval: { select: { state: true } } },
+          })
+        : [],
+      memberUids.length
+        ? this.prisma.policyAssignment.findMany({
+            where: { memberUid: { in: memberUids }, policy: { code: JOB_ASPIRANT_POLICY_CODE } },
+            select: { memberUid: true },
+          })
+        : [],
+    ]);
+
+    const teamLevels = new Map<string, string | null>(
+      teams.map((team: { uid: string; accessLevel: string | null }) => [team.uid, team.accessLevel ?? null])
+    );
+    // Same default as the member profile: a member without an approval row counts as PENDING.
+    const memberStates = new Map<string, MemberState>(
+      members.map((member: { uid: string; memberApproval: { state: MemberState } | null }) => [
+        member.uid,
+        member.memberApproval?.state ?? 'PENDING',
+      ])
+    );
+    const aspirantUids = new Set<string>(aspirants.map((assignment: { memberUid: string }) => assignment.memberUid));
+
+    const addFields = (item: SearchResultItem): SearchResultItem => {
+      if (item.index === 'teams' && teamLevels.has(item.uid)) {
+        return { ...item, accessLevel: teamLevels.get(item.uid) };
+      }
+      if (item.index === 'members' && memberStates.has(item.uid)) {
+        return { ...item, memberState: memberStates.get(item.uid), isJobAspirant: aspirantUids.has(item.uid) };
+      }
+      return item;
+    };
+
+    return {
+      ...result,
+      teams: (result.teams ?? []).map(addFields),
+      members: (result.members ?? []).map(addFields),
+      top: (result.top ?? []).map(addFields),
+    };
   }
 
   private removeForumResults(result: SearchResult): SearchResult {

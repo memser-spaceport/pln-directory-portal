@@ -9,7 +9,11 @@ import { ResponseSearchResultDto, SearchQueryDto } from 'libs/contracts/src/sche
 import { OptionalUserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { isRequestAuthenticated } from '../members/member-contact-sanitizer';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
-import { FORUM_PERMISSIONS, MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
+import {
+  ADMIN_PERMISSIONS,
+  FORUM_PERMISSIONS,
+  MEMBER_PERMISSIONS,
+} from '../access-control-v2/access-control-v2.constants';
 import { Request } from 'express';
 
 @ApiTags('Search')
@@ -51,12 +55,15 @@ export class SearchController {
     const canReadContacts = isEmailQuery(query.q)
       ? await this.hasPermission(req, MEMBER_PERMISSIONS.CONTACTS_READ)
       : false;
-    return this.searchService.fetchAllIndices(query.q, {
+    const result = await this.searchService.fetchAllIndices(query.q, {
       strict: query.strict,
       canReadForum,
       isAuthenticated: isRequestAuthenticated(req as any),
       canReadContacts,
     });
+    // L0/L1 and Job Aspirant badges are admin-only (LAB-3180, LAB-3252); other callers get no access fields.
+    const isDirectoryAdmin = await this.hasPermission(req, ADMIN_PERMISSIONS.DIRECTORY_FULL);
+    return isDirectoryAdmin ? this.searchService.addAdminAccessFields(result) : result;
   }
 
   @TsRest(apiSearch.autocompleteSearch)
