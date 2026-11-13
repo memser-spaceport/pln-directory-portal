@@ -30,6 +30,7 @@ import { MembersHooksService } from './members.hooks.service';
 import { toPreferencePatch } from './member-preferences';
 import { NewsTagVocabularyService } from '../team-news/news-tag-vocabulary.service';
 import { resolveNewsTags } from '../team-news/utils/news-tags';
+import { readNewsCategoryTags } from '../team-news/utils/news-category-tags';
 import { readNewsCategories } from '../team-news/utils/news-categories';
 import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
 import { OfficeHoursService } from '../office-hours/office-hours.service';
@@ -1935,6 +1936,8 @@ export class MembersService {
     preferences.subscription = !!member.isSubscribedToNewsletter;
     // Always present (LAB-2940): the stored list, or every category by default.
     preferences.newsCategories = readNewsCategories(member.preferences);
+    // Always present (LAB-3140). Missing key is [], so an old newsCategories value stays off.
+    preferences.newsCategoryTags = readNewsCategoryTags(member.preferences);
     return preferences;
   }
 
