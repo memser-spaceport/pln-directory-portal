@@ -210,7 +210,7 @@ describe('NewsTagVocabularyService', () => {
         expect(prisma.teamMemberRole.findMany).toHaveBeenCalledTimes(1);
       });
 
-      it('ignores the profile for a member with a saved list, an empty one too', async () => {
+      it('ignores the profile for a saved list, and uses it for a saved empty list (LAB-3243)', async () => {
         const prisma = buildPrisma(
           {},
           { m1: { newsTags: ['climate-refi'] }, m2: { newsTags: [] } },
@@ -221,10 +221,24 @@ describe('NewsTagVocabularyService', () => {
         const tags = await service.getEffectiveTagsForMembers(['m1', 'm2', 'm3']);
 
         expect([...(tags.get('m1') ?? [])]).toEqual(['climate-refi']);
-        expect([...(tags.get('m2') ?? [])]).toEqual([]);
-        // The member who never saved gets the profile topic, expanded to its children.
+        // A saved empty list gets the profile topic, like a member who never saved.
+        expect([...(tags.get('m2') ?? [])]).toEqual(['ai']);
+        // A parent topic is expanded to its children.
         expect([...(tags.get('m3') ?? [])].sort()).toEqual(['ai', 'ai-robotics']);
-        expect((prisma.memberInterestProfileEntry.findMany.mock.calls[0] as any)[0].where.memberUid.in).toEqual(['m3']);
+        expect(prisma.memberInterestProfileEntry.findMany).toHaveBeenCalledTimes(1);
+        expect((prisma.memberInterestProfileEntry.findMany.mock.calls[0] as any)[0].where.memberUid.in).toEqual([
+          'm2',
+          'm3',
+        ]);
+      });
+
+      it('uses the team focus areas for a saved empty list with no profile (LAB-3243)', async () => {
+        const prisma = buildPrisma({ m1: ['Climate / ReFi'] }, { m1: { newsTags: [] } });
+        const service = new NewsTagVocabularyService(prisma as any);
+
+        const tags = await service.getEffectiveTagsForMembers(['m1']);
+
+        expect([...(tags.get('m1') ?? [])]).toEqual(['climate-refi']);
       });
     });
   });
@@ -240,16 +254,36 @@ describe('NewsTagVocabularyService', () => {
       expect([...(tags.get('m1') ?? [])].sort()).toEqual(['data-ownership', 'digital-human-rights']);
     });
 
-    it('seeds a member who never saved, and keeps a saved empty list empty', async () => {
+    it('seeds a member who never saved and a member who saved an empty list (LAB-3243)', async () => {
       const prisma = buildPrisma({ m1: ['AI'], m2: ['AI'] }, { m2: { newsTags: [] } });
       const service = new NewsTagVocabularyService(prisma as any);
 
       const tags = await service.getEffectiveTagsForMembers(['m1', 'm2']);
 
       expect([...(tags.get('m1') ?? [])]).toEqual(['ai']);
-      expect([...(tags.get('m2') ?? [])]).toEqual([]);
-      // Only the member who never saved is seeded.
-      expect((prisma.teamMemberRole.findMany.mock.calls[0] as any)[0].where.memberUid.in).toEqual(['m1']);
+      expect([...(tags.get('m2') ?? [])]).toEqual(['ai']);
+      // Both are seeded in one batch, and the profile is not read with the flag off.
+      expect(prisma.teamMemberRole.findMany).toHaveBeenCalledTimes(1);
+      expect((prisma.teamMemberRole.findMany.mock.calls[0] as any)[0].where.memberUid.in).toEqual(['m1', 'm2']);
+      expect(prisma.memberInterestProfileEntry.findMany).not.toHaveBeenCalled();
+    });
+
+    it('gives no tags to a member with a saved empty list, no team and no profile (LAB-3243)', async () => {
+      const service = new NewsTagVocabularyService(buildPrisma({}, { m1: { newsTags: [] } }) as any);
+
+      const tags = await service.getEffectiveTagsForMembers(['m1']);
+
+      expect([...(tags.get('m1') ?? [])]).toEqual([]);
+    });
+
+    it('uses only a saved list of 2 tags, and does not seed that member', async () => {
+      const prisma = buildPrisma({ m1: ['AI'] }, { m1: { newsTags: ['climate-refi', 'data-ownership'] } });
+      const service = new NewsTagVocabularyService(prisma as any);
+
+      const tags = await service.getEffectiveTagsForMembers(['m1']);
+
+      expect([...(tags.get('m1') ?? [])].sort()).toEqual(['climate-refi', 'data-ownership']);
+      expect(prisma.teamMemberRole.findMany).not.toHaveBeenCalled();
     });
   });
 });
