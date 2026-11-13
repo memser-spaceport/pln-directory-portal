@@ -83,7 +83,7 @@ The API SHALL list the news tags members can choose: every focus area whose slug
 
 ### Requirement: Member news tags
 
-A member's chosen news tags SHALL be stored as a list of focus-area slugs. Saving the list SHALL replace the previous list and leave every other preference unchanged. A list with a slug that is not a focus-area slug SHALL be rejected with 400, and nothing SHALL be stored. An empty list SHALL be stored as a valid choice.
+A member's chosen news tags SHALL be stored as a list of focus-area slugs. Saving the list SHALL replace the previous list and leave every other preference unchanged. A list with a slug that is not a focus-area slug SHALL be rejected with 400, and nothing SHALL be stored. An empty list SHALL be stored as a valid choice. A stored empty list SHALL be read as no saved tags: the member gets their starting tags.
 
 #### Scenario: Save tags
 
@@ -98,12 +98,13 @@ A member's chosen news tags SHALL be stored as a list of focus-area slugs. Savin
 
 #### Scenario: Remove every tag
 
-- **WHEN** a member saves `[]`
-- **THEN** reading their preferences returns `newsTags` `[]` with no seeded marker
+- **GIVEN** a member of a team with the focus areas DeSci and AI, and profile starting tags are disabled
+- **WHEN** they save `[]`
+- **THEN** the save is accepted, the stored list is `[]`, and reading their preferences returns `newsTags` `["desci", "ai"]` (in any order) with `newsTagsSeeded: true`
 
 ### Requirement: Starting tags
 
-When a member has never saved news tags, reading their preferences SHALL return starting tags and `newsTagsSeeded: true`. When profile starting tags are enabled and the member's interest profile has topics with a positive score that are news tags, the starting tags SHALL be the 5 highest-scored of those topics. Otherwise the starting tags SHALL be the slugs of the focus areas of the teams they belong to. Reading SHALL NOT store anything. Once the member saves any list, including an empty one, that list SHALL be returned without the seeded marker.
+When a member has no saved news tags (they never saved a list, or their saved list is empty), reading their preferences SHALL return starting tags and `newsTagsSeeded: true`. When profile starting tags are enabled and the member's interest profile has topics with a positive score that are news tags, the starting tags SHALL be the 5 highest-scored of those topics. Otherwise the starting tags SHALL be the slugs of the focus areas of the teams they belong to. Reading SHALL NOT store anything. Once the member saves a list with 1 or more tags, that list SHALL be returned without the seeded marker.
 
 #### Scenario: Never saved
 
@@ -137,9 +138,27 @@ When a member has never saved news tags, reading their preferences SHALL return 
 
 #### Scenario: Saved tags win over the profile
 
-- **GIVEN** profile starting tags are enabled and a member saved the tags `defi`, or saved an empty list
+- **GIVEN** profile starting tags are enabled and a member saved the tags `defi` and `desci`
 - **WHEN** their profile later gains the topic `ai` and their preferences are read
-- **THEN** `newsTags` is the saved list unchanged, with no seeded marker
+- **THEN** `newsTags` is `["defi", "desci"]`, with no seeded marker
+
+#### Scenario: Saved empty list, profile topics
+
+- **GIVEN** profile starting tags are enabled and a member with the profile topic `ai` saved an empty list
+- **WHEN** their preferences are read
+- **THEN** `newsTags` is `["ai"]`, `newsTagsSeeded` is `true`, and the stored list is still `[]`
+
+#### Scenario: Saved empty list, no profile
+
+- **GIVEN** a member of a team with the focus areas DeSci and AI, with no interest profile, saved an empty list
+- **WHEN** their preferences are read, with profile starting tags enabled or disabled
+- **THEN** `newsTags` is `["desci", "ai"]` (in any order) and `newsTagsSeeded` is `true`
+
+#### Scenario: Saved empty list, no team and no profile
+
+- **GIVEN** a member on no team and with no interest profile saved an empty list
+- **WHEN** their preferences are read
+- **THEN** `newsTags` is `[]` and `newsTagsSeeded` is `true`
 
 #### Scenario: Reading does not store
 
@@ -149,19 +168,25 @@ When a member has never saved news tags, reading their preferences SHALL return 
 
 #### Scenario: Same starting tags everywhere
 
-- **GIVEN** profile starting tags are enabled and a member who never saved news tags has the profile topic `ai`
+- **GIVEN** profile starting tags are enabled and a member who never saved news tags, or saved an empty list, has the profile topic `ai`
 - **WHEN** they load the grouped home feed, or their digest picks are built with news tag picks enabled
 - **THEN** their effective tags are `ai` and the focus areas under it, the same starting tags the preferences read returns
 
 ### Requirement: For You tag fields
 
-The home feed's grouped news response SHALL include, for a signed-in viewer, the viewer's effective news tags (their saved tags, or their starting tags when they never saved any, with every parent focus area expanded to the focus areas under it) and the uids of the teams they belong to or follow. For a signed-out viewer both SHALL be empty. The existing For You team list SHALL be unchanged.
+The home feed's grouped news response SHALL include, for a signed-in viewer, the viewer's effective news tags (their saved tags, or their starting tags when they have no saved tags, with every parent focus area expanded to the focus areas under it) and the uids of the teams they belong to or follow. For a signed-out viewer both SHALL be empty. The existing For You team list SHALL be unchanged.
 
 #### Scenario: Signed-in viewer
 
 - **GIVEN** a member who saved the tag Digital Human Rights and belongs to team A
 - **WHEN** they load the grouped home feed
 - **THEN** the tags include `digital-human-rights` and the focus areas under it, and the own teams include team A
+
+#### Scenario: Viewer who removed every tag
+
+- **GIVEN** a member of a team with the focus area AI who saved an empty list, and profile starting tags are disabled
+- **WHEN** they load the grouped home feed
+- **THEN** the tags include `ai` and the focus areas under it
 
 #### Scenario: Signed-out viewer
 

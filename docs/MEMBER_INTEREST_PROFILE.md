@@ -55,14 +55,17 @@ instances.
 
 ## News starting tags
 
-With `NEWS_PROFILE_STARTING_TAGS_ENABLED=true`, a member who never saved news tags gets starting tags from their
+A member with no saved news tags gets starting tags. That is a member who never saved a list, and a member who saved
+an empty one (removed every tag). With `NEWS_PROFILE_STARTING_TAGS_ENABLED=true` the starting tags come from their
 profile: the `TOPIC` entries with a positive score that are news tags, the 5 with the highest scores (ties by slug).
 A member with no such entry gets the focus areas of their teams, as with the flag off. The profile already holds the
 current team's focus areas at a low weight, so they compete for those 5 places with everything else.
 
 - Starting tags are what News preferences shows as selected (`newsTagsSeeded: true`), and what For You and the digest
   tag picks (`NEWS_TAG_PICKS_ENABLED`) match on. They are never stored.
-- A saved list, an empty one too, always wins: the profile is not read for that member.
+- A saved list with 1 or more tags always wins: the profile is not read for that member.
+- A saved empty list stays stored as `[]`, and the member gets starting tags again on every read. A member cannot keep
+  "no tags".
 - Saved tags feed the profile as declared topics (see Sources); starting tags do not.
 - The flag is read on every call; anything but `true` is off, and then the profile table is not queried. It stays off
   in an environment until the LAB-3124 pilot passes.

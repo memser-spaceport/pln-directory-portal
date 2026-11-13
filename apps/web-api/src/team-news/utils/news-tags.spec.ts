@@ -4,6 +4,7 @@ import {
   isNewsProfileStartingTagsEnabled,
   isNewsTagPicksEnabled,
   parseNewsTags,
+  readChosenNewsTags,
   readStoredNewsTags,
   resolveNewsTags,
 } from './news-tags';
@@ -40,8 +41,23 @@ describe('readStoredNewsTags', () => {
     expect(readStoredNewsTags(null)).toBeUndefined();
   });
 
-  it('returns a saved empty list as a choice, not as "never saved"', () => {
+  it('returns a saved empty list as stored', () => {
     expect(readStoredNewsTags({ newsTags: [] })).toEqual([]);
+  });
+});
+
+describe('readChosenNewsTags (LAB-3243)', () => {
+  it('is undefined when the member never saved news tags', () => {
+    expect(readChosenNewsTags({ showEmail: true })).toBeUndefined();
+    expect(readChosenNewsTags(null)).toBeUndefined();
+  });
+
+  it('is undefined for a saved empty list', () => {
+    expect(readChosenNewsTags({ newsTags: [] })).toBeUndefined();
+  });
+
+  it('returns a saved list with 1 or more tags', () => {
+    expect(readChosenNewsTags({ newsTags: ['ai', 'desci'] })).toEqual(['ai', 'desci']);
   });
 });
 
@@ -49,12 +65,24 @@ describe('resolveNewsTags', () => {
   it('returns the saved list without the seeded marker, and does not seed', async () => {
     const seed = jest.fn(async () => ['desci']);
 
-    await expect(resolveNewsTags({ newsTags: ['ai'] }, seed)).resolves.toEqual({ newsTags: ['ai'] });
+    await expect(resolveNewsTags({ newsTags: ['ai', 'desci'] }, seed)).resolves.toEqual({
+      newsTags: ['ai', 'desci'],
+    });
     expect(seed).not.toHaveBeenCalled();
   });
 
-  it('returns a saved empty list as is', async () => {
-    await expect(resolveNewsTags({ newsTags: [] }, async () => ['desci'])).resolves.toEqual({ newsTags: [] });
+  it('seeds a member who saved an empty list, and marks the tags as seeded (LAB-3243)', async () => {
+    await expect(resolveNewsTags({ newsTags: [] }, async () => ['desci'])).resolves.toEqual({
+      newsTags: ['desci'],
+      newsTagsSeeded: true,
+    });
+  });
+
+  it('marks an empty seed as seeded for a saved empty list too (no team, no profile)', async () => {
+    await expect(resolveNewsTags({ newsTags: [] }, async () => [])).resolves.toEqual({
+      newsTags: [],
+      newsTagsSeeded: true,
+    });
   });
 
   it('seeds a member who never saved, and marks the tags as seeded', async () => {
