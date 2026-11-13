@@ -38,6 +38,7 @@ import { ENABLED_RETRIEVAL_PROFILE } from '../utils/prisma-query-builder/profile
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
 import { MembersService } from './members.service';
 import { InvestorProfileService } from './investor-profile.service';
+import { MemberJobAspirantFlagsService } from './member-job-aspirant-flags.service';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { AuthGuard } from '../guards/auth.guard';
@@ -56,6 +57,7 @@ import {
 } from './member-contact-sanitizer';
 import { assignJobSearchStatusFromInput, presentJobSearchStatusForViewer } from './job-search-status';
 import { presentEmailForViewer } from './inactive-email';
+import { presentEventGuestsForViewer } from './member-event-guests';
 import { parseMemberSelfUpdate } from './member-self-update';
 
 const server = initNestServer(apiMembers);
@@ -67,7 +69,8 @@ export class MemberController {
   constructor(
     private readonly membersService: MembersService,
     private readonly investorProfileService: InvestorProfileService,
-    private logger: LogService
+    private logger: LogService,
+    private readonly jobAspirantFlags: MemberJobAspirantFlagsService
   ) {}
 
   // Declared before `getMember` so `crawl-index` isn't taken for a member uid.
@@ -125,10 +128,9 @@ export class MemberController {
     }
     const result = await this.membersService.findAll(builtQuery);
     const isAuthenticated = isRequestAuthenticated(request as any);
-    return {
-      ...result,
-      members: sanitizeMembersContactsForViewer(result.members, isAuthenticated),
-    };
+    const members = sanitizeMembersContactsForViewer(result.members, isAuthenticated);
+    const viewerEmail = (request as Request & { userEmail?: string }).userEmail;
+    return { ...result, members: await this.jobAspirantFlags.flagForViewer(members, viewerEmail) };
   }
 
   /**
@@ -488,8 +490,12 @@ export class MemberController {
     const params = request.query as unknown as z.infer<typeof MemberFilterQueryParams>;
     const result = await this.membersService.searchMembers(params || {});
     const isAuthenticated = isRequestAuthenticated(request as any);
-    const members = result?.members ? sanitizeMembersContactsForViewer(result.members, isAuthenticated) : result;
-    return result?.members ? { ...result, members } : members;
+    if (!result?.members) {
+      return result;
+    }
+    const members = sanitizeMembersContactsForViewer(result.members, isAuthenticated);
+    const viewerEmail = (request as Request & { userEmail?: string }).userEmail;
+    return { ...result, members: await this.jobAspirantFlags.flagForViewer(members, viewerEmail) };
   }
 
   /**
@@ -711,7 +717,12 @@ export class MemberController {
     const email = request.userEmail;
     const requestor = email ? await this.membersService.findMemberByEmail(email) : null;
     const canSee = !!requestor && (requestor.uid === memberUid || requestor.isDirectoryAdmin === true);
-    return presentEmailForViewer(presentJobSearchStatusForViewer({ ...member }, canSee), canSee);
+    // Hidden event rows are for the member only, not for admins (LAB-3215).
+    const isOwner = !!requestor && requestor.uid === memberUid;
+    return presentEventGuestsForViewer(
+      presentEmailForViewer(presentJobSearchStatusForViewer({ ...member }, canSee), canSee),
+      isOwner
+    );
   }
 
   /**

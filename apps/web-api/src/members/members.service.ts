@@ -541,6 +541,7 @@ export class MembersService {
               isHost: true,
               isSpeaker: true,
               isSponsor: true,
+              showOnProfile: true,
               event: {
                 select: {
                   uid: true,

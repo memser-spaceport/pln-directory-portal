@@ -60,6 +60,7 @@ type UpcomingEventRow = {
   uid: string;
   name: string;
   externalId: string | null;
+  locationUid?: string | null;
   websiteURL: string | null;
   startDate: Date;
   endDate: Date;
@@ -78,6 +79,8 @@ export function toUpcomingEvent(event: UpcomingEventRow) {
     websiteUrl: event.websiteURL ?? null,
     logo: event.logo?.url ?? null,
     location: event.location?.location ?? null,
+    // The gathering uid, so a list row can open the event (LAB-3213).
+    locationUid: event.locationUid ?? null,
     flag: event.location?.flag ?? null,
     startDate: new Date(event.startDate).toISOString(),
     endDate: new Date(event.endDate).toISOString(),

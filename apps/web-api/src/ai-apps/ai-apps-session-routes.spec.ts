@@ -12,7 +12,7 @@ import { PATH_METADATA, METHOD_METADATA, GUARDS_METADATA } from '@nestjs/common/
 import { RequestMethod } from '@nestjs/common';
 import { AiAppsController } from './ai-apps.controller';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
-import { RbacGuard } from '../rbac/rbac.guard';
+import { AiAppReadOrAudienceGuard } from './guards/ai-app-read-or-audience.guard';
 import { RBAC_PERMISSIONS_KEY } from '../rbac/rbac.decorator';
 import { AI_APPS_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { AI_APPS_SIDECAR_THROTTLE_LIMIT } from './ai-apps.constants';
@@ -23,8 +23,8 @@ const methods = Object.getOwnPropertyNames(AiAppsController.prototype);
 
 describe('AiAppsController app-session routes', () => {
   it.each([
-    ['issueAppSessionCode', 'sessions/code', [UserTokenCheckGuard, RbacGuard], READ],
-    ['exchangeAppSessionToken', 'sessions/exchange-token', [UserTokenCheckGuard, RbacGuard], READ],
+    ['issueAppSessionCode', 'sessions/code', [UserTokenCheckGuard, AiAppReadOrAudienceGuard], READ],
+    ['exchangeAppSessionToken', 'sessions/exchange-token', [UserTokenCheckGuard, AiAppReadOrAudienceGuard], READ],
     ['redeemAppSessionCode', 'sessions/redeem', undefined, undefined],
     ['revokeAppSessions', 'sessions/revoke', [UserTokenCheckGuard], undefined],
   ])('%s: POST %s with the expected guards and permission', (name, path, guards, permission) => {

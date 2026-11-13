@@ -3,6 +3,7 @@ import { MemberController } from './members.controller';
 import { MembersService } from './members.service';
 import { MembersHooksService } from './members.hooks.service';
 import { InvestorProfileService } from './investor-profile.service';
+import { MemberJobAspirantFlagsService } from './member-job-aspirant-flags.service';
 import { OnboardingRemindersJob } from './onboarding-reminders.job';
 import { ParticipantsRequestModule } from '../participants-request/participants-request.module';
 import { OtpModule } from '../otp/otp.module';
@@ -35,6 +36,7 @@ import { NewsTagVocabularyService } from '../team-news/news-tag-vocabulary.servi
     MembersService,
     MembersHooksService,
     InvestorProfileService,
+    MemberJobAspirantFlagsService,
     OnboardingRemindersJob,
     NewsTagVocabularyService,
   ],

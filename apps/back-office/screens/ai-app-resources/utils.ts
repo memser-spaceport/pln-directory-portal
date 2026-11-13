@@ -7,6 +7,11 @@ export function canManageAiAppResources(hasPermission: (permission: string) => b
   return hasPermission(ADMIN_PERMISSIONS.DIRECTORY_FULL) || hasPermission(AI_APPS_PERMISSIONS.RESOURCES_MANAGE);
 }
 
+/** Mirrors the ai-app-audience admin endpoints: only full Directory admins can open an app to members. */
+export function canManageAiAppAudience(hasPermission: (permission: string) => boolean): boolean {
+  return hasPermission(ADMIN_PERMISSIONS.DIRECTORY_FULL);
+}
+
 export function resourcesToForm(response: AiAppResourcesResponse | undefined): {
   values: AiAppResourceValues;
   isOverride: boolean;
@@ -76,4 +81,28 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
 export function getHostUrl(host: string | null | undefined): string | null {
   if (!host) return null;
   return /^https?:\/\//i.test(host) ? host : `https://${host}`;
+}
+
+export function getApiErrorStatus(error: unknown): number | undefined {
+  return (error as { response?: { status?: number } })?.response?.status;
+}
+
+export function isNotFoundError(error: unknown): boolean {
+  return getApiErrorStatus(error) === 404;
+}
+
+export function isSamePolicyCodes(a: string[], b: string[]): boolean {
+  return a.length === b.length && [...a].sort().join('\n') === [...b].sort().join('\n');
+}
+
+export function getAudienceStatusLabel(policyCodes: string[]): string {
+  if (policyCodes.length === 0) return 'PL Infra only';
+  return `Open to ${policyCodes.length} ${policyCodes.length === 1 ? 'policy' : 'policies'}`;
+}
+
+/** States plainly what saving this audience does; shown in the confirmation step. */
+export function getAudienceConfirmMessage(policyCount: number, appName: string): string {
+  if (policyCount === 0) return `Nobody outside PL Infra will be able to open ${appName}.`;
+  if (policyCount === 1) return `Members holding this policy will be able to open ${appName}.`;
+  return `Members holding any of these ${policyCount} policies will be able to open ${appName}.`;
 }

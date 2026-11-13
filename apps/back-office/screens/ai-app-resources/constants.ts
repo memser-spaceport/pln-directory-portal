@@ -17,3 +17,6 @@ export const AI_APP_RESOURCE_FIELDS: { key: keyof AiAppResourceValues; label: st
   { key: 'memoryRequest', label: 'Memory Request', placeholder: 'e.g. 512Mi' },
   { key: 'memoryLimit', label: 'Memory Limit', placeholder: 'e.g. 1Gi' },
 ];
+
+/** Policy roles that together make up the standard "all approved members" audience. */
+export const AI_APP_AUDIENCE_MEMBER_ROLES = ['Founder', 'Investor', 'Unassigned'];

@@ -31,6 +31,7 @@ import {
   UpdatePLEventLocationSchemaDto,
   UpdateIRLAggregatedPriorityDto,
 } from 'libs/contracts/src/schema';
+import { SyncPLEventsBodySchema } from 'libs/contracts/src/schema/pl-event-details';
 import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
 import { PLEventsService } from './pl-events.service';
@@ -55,6 +56,20 @@ import { RbacGuard } from '../rbac/rbac.guard';
 import { RequirePermissions } from '../rbac/rbac.decorator';
 import { RBAC_PERMISSION_CODES } from '../rbac/rbac.constants';
 import { ADMIN_PERMISSIONS, IRL_GATHERINGS_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
+import {
+  DeletePLEventGuestsSchema,
+  UpdateMyEventVisibilitySchema,
+  UpdateMyGuestPlansSchema,
+} from 'libs/contracts/src/schema/pl-event-attendance';
+
+/** `@Api` and the zod DTOs don't validate bodies here, so the LAB-3213 routes parse their own (400 before any write). */
+function parseBody<T>(schema: { safeParse: (input: unknown) => any }, body: unknown): T {
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    throw new BadRequestException(parsed.error.issues);
+  }
+  return parsed.data as T;
+}
 
 const server = initNestServer(apiEvents);
 type RouteShape = typeof server.routeShapes;
@@ -129,7 +144,7 @@ export class PLEventsController {
     const { type } = request.query;
     const member: any = await this.memberService.findMemberByEmail(request['userEmail']);
     const result =
-      (await this.memberService.isMemberPartOfTeams(member, [body.teamUid])) ||
+      (await this.memberService.isMemberPartOfTeams(member, [body.teamUid ?? ''])) ||
       (await this.memberService.checkIfAdminUser(member));
     if (!result && !isEmpty(body.teamUid)) {
       throw new ForbiddenException(`Member with email ${userEmail} is not part of
@@ -169,7 +184,7 @@ export class PLEventsController {
     const { type } = request.query;
     const member: any = await this.memberService.findMemberByEmail(request['userEmail']);
     const result =
-      (await this.memberService.isMemberPartOfTeams(member, [body.teamUid])) ||
+      (await this.memberService.isMemberPartOfTeams(member, [body.teamUid ?? ''])) ||
       (await this.memberService.checkIfAdminUser(member));
     if (!result && !isEmpty(body.teamUid)) {
       throw new ForbiddenException(
@@ -195,9 +210,11 @@ export class PLEventsController {
   @RequirePermissions({ anyOf: [RBAC_PERMISSION_CODES.IRLG_GOING_WRITE, ADMIN_PERMISSIONS.DIRECTORY_FULL] })
   async deletePLEventGuestsByLocation(
     @Param('uid') locationUid,
-    @Body() body: DeletePLEventGuestsSchemaDto,
+    @Body() rawBody: DeletePLEventGuestsSchemaDto,
     @Req() request
   ) {
+    // A body without `events` used to delete every row of the member at the gathering (LAB-3213).
+    const body = parseBody<DeletePLEventGuestsSchemaDto>(DeletePLEventGuestsSchema, rawBody);
     const userEmail = request['userEmail'];
     const member: any = await this.memberService.findMemberByEmail(request['userEmail']);
     const isAdmin = await this.memberService.checkIfAdminUser(member);
@@ -208,6 +225,26 @@ export class PLEventsController {
       );
     }
     return await this.eventGuestService.deletePLEventGuests(locationUid, body.membersAndEvents);
+  }
+
+  @Api(server.route.updateMyGuestPlansByLocation)
+  @UseGuards(UserTokenValidation, RbacGuard)
+  @RequirePermissions({ anyOf: [RBAC_PERMISSION_CODES.IRLG_GOING_WRITE, ADMIN_PERMISSIONS.DIRECTORY_FULL] })
+  async updateMyGuestPlansByLocation(@Param('uid') locationUid: string, @Body() rawBody: unknown, @Req() request) {
+    const body = parseBody<any>(UpdateMyGuestPlansSchema, rawBody);
+    const member: any = await this.memberService.findMemberByEmail(request['userEmail']);
+    if (!member) {
+      throw new UnauthorizedException('User not logged in');
+    }
+    if (body.teamUid) {
+      const allowed =
+        (await this.memberService.isMemberPartOfTeams(member, [body.teamUid ?? ''])) ||
+        this.memberService.checkIfAdminUser(member);
+      if (!allowed) {
+        throw new ForbiddenException(`Member is not part of team with uid ${body.teamUid}`);
+      }
+    }
+    return await this.eventGuestService.updateMyPlansAtLocation(locationUid, member, body);
   }
 
   @Api(server.route.getPLEventsByLoggedInMember)
@@ -254,7 +291,15 @@ export class PLEventsController {
   @Api(server.route.syncPLEventsByLocation)
   @UseGuards(InternalAuthGuard)
   async syncPLEventsByLocation(@Body() body) {
-    const { selectedEventUids } = body;
+    // @Api does not validate the body (see contract-pl-events), so it is parsed here.
+    const parsed = SyncPLEventsBodySchema.safeParse(body ?? {});
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.issues.map((issue) => issue.message).join('; '));
+    }
+    const { selectedEventUids, detailsOnly } = parsed.data;
+    if (detailsOnly) {
+      return await this.eventSyncService.syncEventDetailsOnly({ selectedEventUids });
+    }
     return await this.eventSyncService.syncEvents({ selectedEventUids });
   }
 
@@ -333,6 +378,28 @@ export class PLEventsController {
       res.setHeader('X-Total-Count', String(total));
     }
     return items;
+  }
+
+  // Declared after the static GET /irl/events/upcoming and /irl/events/contributors handlers, so those paths are
+  // matched first (LAB-3213).
+  @Api(server.route.getPLEventByUid)
+  @UseGuards(OptionalUserTokenCheckGuard)
+  @NoCache()
+  async getPLEventByUid(@Param('uid') uid: string, @Req() request: Request) {
+    const viewer = request['userEmail'] ? await this.memberService.findMemberByEmail(request['userEmail']) : null;
+    return await this.eventService.getPLEventDetail(uid, viewer);
+  }
+
+  // No RBAC on purpose: hiding only narrows who sees it, and a member who lost irlg.going.write can still hide.
+  @Api(server.route.updateMyEventVisibility)
+  @UseGuards(UserTokenValidation)
+  async updateMyEventVisibility(@Param('uid') eventUid: string, @Body() rawBody: unknown, @Req() request) {
+    const { showOnProfile } = parseBody<{ showOnProfile: boolean }>(UpdateMyEventVisibilitySchema, rawBody);
+    const member: any = await this.memberService.findMemberByEmail(request['userEmail']);
+    if (!member) {
+      throw new UnauthorizedException('User not logged in');
+    }
+    return await this.eventGuestService.updateMyEventVisibility(eventUid, member.uid, showOnProfile);
   }
 
   @Api(server.route.deleteEvent)

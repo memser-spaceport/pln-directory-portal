@@ -11,6 +11,7 @@ import { TeamsService } from '../teams/teams.service';
 import { getFilenameFromUrl, getFileTypeFromUrl } from '../utils/helper/helper';
 import { PLEvent, PLEventLocation, PLEventType, PLEventLocationAssociation } from '@prisma/client';
 import { CacheService } from '../utils/cache/cache.service';
+import { mapEventDetails, withEventDetails } from '../pl-events/pl-event-details.mapper';
 import { 
   PLEventAssociationInputSchema, 
   PLEventAssociationInput,
@@ -186,9 +187,12 @@ export class EventConsumerHelper {
     tx: any
   ): Promise<string> {
     const existingEvent = await this.findEventByExternalId(event.externalId, tx);
-    
+
+    // `details` is not a column: it is merged into `additionalInfo`, keeping any other key (LAB-3214).
+    const { details, ...eventFields } = event;
     const eventData = {
-      ...event,
+      ...eventFields,
+      ...(details ? { additionalInfo: withEventDetails(existingEvent?.additionalInfo, details) } : {}),
       locationStatus,
       locationUid,
       pLEventLocationAssociationUid: associationUid
@@ -251,6 +255,12 @@ export class EventConsumerHelper {
       type: event.format === PLEventType.VIRTUAL ? PLEventType.VIRTUAL: PLEventType.IN_PERSON,
       isDeleted: false,
       associations: event.associations,
+      details: mapEventDetails(event, (field, reason) =>
+        this.logger.info(
+          `Event ${event?.event_id}: details field "${field}" ignored (${reason})`,
+          'EventConsumerHelper'
+        )
+      ),
     };
   }
 

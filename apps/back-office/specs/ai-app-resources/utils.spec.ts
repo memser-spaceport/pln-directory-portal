@@ -1,8 +1,13 @@
 import {
+  canManageAiAppAudience,
   canManageAiAppResources,
   getApiErrorMessage,
+  getAudienceConfirmMessage,
+  getAudienceStatusLabel,
   getHostUrl,
   hasEmptyResourceValue,
+  isNotFoundError,
+  isSamePolicyCodes,
   isSameResourceValues,
   resourcesToForm,
   trimResourceValues,
@@ -21,6 +26,41 @@ describe('ai-app-resources utils', () => {
 
     it('denies admins without either permission', () => {
       expect(canManageAiAppResources((p) => p === 'ai_apps.read' || p === 'admin.tools.access')).toBe(false);
+    });
+  });
+
+  describe('audience', () => {
+    it('lets only full Directory admins manage the audience', () => {
+      expect(canManageAiAppAudience((p) => p === 'directory.admin.full')).toBe(true);
+      expect(canManageAiAppAudience((p) => p === 'ai_apps.resources.manage' || p === 'ai_apps.read')).toBe(false);
+    });
+
+    it('describes the current state', () => {
+      expect(getAudienceStatusLabel([])).toBe('PL Infra only');
+      expect(getAudienceStatusLabel(['a'])).toBe('Open to 1 policy');
+      expect(getAudienceStatusLabel(['a', 'b', 'c'])).toBe('Open to 3 policies');
+    });
+
+    it('states plainly what saving does', () => {
+      expect(getAudienceConfirmMessage(0, 'PLaybook')).toBe('Nobody outside PL Infra will be able to open PLaybook.');
+      expect(getAudienceConfirmMessage(1, 'PLaybook')).toBe(
+        'Members holding this policy will be able to open PLaybook.'
+      );
+      expect(getAudienceConfirmMessage(3, 'PLaybook')).toBe(
+        'Members holding any of these 3 policies will be able to open PLaybook.'
+      );
+    });
+
+    it('compares policy codes regardless of order', () => {
+      expect(isSamePolicyCodes(['a', 'b'], ['b', 'a'])).toBe(true);
+      expect(isSamePolicyCodes(['a'], ['a', 'b'])).toBe(false);
+      expect(isSamePolicyCodes([], [])).toBe(true);
+    });
+
+    it('detects a 404 response', () => {
+      expect(isNotFoundError({ response: { status: 404 } })).toBe(true);
+      expect(isNotFoundError({ response: { status: 403 } })).toBe(false);
+      expect(isNotFoundError(new Error('Network Error'))).toBe(false);
     });
   });
 
