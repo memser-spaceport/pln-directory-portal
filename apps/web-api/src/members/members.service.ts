@@ -1905,8 +1905,8 @@ export class MembersService {
       },
     });
     const response = this.buildPreferenceResponse(member);
-    /* LAB-2998: a member who never saved news tags gets their teams' focus areas
-       as starting tags, marked as seeded; nothing is stored until they save. */
+    /* LAB-2998, LAB-3243: a member with no saved news tags (never saved, or saved
+       an empty list) gets starting tags, marked as seeded; reading stores nothing. */
     return {
       ...response,
       ...(await resolveNewsTags(member?.preferences, () => this.newsTagVocabulary.seedTagsForMember(uid))),

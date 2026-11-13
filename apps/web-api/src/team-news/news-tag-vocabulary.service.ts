@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
 import { slugify } from '../utils/helper/helper';
-import { isNewsProfileStartingTagsEnabled, readStoredNewsTags } from './utils/news-tags';
+import { isNewsProfileStartingTagsEnabled, readChosenNewsTags } from './utils/news-tags';
 
 /**
  * News tags are focus-area slugs (LAB-2969): the enrichment producer tags news
@@ -115,7 +115,7 @@ export function expandNewsTags(tags: Iterable<string>, vocabulary: NewsTagVocabu
 
 /**
  * The focus-area vocabulary, cached in memory, plus the starting tags of a
- * member who never chose any. Depends only on Prisma, so both the members and
+ * member with no saved tags. Depends only on Prisma, so both the members and
  * the team-news modules can provide it without importing each other.
  */
 @Injectable()
@@ -145,7 +145,8 @@ export class NewsTagVocabularyService {
   }
 
   /**
-   * Starting tags for a member who never saved news tags, as vocabulary slugs.
+   * Starting tags for a member with no saved news tags (never saved, or saved
+   * an empty list), as vocabulary slugs.
    * With profile starting tags enabled (LAB-3199): the member's highest-scored
    * interest-profile topics, at most PROFILE_STARTING_TAGS_LIMIT. Otherwise, or
    * when the profile has no such topic: the focus areas of the teams they
@@ -205,8 +206,9 @@ export class NewsTagVocabularyService {
 
   /**
    * The tags For You and the digest match news on, per member (LAB-2999): the
-   * saved list, or the starting tags when they never saved one, with each
-   * parent focus area expanded to its children. Every member gets an entry.
+   * saved list, or the starting tags when they have no saved tags (never
+   * saved, or saved an empty list), with each parent focus area expanded to
+   * its children. Every member gets an entry.
    */
   async getEffectiveTagsForMembers(memberUids: string[]): Promise<Map<string, Set<string>>> {
     const uniqueMemberUids = [...new Set(memberUids)];
@@ -219,11 +221,11 @@ export class NewsTagVocabularyService {
         select: { uid: true, preferences: true },
       }),
     ]);
-    const stored = new Map(members.map((m) => [m.uid, readStoredNewsTags(m.preferences)]));
-    const unsaved = uniqueMemberUids.filter((uid) => !stored.get(uid));
+    const chosen = new Map(members.map((m) => [m.uid, readChosenNewsTags(m.preferences)]));
+    const unsaved = uniqueMemberUids.filter((uid) => !chosen.get(uid));
     const seeds = unsaved.length > 0 ? await this.seedTagsForMembers(unsaved) : new Map<string, string[]>();
     for (const uid of uniqueMemberUids) {
-      result.set(uid, expandNewsTags(stored.get(uid) ?? seeds.get(uid) ?? [], vocabulary));
+      result.set(uid, expandNewsTags(chosen.get(uid) ?? seeds.get(uid) ?? [], vocabulary));
     }
     return result;
   }

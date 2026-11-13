@@ -25,7 +25,7 @@ export const DERIVED_PREFERENCE_KEYS = [
   'twitter',
   'bluesky',
   'subscription',
-  // Computed on read for a member who never saved news tags (LAB-2998); a client
+  // Computed on read for a member with no saved news tags (LAB-2998, LAB-3243); a client
   // echoing it back must not freeze "seeded" into the blob.
   'newsTagsSeeded',
 ] as const;
