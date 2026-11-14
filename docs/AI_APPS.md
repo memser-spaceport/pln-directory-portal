@@ -413,16 +413,20 @@ Being whitelisted never bypasses the PL Infra permission. The rule lives in
   warns about this and offers a one-click redeploy through
   `POST /v1/ai-apps/:uid/deploy`.
 
-## Publishing an app to members (LAB-3200)
+## Publishing an app to members (LAB-3200, LAB-3236)
 
-A directory admin can open one app to members outside PL Infra. The app gets an
-**audience**: a list of policy codes in `AiApp.audiencePolicyCodes`. An empty
-list means the app is open to PL Infra only (Back Office shows "PL Infra only").
-Publishing is separate from deploying: it does not build or restart anything,
-and PL Infra members keep their access either way.
+A directory admin can open an app to members outside PL Infra and set how LabOS
+shows it. The app gets an **audience** made of three lists: policy codes
+(`AiApp.audiencePolicyCodes`), permission codes (`AiApp.audiencePermissionCodes`)
+and individual members (`AiAppAudienceMember`). All three empty means the app is
+open to PL Infra only (Back Office shows "PL Infra only"). Publishing is separate
+from deploying: it does not build or restart anything, and PL Infra members keep
+their access either way.
 
 **Who is in the audience.** A member with approval state `APPROVED` who holds at
-least one of the listed policies. The rule lives in
+least one of the listed policies, has at least one of the listed permissions
+among their effective permissions (Access Control V2: policies plus direct
+grants), or is on the member list. The rule lives in
 `AiAppsAudienceService.isInAudience`.
 
 **What the audience gets.** The production app only, with every HTTP method:
@@ -433,26 +437,46 @@ least one of the listed policies. The rule lives in
   `GET /v1/ai-apps/me` accept the member for that app
   (`AiAppReadOrAudienceGuard`, `AiAppMeRbacGuard`).
 - `GET /v1/ai-apps/published` (any signed-in member) returns the live apps
-  published to the requester: `{ apps: [{ uid, appId, name, description, url }] }`.
-  LabOS shows them under More.
+  published to the requester:
+  `{ apps: [{ uid, appId, name, description, url, path, iconUrl, showInMore, hideTopNav }] }`.
+  LabOS lists the ones with `showInMore` under More and opens any of them at
+  `/apps/<path or uid>`.
 
 **What it does not get.** The AI Apps catalog, any other app, the preview target,
 feedback, logs, settings, the starter kit and deploys. Those routes still need
 `ai_apps.read`/`write`.
 
+**LabOS settings** (same admin, same save):
+- `showInMore` (default on): off keeps the app out of the More menu; the audience
+  still opens it by its link.
+- `path`: a readable segment for `/apps/<path>`, 2–60 lowercase letters, digits
+  and single hyphens, unique across apps, never shaped like an app uid. The uid
+  link keeps working, and `GET /v1/ai-apps/:uid` also resolves a path.
+- `iconUrl`: an https URL, normally from the Back Office image upload. LabOS
+  shows its default icon when it is empty.
+- `hideTopNav`: LabOS opens the app full page, without its top navigation. Sign-in
+  is unchanged.
+
+These fields are also returned with every app in the catalog responses.
+
 **Managing it** (Back Office, directory admins only, `AdminAuthGuard`):
 - `GET /v1/admin/ai-app-audience/:appId` returns
-  `{ appUid, appId, name, policyCodes, directLinkGateReady }`.
-- `PUT /v1/admin/ai-app-audience/:appId` with `{ policyCodes }` replaces the list.
-  `[]` takes the app back. An unknown policy code is rejected with 400 and
-  nothing is saved.
+  `{ appUid, appId, name, policyCodes, permissionCodes, members: [{ uid, name, email }],
+  showInMore, path, iconUrl, hideTopNav, directLinkGateReady }`.
+- `PUT /v1/admin/ai-app-audience/:appId` with
+  `{ policyCodes, permissionCodes?, memberUids?, showInMore?, path?, iconUrl?, hideTopNav? }`.
+  The lists replace the stored ones; a field left out stays as it is, so the v0
+  body `{ policyCodes }` still works. `path`/`iconUrl` take `null` or `''` to
+  clear. An unknown policy, permission or member, an invalid path or a non-https
+  icon is rejected with 400; a path another app uses with 409 (`path_taken`).
+  Nothing is saved on an error.
 - Every change appends an `AUDIENCE_UPDATED` event with the admin and the
-  resulting list. Saving the same list is a no-op.
+  resulting settings. Saving the same values is a no-op.
 
 Decisions are not cached, so publishing and taking back apply on the next
 request, including for members who already hold an app session. No deploy or
-upload touches the audience. An app with `directLinkGateReady = false` needs one
-redeploy first: its sidecar does not ask for a per-app decision and refuses
+upload touches these settings. An app with `directLinkGateReady = false` needs
+one redeploy first: its sidecar does not ask for a per-app decision and refuses
 members without the PL Infra permission.
 
 ## Public endpoints (paths without LabOS auth)

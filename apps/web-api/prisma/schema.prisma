@@ -3978,6 +3978,21 @@ model AiApp {
   /// under More in LabOS. Empty = not published. Set by directory admins in
   /// Back Office; no deploy or upload touches it.
   audiencePolicyCodes String[] @default([])
+  /// Permission codes the app is published to (LAB-3236). An approved member
+  /// whose effective permissions include any of them is in the audience, the
+  /// same as for `audiencePolicyCodes`. Individual members live in
+  /// `AiAppAudienceMember`.
+  audiencePermissionCodes String[] @default([])
+  /// Whether LabOS lists the app under More for its audience. Off = the
+  /// audience still opens it by its direct link.
+  showInMore      Boolean     @default(true)
+  /// Readable LabOS path segment set by a directory admin (`/apps/<path>`),
+  /// unique across apps. The uid link keeps working.
+  path            String?     @unique
+  /// App icon uploaded by a directory admin; LabOS shows its default icon when null.
+  iconUrl         String?
+  /// Open the app full page in LabOS, without the LabOS top navigation.
+  hideTopNav      Boolean     @default(false)
   /// Coarse progress of the current deploy attempt: queued | building |
   /// injecting_runtime_config | done | failed. The background deploy job
   /// resumes from it after a web-api restart. Written mid-deploy via raw SQL
@@ -4135,6 +4150,20 @@ model AiAppAuthGate {
 /// Whitelist of a PRIVATE app: members (besides the owner and directory
 /// admins) who may find and open it. Kept while the app is OPEN so switching
 /// back restores it.
+/// Individual members an AI App is published to (LAB-3236), next to the
+/// policy and permission audience on `AiApp`. Directory admins only.
+model AiAppAudienceMember {
+  /// AiApp.uid (no FK relation, matching the other AI Apps tables).
+  appUid     String
+  memberUid  String
+  /// The directory admin who added the member.
+  addedByUid String
+  createdAt  DateTime @default(now())
+
+  @@id([appUid, memberUid])
+  @@index([memberUid])
+}
+
 model AiAppAllowedMember {
   /// AiApp.uid (no FK relation, matching the other POC tables).
   appUid      String
