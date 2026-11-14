@@ -468,7 +468,9 @@ These fields are also returned with every app in the catalog responses.
   The lists replace the stored ones; a field left out stays as it is, so the v0
   body `{ policyCodes }` still works. `path`/`iconUrl` take `null` or `''` to
   clear. An unknown policy, permission or member, an invalid path or a non-https
-  icon is rejected with 400; a path another app uses with 409 (`path_taken`).
+  icon is rejected with 400; a path another app uses with 409. (The API's error
+  filter returns only `statusCode` and `message`, so clients tell a taken path
+  by the 409.)
   Nothing is saved on an error.
 - Every change appends an `AUDIENCE_UPDATED` event with the admin and the
   resulting settings. Saving the same values is a no-op.

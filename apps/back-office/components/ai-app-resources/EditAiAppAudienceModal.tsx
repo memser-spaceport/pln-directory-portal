@@ -17,6 +17,7 @@ import { AI_APP_AUDIENCE_MEMBER_ROLES } from '../../screens/ai-app-resources/con
 import type { AiAppAudienceSettings } from '../../screens/ai-app-resources/types';
 import {
   getApiErrorMessage,
+  getApiErrorStatus,
   getAppPathError,
   getAudienceConfirmMessage,
   getAudienceStatusLabel,
@@ -175,9 +176,9 @@ export const EditAiAppAudienceModal: React.FC<EditAiAppAudienceModalProps> = ({ 
       toast.success(isAudienceEmpty(form) ? 'Access limited to PL Infra' : 'Audience saved');
     } catch (err) {
       const message = getApiErrorMessage(err, 'Failed to save the audience. Please try again.');
-      const code = (err as { response?: { data?: { code?: string } } })?.response?.data?.code;
       setConfirmSave(false);
-      if (code === 'path_taken' || code === 'invalid_path') {
+      // 409 is only ever a path another app uses (the API's error filter keeps just status and message).
+      if (getApiErrorStatus(err) === 409) {
         setPathServerError(message);
       } else {
         setFormError(message);

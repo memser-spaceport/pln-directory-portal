@@ -339,7 +339,7 @@ describe('EditAiAppAudienceModal', () => {
   it('shows a taken path next to the field and does not close the form', async () => {
     mockFetch.mockResolvedValue(audience());
     mockUpdate.mockRejectedValue({
-      response: { status: 409, data: { message: 'Path "pla" is already used by another app', code: 'path_taken' } },
+      response: { status: 409, data: { statusCode: 409, message: 'Path "pla" is already used by another app' } },
     });
     renderModal();
     await screen.findByText('PL Infra only');
@@ -348,7 +348,10 @@ describe('EditAiAppAudienceModal', () => {
     fireEvent.click(screen.getByText('Save'));
     fireEvent.click(screen.getByText('Yes, save'));
 
-    expect((await screen.findByRole('alert')).textContent).toBe('Path "pla" is already used by another app');
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toBe('Path "pla" is already used by another app');
+    // Next to the field, not at the bottom of the form.
+    expect(alert.previousElementSibling?.querySelector('#ai-app-path')).not.toBeNull();
     expect((screen.getByLabelText('Path') as HTMLInputElement).value).toBe('pla');
   });
 
