@@ -4,11 +4,18 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { EditAiAppAudienceModal } from '../../components/ai-app-resources/EditAiAppAudienceModal';
 import api from '../../utils/api';
-import { fetchAiAppAudience, updateAiAppAudience } from '../../utils/services/ai-app-resources';
+import {
+  fetchAccessControlPermissions,
+  fetchAiAppAudience,
+  updateAiAppAudience,
+  uploadAiAppIcon,
+} from '../../utils/services/ai-app-resources';
 
 jest.mock('../../utils/services/ai-app-resources', () => ({
   fetchAiAppAudience: jest.fn(),
   updateAiAppAudience: jest.fn(),
+  fetchAccessControlPermissions: jest.fn(),
+  uploadAiAppIcon: jest.fn(),
 }));
 jest.mock('../../utils/api', () => ({ __esModule: true, default: { get: jest.fn() } }));
 jest.mock('../../components/modal/modal', () => ({
@@ -20,6 +27,8 @@ jest.mock('react-toastify', () => ({ toast: { success: jest.fn(), error: jest.fn
 
 const mockFetch = fetchAiAppAudience as jest.Mock;
 const mockUpdate = updateAiAppAudience as jest.Mock;
+const mockPermissions = fetchAccessControlPermissions as jest.Mock;
+const mockUpload = uploadAiAppIcon as jest.Mock;
 const mockApiGet = api.get as jest.Mock;
 
 const policies = [
@@ -31,12 +40,52 @@ const policies = [
 ];
 const MEMBER_POLICY_NAMES = ['Founder / PLC Crypto', 'Investor / PL', 'Unassigned / PLC Other'];
 
-const audience = (overrides: Partial<{ policyCodes: string[]; directLinkGateReady: boolean }> = {}) => ({
+const permissions = [
+  { uid: 'p1', code: 'plaa.member', module: 'plaa', description: 'PLAA member access' },
+  { uid: 'p2', code: 'deals.read', module: 'deals', description: null },
+];
+const searchRows = [
+  { uid: 'm-ada', name: 'Ada Founder', email: 'ada@example.test', teamMemberRoles: [] },
+  { uid: 'm-bob', name: 'Bob Builder', email: null, teamMemberRoles: [] },
+];
+
+type AudienceOverrides = Partial<{
+  policyCodes: string[];
+  permissionCodes: string[];
+  members: Array<{ uid: string; name: string; email: string | null }>;
+  showInMore: boolean;
+  path: string | null;
+  iconUrl: string | null;
+  hideTopNav: boolean;
+  directLinkGateReady: boolean;
+}>;
+
+const audience = (overrides: AudienceOverrides = {}) => ({
   appUid: 'cm1',
   appId: 'playbook',
   name: 'PLaybook',
   policyCodes: [],
+  permissionCodes: [],
+  members: [],
+  showInMore: true,
+  path: null,
+  iconUrl: null,
+  hideTopNav: false,
   directLinkGateReady: true,
+  ...overrides,
+});
+
+/** The full PUT body for the given changes on top of the default settings. */
+const saveBody = (overrides: Record<string, unknown> = {}) => ({
+  authToken: 'token-1',
+  appId: 'playbook',
+  policyCodes: [],
+  permissionCodes: [],
+  memberUids: [],
+  showInMore: true,
+  path: null,
+  iconUrl: null,
+  hideTopNav: false,
   ...overrides,
 });
 
@@ -59,7 +108,10 @@ const selectedPolicies = () =>
 describe('EditAiAppAudienceModal', () => {
   beforeEach(() => {
     jest.resetAllMocks();
-    mockApiGet.mockResolvedValue({ data: policies });
+    mockApiGet.mockImplementation(async (url: string) =>
+      url.includes('/rbac/members/search') ? { data: searchRows } : { data: policies }
+    );
+    mockPermissions.mockResolvedValue(permissions);
   });
 
   it('shows the current audience of the app', async () => {
@@ -92,7 +144,9 @@ describe('EditAiAppAudienceModal', () => {
     await screen.findByText('PL Infra only');
 
     fireEvent.click(screen.getByText('No policies selected'));
-    const options = await screen.findAllByRole('checkbox');
+    await screen.findByText('Advisor');
+    const settingsCheckboxes = [screen.getByLabelText(/Show under More/), screen.getByLabelText(/Hide top navigation/)];
+    const options = screen.getAllByRole('checkbox').filter((box) => !settingsCheckboxes.includes(box));
     expect(options).toHaveLength(policies.length);
     ['Advisor', 'Directory Admin', 'Founder', 'Investor', 'Unassigned'].forEach((role) =>
       expect(screen.getByText(role)).toBeTruthy()
@@ -125,9 +179,7 @@ describe('EditAiAppAudienceModal', () => {
     expect(mockUpdate).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByText('Yes, save'));
-    await waitFor(() =>
-      expect(mockUpdate).toHaveBeenCalledWith({ authToken: 'token-1', appId: 'playbook', policyCodes: saved })
-    );
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledWith(saveBody({ policyCodes: saved })));
     expect(mockUpdate).toHaveBeenCalledTimes(1);
     expect(await screen.findByText('Open to 3 policies')).toBeTruthy();
     expect(mockFetch).toHaveBeenCalledTimes(2);
@@ -145,9 +197,7 @@ describe('EditAiAppAudienceModal', () => {
     expect(screen.getByText(/Nobody outside PL Infra will be able to open PLaybook\./)).toBeTruthy();
 
     fireEvent.click(screen.getByText('Yes, save'));
-    await waitFor(() =>
-      expect(mockUpdate).toHaveBeenCalledWith({ authToken: 'token-1', appId: 'playbook', policyCodes: [] })
-    );
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledWith(saveBody()));
     expect(await screen.findByText('PL Infra only')).toBeTruthy();
   });
 
@@ -210,5 +260,107 @@ describe('EditAiAppAudienceModal', () => {
     expect(await screen.findByText('Forbidden')).toBeTruthy();
     fireEvent.click(screen.getByText('Retry'));
     expect(await screen.findByText('PL Infra only')).toBeTruthy();
+  });
+  it('adds a permission to the audience and saves it', async () => {
+    mockFetch.mockResolvedValue(audience());
+    mockUpdate.mockResolvedValue(audience({ permissionCodes: ['plaa.member'] }));
+    renderModal();
+    await screen.findByText('PL Infra only');
+
+    const input = screen.getByLabelText('Permissions that can open this app');
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.click(await screen.findByText('plaa.member — PLAA member access'));
+    fireEvent.click(screen.getByText('Save'));
+    expect(
+      screen.getByText(/Approved members matching any of 1 permission will be able to open PLaybook\./)
+    ).toBeTruthy();
+    fireEvent.click(screen.getByText('Yes, save'));
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledWith(saveBody({ permissionCodes: ['plaa.member'] })));
+  });
+
+  it('adds members found by search, removes them, and saves their uids', async () => {
+    mockFetch.mockResolvedValue(audience({ members: [{ uid: 'm-old', name: 'Old Friend', email: null }] }));
+    mockUpdate.mockResolvedValue(audience());
+    renderModal();
+    expect(await screen.findByText('Open to 1 member')).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText('Members who can open this app'), { target: { value: 'ad' } });
+    fireEvent.click(await screen.findByText('Ada Founder'));
+    expect(screen.getByLabelText('Selected members').textContent).toContain('Ada Founder');
+    fireEvent.click(screen.getByLabelText('Remove Old Friend'));
+
+    fireEvent.click(screen.getByText('Save'));
+    fireEvent.click(screen.getByText('Yes, save'));
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledWith(saveBody({ memberUids: ['m-ada'] })));
+    expect(mockApiGet).toHaveBeenCalledWith(expect.stringContaining('/rbac/members/search?q=ad'), expect.anything());
+  });
+
+  it('saves the LabOS settings: More, path, icon and top navigation', async () => {
+    mockFetch.mockResolvedValue(audience({ policyCodes: ['investor_pl'] }));
+    mockUpdate.mockResolvedValue(audience());
+    mockUpload.mockResolvedValue('https://cdn.example.test/pla.png');
+    renderModal();
+    await screen.findByText('Open to 1 policy');
+
+    fireEvent.click(screen.getByLabelText(/Show under More/));
+    fireEvent.change(screen.getByLabelText('Path'), { target: { value: 'PLA' } });
+    fireEvent.change(screen.getByTestId('ai-app-icon-input'), {
+      target: { files: [new File(['x'], 'pla.png', { type: 'image/png' })] },
+    });
+    expect(await screen.findByAltText('App icon')).toBeTruthy();
+    expect(mockUpload).toHaveBeenCalledWith({ authToken: 'token-1', file: expect.any(File) });
+    fireEvent.click(screen.getByLabelText(/Hide top navigation/));
+
+    fireEvent.click(screen.getByText('Save'));
+    fireEvent.click(screen.getByText('Yes, save'));
+    await waitFor(() =>
+      expect(mockUpdate).toHaveBeenCalledWith(
+        saveBody({
+          policyCodes: ['investor_pl'],
+          showInMore: false,
+          path: 'pla',
+          iconUrl: 'https://cdn.example.test/pla.png',
+          hideTopNav: true,
+        })
+      )
+    );
+  });
+
+  it('blocks an invalid path before saving', async () => {
+    mockFetch.mockResolvedValue(audience());
+    renderModal();
+    await screen.findByText('PL Infra only');
+
+    fireEvent.change(screen.getByLabelText('Path'), { target: { value: 'pla-' } });
+    expect((await screen.findByRole('alert')).textContent).toContain('lowercase letters');
+    expect((screen.getByText('Save') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('shows a taken path next to the field and does not close the form', async () => {
+    mockFetch.mockResolvedValue(audience());
+    mockUpdate.mockRejectedValue({
+      response: { status: 409, data: { message: 'Path "pla" is already used by another app', code: 'path_taken' } },
+    });
+    renderModal();
+    await screen.findByText('PL Infra only');
+
+    fireEvent.change(screen.getByLabelText('Path'), { target: { value: 'pla' } });
+    fireEvent.click(screen.getByText('Save'));
+    fireEvent.click(screen.getByText('Yes, save'));
+
+    expect((await screen.findByRole('alert')).textContent).toBe('Path "pla" is already used by another app');
+    expect((screen.getByLabelText('Path') as HTMLInputElement).value).toBe('pla');
+  });
+
+  it('removes the icon', async () => {
+    mockFetch.mockResolvedValue(audience({ iconUrl: 'https://cdn.example.test/old.png' }));
+    mockUpdate.mockResolvedValue(audience());
+    renderModal();
+    await screen.findByAltText('App icon');
+
+    fireEvent.click(screen.getByText('Remove icon'));
+    fireEvent.click(screen.getByText('Save'));
+    fireEvent.click(screen.getByText('Yes, save'));
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledWith(saveBody({ iconUrl: null })));
   });
 });
