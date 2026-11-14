@@ -260,3 +260,93 @@ export async function fetchOgImageUrl(pageUrl: string): Promise<string | null> {
     clearTimeout(timer);
   }
 }
+
+const IMAGE_FETCH_TIMEOUT_MS = 10_000;
+export const IMAGE_FETCH_MAX_BYTES = 10 * 1024 * 1024;
+
+// Read the body, but stop and return null past `max` bytes.
+async function readImageBytes(response: Response, max: number): Promise<Buffer | null> {
+  const declared = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > max) {
+    return null;
+  }
+  const reader = response.body?.getReader?.();
+  if (!reader) {
+    const bytes = Buffer.from(await response.arrayBuffer());
+    return bytes.length > max ? null : bytes;
+  }
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > max) return null;
+      chunks.push(value);
+    }
+  } finally {
+    reader.cancel().catch(() => undefined);
+  }
+  return Buffer.concat(chunks);
+}
+
+/**
+ * Download an image file (LAB-3135: our copy of a news item's og:image), or
+ * null on any failure. The same host checks as `fetchOgImageUrl` apply to the
+ * URL and to each redirect hop. Only an `image/*` answer is read, up to
+ * `maxBytes` and `IMAGE_FETCH_TIMEOUT_MS`.
+ */
+export async function fetchPublicImage(
+  imageUrl: string,
+  maxBytes: number = IMAGE_FETCH_MAX_BYTES
+): Promise<Buffer | null> {
+  if (!imageUrl || !isAllowedOgPageUrl(imageUrl)) {
+    return null;
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), IMAGE_FETCH_TIMEOUT_MS);
+
+  try {
+    let currentUrl = imageUrl;
+    for (let hop = 0; hop <= OG_MAX_REDIRECTS; hop++) {
+      if (!(await resolvesToPublicAddresses(currentUrl))) {
+        return null;
+      }
+      const response = await fetch(currentUrl, {
+        method: 'GET',
+        redirect: 'manual',
+        signal: controller.signal,
+        headers: { Accept: 'image/*', 'User-Agent': OG_USER_AGENT },
+      });
+
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get('location');
+        if (!location) {
+          return null;
+        }
+        const nextUrl = new URL(location, currentUrl).href;
+        if (!isAllowedOgPageUrl(nextUrl)) {
+          return null;
+        }
+        currentUrl = nextUrl;
+        continue;
+      }
+
+      if (!response.ok) {
+        return null;
+      }
+      const contentType = (response.headers.get('content-type') || '').toLowerCase();
+      if (!contentType.startsWith('image/')) {
+        return null;
+      }
+      return await readImageBytes(response, maxBytes);
+    }
+    return null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}

@@ -51,6 +51,21 @@ export const TeamNewsDiscussionSchema = z.object({
   latestTopicUrl: z.string().nullable(),
 });
 
+// LAB-3135: our 16:9 JPEG copy of the og:image, for `srcset`. `width` and
+// `height` are the stored original's size. `variants` lists every stored copy,
+// the original included, narrowest first. Null when no copy exists yet or the
+// copy failed; `imageUrl` stays the fallback.
+export const TeamNewsImageVariantSchema = z.object({
+  width: z.number().int().min(1),
+  url: z.string(),
+});
+
+export const TeamNewsImageSchema = z.object({
+  width: z.number().int().min(1),
+  height: z.number().int().min(1),
+  variants: z.array(TeamNewsImageVariantSchema),
+});
+
 export const TeamNewsItemSchema = z.object({
   uid: z.string(),
   teamUid: z.string(),
@@ -89,6 +104,8 @@ export const TeamNewsItemSchema = z.object({
   // Absolute https og:image / twitter:image of the source page, captured when
   // the item is created. Null when the page has none or was not checked yet.
   imageUrl: z.string().nullable(),
+  // LAB-3135: resized copies of imageUrl for srcset; null falls back to imageUrl.
+  image: TeamNewsImageSchema.nullable(),
 });
 
 export const CreateTeamNewsPostRequestSchema = z.object({
@@ -471,6 +488,7 @@ export const TeamNewsLatestResponseSchema = z.object({
 export type NewsEventType = z.infer<typeof NewsEventTypeSchema>;
 export type NewsDiscoveryOutcome = z.infer<typeof NewsDiscoveryOutcomeSchema>;
 export type TeamNewsItemDto = z.infer<typeof TeamNewsItemSchema>;
+export type TeamNewsImage = z.infer<typeof TeamNewsImageSchema>;
 export type TeamNewsListResponse = z.infer<typeof TeamNewsListResponseSchema>;
 export type TeamNewsGroupedResponse = z.infer<typeof TeamNewsGroupedResponseSchema>;
 export type TeamNewsFiltersResponse = z.infer<typeof TeamNewsFiltersResponseSchema>;
@@ -573,6 +591,7 @@ export const LabosDigestNewsDetailSchema = z.object({
   sourceUrls: z.array(z.string()),
   sourceDomain: z.string().nullable(),
   imageUrl: z.string().nullable(),
+  image: TeamNewsImageSchema.nullable(),
   eventDate: z.string(),
   tags: z.array(z.string()),
   team: z.object({

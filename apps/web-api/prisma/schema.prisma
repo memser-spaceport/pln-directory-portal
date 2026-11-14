@@ -592,6 +592,7 @@ model Image {
   articleCoverImages      Article[]                    @relation("ArticleCoverImage")
   logoVerificationResults TeamLogoVerificationResult[]
   teamEnrichmentLogos     TeamEnrichment[]
+  teamNewsItemImages      TeamNewsItem[]               @relation("TeamNewsItemImage")
 }
 
 model Faq {
@@ -2815,6 +2816,11 @@ model TeamNewsItem {
   /// Set when the image fetch was tried (with or without a result), so a page
   /// without an image is not fetched again.
   imageCheckedAt    DateTime?
+  /// LAB-3135: our 16:9 JPEG copy of imageUrl (the ORIGINAL Image) with its
+  /// resized thumbnails for srcset. Null when not made yet or the copy failed;
+  /// the API then serves imageUrl only.
+  imageUid          String?
+  image             Image?              @relation("TeamNewsItemImage", fields: [imageUid], references: [uid], onDelete: SetNull)
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
   forumLinks             TeamNewsForumLink[]

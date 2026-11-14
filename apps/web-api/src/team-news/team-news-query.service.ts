@@ -26,6 +26,7 @@ import { narrowsNews, readNewsCategories } from './utils/news-categories';
 import { groupUsedNewsTags, NewsTagVocabularyService } from './news-tag-vocabulary.service';
 import { isNewsTagPicksEnabled } from './utils/news-tags';
 import { DigestTopSelection, LabosDigestService } from './labos-digest.service';
+import { NewsImageRow, TEAM_NEWS_IMAGE_SELECT, toNewsImageDto } from './utils/news-image-variants';
 
 const EMPTY_DISCUSSION: TeamNewsDiscussion = { count: 0, latestTopicUrl: null };
 const POPULAR_WINDOW_DAYS = 14;
@@ -40,6 +41,7 @@ const TEAM_NEWS_TEAM_INCLUDE = Prisma.validator<Prisma.TeamNewsItemInclude>()({
       teamFocusAreas: { include: { focusArea: true, ancestorArea: true } },
     },
   },
+  ...TEAM_NEWS_IMAGE_SELECT,
 });
 
 const POPULAR_MIN_UPVOTES = 2;
@@ -236,6 +238,7 @@ export class TeamNewsQueryService {
           teamFocusAreas: { include: { focusArea: true, ancestorArea: true } },
         },
       },
+      ...TEAM_NEWS_IMAGE_SELECT,
     } as const;
 
     const followed = [...followedTeamUids];
@@ -396,6 +399,7 @@ export class TeamNewsQueryService {
               teamFocusAreas: { include: { focusArea: true, ancestorArea: true } },
             },
           },
+          ...TEAM_NEWS_IMAGE_SELECT,
         },
       }),
       this.prisma.teamNewsItem.count({ where }),
@@ -442,6 +446,7 @@ export class TeamNewsQueryService {
             teamFocusAreas: { include: { focusArea: true, ancestorArea: true } },
           },
         },
+        ...TEAM_NEWS_IMAGE_SELECT,
       },
     });
 
@@ -933,6 +938,7 @@ export class TeamNewsQueryService {
       viewCount: number;
       postedByMemberUid: string | null;
       imageUrl: string | null;
+      image: NewsImageRow;
       createdAt: Date;
       team: {
         uid: string;
@@ -995,6 +1001,7 @@ export class TeamNewsQueryService {
       viewCount: row.viewCount,
       isTeamPosted: row.postedByMemberUid != null,
       imageUrl: row.imageUrl ?? null,
+      image: toNewsImageDto(row.image),
     };
   }
 
@@ -1012,6 +1019,7 @@ export class TeamNewsQueryService {
           teamFocusAreas: { include: { focusArea: true, ancestorArea: true } },
         },
       },
+      ...TEAM_NEWS_IMAGE_SELECT,
     } as const;
 
     const row = await this.prisma.teamNewsItem.findUnique({ where: { uid }, include });
