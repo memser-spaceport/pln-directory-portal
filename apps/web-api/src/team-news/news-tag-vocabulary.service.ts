@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
 import { slugify } from '../utils/helper/helper';
-import { isNewsProfileStartingTagsEnabled, readChosenNewsTags } from './utils/news-tags';
+import { isNewsProfileStartingTagsEnabled, readChosenNewsTags, readMutedNewsTags } from './utils/news-tags';
 
 /**
  * News tags are focus-area slugs (LAB-2969): the enrichment producer tags news
@@ -224,8 +224,33 @@ export class NewsTagVocabularyService {
     const chosen = new Map(members.map((m) => [m.uid, readChosenNewsTags(m.preferences)]));
     const unsaved = uniqueMemberUids.filter((uid) => !chosen.get(uid));
     const seeds = unsaved.length > 0 ? await this.seedTagsForMembers(unsaved) : new Map<string, string[]>();
+    const mutedByMember = new Map(members.map((m) => [m.uid, readMutedNewsTags(m.preferences)]));
     for (const uid of uniqueMemberUids) {
-      result.set(uid, expandNewsTags(chosen.get(uid) ?? seeds.get(uid) ?? [], vocabulary));
+      const effective = expandNewsTags(chosen.get(uid) ?? seeds.get(uid) ?? [], vocabulary);
+      // LAB-3263: muted tags, and the children of a muted parent, never count.
+      for (const muted of expandNewsTags(mutedByMember.get(uid) ?? [], vocabulary)) effective.delete(muted);
+      result.set(uid, effective);
+    }
+    return result;
+  }
+
+  /**
+   * Each member's muted news tags (LAB-3263), expanded to their children. Every
+   * member gets an entry, empty when they muted nothing.
+   */
+  async getMutedTagsForMembers(memberUids: string[]): Promise<Map<string, Set<string>>> {
+    const uniqueMemberUids = [...new Set(memberUids)];
+    const result = new Map<string, Set<string>>(uniqueMemberUids.map((uid) => [uid, new Set<string>()]));
+    if (uniqueMemberUids.length === 0) return result;
+    const [vocabulary, members] = await Promise.all([
+      this.getVocabulary(),
+      this.prisma.member.findMany({
+        where: { uid: { in: uniqueMemberUids } },
+        select: { uid: true, preferences: true },
+      }),
+    ]);
+    for (const member of members) {
+      result.set(member.uid, expandNewsTags(readMutedNewsTags(member.preferences), vocabulary));
     }
     return result;
   }

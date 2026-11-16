@@ -2,13 +2,19 @@
 
 ### Requirement: Muted news tags
 
-A member's muted news tags SHALL be stored as `newsTagsMuted`, a list of focus-area slugs, next to `newsTags`. Saving preferences with `newsTagsMuted` SHALL validate it the same way as `newsTags`: a slug that is not a focus area is rejected with 400 and nothing is stored. A member's effective news tags SHALL be their saved or starting tags, expanded as before, minus their muted tags and the children of a muted parent. A muted tag SHALL NOT come back as a starting tag.
+A member's muted news tags SHALL be stored as `newsTagsMuted`, a list of focus-area slugs, next to `newsTags`. Saving preferences with `newsTagsMuted` SHALL validate it the same way as `newsTags`: a slug that is not a focus area is rejected with 400 and nothing is stored. A member's effective news tags SHALL be their saved or starting tags, expanded as before, minus their muted tags and the children of a muted parent. A muted tag SHALL NOT come back as a starting tag. Saving `newsTags` without `newsTagsMuted` SHALL unmute every tag in the saved list, so a tag the member picks again on News preferences counts again.
 
 #### Scenario: Muted starting tag
 
 - **GIVEN** a member with no saved news tags, starting tags `["ai", "desci"]` and muted tags `["ai"]`
 - **WHEN** their effective tags are read
 - **THEN** they are `["desci"]`
+
+#### Scenario: Picked again on News preferences
+
+- **GIVEN** a member who muted `ai`
+- **WHEN** they save `newsTags` `["ai", "desci"]`
+- **THEN** `ai` is no longer muted
 
 #### Scenario: Unknown muted slug
 

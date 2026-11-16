@@ -4,7 +4,7 @@
 - The digest's links carry `target_uid` and `target_email` in plain text and need sign-in at the target. The backend's only signed one-click links are `job-alerts-token.util.ts` and `job-match/suggested-candidates-token.util.ts` (HMAC, `v1.<body>.<sig>`).
 - News preferences: `Member.preferences.newsTags` (focus-area slugs) is written through `MembersService.updatePreference`, a jsonb merge. A saved empty list counts as no saved tags, and the member then gets starting tags (`resolveNewsTags`, `getEffectiveTagsForMembers`).
 - Digest tag picks (`pickDigestNewsByTags`) run only when `NEWS_TAG_PICKS_ENABLED=true`. Otherwise picks come from For You teams and categories, and tags do not matter.
-- Forum reads as a member go through NodeBB with an `X-PL-Member-Proof` header (`mcp-forum-tools.ts`, `callForum`, `GET /api/topic/:tid`).
+- Forum reads as a member go through NodeBB with an `X-PL-Member-Proof` header (`mcp-forum-tools.ts`, `callForum`, `GET /api/topic/:tid`), but proofs exist only for MCP connections. The notification service reads the forum with a `FORUM_API_KEY` bearer key.
 - The decisions behind this change are on LAB-3241 and LAB-3263 (2026-11-16).
 
 ## Goals / Non-Goals
@@ -43,14 +43,22 @@
 
 6. **Muted tags are applied in one place.** `getEffectiveTagsForMembers` and `resolveNewsTags` subtract the expanded muted set, so starting tags never bring a muted tag back. `pickDigestNewsByTags` also filters items that carry a muted tag, unless the team is in the member's own or followed set, before matching and before the fallback. The disabled path is unchanged, which keeps the "Digest picks by news tags / Disabled" scenario true.
 
-7. **Forum posts are read as the link's member** through the existing member-proof call. The shared `callForum` and topic mapping move from `mcp-forum-tools.ts` into a small forum reader that both use. The topics are fetched in parallel with a timeout, and the opening post's HTML is returned as NodeBB renders it. The frontend sanitises it with `SafeHtml`. Any failure gives `forumUnavailable: true` rather than an error.
+7. **Forum posts are read with the backend's forum API key, not as the member.** Found during build: NodeBB member proofs are issued only for MCP connections (`McpMemberProofService.issueForAuthorization` needs an MCP authorization), so a signed-out page has no way to read as the member. The backend reads `GET /api/topic/:tid` with `Authorization: Bearer FORUM_API_KEY`, the same kind of key the notification service uses to build the digest, and only for the tids signed into the link (`LabosDigestForumReader`). `mcp-forum-tools.ts` is unchanged. The topics are fetched in parallel with a 5 s timeout each; a 403/404 topic is left out; when the forum is not set up or no topic answers, the page gets `forumUnavailable: true`. The opening post's HTML is returned as NodeBB renders it, and the frontend sanitises it with `SafeHtml`. Trade-off: a forwarded link shows those topics to whoever opens it, which is the same exposure the email itself has (it already carries the post titles and excerpts). Needs a new BE secret `FORUM_API_KEY` in dev and prod SSM.
 
 8. **Contracts.** The request and response zod schemas go in `libs/contracts/src/schema/team-news.ts`, next to the other LabosDigest schemas. Request bodies are checked with `safeParse` in the controller (ts-rest `@Api` skips body validation).
+
+### Shared test vector (for LAB-3265)
+
+Secret `digest-link-test-secret`. Payload, serialised with the keys in this order:
+`{"purpose":"digest","m":"cm-member-1","f":"daily","s":"2026-11-16T09:00:00.000Z","n":["news-b","news-a","news-c"],"l":"news-b","p":[101,102],"iat":1763283600}`
+Token:
+`v1.eyJwdXJwb3NlIjoiZGlnZXN0IiwibSI6ImNtLW1lbWJlci0xIiwiZiI6ImRhaWx5IiwicyI6IjIwMjYtMTEtMTZUMDk6MDA6MDAuMDAwWiIsIm4iOlsibmV3cy1iIiwibmV3cy1hIiwibmV3cy1jIl0sImwiOiJuZXdzLWIiLCJwIjpbMTAxLDEwMl0sImlhdCI6MTc2MzI4MzYwMH0.w8SOyedllelo39DQrxPHy-VcEAFEgYrsxTJ2qmN0Lbs`
 
 ## Risks / Trade-offs
 
 - [A forwarded email lets anyone press More or Less for its owner] → Accepted, as for every one-click email link. The worst outcome is changed news tags, which Undo or News preferences can fix. The token reveals only the story list and the first name.
 - [`NEWS_TAG_PICKS_ENABLED` is off in an environment, so More and Less save but the digest doesn't change] → Make it a rollout prerequisite, checked with the lead before the template goes live.
+- [`FORUM_API_KEY` is not set in an environment] → The page still shows the stories and says the forum posts can't load (`forumUnavailable`). The key goes into dev and prod SSM with `DIGEST_LINK_SECRET`.
 - [The secret leaks or rotates] → Rotating `DIGEST_LINK_SECRET` makes every sent link show "expired". That's acceptable, and the page offers Home.
 - [Story tags that aren't focus areas (legacy verbs)] → They're ignored. A story with none still records the choice, with `changed: false`.
 - [Big weekly digests] → The token holds at most 5 news uids and 2 tids today. The schema caps them at 20 and 10 to bound the URL and the work.

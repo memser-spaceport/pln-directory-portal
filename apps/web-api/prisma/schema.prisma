@@ -302,6 +302,7 @@ model Member {
   teamNewsUpvotes           TeamNewsUpvote[]        @relation("MemberTeamNewsUpvotes")
   feedComments              FeedComment[]           @relation("MemberFeedComments")
   feedNewsLikes             FeedNewsLike[]          @relation("MemberFeedNewsLikes")
+  labosDigestChoices        LabosDigestChoice[]     @relation("MemberLabosDigestChoices")
 
   /// Read-only Affinity CRM sidecar (task 02). Optional 1:1 when linked.
   affinityPerson               AffinityPerson?
@@ -2829,6 +2830,7 @@ model TeamNewsItem {
   feedLikes              FeedNewsLike[]
   networkOverviews       NetworkOverview[]
   labosDigestSendStories LabosDigestSendStory[]
+  labosDigestChoices     LabosDigestChoice[]
 
   @@index([teamUid])
   @@index([eventDate])
@@ -2893,6 +2895,38 @@ model LabosDigestSendStory {
   isLead      Boolean
 
   @@unique([sendId, position])
+  @@index([newsItemUid])
+}
+
+enum LabosDigestChoiceKind {
+  MORE
+  LESS
+}
+
+/// A "More like this" / "Less like this" choice a member made on a digest story (LAB-3263).
+/// Records exactly what the choice changed in `Member.preferences`, so Undo reverts only that.
+/// At most one active (`undoneAt` null) choice per member and story: a partial unique index in the migration.
+model LabosDigestChoice {
+  uid            String                @id @default(cuid())
+  memberUid      String
+  member         Member                @relation("MemberLabosDigestChoices", fields: [memberUid], references: [uid], onDelete: Cascade)
+  newsItemUid    String
+  newsItem       TeamNewsItem          @relation(fields: [newsItemUid], references: [uid], onDelete: Cascade)
+  choice         LabosDigestChoiceKind
+  /// Tags this choice added to / removed from `newsTags`, and added to / removed from `newsTagsMuted`.
+  addedTags      String[]
+  removedTags    String[]
+  mutedAdded     String[]
+  mutedRemoved   String[]
+  /// The stored lists before and after the choice. Null in `before*` means the key was absent.
+  beforeNewsTags Json?
+  beforeMuted    Json?
+  afterNewsTags  Json
+  afterMuted     Json
+  createdAt      DateTime              @default(now())
+  undoneAt       DateTime?
+
+  @@index([memberUid, newsItemUid])
   @@index([newsItemUid])
 }
 

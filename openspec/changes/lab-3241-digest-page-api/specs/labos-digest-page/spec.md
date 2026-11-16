@@ -28,7 +28,7 @@ A digest link token SHALL have the form `v1.<body>.<signature>`. `<body>` is the
 
 ### Requirement: Digest page read
 
-`POST v1/labos-digest/page` with `{ token }` SHALL return, without sign-in, the digest the token describes: `frequency`, `sentAt`, the member's first name, `stories` and `forumPosts`. `stories` SHALL list the token's news items in token order. Each has `uid`, `position`, `isTopStory` (true only for the item named in `l`), `title`, `summary`, `contentHtml`, the image, `sourceUrl`, `sourceDomain`, `teamName`, `eventType`, `tags` and `choice` (`more`, `less` or null, the member's active choice on that story). A news item that no longer exists SHALL be left out, and the others keep their order. `forumPosts` SHALL list the token's topics in token order, read from the forum as the token's member, each with `tid`, `title`, the author's name, role and avatar, the opening post's HTML and the forum URL. A topic the forum does not return SHALL be left out. A forum failure SHALL return the news with an empty `forumPosts` and `forumUnavailable: true`. The signed-in session, if any, SHALL NOT change the result. The response SHALL NOT be cached.
+`POST v1/labos-digest/page` with `{ token }` SHALL return, without sign-in, the digest the token describes: `frequency`, `sentAt`, the member's first name, `stories` and `forumPosts`. `stories` SHALL list the token's news items in token order. Each has `uid`, `position`, `isTopStory` (true only for the item named in `l`), `title`, `summary`, `contentHtml`, the image, `sourceUrl`, `sourceDomain`, `teamName`, `eventType`, `tags` and `choice` (`more`, `less` or null, the member's active choice on that story). A news item that no longer exists SHALL be left out, and the others keep their order. `forumPosts` SHALL list the token's topics in token order, read from the forum with the backend's forum API key (`FORUM_API_KEY`), and only the topics the token names, each with `tid`, `title`, the author's name, role and avatar, the opening post's HTML and the forum URL. A topic the forum does not return SHALL be left out. A forum failure SHALL return the news with an empty `forumPosts` and `forumUnavailable: true`. The signed-in session, if any, SHALL NOT change the result. The response SHALL NOT be cached.
 
 #### Scenario: Stories in email order
 
@@ -47,6 +47,12 @@ A digest link token SHALL have the form `v1.<body>.<signature>`. `<body>` is the
 - **GIVEN** news item A in the token was deleted
 - **WHEN** the page is read
 - **THEN** the other stories are returned in order, and A is not
+
+#### Scenario: Forum not set up
+
+- **GIVEN** the environment has no `FORUM_API_URL` or `FORUM_API_KEY`
+- **WHEN** the page is read
+- **THEN** the stories are returned, `forumPosts` is empty and `forumUnavailable` is true
 
 #### Scenario: Forum down
 
