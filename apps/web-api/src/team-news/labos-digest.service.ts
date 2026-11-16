@@ -3,6 +3,7 @@ import { LabosDigestFrequency, LabosDigestPickSource, Prisma } from '@prisma/cli
 import { EDITORIAL_RANK_LIMIT } from './team-news-trending-seed.util';
 import { TEAM_NEWS_EXCLUDED_TEAM_NAMES } from './team-news-public-list.config';
 import { extractDomain } from './utils/url-normalize';
+import { TEAM_NEWS_IMAGE_SELECT, toNewsImageDto } from './utils/news-image-variants';
 import { isSafeHttpUrl } from './team-news-body-html.util';
 import { TeamNewsService } from './team-news.service';
 import { PrismaService } from '../shared/prisma.service';
@@ -48,6 +49,7 @@ const NEWS_DETAIL_SELECT = {
   sourceUrls: true,
   sourceDomain: true,
   imageUrl: true,
+  ...TEAM_NEWS_IMAGE_SELECT,
   eventDate: true,
   tags: true,
   team: { select: { uid: true, name: true } },
@@ -442,6 +444,7 @@ function toNewsDetail(
     sourceUrls,
     sourceDomain: row.sourceDomain,
     imageUrl: row.imageUrl,
+    image: toNewsImageDto(row.image),
     eventDate: row.eventDate.toISOString(),
     tags: row.tags,
     team: { uid: row.team.uid, name: row.team.name },

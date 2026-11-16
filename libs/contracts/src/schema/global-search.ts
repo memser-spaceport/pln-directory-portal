@@ -53,6 +53,11 @@ export const SearchResultItemSchema = z.object({
   officeHoursUrl: z.string().optional(),
   availableToConnect: z.boolean().optional(),
 
+  // Admin-only access fields (LAB-3252). Present only when a directory admin searches.
+  accessLevel: z.string().nullable().optional(), // teams: L0, L1 or null
+  memberState: z.enum(['PENDING', 'VERIFIED', 'APPROVED', 'REJECTED']).optional(), // members
+  isJobAspirant: z.boolean().optional(), // members
+
   // Forum thread extras (one document per thread)
   topicTitle: z.string().optional(),
   topicSlug: z.string().optional(),

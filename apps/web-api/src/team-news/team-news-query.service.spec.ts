@@ -230,6 +230,53 @@ describe('TeamNewsQueryService — viewCount', () => {
     expect(result.items[0].imageUrl).toBeNull();
   });
 
+  it('maps the resized copies onto image, narrowest first, next to imageUrl (LAB-3135)', async () => {
+    teamNewsItemFindMany.mockResolvedValue([
+      makeRow({
+        imageUrl: 'https://cdn.example.com/og.jpg',
+        image: {
+          width: 1120,
+          height: 630,
+          url: 'https://s3/team-news/news-1/1120.jpg',
+          thumbnails: [
+            { width: 800, url: 'https://s3/team-news/news-1/800.jpg' },
+            { width: 400, url: 'https://s3/team-news/news-1/400.jpg' },
+          ],
+        },
+      }),
+    ]);
+
+    const result = await service.listTeamNewsByTeam('team-1', { page: 1, limit: 50 });
+
+    expect(result.items[0].imageUrl).toBe('https://cdn.example.com/og.jpg');
+    expect(result.items[0].image).toEqual({
+      width: 1120,
+      height: 630,
+      variants: [
+        { width: 400, url: 'https://s3/team-news/news-1/400.jpg' },
+        { width: 800, url: 'https://s3/team-news/news-1/800.jpg' },
+        { width: 1120, url: 'https://s3/team-news/news-1/1120.jpg' },
+      ],
+    });
+    expect(teamNewsItemFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          image: {
+            select: { width: true, height: true, url: true, thumbnails: { select: { width: true, url: true } } },
+          },
+        }),
+      })
+    );
+  });
+
+  it('returns image null when the row has no copy', async () => {
+    teamNewsItemFindMany.mockResolvedValue([makeRow({ imageUrl: 'https://cdn.example.com/og.jpg', image: null })]);
+
+    const result = await service.listTeamNewsByTeam('team-1', { page: 1, limit: 50 });
+
+    expect(result.items[0].image).toBeNull();
+  });
+
   it('defaults viewCount to 0 for an item with no impressions yet', async () => {
     const result = await service.listTeamNewsByTeam('team-1', { page: 1, limit: 50 });
 

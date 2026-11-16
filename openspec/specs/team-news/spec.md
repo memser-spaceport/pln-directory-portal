@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The team-news seed ranks a 14-day window into Top stories and Popular this week. Top stories use `editorialRank`. Popular this week uses synthetic upvotes from that seed. The news feed still lists every story. It also covers the news tags members can choose, and how the API stores and returns each member's tags for For You and the digest.
+The team-news seed ranks a 14-day window into Top stories and Popular this week. Top stories use `editorialRank`. Popular this week uses synthetic upvotes from that seed. The news feed still lists every story. It also covers the news tags members can choose, and how the API stores and returns each member's tags for For You and the digest. It also covers the resized copies of each news image that the API returns for `srcset`.
 
 ## Requirements
 
@@ -83,7 +83,7 @@ The API SHALL list the news tags members can choose: every focus area whose slug
 
 ### Requirement: Member news tags
 
-A member's chosen news tags SHALL be stored as a list of focus-area slugs. Saving the list SHALL replace the previous list and leave every other preference unchanged. A list with a slug that is not a focus-area slug SHALL be rejected with 400, and nothing SHALL be stored. An empty list SHALL be stored as a valid choice.
+A member's chosen news tags SHALL be stored as a list of focus-area slugs. Saving the list SHALL replace the previous list and leave every other preference unchanged. A list with a slug that is not a focus-area slug SHALL be rejected with 400, and nothing SHALL be stored. An empty list SHALL be stored as a valid choice. A stored empty list SHALL be read as no saved tags: the member gets their starting tags.
 
 #### Scenario: Save tags
 
@@ -98,8 +98,9 @@ A member's chosen news tags SHALL be stored as a list of focus-area slugs. Savin
 
 #### Scenario: Remove every tag
 
-- **WHEN** a member saves `[]`
-- **THEN** reading their preferences returns `newsTags` `[]` with no seeded marker
+- **GIVEN** a member of a team with the focus areas DeSci and AI, and profile starting tags are disabled
+- **WHEN** they save `[]`
+- **THEN** the save is accepted, the stored list is `[]`, and reading their preferences returns `newsTags` `["desci", "ai"]` (in any order) with `newsTagsSeeded: true`
 
 ### Requirement: Member news category tags
 
@@ -129,7 +130,7 @@ A member's chosen news category tags SHALL be stored as `newsCategoryTags`. The 
 
 ### Requirement: Starting tags
 
-When a member has never saved news tags, reading their preferences SHALL return starting tags and `newsTagsSeeded: true`. When profile starting tags are enabled and the member's interest profile has topics with a positive score that are news tags, the starting tags SHALL be the 5 highest-scored of those topics. Otherwise the starting tags SHALL be the slugs of the focus areas of the teams they belong to. Reading SHALL NOT store anything. Once the member saves any list, including an empty one, that list SHALL be returned without the seeded marker.
+When a member has no saved news tags (they never saved a list, or their saved list is empty), reading their preferences SHALL return starting tags and `newsTagsSeeded: true`. When profile starting tags are enabled and the member's interest profile has topics with a positive score that are news tags, the starting tags SHALL be the 5 highest-scored of those topics. Otherwise the starting tags SHALL be the slugs of the focus areas of the teams they belong to. Reading SHALL NOT store anything. Once the member saves a list with 1 or more tags, that list SHALL be returned without the seeded marker.
 
 #### Scenario: Never saved
 
@@ -163,9 +164,27 @@ When a member has never saved news tags, reading their preferences SHALL return 
 
 #### Scenario: Saved tags win over the profile
 
-- **GIVEN** profile starting tags are enabled and a member saved the tags `defi`, or saved an empty list
+- **GIVEN** profile starting tags are enabled and a member saved the tags `defi` and `desci`
 - **WHEN** their profile later gains the topic `ai` and their preferences are read
-- **THEN** `newsTags` is the saved list unchanged, with no seeded marker
+- **THEN** `newsTags` is `["defi", "desci"]`, with no seeded marker
+
+#### Scenario: Saved empty list, profile topics
+
+- **GIVEN** profile starting tags are enabled and a member with the profile topic `ai` saved an empty list
+- **WHEN** their preferences are read
+- **THEN** `newsTags` is `["ai"]`, `newsTagsSeeded` is `true`, and the stored list is still `[]`
+
+#### Scenario: Saved empty list, no profile
+
+- **GIVEN** a member of a team with the focus areas DeSci and AI, with no interest profile, saved an empty list
+- **WHEN** their preferences are read, with profile starting tags enabled or disabled
+- **THEN** `newsTags` is `["desci", "ai"]` (in any order) and `newsTagsSeeded` is `true`
+
+#### Scenario: Saved empty list, no team and no profile
+
+- **GIVEN** a member on no team and with no interest profile saved an empty list
+- **WHEN** their preferences are read
+- **THEN** `newsTags` is `[]` and `newsTagsSeeded` is `true`
 
 #### Scenario: Reading does not store
 
@@ -175,19 +194,26 @@ When a member has never saved news tags, reading their preferences SHALL return 
 
 #### Scenario: Same starting tags everywhere
 
-- **GIVEN** profile starting tags are enabled and a member who never saved news tags has the profile topic `ai`
+- **GIVEN** profile starting tags are enabled and a member who never saved news tags, or saved an empty list, has the profile topic `ai`
 - **WHEN** they load the grouped home feed, or their digest picks are built with news tag picks enabled
 - **THEN** their effective tags are `ai` and the focus areas under it, the same starting tags the preferences read returns
 
 ### Requirement: For You tag fields
 
-The home feed's grouped news response SHALL include, for a signed-in viewer, the viewer's effective news tags (their saved tags, or their starting tags when they never saved any, with every parent focus area expanded to the focus areas under it), the uids of the teams they belong to or follow, and the viewer's saved `newsCategoryTags` (`[]` when they never saved any). For a signed-out viewer the tags, own teams and category tags SHALL be empty. The existing For You team list SHALL be unchanged.
+The home feed's grouped news response SHALL include, for a signed-in viewer, the viewer's effective news tags (their saved tags, or their starting tags when they have no saved tags, with every parent focus area expanded to the focus areas under it) and the uids of the teams they belong to or follow. For a signed-out viewer both SHALL be empty. The existing For You team list SHALL be unchanged.
+
 
 #### Scenario: Signed-in viewer
 
 - **GIVEN** a member who saved the tag Digital Human Rights and belongs to team A
 - **WHEN** they load the grouped home feed
 - **THEN** the tags include `digital-human-rights` and the focus areas under it, and the own teams include team A
+
+#### Scenario: Viewer who removed every tag
+
+- **GIVEN** a member of a team with the focus area AI who saved an empty list, and profile starting tags are disabled
+- **WHEN** they load the grouped home feed
+- **THEN** the tags include `ai` and the focus areas under it
 
 #### Scenario: Signed-out viewer
 
@@ -330,3 +356,31 @@ A service that sends `Authorization: Basic` or `Bearer` with `INTERNAL_SERVICE_S
 
 - **WHEN** the call has no key or a wrong key
 - **THEN** the API returns 401
+
+### Requirement: Resized copies of each news image
+
+When the system finds an og:image for a team news item, it SHALL download the image and keep its own 16:9 JPEG copies in the image bucket (`AWS_S3_IMAGE_BUCKET_NAME`) under `team-news/<uid>/<width>.jpg`. The download SHALL use the same public-host checks as the og:image fetch, for the URL and each redirect. The download SHALL accept only an `image/*` answer of 10 MB or less within 10 seconds. The system SHALL crop the image to 16:9 at the centre and SHALL store the cropped original. It SHALL also store a copy at each of the widths 400, 800, 1200 and 1800 that is smaller than the cropped original. The copies SHALL be JPEG at quality 80, because Outlook desktop cannot show WebP. The original SHALL be an `Image` row with version `ORIGINAL`, and the copies SHALL be its thumbnails. The news item SHALL link the original through `imageUid`.
+
+The team news DTOs (`TeamNewsItemSchema`) and the digest news detail (`LabosDigestNewsDetailSchema`) SHALL return `image: { width, height, variants: [{ width, url }] }` next to `imageUrl`. `width` and `height` SHALL be the stored original size. `variants` SHALL list every stored copy, the original included, narrowest first. `image` SHALL be null when no copy exists. `imageUrl` SHALL not change.
+
+A failed download, resize, upload or link SHALL keep `imageUrl` as it is and `image` null. The failure SHALL be logged and SHALL never fail the publish path. With no image bucket set, the system SHALL make no copies.
+
+The backfill script `yarn api:backfill-team-news-images -- --variants` SHALL make the copies for items that have an `imageUrl` and no copy. It SHALL process only items with an `eventDate` in the last 90 days. A `--days` value above 90 SHALL be refused. `--dry-run` SHALL list the items and write nothing.
+
+#### Scenario: A 1200 × 630 og:image
+
+- **WHEN** a news item gets a 1200 × 630 og:image
+- **THEN** the system stores a 1120 × 630 original and 400 and 800 wide copies
+- **AND** the DTO `image.variants` lists the 400, 800 and 1120 wide copies in that order
+
+#### Scenario: The image cannot be downloaded
+
+- **WHEN** the og:image download fails or the answer is not an image
+- **THEN** the item keeps its `imageUrl`
+- **AND** the DTO `image` is null
+
+#### Scenario: Backfill window
+
+- **WHEN** an admin runs the backfill with `--variants`
+- **THEN** only items with an `eventDate` in the last 90 days, an `imageUrl` and no copy get copies
+- **AND** a second run does nothing for the items that got copies

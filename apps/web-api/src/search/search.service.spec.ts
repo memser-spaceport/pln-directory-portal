@@ -129,3 +129,60 @@ describe('SearchService email lookup (LAB-2881)', () => {
     expect(result.top).toEqual([]);
   });
 });
+
+describe('SearchService.addAdminAccessFields (LAB-3252)', () => {
+  const teamFindMany = jest.fn();
+  const memberFindMany = jest.fn();
+  const policyAssignmentFindMany = jest.fn();
+  const prismaMock = {
+    team: { findMany: teamFindMany },
+    member: { findMany: memberFindMany },
+    policyAssignment: { findMany: policyAssignmentFindMany },
+  } as unknown as PrismaService;
+  const service = new SearchService({} as OpenSearchService, prismaMock);
+
+  const item = (uid: string, index: string) => ({ uid, name: uid, image: '', index, matches: [] });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    teamFindMany.mockResolvedValue([
+      { uid: 'team-l1', accessLevel: 'L1' },
+      { uid: 'team-l0', accessLevel: 'L0' },
+      { uid: 'team-null', accessLevel: null },
+    ]);
+    memberFindMany.mockResolvedValue([
+      { uid: 'member-verified', memberApproval: { state: 'VERIFIED' } },
+      { uid: 'member-no-approval', memberApproval: null },
+    ]);
+    policyAssignmentFindMany.mockResolvedValue([{ memberUid: 'member-no-approval' }]);
+  });
+
+  it('adds the team level and the member state and Job Aspirant flag, also in top', async () => {
+    const result = await service.addAdminAccessFields({
+      events: [item('event-1', 'events')],
+      projects: [],
+      teams: [item('team-l1', 'teams'), item('team-l0', 'teams'), item('team-null', 'teams')],
+      members: [item('member-verified', 'members'), item('member-no-approval', 'members')],
+      forumThreads: [],
+      top: [item('member-verified', 'members'), item('team-l1', 'teams'), item('event-1', 'events')],
+    });
+
+    expect(result.teams.map((t) => t.accessLevel)).toEqual(['L1', 'L0', null]);
+    expect(result.members).toEqual([
+      expect.objectContaining({ uid: 'member-verified', memberState: 'VERIFIED', isJobAspirant: false }),
+      expect.objectContaining({ uid: 'member-no-approval', memberState: 'PENDING', isJobAspirant: true }),
+    ]);
+    expect(result.top[0]).toMatchObject({ memberState: 'VERIFIED' });
+    expect(result.top[1]).toMatchObject({ accessLevel: 'L1' });
+    expect(result.top[2]).not.toHaveProperty('accessLevel');
+    expect(result.events[0]).not.toHaveProperty('accessLevel');
+  });
+
+  it('skips the database when there are no teams or members', async () => {
+    const empty = { events: [], projects: [], teams: [], members: [], forumThreads: [], top: [] };
+
+    expect(await service.addAdminAccessFields(empty)).toBe(empty);
+    expect(teamFindMany).not.toHaveBeenCalled();
+    expect(memberFindMany).not.toHaveBeenCalled();
+  });
+});

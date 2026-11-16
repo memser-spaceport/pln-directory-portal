@@ -7,6 +7,8 @@ import {
   decodeHtmlEntities,
   extractSocialImageUrl,
   fetchOgImageUrl,
+  fetchPublicImage,
+  IMAGE_FETCH_MAX_BYTES,
   isAllowedOgPageUrl,
   isNonPublicAddress,
 } from './og-image';
@@ -276,5 +278,103 @@ describe('fetchOgImageUrl', () => {
     });
     await expect(fetchOgImageUrl('https://news.example.com/a')).resolves.toBeNull();
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('fetchPublicImage', () => {
+  const originalFetch = global.fetch;
+  let fetchMock: jest.Mock;
+
+  const imageResponse = (bytes: Buffer, init: { contentType?: string; status?: number; length?: number } = {}) => ({
+    ok: (init.status ?? 200) >= 200 && (init.status ?? 200) < 300,
+    status: init.status ?? 200,
+    url: '',
+    headers: fakeHeaders({
+      'content-type': init.contentType ?? 'image/jpeg',
+      ...(init.length !== undefined ? { 'content-length': String(init.length) } : {}),
+    }),
+    arrayBuffer: jest.fn().mockResolvedValue(bytes),
+  });
+
+  beforeEach(() => {
+    lookupMock.mockReset();
+    lookupMock.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
+    fetchMock = jest.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('returns the image bytes and asks for an image', async () => {
+    fetchMock.mockResolvedValue(imageResponse(Buffer.from('jpeg-bytes')));
+    await expect(fetchPublicImage('https://cdn.example.com/a.jpg')).resolves.toEqual(Buffer.from('jpeg-bytes'));
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://cdn.example.com/a.jpg',
+      expect.objectContaining({ redirect: 'manual', headers: expect.objectContaining({ Accept: 'image/*' }) })
+    );
+  });
+
+  it.each(['http://cdn.example.com/a.jpg', 'https://127.0.0.1/a.jpg', 'https://localhost/a.jpg', ''])(
+    'makes no request for %s',
+    async (url) => {
+      await expect(fetchPublicImage(url)).resolves.toBeNull();
+      expect(fetchMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('makes no request when the host resolves to a private address', async () => {
+    lookupMock.mockResolvedValue([{ address: '192.168.1.5', family: 4 }]);
+    await expect(fetchPublicImage('https://internal.example.com/a.jpg')).resolves.toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('returns null for an answer that is not an image', async () => {
+    fetchMock.mockResolvedValue(imageResponse(Buffer.from('<html>'), { contentType: 'text/html' }));
+    await expect(fetchPublicImage('https://cdn.example.com/a.jpg')).resolves.toBeNull();
+  });
+
+  it('returns null for an error status', async () => {
+    fetchMock.mockResolvedValue(imageResponse(Buffer.alloc(0), { status: 404 }));
+    await expect(fetchPublicImage('https://cdn.example.com/a.jpg')).resolves.toBeNull();
+  });
+
+  it('returns null when the declared size is over the limit', async () => {
+    const response = imageResponse(Buffer.alloc(1), { length: IMAGE_FETCH_MAX_BYTES + 1 });
+    fetchMock.mockResolvedValue(response);
+    await expect(fetchPublicImage('https://cdn.example.com/a.jpg')).resolves.toBeNull();
+    expect(response.arrayBuffer).not.toHaveBeenCalled();
+  });
+
+  it('stops a streamed body past the limit', async () => {
+    const cancel = jest.fn().mockResolvedValue(undefined);
+    fetchMock.mockResolvedValue({
+      ...imageResponse(Buffer.alloc(0)),
+      body: {
+        getReader: () => ({
+          read: jest.fn(async () => ({ done: false, value: new Uint8Array(600) })),
+          cancel,
+        }),
+      },
+    });
+    await expect(fetchPublicImage('https://cdn.example.com/a.jpg', 1000)).resolves.toBeNull();
+    expect(cancel).toHaveBeenCalled();
+  });
+
+  it('does not follow a redirect to a refused host', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 302,
+      url: '',
+      headers: fakeHeaders({ location: 'https://10.0.0.1/a.jpg' }),
+    });
+    await expect(fetchPublicImage('https://cdn.example.com/a.jpg')).resolves.toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns null when the request fails', async () => {
+    fetchMock.mockRejectedValue(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+    await expect(fetchPublicImage('https://cdn.example.com/a.jpg')).resolves.toBeNull();
   });
 });
