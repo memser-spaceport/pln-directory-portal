@@ -35,6 +35,7 @@ describe('loadProfileBatch (LAB-3122)', () => {
         ]),
       },
       projectFocusArea: { findMany: findMany() },
+      pLEventAssociation: { findMany: findMany() },
     };
   }
 
@@ -90,5 +91,38 @@ describe('loadProfileBatch (LAB-3122)', () => {
     );
 
     expect(lookups.isExcludedMember('ghost')).toBe(true);
+  });
+
+  it('loads the linked teams of viewed events, without attendee links and deleted events (LAB-3267)', async () => {
+    const p = prisma();
+    p.memberSignal.findMany = findMany([
+      { memberUid: 'm1', action: 'view', entityType: 'EVENT', entityUid: 'e1', own: false, createdAt: NOW },
+      { memberUid: 'm1', action: 'view', entityType: 'EVENT', entityUid: 'e-deleted', own: false, createdAt: NOW },
+    ]);
+    // The query filters roles and deleted events, so only the host link of e1 comes back.
+    p.pLEventAssociation.findMany = findMany([{ eventUid: 'e1', teamUid: 't9' }]);
+
+    const { lookups } = await loadProfileBatch(
+      p as never,
+      [{ uid: 'm1', preferences: null, customSkills: [], ohInterest: [], skills: [] }],
+      buildNewsTagVocabulary([]),
+      NOW
+    );
+
+    expect(p.pLEventAssociation.findMany).toHaveBeenCalledWith({
+      where: {
+        eventUid: { in: ['e1', 'e-deleted'] },
+        entityType: 'TEAM',
+        teamUid: { not: null },
+        role: { in: ['HOST', 'CO_HOST', 'SPEAKER', 'SPONSOR'] },
+        event: { isDeleted: false },
+      },
+      select: { eventUid: true, teamUid: true },
+    });
+    expect(lookups.eventTeams('e1')).toEqual(['t9']);
+    expect(lookups.eventTeams('e-deleted')).toEqual([]);
+    expect(p.teamFocusArea.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { teamUid: { in: expect.arrayContaining(['t9']) } } })
+    );
   });
 });
