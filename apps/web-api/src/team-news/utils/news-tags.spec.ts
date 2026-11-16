@@ -5,6 +5,7 @@ import {
   isNewsTagPicksEnabled,
   parseNewsTags,
   readChosenNewsTags,
+  readMutedNewsTags,
   readStoredNewsTags,
   resolveNewsTags,
 } from './news-tags';
@@ -124,5 +125,29 @@ describe('isNewsProfileStartingTagsEnabled (LAB-3199)', () => {
     expect(isNewsProfileStartingTagsEnabled({ NEWS_PROFILE_STARTING_TAGS_ENABLED: value } as NodeJS.ProcessEnv)).toBe(
       expected
     );
+  });
+});
+
+describe('muted news tags (LAB-3263)', () => {
+  it('reads a missing key as an empty list', () => {
+    expect(readMutedNewsTags({ newsTags: ['ai'] })).toEqual([]);
+    expect(readMutedNewsTags(null)).toEqual([]);
+  });
+
+  it('reads the stored list', () => {
+    expect(readMutedNewsTags({ newsTagsMuted: ['ai', 3] })).toEqual(['ai']);
+  });
+
+  it('never returns a muted tag as a starting tag', async () => {
+    await expect(resolveNewsTags({ newsTagsMuted: ['ai'] }, async () => ['ai', 'desci'])).resolves.toEqual({
+      newsTags: ['desci'],
+      newsTagsSeeded: true,
+    });
+  });
+
+  it('leaves a muted tag out of the saved list too', async () => {
+    await expect(
+      resolveNewsTags({ newsTags: ['ai', 'desci'], newsTagsMuted: ['ai'] }, async () => [])
+    ).resolves.toEqual({ newsTags: ['desci'] });
   });
 });

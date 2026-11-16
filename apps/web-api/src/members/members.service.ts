@@ -27,7 +27,7 @@ import { hashFileName } from '../utils/hashing';
 import { buildMultiRelationMapping, copyObj } from '../utils/helper/helper';
 import { CacheService } from '../utils/cache/cache.service';
 import { MembersHooksService } from './members.hooks.service';
-import { toPreferencePatch } from './member-preferences';
+import { toPreferencePatch, unmutePickedNewsTags } from './member-preferences';
 import { NewsTagVocabularyService } from '../team-news/news-tag-vocabulary.service';
 import { resolveNewsTags } from '../team-news/utils/news-tags';
 import { readNewsCategoryTags } from '../team-news/utils/news-category-tags';
@@ -1814,10 +1814,16 @@ export class MembersService {
   async updatePreference(id: string, preferences: any): Promise<Member> {
     // Loaded only when needed: most saves don't carry news tags (LAB-2998).
     const vocabulary =
-      preferences && typeof preferences === 'object' && 'newsTags' in preferences
+      preferences && typeof preferences === 'object' && ('newsTags' in preferences || 'newsTagsMuted' in preferences)
         ? await this.newsTagVocabulary.getVocabulary()
         : undefined;
     const patch = toPreferencePatch(preferences, vocabulary);
+    /* LAB-3263: a tag the member picks again on News preferences is no longer
+       muted by an earlier "Less like this". */
+    if (Array.isArray(patch.newsTags) && !('newsTagsMuted' in patch)) {
+      const current = await this.prisma.member.findUnique({ where: { uid: id }, select: { preferences: true } });
+      Object.assign(patch, unmutePickedNewsTags(patch, current?.preferences));
+    }
 
     const updated = await this.prisma.$executeRaw`
       UPDATE "Member"

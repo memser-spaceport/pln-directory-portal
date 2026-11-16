@@ -10,6 +10,9 @@ import { TeamNewsController } from './team-news.controller';
 import { TeamNewsServiceController } from './team-news-service.controller';
 import { LabosDigestAdminController } from './labos-digest-admin.controller';
 import { LabosDigestServiceController } from './labos-digest-service.controller';
+import { LabosDigestPublicController } from './labos-digest-public.controller';
+import { LabosDigestPageService } from './labos-digest-page.service';
+import { LabosDigestForumReader } from './labos-digest-forum.reader';
 import { LabosDigestService } from './labos-digest.service';
 import { TeamNewsService } from './team-news.service';
 import { TeamNewsQueryService } from './team-news-query.service';
@@ -37,11 +40,14 @@ import { NewsDefaultTagsJob } from './news-default-tags.job';
     TeamNewsServiceController,
     LabosDigestAdminController,
     LabosDigestServiceController,
+    LabosDigestPublicController,
   ],
   providers: [
     AdminAuthGuard,
     JwtService,
     LabosDigestService,
+    LabosDigestPageService,
+    LabosDigestForumReader,
     TeamNewsService,
     TeamNewsQueryService,
     TeamNewsEnrichmentService,
