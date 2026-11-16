@@ -11,6 +11,7 @@ import { createForestAdminAgent } from './utils/forest-admin/agent';
 import { SetupService } from './setup.service';
 import { setupSwagger } from './swagger/swagger.setup';
 
+// trigger redeploy
 export async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: new SetupService().setupLog(),
