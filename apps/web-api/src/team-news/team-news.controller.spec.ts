@@ -79,6 +79,7 @@ describe('TeamNewsController default tags routes', () => {
       method: 'POST',
       path: '/v1/team-news/default-tags/approve',
     });
+    expect(decoratorsOf('approveTeamNewsDefaultTags')).toContain('@HttpCode(200)');
     const handler = source.slice(source.indexOf('@Api(server.route.approveTeamNewsDefaultTags)'));
     expect(handler.slice(0, handler.indexOf('@Api(', 5))).toContain('throw new BadRequestException(');
   });
