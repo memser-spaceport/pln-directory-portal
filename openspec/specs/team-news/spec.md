@@ -3,9 +3,7 @@
 ## Purpose
 
 The team-news seed ranks a 14-day window into Top stories and Popular this week. Top stories use `editorialRank`. Popular this week uses synthetic upvotes from that seed. The news feed still lists every story. It also covers the news tags members can choose, and how the API stores and returns each member's tags for For You and the digest. It also covers the resized copies of each news image that the API returns for `srcset`.
-
 ## Requirements
-
 ### Requirement: Story picking uses Claude Opus 5.5
 
 `POST /v1/service/team-news/seed-trending` SHALL rank stories with Claude Opus 5.5 (`claude-opus-5-5`). The call SHALL use the Anthropic provider. The call SHALL NOT follow `AI_PROVIDER` or `CLAUDE_MODEL`. The model SHALL reply with one JSON object whose keys are `editorialUids`, `likedUids`, and `excludedUids`. The system SHALL store ranks only when that object matches the ranking schema. A reply that does not match SHALL leave the current ranks unchanged.
@@ -202,7 +200,6 @@ When a member has no saved news tags (they never saved a list, or their saved li
 
 The home feed's grouped news response SHALL include, for a signed-in viewer, the viewer's effective news tags (their saved tags, or their starting tags when they have no saved tags, with every parent focus area expanded to the focus areas under it) and the uids of the teams they belong to or follow. For a signed-out viewer both SHALL be empty. The existing For You team list SHALL be unchanged.
 
-
 #### Scenario: Signed-in viewer
 
 - **GIVEN** a member who saved the tag Digital Human Rights and belongs to team A
@@ -384,3 +381,47 @@ The backfill script `yarn api:backfill-team-news-images -- --variants` SHALL mak
 - **WHEN** an admin runs the backfill with `--variants`
 - **THEN** only items with an `eventDate` in the last 90 days, an `imageUrl` and no copy get copies
 - **AND** a second run does nothing for the items that got copies
+
+### Requirement: Muted news tags
+
+A member's muted news tags SHALL be stored as `newsTagsMuted`, a list of focus-area slugs, next to `newsTags`. Saving preferences with `newsTagsMuted` SHALL validate it the same way as `newsTags`: a slug that is not a focus area is rejected with 400 and nothing is stored. A member's effective news tags SHALL be their saved or starting tags, expanded as before, minus their muted tags and the children of a muted parent. A muted tag SHALL NOT come back as a starting tag. Saving `newsTags` without `newsTagsMuted` SHALL unmute every tag in the saved list, so a tag the member picks again on News preferences counts again.
+
+#### Scenario: Muted starting tag
+
+- **GIVEN** a member with no saved news tags, starting tags `["ai", "desci"]` and muted tags `["ai"]`
+- **WHEN** their effective tags are read
+- **THEN** they are `["desci"]`
+
+#### Scenario: Picked again on News preferences
+
+- **GIVEN** a member who muted `ai`
+- **WHEN** they save `newsTags` `["ai", "desci"]`
+- **THEN** `ai` is no longer muted
+
+#### Scenario: Unknown muted slug
+
+- **WHEN** a member saves `newsTagsMuted` `["not-a-focus-area"]`
+- **THEN** the request is rejected with 400 and nothing is stored
+
+### Requirement: Digest tag picks skip muted tags
+
+When news tag picks are enabled, a member's digest picks SHALL leave out every story that has one of the member's muted tags, unless the story is from a team the member belongs to or follows. The fallback to the newest network stories SHALL leave those stories out as well. When news tag picks are disabled, picks SHALL be exactly as before. The top story SHALL be the same for everyone.
+
+#### Scenario: Muted tag from an unrelated team
+
+- **GIVEN** news tag picks are enabled and a member who muted `ai`
+- **WHEN** a story tagged `ai` from a team they neither belong to nor follow is in the window
+- **THEN** it is not picked for them, not even as a fallback
+
+#### Scenario: Muted tag from a followed team
+
+- **GIVEN** news tag picks are enabled and a member who muted `ai` and follows team T
+- **WHEN** team T has a story tagged `ai` in the window
+- **THEN** it can still be picked for them
+
+#### Scenario: Picks disabled
+
+- **GIVEN** news tag picks are disabled and a member who muted `ai`
+- **WHEN** digest picks are built
+- **THEN** they are the same as before this change
+
