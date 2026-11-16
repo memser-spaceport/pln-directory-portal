@@ -359,7 +359,7 @@ A service that sends `Authorization: Basic` or `Bearer` with `INTERNAL_SERVICE_S
 
 ### Requirement: Resized copies of each news image
 
-When the system finds an og:image for a team news item, it SHALL download the image and keep its own 16:9 JPEG copies in the image bucket (`AWS_S3_IMAGE_BUCKET_NAME`) under `team-news/<uid>/<width>.jpg`. The download SHALL use the same public-host checks as the og:image fetch, for the URL and each redirect. The download SHALL accept only an `image/*` answer of 10 MB or less within 10 seconds. The system SHALL crop the image to 16:9 at the centre and SHALL store the cropped original. It SHALL also store a copy at each of the widths 400, 800, 1200 and 1800 that is smaller than the cropped original. The copies SHALL be JPEG at quality 80, because Outlook desktop cannot show WebP. The original SHALL be an `Image` row with version `ORIGINAL`, and the copies SHALL be its thumbnails. The news item SHALL link the original through `imageUid`.
+When the system finds an og:image for a team news item, it SHALL download the image and keep its own 16:9 JPEG copies in the image bucket (`AWS_S3_IMAGE_BUCKET_NAME`) under `team-news/<uid>/<width>.jpg`. The download SHALL use the same public-host checks as the og:image fetch, for the URL and each redirect. The download SHALL accept an answer of 10 MB or less within 10 seconds. The answer SHALL have an `image/*` content type. Alternatively, it SHALL have no content type or `application/octet-stream`, and its first bytes SHALL match JPEG, PNG, GIF, WebP or AVIF. The system SHALL crop the image to 16:9 at the centre and SHALL store the cropped original. It SHALL also store a copy at each of the widths 400, 800, 1200 and 1800 that is smaller than the cropped original. The copies SHALL be JPEG at quality 80, because Outlook desktop cannot show WebP. The original SHALL be an `Image` row with version `ORIGINAL`, and the copies SHALL be its thumbnails. The news item SHALL link the original through `imageUid`.
 
 The team news DTOs (`TeamNewsItemSchema`) and the digest news detail (`LabosDigestNewsDetailSchema`) SHALL return `image: { width, height, variants: [{ width, url }] }` next to `imageUrl`. `width` and `height` SHALL be the stored original size. `variants` SHALL list every stored copy, the original included, narrowest first. `image` SHALL be null when no copy exists. `imageUrl` SHALL not change.
 
@@ -378,6 +378,11 @@ The backfill script `yarn api:backfill-team-news-images -- --variants` SHALL mak
 - **WHEN** the og:image download fails or the answer is not an image
 - **THEN** the item keeps its `imageUrl`
 - **AND** the DTO `image` is null
+
+#### Scenario: An image with a generic content type
+
+- **WHEN** the host sends WebP bytes with `application/octet-stream` or no content type
+- **THEN** the system stores the copies
 
 #### Scenario: Backfill window
 
