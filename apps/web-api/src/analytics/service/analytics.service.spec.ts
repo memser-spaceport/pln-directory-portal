@@ -40,6 +40,28 @@ describe('AnalyticsService', () => {
     expect(posthog.trackEvent).toHaveBeenCalledWith(event);
   });
 
+  it('sends an ai_app event to PostHog when the database provider is selected', async () => {
+    const { analytics, db, posthog } = service(ANALYTICS_PROVIDER.DB);
+    const event = {
+      name: 'ai_app_opened',
+      distinctId: 'member-1',
+      properties: { source: 'ai-app', appId: 'pl-infra-definitions' },
+    };
+
+    await analytics.trackEvent(event);
+
+    expect(db.trackEvent).toHaveBeenCalledWith(event);
+    expect(posthog.trackEvent).toHaveBeenCalledWith(event);
+  });
+
+  it('keeps an ai_apps_ server event off PostHog when the database provider is selected', async () => {
+    const { analytics, posthog } = service(ANALYTICS_PROVIDER.DB);
+
+    await analytics.trackEvent({ name: 'ai_apps_agent_feedback_submitted', distinctId: 'member-1' });
+
+    expect(posthog.trackEvent).not.toHaveBeenCalled();
+  });
+
   it('keeps a non-mcp event off PostHog when the database provider is selected', async () => {
     const { analytics, posthog, db } = service(ANALYTICS_PROVIDER.DB);
 
