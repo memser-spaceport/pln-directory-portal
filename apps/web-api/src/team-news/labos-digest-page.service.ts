@@ -62,8 +62,10 @@ export class LabosDigestPageService {
     if (!member) throw new NotFoundException('Digest not found');
 
     const itemByUid = new Map(items.map((item) => [item.uid, item]));
-    const choiceByUid = new Map(choices.map((c) => [c.newsItemUid, toChoiceValue(c.choice)]));
-    const stories = link.n.flatMap((uid, position) => {
+    const choiceByUid = new Map<string, LabosDigestChoiceValue>(
+      choices.map((c) => [c.newsItemUid, toChoiceValue(c.choice)])
+    );
+    const stories = link.n.flatMap((uid, position): LabosDigestPage['stories'] => {
       const item = itemByUid.get(uid);
       if (!item) return [];
       return [
