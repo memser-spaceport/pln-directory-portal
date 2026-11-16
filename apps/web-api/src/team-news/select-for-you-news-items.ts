@@ -28,12 +28,22 @@ export function selectForYouNewsItems<T extends { teamUid: string; eventDate: st
  * For You by news tags (LAB-2999): stories from the member's own or followed
  * teams, plus stories sharing any of their tags, then the latest story per team.
  * `tags` holds focus-area slugs only, so a legacy verb tag (`launch`) never matches.
+ * `categories` (LAB-3140) also keeps a story whose category the member picked.
+ * An empty set adds nothing.
  */
 export function selectNewsItemsByTagsAndTeams<
-  T extends { teamUid: string; eventDate: string; createdAt: string; tags?: string[] | null }
->(items: T[], ownTeamUids: ReadonlySet<string>, tags: ReadonlySet<string>): T[] {
+  T extends { teamUid: string; eventDate: string; createdAt: string; tags?: string[] | null; eventType?: string | null }
+>(
+  items: T[],
+  ownTeamUids: ReadonlySet<string>,
+  tags: ReadonlySet<string>,
+  categories: ReadonlySet<string> = new Set()
+): T[] {
   const matched = items.filter(
-    (item) => ownTeamUids.has(item.teamUid) || (item.tags ?? []).some((tag) => tags.has(tag.trim().toLowerCase()))
+    (item) =>
+      ownTeamUids.has(item.teamUid) ||
+      (item.tags ?? []).some((tag) => tags.has(tag.trim().toLowerCase())) ||
+      (categories.size > 0 && !!item.eventType && categories.has(item.eventType))
   );
   return selectForYouNewsItems(matched, new Set(matched.map((item) => item.teamUid)));
 }

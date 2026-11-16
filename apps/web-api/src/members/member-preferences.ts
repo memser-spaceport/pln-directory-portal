@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { parseNewsCategoryTags } from '../team-news/utils/news-category-tags';
 import { parseNewsCategories } from '../team-news/utils/news-categories';
 import { parseNewsTags } from '../team-news/utils/news-tags';
 import type { NewsTagVocabulary } from '../team-news/news-tag-vocabulary.service';
@@ -44,8 +45,8 @@ export const DERIVED_PREFERENCE_KEYS = [
  * @param newsTagVocabulary - The focus-area vocabulary, needed only when the body
  *   carries `newsTags`.
  * @throws BadRequestException when the body is not a plain object, or when it
- *   carries an invalid `newsCategories` (see parseNewsCategories) or `newsTags`
- *   (see parseNewsTags).
+ *   carries an invalid `newsCategories` (see parseNewsCategories), `newsCategoryTags`
+ *   (see parseNewsCategoryTags) or `newsTags` (see parseNewsTags).
  */
 export function toPreferencePatch(body: unknown, newsTagVocabulary?: NewsTagVocabulary): Record<string, unknown> {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
@@ -60,6 +61,9 @@ export function toPreferencePatch(body: unknown, newsTagVocabulary?: NewsTagVoca
      typo or an empty list must not reach the blob. */
   if ('newsCategories' in patch) {
     patch.newsCategories = parseNewsCategories(patch.newsCategories);
+  }
+  if ('newsCategoryTags' in patch) {
+    patch.newsCategoryTags = parseNewsCategoryTags(patch.newsCategoryTags);
   }
   // LAB-2998: For You and the digest match news on these, so only focus-area slugs reach the blob.
   if ('newsTags' in patch) {
