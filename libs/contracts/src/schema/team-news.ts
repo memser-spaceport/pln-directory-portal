@@ -713,3 +713,68 @@ export type TeamNewsCountsResponse = z.infer<typeof TeamNewsCountsResponseSchema
 export type CreateTeamNewsPostRequest = z.infer<typeof CreateTeamNewsPostRequestSchema>;
 export type SeedTeamNewsTrendingDto = z.infer<typeof SeedTeamNewsTrendingDtoSchema>;
 export type SeedTeamNewsTrendingResponse = z.infer<typeof SeedTeamNewsTrendingResponseSchema>;
+
+/* LAB-3263: the public digest page and its More / Less like this choices. The link token is the only credential. */
+
+export const LabosDigestPageRequestSchema = z.object({
+  token: z.string().min(1).max(4000),
+});
+
+export const LabosDigestChoiceValueSchema = z.enum(['more', 'less']);
+
+export const LabosDigestPageStorySchema = z.object({
+  uid: z.string(),
+  position: z.number().int(),
+  isTopStory: z.boolean(),
+  title: z.string(),
+  summary: z.string().nullable(),
+  contentHtml: z.string().nullable(),
+  image: TeamNewsImageSchema.nullable(),
+  imageUrl: z.string().nullable(),
+  sourceUrl: z.string(),
+  sourceDomain: z.string().nullable(),
+  teamUid: z.string(),
+  teamName: z.string(),
+  eventType: NewsEventTypeSchema,
+  tags: z.array(z.string()),
+  choice: LabosDigestChoiceValueSchema.nullable(),
+});
+
+export const LabosDigestPageForumPostSchema = z.object({
+  tid: z.number().int(),
+  title: z.string(),
+  authorName: z.string(),
+  authorRole: z.string().nullable(),
+  authorTeam: z.string().nullable(),
+  authorAvatarUrl: z.string().nullable(),
+  contentHtml: z.string(),
+  url: z.string(),
+});
+
+export const LabosDigestPageSchema = z.object({
+  frequency: LabosDigestFrequencySchema,
+  sentAt: z.string(),
+  firstName: z.string().nullable(),
+  stories: z.array(LabosDigestPageStorySchema),
+  forumPosts: z.array(LabosDigestPageForumPostSchema),
+  forumUnavailable: z.boolean(),
+});
+
+export const LabosDigestChoiceRequestSchema = z.object({
+  token: z.string().min(1).max(4000),
+  newsItemUid: z.string().min(1),
+  choice: z.enum(['more', 'less', 'none']),
+});
+
+export const LabosDigestChoiceResponseSchema = z.object({
+  newsItemUid: z.string(),
+  choice: LabosDigestChoiceValueSchema.nullable(),
+  changed: z.boolean(),
+});
+
+export type LabosDigestPage = z.infer<typeof LabosDigestPageSchema>;
+export type LabosDigestPageStory = z.infer<typeof LabosDigestPageStorySchema>;
+export type LabosDigestPageForumPost = z.infer<typeof LabosDigestPageForumPostSchema>;
+export type LabosDigestChoiceValue = z.infer<typeof LabosDigestChoiceValueSchema>;
+export type LabosDigestChoiceRequest = z.infer<typeof LabosDigestChoiceRequestSchema>;
+export type LabosDigestChoiceResponse = z.infer<typeof LabosDigestChoiceResponseSchema>;

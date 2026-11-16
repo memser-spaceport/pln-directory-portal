@@ -47,3 +47,18 @@ export function selectNewsItemsByTagsAndTeams<
   );
   return selectForYouNewsItems(matched, new Set(matched.map((item) => item.teamUid)));
 }
+
+/**
+ * Drops stories that carry one of the member's muted tags (LAB-3263), except
+ * stories from a team the member belongs to or follows.
+ */
+export function skipMutedNewsItems<T extends { teamUid: string; tags?: string[] | null }>(
+  items: T[],
+  ownTeamUids: ReadonlySet<string>,
+  mutedTags: ReadonlySet<string>
+): T[] {
+  if (mutedTags.size === 0) return items;
+  return items.filter(
+    (item) => ownTeamUids.has(item.teamUid) || !(item.tags ?? []).some((tag) => mutedTags.has(tag.trim().toLowerCase()))
+  );
+}

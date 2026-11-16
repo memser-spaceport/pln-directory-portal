@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { parseNewsCategoryTags } from '../team-news/utils/news-category-tags';
 import { parseNewsCategories } from '../team-news/utils/news-categories';
-import { parseNewsTags } from '../team-news/utils/news-tags';
+import { parseNewsTags, readMutedNewsTags } from '../team-news/utils/news-tags';
 import type { NewsTagVocabulary } from '../team-news/news-tag-vocabulary.service';
 
 /**
@@ -43,10 +43,10 @@ export const DERIVED_PREFERENCE_KEYS = [
  * reach a `jsonb` merge.
  *
  * @param newsTagVocabulary - The focus-area vocabulary, needed only when the body
- *   carries `newsTags`.
+ *   carries `newsTags` or `newsTagsMuted`.
  * @throws BadRequestException when the body is not a plain object, or when it
  *   carries an invalid `newsCategories` (see parseNewsCategories), `newsCategoryTags`
- *   (see parseNewsCategoryTags) or `newsTags` (see parseNewsTags).
+ *   (see parseNewsCategoryTags), `newsTags` or `newsTagsMuted` (see parseNewsTags).
  */
 export function toPreferencePatch(body: unknown, newsTagVocabulary?: NewsTagVocabulary): Record<string, unknown> {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
@@ -72,5 +72,28 @@ export function toPreferencePatch(body: unknown, newsTagVocabulary?: NewsTagVoca
     }
     patch.newsTags = parseNewsTags(patch.newsTags, newsTagVocabulary);
   }
+  // LAB-3263: muted tags ("Less like this") are focus-area slugs too.
+  if ('newsTagsMuted' in patch) {
+    if (!newsTagVocabulary) {
+      throw new Error('toPreferencePatch needs the news tag vocabulary to validate newsTagsMuted');
+    }
+    patch.newsTagsMuted = parseNewsTags(patch.newsTagsMuted, newsTagVocabulary);
+  }
   return patch;
+}
+
+/**
+ * LAB-3263: a tag the member picks again on News preferences is no longer muted
+ * by an earlier "Less like this". Returns `{ newsTagsMuted }` to add to a patch
+ * that saves `newsTags` without `newsTagsMuted`, or `{}` when nothing changes.
+ */
+export function unmutePickedNewsTags(
+  patch: Record<string, unknown>,
+  currentPreferences: unknown
+): { newsTagsMuted?: string[] } {
+  if (!Array.isArray(patch.newsTags) || 'newsTagsMuted' in patch) return {};
+  const picked = new Set(patch.newsTags as string[]);
+  const muted = readMutedNewsTags(currentPreferences);
+  if (!muted.some((tag) => picked.has(tag))) return {};
+  return { newsTagsMuted: muted.filter((tag) => !picked.has(tag)) };
 }
