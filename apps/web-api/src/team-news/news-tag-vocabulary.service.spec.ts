@@ -57,9 +57,17 @@ describe('NewsTagVocabularyService', () => {
   function buildPrisma(
     teamAreasByMember: Record<string, string[]> = {},
     preferencesByMember: Record<string, unknown> = {},
-    profileTopicsByMember: Record<string, Record<string, number>> = {}
+    profileTopicsByMember: Record<string, Record<string, number>> = {},
+    aiTagsByMember: Record<string, string[]> = {}
   ) {
     return {
+      memberNewsTagSuggestion: {
+        findMany: jest.fn(async (args: any) =>
+          (args.where.memberUid.in as string[])
+            .filter((memberUid) => aiTagsByMember[memberUid] !== undefined)
+            .map((memberUid) => ({ memberUid, tags: aiTagsByMember[memberUid] }))
+        ),
+      },
       memberInterestProfileEntry: {
         findMany: jest.fn(async (args: any) =>
           (args.where.memberUid.in as string[]).flatMap((memberUid) =>
@@ -240,6 +248,61 @@ describe('NewsTagVocabularyService', () => {
 
         expect([...(tags.get('m1') ?? [])]).toEqual(['climate-refi']);
       });
+    });
+  });
+
+  describe('AI tags (LAB-3249)', () => {
+    const flag = process.env.NEWS_PROFILE_STARTING_TAGS_ENABLED;
+    afterEach(() => {
+      if (flag === undefined) delete process.env.NEWS_PROFILE_STARTING_TAGS_ENABLED;
+      else process.env.NEWS_PROFILE_STARTING_TAGS_ENABLED = flag;
+    });
+
+    it('uses the stored AI tags before the team focus areas, with the source', async () => {
+      delete process.env.NEWS_PROFILE_STARTING_TAGS_ENABLED;
+      const prisma = buildPrisma({ m1: ['Data Ownership'], m2: ['AI'] }, {}, {}, { m1: ['ai', 'not-a-tag'] });
+      const service = new NewsTagVocabularyService(prisma as any);
+
+      const starting = await service.startingTagsForMembers(['m1', 'm2', 'm3']);
+
+      expect(Object.fromEntries(starting)).toEqual({
+        m1: { tags: ['ai'], source: 'ai' },
+        m2: { tags: ['ai'], source: 'team' },
+        m3: { tags: [], source: 'team' },
+      });
+      expect(prisma.memberNewsTagSuggestion.findMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('uses the team focus areas when no stored AI tag is a news tag', async () => {
+      delete process.env.NEWS_PROFILE_STARTING_TAGS_ENABLED;
+      const prisma = buildPrisma({ m1: ['Data Ownership'] }, {}, {}, { m1: [] });
+      const service = new NewsTagVocabularyService(prisma as any);
+
+      await expect(service.seedTagsForMember('m1')).resolves.toEqual(['data-ownership']);
+    });
+
+    it('uses the profile topics before the AI tags when profile starting tags are enabled', async () => {
+      process.env.NEWS_PROFILE_STARTING_TAGS_ENABLED = 'true';
+      const prisma = buildPrisma({}, {}, { m1: { 'climate-refi': 3 } }, { m1: ['ai'], m2: ['ai'] });
+      const service = new NewsTagVocabularyService(prisma as any);
+
+      const starting = await service.startingTagsForMembers(['m1', 'm2']);
+
+      expect(Object.fromEntries(starting)).toEqual({
+        m1: { tags: ['climate-refi'], source: 'interest-profile' },
+        m2: { tags: ['ai'], source: 'ai' },
+      });
+    });
+
+    it('matches For You on the AI tags of a member with no saved tags', async () => {
+      delete process.env.NEWS_PROFILE_STARTING_TAGS_ENABLED;
+      const prisma = buildPrisma({}, { m2: { newsTags: ['climate-refi'] } }, {}, { m1: ['ai'], m2: ['ai'] });
+      const service = new NewsTagVocabularyService(prisma as any);
+
+      const effective = await service.getEffectiveTagsForMembers(['m1', 'm2']);
+
+      expect([...(effective.get('m1') ?? [])]).toEqual(['ai']);
+      expect([...(effective.get('m2') ?? [])]).toEqual(['climate-refi']);
     });
   });
 
