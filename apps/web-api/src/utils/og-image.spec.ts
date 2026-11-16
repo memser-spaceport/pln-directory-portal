@@ -8,6 +8,7 @@ import {
   extractSocialImageUrl,
   fetchOgImageUrl,
   fetchPublicImage,
+  looksLikeImage,
   IMAGE_FETCH_MAX_BYTES,
   isAllowedOgPageUrl,
   isNonPublicAddress,
@@ -335,6 +336,24 @@ describe('fetchPublicImage', () => {
     await expect(fetchPublicImage('https://cdn.example.com/a.jpg')).resolves.toBeNull();
   });
 
+  const webp = Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WEBPVP8 ')]);
+
+  it.each([
+    ['a generic binary type', 'application/octet-stream'],
+    ['a type list with an image type', 'application/octet-stream, image/webp'],
+    ['no type', ''],
+  ])('returns WebP bytes sent with %s', async (_name, contentType) => {
+    fetchMock.mockResolvedValue(imageResponse(webp, { contentType }));
+    await expect(fetchPublicImage('https://cdn.example.com/a.webp')).resolves.toEqual(webp);
+  });
+
+  it('returns null for generic binary bytes that are not an image', async () => {
+    fetchMock.mockResolvedValue(
+      imageResponse(Buffer.from('PK\u0003\u0004 not an image'), { contentType: 'application/octet-stream' })
+    );
+    await expect(fetchPublicImage('https://cdn.example.com/a.webp')).resolves.toBeNull();
+  });
+
   it('returns null for an error status', async () => {
     fetchMock.mockResolvedValue(imageResponse(Buffer.alloc(0), { status: 404 }));
     await expect(fetchPublicImage('https://cdn.example.com/a.jpg')).resolves.toBeNull();
@@ -376,5 +395,26 @@ describe('fetchPublicImage', () => {
   it('returns null when the request fails', async () => {
     fetchMock.mockRejectedValue(Object.assign(new Error('aborted'), { name: 'AbortError' }));
     await expect(fetchPublicImage('https://cdn.example.com/a.jpg')).resolves.toBeNull();
+  });
+});
+
+describe('looksLikeImage', () => {
+  const pad = (head: Buffer) => Buffer.concat([head, Buffer.alloc(12)]);
+
+  it.each([
+    ['JPEG', pad(Buffer.from([0xff, 0xd8, 0xff, 0xe0]))],
+    ['PNG', pad(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))],
+    ['GIF', pad(Buffer.from('GIF89a'))],
+    ['WebP', Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WEBPVP8 ')])],
+    ['AVIF', pad(Buffer.concat([Buffer.alloc(4), Buffer.from('ftypavif')]))],
+  ])('knows %s', (_name, bytes) => {
+    expect(looksLikeImage(bytes)).toBe(true);
+  });
+
+  it.each([
+    ['HTML', Buffer.from('<!doctype html><html>')],
+    ['a short buffer', Buffer.from([0xff, 0xd8])],
+  ])('refuses %s', (_name, bytes) => {
+    expect(looksLikeImage(bytes)).toBe(false);
   });
 });

@@ -264,6 +264,20 @@ export async function fetchOgImageUrl(pageUrl: string): Promise<string | null> {
 const IMAGE_FETCH_TIMEOUT_MS = 10_000;
 export const IMAGE_FETCH_MAX_BYTES = 10 * 1024 * 1024;
 
+const GENERIC_BINARY_TYPES = ['application/octet-stream', 'binary/octet-stream'];
+
+/** True when the bytes start with a JPEG, PNG, GIF, WebP or AVIF/HEIF signature. */
+export function looksLikeImage(bytes: Buffer): boolean {
+  if (bytes.length < 12) return false;
+  const ascii = (start: number, end: number) => bytes.subarray(start, end).toString('latin1');
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return true; // JPEG
+  if (bytes[0] === 0x89 && ascii(1, 4) === 'PNG') return true; // PNG
+  if (ascii(0, 4) === 'GIF8') return true; // GIF
+  if (ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP') return true; // WebP
+  if (ascii(4, 8) === 'ftyp') return true; // AVIF, HEIF
+  return false;
+}
+
 // Read the body, but stop and return null past `max` bytes.
 async function readImageBytes(response: Response, max: number): Promise<Buffer | null> {
   const declared = Number(response.headers.get('content-length'));
@@ -294,8 +308,9 @@ async function readImageBytes(response: Response, max: number): Promise<Buffer |
 /**
  * Download an image file (LAB-3135: our copy of a news item's og:image), or
  * null on any failure. The same host checks as `fetchOgImageUrl` apply to the
- * URL and to each redirect hop. Only an `image/*` answer is read, up to
- * `maxBytes` and `IMAGE_FETCH_TIMEOUT_MS`.
+ * URL and to each redirect hop. An answer with an `image/*` type is read, up to
+ * `maxBytes` and `IMAGE_FETCH_TIMEOUT_MS`. An answer with no type or a generic
+ * binary type is kept only when its bytes start like an image (`looksLikeImage`).
  */
 export async function fetchPublicImage(
   imageUrl: string,
@@ -338,10 +353,16 @@ export async function fetchPublicImage(
         return null;
       }
       const contentType = (response.headers.get('content-type') || '').toLowerCase();
-      if (!contentType.startsWith('image/')) {
-        return null;
+      if (contentType.includes('image/')) {
+        return await readImageBytes(response, maxBytes);
       }
-      return await readImageBytes(response, maxBytes);
+      // Some hosts send no type or a generic binary type for real images.
+      // Read those bytes only when the file starts like a known image format.
+      if (!contentType || GENERIC_BINARY_TYPES.some((type) => contentType.startsWith(type))) {
+        const bytes = await readImageBytes(response, maxBytes);
+        return bytes && looksLikeImage(bytes) ? bytes : null;
+      }
+      return null;
     }
     return null;
   } catch {
