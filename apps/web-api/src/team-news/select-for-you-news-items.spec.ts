@@ -76,4 +76,16 @@ describe('selectNewsItemsByTagsAndTeams (LAB-2999)', () => {
   it('picks nothing with no own teams and no tags', () => {
     expect(selectNewsItemsByTagsAndTeams([item('a', 'team-x', ['ai'])], new Set(), new Set())).toEqual([]);
   });
+
+  it('adds a story whose category the member picked, from any team', () => {
+    const funding = { ...item('funding', 'team-x', ['desci']), eventType: 'FUNDING' };
+    const launch = { ...item('launch', 'team-y', []), eventType: 'LAUNCH' };
+    const picked = selectNewsItemsByTagsAndTeams([funding, launch], new Set(), new Set(), new Set(['FUNDING']));
+    expect(picked.map((i) => i.uid)).toEqual(['funding']);
+  });
+
+  it('adds nothing when the category set is empty', () => {
+    const funding = { ...item('funding', 'team-x', []), eventType: 'FUNDING' };
+    expect(selectNewsItemsByTagsAndTeams([funding], new Set(), new Set(), new Set())).toEqual([]);
+  });
 });

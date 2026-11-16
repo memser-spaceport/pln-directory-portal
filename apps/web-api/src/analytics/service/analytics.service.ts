@@ -61,14 +61,19 @@ export class AnalyticsService {
       this.logger.error(`Failed to track event: ${event.name}`, error);
     }
 
-    // The database provider does not reach PostHog. MCP events still must.
-    if (this.provider !== this.postHogProvider && event.name.startsWith('mcp-')) {
+    // The database provider does not reach PostHog. MCP and AI App events still must.
+    if (this.provider !== this.postHogProvider && AnalyticsService.mustReachPostHog(event.name)) {
       try {
         await this.postHogProvider.trackEvent(event);
       } catch (error) {
         this.logger.error(`Failed to send ${event.name} to PostHog`, error);
       }
     }
+  }
+
+  /** Event names that go to PostHog even when another provider is selected (LAB-3166, LAB-2851). */
+  private static mustReachPostHog(name: string): boolean {
+    return name.startsWith('mcp-') || name.startsWith('ai_app_');
   }
 
   async shutdown(): Promise<void> {

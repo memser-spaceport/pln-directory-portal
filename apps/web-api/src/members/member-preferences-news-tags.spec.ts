@@ -46,3 +46,23 @@ describe('toPreferencePatch with newsTags', () => {
     expect(() => toPreferencePatch({ newsTags: ['ai'] })).toThrow('vocabulary');
   });
 });
+
+describe('toPreferencePatch with newsCategoryTags', () => {
+  it('stores the categories and leaves every other preference unchanged', () => {
+    expect(
+      merge({ showEmail: true, newsTags: ['ai'] }, { newsCategoryTags: ['ANNOUNCEMENT', 'FUNDING', 'FUNDING'] })
+    ).toEqual({
+      showEmail: true,
+      newsTags: ['ai'],
+      newsCategoryTags: ['FUNDING', 'ANNOUNCEMENT'],
+    });
+  });
+
+  it('stores an empty list', () => {
+    expect(merge({ newsCategoryTags: ['FUNDING'] }, { newsCategoryTags: [] })).toEqual({ newsCategoryTags: [] });
+  });
+
+  it('rejects a category that is not offered, so nothing reaches the blob', () => {
+    expect(() => toPreferencePatch({ newsCategoryTags: ['FUNDING', 'PARTNERSHIP'] })).toThrow(BadRequestException);
+  });
+});

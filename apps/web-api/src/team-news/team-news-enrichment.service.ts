@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { NewsDiscoveryOutcome } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
+import { TEAM_NEWS_IMAGE_SELECT, toNewsImageDto } from './utils/news-image-variants';
 import {
   BatchUpdateTeamNewsEnrichmentResponse,
   TeamNewsPerTeamResponse,
@@ -106,6 +107,7 @@ export class TeamNewsEnrichmentService {
             teamFocusAreas: { include: { focusArea: true, ancestorArea: true } },
           },
         },
+        ...TEAM_NEWS_IMAGE_SELECT,
       },
     });
 
@@ -160,6 +162,7 @@ export class TeamNewsEnrichmentService {
           viewCount: item.viewCount,
           isTeamPosted: item.postedByMemberUid != null,
           imageUrl: item.imageUrl ?? null,
+          image: toNewsImageDto(item.image),
         };
       }),
     };

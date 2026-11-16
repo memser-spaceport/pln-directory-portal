@@ -22,10 +22,12 @@ import { buildTeamNewsEventDateWhere } from './team-news-event-date.where';
 import { TEAM_NEWS_EXCLUDED_TEAM_NAMES } from './team-news-public-list.config';
 import { TeamNewsSuggestionsService } from './team-news-suggestions.service';
 import { selectForYouNewsItems, selectNewsItemsByTagsAndTeams } from './select-for-you-news-items';
+import { readNewsCategoryTags } from './utils/news-category-tags';
 import { narrowsNews, readNewsCategories } from './utils/news-categories';
 import { groupUsedNewsTags, NewsTagVocabularyService } from './news-tag-vocabulary.service';
 import { isNewsTagPicksEnabled } from './utils/news-tags';
 import { DigestTopSelection, LabosDigestService } from './labos-digest.service';
+import { NewsImageRow, TEAM_NEWS_IMAGE_SELECT, toNewsImageDto } from './utils/news-image-variants';
 
 const EMPTY_DISCUSSION: TeamNewsDiscussion = { count: 0, latestTopicUrl: null };
 const POPULAR_WINDOW_DAYS = 14;
@@ -40,6 +42,7 @@ const TEAM_NEWS_TEAM_INCLUDE = Prisma.validator<Prisma.TeamNewsItemInclude>()({
       teamFocusAreas: { include: { focusArea: true, ancestorArea: true } },
     },
   },
+  ...TEAM_NEWS_IMAGE_SELECT,
 });
 
 const POPULAR_MIN_UPVOTES = 2;
@@ -236,6 +239,7 @@ export class TeamNewsQueryService {
           teamFocusAreas: { include: { focusArea: true, ancestorArea: true } },
         },
       },
+      ...TEAM_NEWS_IMAGE_SELECT,
     } as const;
 
     const followed = [...followedTeamUids];
@@ -396,6 +400,7 @@ export class TeamNewsQueryService {
               teamFocusAreas: { include: { focusArea: true, ancestorArea: true } },
             },
           },
+          ...TEAM_NEWS_IMAGE_SELECT,
         },
       }),
       this.prisma.teamNewsItem.count({ where }),
@@ -442,20 +447,22 @@ export class TeamNewsQueryService {
             teamFocusAreas: { include: { focusArea: true, ancestorArea: true } },
           },
         },
+        ...TEAM_NEWS_IMAGE_SELECT,
       },
     });
 
     const itemUids = rows.map((r) => r.uid);
-    const [focusAreas, discussions, upvotes, forYouTeamUids, { forYouTags, forYouOwnTeamUids }] = await Promise.all([
-      this.prisma.focusArea.findMany({
-        where: { parentUid: null },
-        select: { uid: true, title: true },
-      }),
-      this.loadDiscussions(itemUids),
-      this.loadUpvotes(itemUids, viewerMemberUid),
-      forYouPromise,
-      forYouTagsPromise,
-    ]);
+    const [focusAreas, discussions, upvotes, forYouTeamUids, { forYouTags, forYouOwnTeamUids, forYouCategories }] =
+      await Promise.all([
+        this.prisma.focusArea.findMany({
+          where: { parentUid: null },
+          select: { uid: true, title: true },
+        }),
+        this.loadDiscussions(itemUids),
+        this.loadUpvotes(itemUids, viewerMemberUid),
+        forYouPromise,
+        forYouTagsPromise,
+      ]);
     const focusByTitle = new Map(focusAreas.map((fa) => [fa.title, fa]));
 
     const groups = new Map<string, TeamNewsItemDto[]>();
@@ -506,23 +513,28 @@ export class TeamNewsQueryService {
       forYouTeamUids,
       forYouTags,
       forYouOwnTeamUids,
+      forYouCategories,
     };
   }
 
-  /** The viewer's effective news tags and own or followed teams; both empty signed out (LAB-2999). */
-  private async loadForYouTagFields(
-    viewerMemberUid?: string
-  ): Promise<{ forYouTags: string[]; forYouOwnTeamUids: string[] }> {
+  /** The viewer's effective news tags, own or followed teams, and picked categories. Empty signed out (LAB-2999, LAB-3140). */
+  private async loadForYouTagFields(viewerMemberUid?: string): Promise<{
+    forYouTags: string[];
+    forYouOwnTeamUids: string[];
+    forYouCategories: NewsEventType[];
+  }> {
     if (!viewerMemberUid || !this.suggestionsService || !this.tagVocabulary) {
-      return { forYouTags: [], forYouOwnTeamUids: [] };
+      return { forYouTags: [], forYouOwnTeamUids: [], forYouCategories: [] };
     }
-    const [tagsByMember, ownByMember] = await Promise.all([
+    const [tagsByMember, ownByMember, categoriesByMember] = await Promise.all([
       this.tagVocabulary.getEffectiveTagsForMembers([viewerMemberUid]),
       this.suggestionsService.getOwnTeamUidsForMembers([viewerMemberUid]),
+      this.loadNewsCategoryTags([viewerMemberUid]),
     ]);
     return {
       forYouTags: [...(tagsByMember.get(viewerMemberUid) ?? [])],
       forYouOwnTeamUids: [...(ownByMember.get(viewerMemberUid) ?? [])],
+      forYouCategories: categoriesByMember.get(viewerMemberUid) ?? [],
     };
   }
 
@@ -677,8 +689,9 @@ export class TeamNewsQueryService {
   /**
    * Digest picks by news tags (LAB-2999, behind NEWS_TAG_PICKS_ENABLED): per
    * member, stories from their own or followed teams plus stories sharing any
-   * of their tags, newest first, one per team. A member with no match gets the
-   * newest network stories. Categories no longer narrow anything here.
+   * of their tags, plus stories in a category they picked, newest first, one per
+   * team. A member with no match gets the newest network stories. The old
+   * `newsCategories` key does not narrow these picks.
    */
   private async pickDigestNewsByTags(
     items: TeamNewsItemDto[],
@@ -688,19 +701,31 @@ export class TeamNewsQueryService {
     const fallback = items.slice(0, limit);
     const picks: Record<string, TeamNewsItemDto[]> = {};
     if (memberUids.length === 0) return picks;
-    const [tagsByMember, ownByMember] = await Promise.all([
+    const [tagsByMember, ownByMember, categoriesByMember] = await Promise.all([
       (this.tagVocabulary as NewsTagVocabularyService).getEffectiveTagsForMembers(memberUids),
       (this.suggestionsService as TeamNewsSuggestionsService).getOwnTeamUidsForMembers(memberUids),
+      this.loadNewsCategoryTags(memberUids),
     ]);
     for (const memberUid of memberUids) {
       const matched = selectNewsItemsByTagsAndTeams(
         items,
         ownByMember.get(memberUid) ?? new Set(),
-        tagsByMember.get(memberUid) ?? new Set()
+        tagsByMember.get(memberUid) ?? new Set(),
+        new Set(categoriesByMember.get(memberUid) ?? [])
       ).slice(0, limit);
       picks[memberUid] = matched.length > 0 ? matched : fallback;
     }
     return picks;
+  }
+
+  /** Saved `newsCategoryTags` per member. A missing key is an empty list (LAB-3140). */
+  private async loadNewsCategoryTags(memberUids: string[]): Promise<Map<string, NewsEventType[]>> {
+    if (memberUids.length === 0) return new Map();
+    const rows = await this.prisma.member.findMany({
+      where: { uid: { in: memberUids } },
+      select: { uid: true, preferences: true },
+    });
+    return new Map(rows.map((row) => [row.uid, readNewsCategoryTags(row.preferences)]));
   }
 
   /**
@@ -933,6 +958,7 @@ export class TeamNewsQueryService {
       viewCount: number;
       postedByMemberUid: string | null;
       imageUrl: string | null;
+      image: NewsImageRow;
       createdAt: Date;
       team: {
         uid: string;
@@ -995,6 +1021,7 @@ export class TeamNewsQueryService {
       viewCount: row.viewCount,
       isTeamPosted: row.postedByMemberUid != null,
       imageUrl: row.imageUrl ?? null,
+      image: toNewsImageDto(row.image),
     };
   }
 
@@ -1012,6 +1039,7 @@ export class TeamNewsQueryService {
           teamFocusAreas: { include: { focusArea: true, ancestorArea: true } },
         },
       },
+      ...TEAM_NEWS_IMAGE_SELECT,
     } as const;
 
     const row = await this.prisma.teamNewsItem.findUnique({ where: { uid }, include });

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The team-news seed ranks a 14-day window into Top stories and Popular this week. Top stories use `editorialRank`. Popular this week uses synthetic upvotes from that seed. The news feed still lists every story. It also covers the news tags members can choose, and how the API stores and returns each member's tags for For You and the digest.
+The team-news seed ranks a 14-day window into Top stories and Popular this week. Top stories use `editorialRank`. Popular this week uses synthetic upvotes from that seed. The news feed still lists every story. It also covers the news tags members can choose, and how the API stores and returns each member's tags for For You and the digest. It also covers the resized copies of each news image that the API returns for `srcset`.
 
 ## Requirements
 
@@ -102,6 +102,32 @@ A member's chosen news tags SHALL be stored as a list of focus-area slugs. Savin
 - **WHEN** they save `[]`
 - **THEN** the save is accepted, the stored list is `[]`, and reading their preferences returns `newsTags` `["desci", "ai"]` (in any order) with `newsTagsSeeded: true`
 
+### Requirement: Member news category tags
+
+A member's chosen news category tags SHALL be stored as `newsCategoryTags`. The only values SHALL be FUNDING, LAUNCH and ANNOUNCEMENT. Saving the list SHALL replace the previous list and leave every other preference unchanged. A value outside those three SHALL be rejected with 400, and nothing SHALL be stored. An empty list SHALL be stored as a valid choice. Reading a missing key SHALL return an empty list. The list SHALL NOT be seeded from teams or from `newsCategories`.
+
+#### Scenario: Save category tags
+
+- **GIVEN** a signed-in member
+- **WHEN** they save `["ANNOUNCEMENT", "FUNDING"]`
+- **THEN** reading their preferences returns `newsCategoryTags` `["FUNDING", "ANNOUNCEMENT"]`, and their other preferences are unchanged
+
+#### Scenario: Empty list
+
+- **WHEN** a member saves `[]`
+- **THEN** reading their preferences returns `newsCategoryTags` `[]`
+
+#### Scenario: Unknown category
+
+- **WHEN** a member saves `["FUNDING", "PARTNERSHIP"]`
+- **THEN** the request is rejected with 400 and their stored category tags are unchanged
+
+#### Scenario: Never saved
+
+- **GIVEN** a member who never saved category tags, including one who saved `newsCategories`
+- **WHEN** their preferences are read
+- **THEN** `newsCategoryTags` is `[]`
+
 ### Requirement: Starting tags
 
 When a member has no saved news tags (they never saved a list, or their saved list is empty), reading their preferences SHALL return starting tags and `newsTagsSeeded: true`. The starting tags SHALL come from the first of these sources that has a news tag: (1) when profile starting tags are enabled, the 5 highest-scored topics of the member's interest profile that have a positive score and are news tags; (2) the member's stored AI news tags; (3) the slugs of the focus areas of the teams they belong to. Reading SHALL NOT store anything. Once the member saves a list with 1 or more tags, that list SHALL be returned without the seeded marker.
@@ -194,6 +220,7 @@ When a member has no saved news tags (they never saved a list, or their saved li
 
 The home feed's grouped news response SHALL include, for a signed-in viewer, the viewer's effective news tags (their saved tags, or their starting tags when they have no saved tags, with every parent focus area expanded to the focus areas under it) and the uids of the teams they belong to or follow. For a signed-out viewer both SHALL be empty. The existing For You team list SHALL be unchanged.
 
+
 #### Scenario: Signed-in viewer
 
 - **GIVEN** a member who saved the tag Digital Human Rights and belongs to team A
@@ -209,7 +236,13 @@ The home feed's grouped news response SHALL include, for a signed-in viewer, the
 #### Scenario: Signed-out viewer
 
 - **WHEN** a visitor who is not signed in loads the grouped home feed
-- **THEN** the tags and own teams are empty, and the rest of the response is as before
+- **THEN** the tags, own teams and category tags are empty, and the rest of the response is as before
+
+#### Scenario: Picked categories
+
+- **GIVEN** a signed-in member who saved category tags FUNDING and LAUNCH
+- **WHEN** they load the grouped home feed
+- **THEN** `forYouCategories` is `["FUNDING", "LAUNCH"]`
 
 ### Requirement: Default news tags
 
@@ -364,13 +397,25 @@ The system SHALL record `team-news-default-tags-generated` when the job stores A
 
 ### Requirement: Digest picks by news tags
 
-When news tag picks are enabled, a member's digest picks SHALL be stories from teams they belong to or follow plus stories sharing any of their effective tags, newest first, at most one per team, up to the limit, falling back to the newest network stories. News categories SHALL NOT narrow these picks. When disabled, picks SHALL be exactly as before. The top story SHALL be the same either way.
+When news tag picks are enabled, a member's digest picks SHALL be stories from teams they belong to or follow, plus stories sharing any of their effective tags, plus stories whose category is one of their `newsCategoryTags`, newest first, at most one per team, up to the limit, falling back to the newest network stories when that set is empty. An empty `newsCategoryTags` SHALL add no stories. The stored `newsCategories` list SHALL NOT narrow these picks. When disabled, picks SHALL be exactly as before. The top story SHALL be the same either way.
 
 #### Scenario: Tag match from an unrelated team
 
 - **GIVEN** news tag picks are enabled and a member with the tag `ai`
 - **WHEN** a story tagged `ai` from a team they neither belong to nor follow is in the window
 - **THEN** it can be picked for them
+
+#### Scenario: Category match from an unrelated team
+
+- **GIVEN** news tag picks are enabled and a member whose category tags are FUNDING
+- **WHEN** a Funding story from a team they neither belong to nor follow is in the window
+- **THEN** it can be picked for them
+
+#### Scenario: No category tags
+
+- **GIVEN** news tag picks are enabled and a member with no category tags
+- **WHEN** a Funding story from a team they neither belong to nor follow is in the window, and it shares none of their tags
+- **THEN** it is not picked because of its category
 
 #### Scenario: Legacy verb tag
 
@@ -480,3 +525,36 @@ A service that sends `Authorization: Basic` or `Bearer` with `INTERNAL_SERVICE_S
 
 - **WHEN** the call has no key or a wrong key
 - **THEN** the API returns 401
+
+### Requirement: Resized copies of each news image
+
+When the system finds an og:image for a team news item, it SHALL download the image and keep its own 16:9 JPEG copies in the image bucket (`AWS_S3_IMAGE_BUCKET_NAME`) under `team-news/<uid>/<width>.jpg`. The download SHALL use the same public-host checks as the og:image fetch, for the URL and each redirect. The download SHALL accept an answer of 10 MB or less within 10 seconds. The answer SHALL have an `image/*` content type. Alternatively, it SHALL have no content type or `application/octet-stream`, and its first bytes SHALL match JPEG, PNG, GIF, WebP or AVIF. The system SHALL crop the image to 16:9 at the centre and SHALL store the cropped original. It SHALL also store a copy at each of the widths 400, 800, 1200 and 1800 that is smaller than the cropped original. The copies SHALL be JPEG at quality 80, because Outlook desktop cannot show WebP. The original SHALL be an `Image` row with version `ORIGINAL`, and the copies SHALL be its thumbnails. The news item SHALL link the original through `imageUid`.
+
+The team news DTOs (`TeamNewsItemSchema`) and the digest news detail (`LabosDigestNewsDetailSchema`) SHALL return `image: { width, height, variants: [{ width, url }] }` next to `imageUrl`. `width` and `height` SHALL be the stored original size. `variants` SHALL list every stored copy, the original included, narrowest first. `image` SHALL be null when no copy exists. `imageUrl` SHALL not change.
+
+A failed download, resize, upload or link SHALL keep `imageUrl` as it is and `image` null. The failure SHALL be logged and SHALL never fail the publish path. With no image bucket set, the system SHALL make no copies.
+
+The backfill script `yarn api:backfill-team-news-images -- --variants` SHALL make the copies for items that have an `imageUrl` and no copy. It SHALL process only items with an `eventDate` in the last 90 days. A `--days` value above 90 SHALL be refused. `--dry-run` SHALL list the items and write nothing.
+
+#### Scenario: A 1200 × 630 og:image
+
+- **WHEN** a news item gets a 1200 × 630 og:image
+- **THEN** the system stores a 1120 × 630 original and 400 and 800 wide copies
+- **AND** the DTO `image.variants` lists the 400, 800 and 1120 wide copies in that order
+
+#### Scenario: The image cannot be downloaded
+
+- **WHEN** the og:image download fails or the answer is not an image
+- **THEN** the item keeps its `imageUrl`
+- **AND** the DTO `image` is null
+
+#### Scenario: An image with a generic content type
+
+- **WHEN** the host sends WebP bytes with `application/octet-stream` or no content type
+- **THEN** the system stores the copies
+
+#### Scenario: Backfill window
+
+- **WHEN** an admin runs the backfill with `--variants`
+- **THEN** only items with an `eventDate` in the last 90 days, an `imageUrl` and no copy get copies
+- **AND** a second run does nothing for the items that got copies
