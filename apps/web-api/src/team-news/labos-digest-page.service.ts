@@ -32,6 +32,8 @@ import { nextDigestSendAt } from './labos-digest-schedule.util';
 import { digestTopics } from './labos-digest-topics.util';
 import { TeamNewsQueryService } from './team-news-query.service';
 import { excludedTeamsWhere } from './labos-digest.service';
+import { hidesAttendance, listedGuestsWhereIn } from '../pl-events/pl-event-detail';
+import { upcomingEventsFindArgs } from '../pl-events/upcoming-events-query';
 import { readChosenNewsTags } from './utils/news-tags';
 
 const toChoiceValue = (kind: LabosDigestChoiceKind): LabosDigestChoiceValue => (kind === 'MORE' ? 'more' : 'less');
@@ -43,6 +45,10 @@ const sameInstant = (a: string, b: string): boolean => Date.parse(a) === Date.pa
 /** More from the network (LAB-3291): how many rows, and how far before the issue's send time they may be added. */
 export const NETWORK_NEWS_LIMIT = 5;
 export const NETWORK_NEWS_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Upcoming events (LAB-3292): how far ahead, and how many rows. */
+export const EVENTS_WINDOW_DAYS = 28;
+export const EVENTS_LIMIT = 5;
 
 /** How many issues Past issues lists (LAB-3294). */
 export const PAST_ISSUES_LIMIT = 8;
@@ -101,6 +107,7 @@ export class LabosDigestPageService {
       topicScores,
       issues,
       networkNews,
+      events,
     ] = await Promise.all([
       this.prisma.member.findUnique({ where: { uid: link.m }, select: { name: true, preferences: true } }),
       this.prisma.teamNewsItem.findMany({
@@ -145,6 +152,7 @@ export class LabosDigestPageService {
       }),
       this.listIssues(link),
       this.listNetworkNews(issue),
+      this.listUpcomingEvents(now),
     ]);
     if (!member) throw new NotFoundException('Digest not found');
     // Same tags News preferences shows as ticked: the saved list, else the starting tags. Reading stores nothing.
@@ -196,6 +204,7 @@ export class LabosDigestPageService {
       nextSendAt: nextDigestSendAt(issue.f, now).toISOString(),
       issues,
       networkNews,
+      events,
       topics: digestTopics(
         followedSlugs,
         choosable,
@@ -298,6 +307,57 @@ export class LabosDigestPageService {
       eventDate: row.eventDate.toISOString(),
       teamName: row.team.name,
     }));
+  }
+
+  /**
+   * Upcoming events (LAB-3292): events starting in the next EVENTS_WINDOW_DAYS from now (not from the issue: a past
+   * issue still shows what's coming), by Home's events rail query, soonest first, at most EVENTS_LIMIT, with the
+   * window's total for "See all". Going counts follow the event drawer's rule; the page reads as signed out, so
+   * invite-only events hide theirs.
+   */
+  private async listUpcomingEvents(now: Date): Promise<LabosDigestPage['events']> {
+    const { where, orderBy, take } = upcomingEventsFindArgs(
+      { days: EVENTS_WINDOW_DAYS, limit: EVENTS_LIMIT, sort: 'soonest' },
+      now
+    );
+    const [rows, total] = await Promise.all([
+      this.prisma.pLEvent.findMany({
+        where,
+        orderBy,
+        take,
+        select: {
+          uid: true,
+          name: true,
+          startDate: true,
+          endDate: true,
+          locationUid: true,
+          externalId: true,
+          type: true,
+          logo: { select: { url: true } },
+          location: { select: { location: true } },
+        },
+      }),
+      this.prisma.pLEvent.count({ where }),
+    ]);
+    const counted = rows.filter((row) => !hidesAttendance(row.type, false)).map((row) => row.uid);
+    const going = counted.length
+      ? await this.prisma.pLEventGuest.groupBy({ by: ['eventUid', 'memberUid'], where: listedGuestsWhereIn(counted) })
+      : [];
+    return {
+      total,
+      items: rows.map((row) => ({
+        uid: row.uid,
+        name: row.name,
+        startDate: row.startDate.toISOString(),
+        endDate: row.endDate.toISOString(),
+        location: row.location?.location ?? null,
+        locationUid: row.locationUid ?? null,
+        externalId: row.externalId ?? null,
+        logoUrl: row.logo?.url ?? null,
+        type: row.type ?? null,
+        goingCount: counted.includes(row.uid) ? going.filter((g) => g.eventUid === row.uid).length : null,
+      })),
+    };
   }
 
   /** The link's own issue, or the member's stored issue sent at `issueKey`. */
