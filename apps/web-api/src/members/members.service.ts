@@ -139,7 +139,9 @@ export class MembersService {
       const filteredMembers = members.map((member: any) => {
         return omitJobSearchStatus({
           ...member,
-          teamMemberRoles: member.teamMemberRoles?.filter((role) => role?.team?.accessLevel !== 'L0'),
+          teamMemberRoles: member.teamMemberRoles?.filter(
+            (role) => role?.team?.accessLevel !== 'L0' && role?.team?.status !== 'INACTIVE'
+          ),
         });
       });
 
@@ -508,6 +510,12 @@ export class MembersService {
                 },
               },
             }, //TODO - docuble check with frontend
+            // A deleted team (status INACTIVE) is not in the member's Teams section (LAB-3192).
+            where: {
+              team: {
+                status: { not: 'INACTIVE' },
+              },
+            },
             // where: {
             //   team: {
             //     accessLevel: {
