@@ -37,10 +37,29 @@ function build(
     seeds?: string[];
     scores?: Record<string, number>;
     choosable?: { slug: string; title: string; children: { slug: string; title: string }[] }[];
+    issues?: {
+      frequency: string;
+      sentAt: Date;
+      newsItemUids: string[];
+      leadUid: string | null;
+      forumTids?: number[];
+    }[];
+    members?: string[];
   } = {}
 ) {
   const prisma = {
-    member: { findUnique: jest.fn(async () => (opts.member === undefined ? { name: 'Ada Lovelace' } : opts.member)) },
+    member: {
+      findUnique: jest.fn(async () => (opts.member === undefined ? { name: 'Ada Lovelace' } : opts.member)),
+      findMany: jest.fn(async () => (opts.members ?? ['m1']).map((uid) => ({ uid }))),
+    },
+    labosDigestIssue: {
+      findMany: jest.fn(async () => opts.issues ?? []),
+      findFirst: jest.fn(async ({ where }: any) => {
+        const row = (opts.issues ?? []).find((i) => i.sentAt.getTime() === where.sentAt.getTime());
+        return row ? { forumTids: [], ...row } : null;
+      }),
+      createMany: jest.fn(async ({ data }: any) => ({ count: data.length })),
+    },
     teamNewsItem: {
       findMany: jest.fn(async () => opts.items ?? []),
       findUnique: jest.fn(async () => ({ tags: ['ai'] })),
@@ -186,6 +205,92 @@ describe('LabosDigestPageService', () => {
       expect(vocabulary.seedTagsForMember).toHaveBeenCalledWith('m1');
       expect(topics.followed).toEqual([{ slug: 'ai', title: 'AI' }]);
       expect(topics.suggested.map((t) => t.slug)).toEqual(['defi', 'desci']);
+    });
+
+    describe('past issues (LAB-3294)', () => {
+      const weekly = (sentAt: string, n: string[], leadUid: string | null = null) => ({
+        frequency: 'WEEKLY',
+        sentAt: new Date(sentAt),
+        newsItemUids: n,
+        leadUid,
+      });
+
+      it('lists the stored issues newest first with the link issue, titled by the top story', async () => {
+        const { service } = build({
+          items: [item('a'), item('b'), item('x'), item('y')],
+          issues: [weekly('2026-11-23T11:00:00.000Z', ['x', 'y'], 'y'), weekly('2026-11-09T11:00:00.000Z', ['x'])],
+        });
+        const { issues } = await service.read(token());
+        expect(issues).toEqual([
+          { sentAt: '2026-11-23T11:00:00.000Z', frequency: 'weekly', title: 'Title y', isLinkIssue: false },
+          { sentAt: '2026-11-16T09:00:00.000Z', frequency: 'weekly', title: 'Title b', isLinkIssue: true },
+          { sentAt: '2026-11-09T11:00:00.000Z', frequency: 'weekly', title: 'Title x', isLinkIssue: false },
+        ]);
+      });
+
+      it('keeps the link issue in a full list by dropping the oldest other one', async () => {
+        const rows = Array.from({ length: 8 }, (_, i) =>
+          weekly(new Date(Date.UTC(2026, 10, 30 - i, 11)).toISOString(), ['x'])
+        );
+        const { service } = build({ items: [item('x')], issues: rows });
+        const { issues } = await service.read(token({ s: '2026-11-01T11:00:00.000Z' }));
+        expect(issues).toHaveLength(8);
+        expect(issues[7]).toMatchObject({ sentAt: '2026-11-01T11:00:00.000Z', isLinkIssue: true });
+        expect(issues.map((i) => i.sentAt)).not.toContain('2026-11-23T11:00:00.000Z');
+      });
+
+      it('opens a past issue of the same member with its own stories, and refuses an unknown one', async () => {
+        const { service, prisma } = build({
+          items: [item('x'), item('y')],
+          issues: [weekly('2026-11-09T11:00:00.000Z', ['y', 'x'], 'x')],
+        });
+        const page = await service.read(token(), '2026-11-09T11:00:00.000Z');
+        expect(prisma.labosDigestIssue.findFirst).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { memberUid: 'm1', sentAt: new Date('2026-11-09T11:00:00.000Z') } })
+        );
+        expect(page.sentAt).toBe('2026-11-09T11:00:00.000Z');
+        expect(page.stories.map((s) => [s.uid, s.isTopStory])).toEqual([
+          ['y', false],
+          ['x', true],
+        ]);
+        await expect(service.read(token(), '2026-10-01T11:00:00.000Z')).rejects.toBeInstanceOf(NotFoundException);
+      });
+
+      it('reads the link issue when the key is its own send time', async () => {
+        const { service, prisma } = build({ items: [item('a'), item('b')] });
+        const page = await service.read(token(), '2026-11-16T09:00:00Z');
+        expect(prisma.labosDigestIssue.findFirst).not.toHaveBeenCalled();
+        expect(page.stories.map((s) => s.uid)).toEqual(['b', 'a']);
+      });
+
+      it('takes More on a story of the past issue, not on one only in the link', async () => {
+        const { service } = build({ issues: [weekly('2026-11-09T11:00:00.000Z', ['y'])] });
+        await expect(service.choose(token(), 'b', 'more', '2026-11-09T11:00:00.000Z')).rejects.toBeInstanceOf(
+          BadRequestException
+        );
+      });
+
+      it('records sent issues once, for members that exist, dropping a top story not in the stories', async () => {
+        const { service, prisma } = build({ members: ['m1'] });
+        const result = await service.recordIssues([
+          { memberUid: 'm1', frequency: 'weekly', sentAt: '2026-11-16T09:00:00.000Z', n: ['a'], l: 'zz', p: [3] },
+          { memberUid: 'gone', frequency: 'daily', sentAt: '2026-11-16T09:00:00.000Z', n: ['a'], p: [] },
+        ]);
+        expect(result).toEqual({ recorded: 1 });
+        expect(prisma.labosDigestIssue.createMany).toHaveBeenCalledWith({
+          data: [
+            {
+              memberUid: 'm1',
+              frequency: 'WEEKLY',
+              sentAt: new Date('2026-11-16T09:00:00.000Z'),
+              newsItemUids: ['a'],
+              leadUid: null,
+              forumTids: [3],
+            },
+          ],
+          skipDuplicates: true,
+        });
+      });
     });
 
     it('is not found for a member who no longer exists', async () => {

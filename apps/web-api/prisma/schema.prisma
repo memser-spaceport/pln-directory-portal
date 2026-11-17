@@ -303,6 +303,7 @@ model Member {
   feedComments              FeedComment[]           @relation("MemberFeedComments")
   feedNewsLikes             FeedNewsLike[]          @relation("MemberFeedNewsLikes")
   labosDigestChoices        LabosDigestChoice[]     @relation("MemberLabosDigestChoices")
+  labosDigestIssues         LabosDigestIssue[]      @relation("MemberLabosDigestIssues")
 
   /// Read-only Affinity CRM sidecar (task 02). Optional 1:1 when linked.
   affinityPerson               AffinityPerson?
@@ -2897,6 +2898,26 @@ model LabosDigestSendStory {
 
   @@unique([sendId, position])
   @@index([newsItemUid])
+}
+
+/// One member's digest issue as the notification service sent it (LAB-3294): the same stories, top story and forum
+/// topics as the email's signed link, so the digest page can list past issues and open them again.
+model LabosDigestIssue {
+  uid          String               @id @default(cuid())
+  memberUid    String
+  member       Member               @relation("MemberLabosDigestIssues", fields: [memberUid], references: [uid], onDelete: Cascade)
+  frequency    LabosDigestFrequency
+  sentAt       DateTime
+  /// News item uids, in email order.
+  newsItemUids String[]
+  /// The top story uid, when the email showed one.
+  leadUid      String?
+  /// Forum topic ids, in email order.
+  forumTids    Int[]
+  createdAt    DateTime             @default(now())
+
+  @@unique([memberUid, frequency, sentAt])
+  @@index([memberUid, sentAt])
 }
 
 enum LabosDigestChoiceKind {
