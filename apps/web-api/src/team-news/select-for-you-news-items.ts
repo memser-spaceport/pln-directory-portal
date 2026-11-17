@@ -47,3 +47,24 @@ export function selectNewsItemsByTagsAndTeams<
   );
   return selectForYouNewsItems(matched, new Set(matched.map((item) => item.teamUid)));
 }
+
+/**
+ * Orders picked stories by the member's interest in them (LAB-3263): the sum of the member's interest profile
+ * `TOPIC` weights for the story's tags, highest first. Stories with the same sum keep their order (newest first).
+ * "More like this" / "Less like this" on the digest page move those weights. Empty weights keep the order as is.
+ */
+export function orderByTopicWeights<T extends { tags?: string[] | null }>(
+  items: T[],
+  weights: ReadonlyMap<string, number>
+): T[] {
+  if (weights.size === 0) return items;
+  const interest = (item: T) =>
+    [...new Set((item.tags ?? []).map((tag) => tag.trim().toLowerCase()))].reduce(
+      (sum, tag) => sum + (weights.get(tag) ?? 0),
+      0
+    );
+  return items
+    .map((item, index) => ({ item, index, score: interest(item) }))
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map(({ item }) => item);
+}

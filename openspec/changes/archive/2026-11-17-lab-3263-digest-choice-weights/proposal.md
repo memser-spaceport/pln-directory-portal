@@ -8,14 +8,14 @@ At the SU on Nov 16, Vova and Anuj changed what "More like this" and "Less like 
 - The change is written to the profile in the same transaction as the choice. The daily profile rebuild applies the active choices again, so a choice survives the rebuild. An active choice has no decay; Undo ends it.
 - `LabosDigestChoice` stores the weights of the story's topics before and after the choice (`beforeWeights`, `afterWeights`). Undo restores them, or removes only this choice's change when the weight moved since.
 - **BREAKING (unreleased)**: the muted news tags (`newsTagsMuted`) are removed: no validation on save, no unmute on save, no effect on effective tags, starting tags or digest tag picks. A stored key from the first version is ignored.
-- Ordering digest picks by these weights for members with saved tags waits on Anuj's answer on LAB-3263 and is not in this change yet.
+- When news tag picks are on, a member's digest picks are ordered by the sum of their topic weights for each story's tags, highest first, newest first on a tie, before the limit. Saved tags, own and followed teams and categories still decide which stories can be picked (Anuj, LAB-3263).
 
 ## Capabilities
 
 ### Modified Capabilities
 
 - `labos-digest-page`: More / Less / Undo move topic weights instead of news tags.
-- `team-news`: the muted news tags and the muted-tag skip in digest tag picks are removed.
+- `team-news`: the muted news tags and the muted-tag skip in digest tag picks are removed; digest tag picks are ordered by topic weights.
 
 ## Impact
 

@@ -7,9 +7,9 @@
 - [x] 1.5 Profile rebuild: the loader reads active choices; `buildProfile` applies them last, never below 0
 - [x] 1.6 Docs: `docs/MEMBER_INTEREST_PROFILE.md`
 
-## 2. Picks order (waits on Anuj, LAB-3263 Q1)
+## 2. Picks order (Anuj, LAB-3263 Q1: yes)
 
-- [ ] 2.1 If yes: order a member's matched digest tag picks by the sum of their topic weights, newest on a tie
+- [x] 2.1 Order a member's matched digest tag picks by the sum of their topic weights, newest on a tie
 
 ## 3. Check
 

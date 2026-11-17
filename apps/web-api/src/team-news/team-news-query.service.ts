@@ -21,7 +21,7 @@ import type {
 import { buildTeamNewsEventDateWhere } from './team-news-event-date.where';
 import { TEAM_NEWS_EXCLUDED_TEAM_NAMES } from './team-news-public-list.config';
 import { TeamNewsSuggestionsService } from './team-news-suggestions.service';
-import { selectForYouNewsItems, selectNewsItemsByTagsAndTeams } from './select-for-you-news-items';
+import { orderByTopicWeights, selectForYouNewsItems, selectNewsItemsByTagsAndTeams } from './select-for-you-news-items';
 import { readNewsCategoryTags } from './utils/news-category-tags';
 import { narrowsNews, readNewsCategories } from './utils/news-categories';
 import { groupUsedNewsTags, NewsTagVocabularyService } from './news-tag-vocabulary.service';
@@ -689,9 +689,11 @@ export class TeamNewsQueryService {
   /**
    * Digest picks by news tags (LAB-2999, behind NEWS_TAG_PICKS_ENABLED): per
    * member, stories from their own or followed teams plus stories sharing any
-   * of their tags, plus stories in a category they picked, newest first, one per
-   * team. A member with no match gets the newest network stories. The old
-   * `newsCategories` key does not narrow these picks.
+   * of their tags, plus stories in a category they picked, one per team (its
+   * newest story). They are ordered by the member's topic weights in their
+   * interest profile, highest first, newest first on a tie (LAB-3263: digest
+   * page More / Less move those weights). A member with no match gets the newest
+   * network stories. The old `newsCategories` key does not narrow these picks.
    */
   private async pickDigestNewsByTags(
     items: TeamNewsItemDto[],
@@ -701,21 +703,42 @@ export class TeamNewsQueryService {
     const fallback = items.slice(0, limit);
     const picks: Record<string, TeamNewsItemDto[]> = {};
     if (memberUids.length === 0) return picks;
-    const [tagsByMember, ownByMember, categoriesByMember] = await Promise.all([
+    const [tagsByMember, ownByMember, categoriesByMember, weightsByMember] = await Promise.all([
       (this.tagVocabulary as NewsTagVocabularyService).getEffectiveTagsForMembers(memberUids),
       (this.suggestionsService as TeamNewsSuggestionsService).getOwnTeamUidsForMembers(memberUids),
       this.loadNewsCategoryTags(memberUids),
+      this.loadTopicWeights(memberUids),
     ]);
     for (const memberUid of memberUids) {
-      const matched = selectNewsItemsByTagsAndTeams(
-        items,
-        ownByMember.get(memberUid) ?? new Set(),
-        tagsByMember.get(memberUid) ?? new Set(),
-        new Set(categoriesByMember.get(memberUid) ?? [])
+      // Ordered before the cut, so a weight change can bring a story into the digest or push one out.
+      const matched = orderByTopicWeights(
+        selectNewsItemsByTagsAndTeams(
+          items,
+          ownByMember.get(memberUid) ?? new Set(),
+          tagsByMember.get(memberUid) ?? new Set(),
+          new Set(categoriesByMember.get(memberUid) ?? [])
+        ),
+        weightsByMember.get(memberUid) ?? new Map()
       ).slice(0, limit);
       picks[memberUid] = matched.length > 0 ? matched : fallback;
     }
     return picks;
+  }
+
+  /** Each member's interest profile `TOPIC` weights, slug → score (LAB-3263). A member with none is left out. */
+  private async loadTopicWeights(memberUids: string[]): Promise<Map<string, Map<string, number>>> {
+    const result = new Map<string, Map<string, number>>();
+    if (memberUids.length === 0) return result;
+    const rows = await this.prisma.memberInterestProfileEntry.findMany({
+      where: { memberUid: { in: memberUids }, kind: 'TOPIC' },
+      select: { memberUid: true, key: true, score: true },
+    });
+    for (const row of rows) {
+      const weights = result.get(row.memberUid) ?? new Map<string, number>();
+      weights.set(row.key, row.score);
+      result.set(row.memberUid, weights);
+    }
+    return result;
   }
 
   /** Saved `newsCategoryTags` per member. A missing key is an empty list (LAB-3140). */
