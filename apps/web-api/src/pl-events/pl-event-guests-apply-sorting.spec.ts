@@ -1,3 +1,4 @@
+
 // Loading the real collaborators makes ts-jest's type check overflow the stack (TS 4.7), so they are stubbed here,
 // as in pl-event-attendance.spec.ts. Only applySorting is under test.
 jest.mock('../members/members.service', () => ({ MembersService: class {} }));
