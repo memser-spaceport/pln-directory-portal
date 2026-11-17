@@ -23,7 +23,12 @@ import { LogService } from '../shared/log.service';
 import { buildMultiRelationMapping, buildRelationMapping, copyObj } from '../utils/helper/helper';
 import { normalizeBlueskyHandler, normalizeCrunchbaseHandler } from './team-handle-normalizer';
 import { syncTeamLocations } from './team-locations';
-import { enforceTeamPublicVisibility, PUBLICLY_VISIBLE_TEAM_WHERE, toTeamCrawlIndex } from './team-public-visibility';
+import {
+  enforceDeletedTeamHidden,
+  enforceTeamPublicVisibility,
+  PUBLICLY_VISIBLE_TEAM_WHERE,
+  toTeamCrawlIndex,
+} from './team-public-visibility';
 import { CacheService } from '../utils/cache/cache.service';
 import { AskService } from '../asks/asks.service';
 import { TeamsHooksService } from './teams.hooks.service';
@@ -187,13 +192,17 @@ export class TeamsService {
    */
   async softDeleteTeam(teamUid: string): Promise<Team> {
     try {
+      // L0 alone also means "no member has logged in yet", and admins see L0 teams (LAB-3252).
+      // INACTIVE marks the team as deleted, so lists, search, member profiles and the team page hide it (LAB-3192).
       const team = await this.prisma.team.update({
         where: { uid: teamUid },
         data: {
           accessLevel: 'L0',
           accessLevelUpdatedAt: new Date(),
+          status: TeamStatus.INACTIVE,
         },
       });
+      await this.cacheService.reset({ service: 'teams' });
 
       this.logger.info(`Team ${teamUid} has been soft deleted (marked as L0)`);
       return team;
@@ -341,7 +350,7 @@ export class TeamsService {
   async assertTeamVisibleToViewer(uid: string, userEmail?: string): Promise<{ uid: string; name: string }> {
     const team = await this.prisma.team.findUnique({
       where: { uid },
-      select: { uid: true, name: true, accessLevel: true },
+      select: { uid: true, name: true, accessLevel: true, status: true },
     });
     if (!team) {
       throw new NotFoundException(`Team not found with uid ${uid}.`);
@@ -350,7 +359,11 @@ export class TeamsService {
     return { uid: team.uid, name: team.name };
   }
 
-  private async enforcePublicVisibility(team: { uid: string; accessLevel?: string | null }, userEmail?: string) {
+  private async enforcePublicVisibility(
+    team: { uid: string; accessLevel?: string | null; status?: TeamStatus | null },
+    userEmail?: string
+  ) {
+    await enforceDeletedTeamHidden(team, userEmail, (email) => this.isDirectoryAdminEmail(email));
     await enforceTeamPublicVisibility(team, userEmail, (email, teamUid) => this.validateRequestor(email, teamUid));
   }
 
@@ -800,6 +813,12 @@ export class TeamsService {
    * @throws {UnauthorizedException} If the requestor is not found
    * @throws {ForbiddenException} If the requestor does not have sufficient permissions
    */
+  /** Whether the member with this email is a directory admin. False for an unknown email. */
+  private async isDirectoryAdminEmail(email: string): Promise<boolean> {
+    const member = await this.membersService.findMemberByEmail(email);
+    return !!member?.isDirectoryAdmin;
+  }
+
   async validateRequestor(requestorEmail: string, teamUid: string): Promise<Member> {
     const requestor = await this.membersService.findMemberByEmail(requestorEmail);
     if (!requestor.isDirectoryAdmin && !requestor.leadingTeams.includes(teamUid)) {
