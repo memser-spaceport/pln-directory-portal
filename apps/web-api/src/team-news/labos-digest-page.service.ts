@@ -26,6 +26,9 @@ import {
 import { TEAM_NEWS_IMAGE_SELECT, toNewsImageDto } from './utils/news-image-variants';
 import { extractDomain, normalizeSourceUrl } from './utils/url-normalize';
 import { nextDigestSendAt } from './labos-digest-schedule.util';
+import { digestTopics } from './labos-digest-topics.util';
+import { TeamNewsQueryService } from './team-news-query.service';
+import { readChosenNewsTags } from './utils/news-tags';
 
 const toChoiceValue = (kind: LabosDigestChoiceKind): LabosDigestChoiceValue => (kind === 'MORE' ? 'more' : 'less');
 const toChoiceKind = (value: LabosDigestChoiceValue): LabosDigestChoiceKind => (value === 'more' ? 'MORE' : 'LESS');
@@ -56,51 +59,62 @@ export class LabosDigestPageService {
     private readonly prisma: PrismaService,
     private readonly tagVocabulary: NewsTagVocabularyService,
     private readonly forum: LabosDigestForumReader,
-    private readonly cache: CacheService
+    private readonly cache: CacheService,
+    private readonly newsQuery: TeamNewsQueryService
   ) {}
 
   /** @throws DigestLinkError for a bad token; NotFoundException when the member no longer exists. */
   async read(token: string): Promise<LabosDigestPage> {
     const link = verifyDigestLinkToken(token);
     const now = new Date();
-    const [member, items, choices, forum, follows, comments, activeRoles] = await Promise.all([
-      this.prisma.member.findUnique({ where: { uid: link.m }, select: { name: true } }),
-      this.prisma.teamNewsItem.findMany({
-        where: { uid: { in: link.n } },
-        select: {
-          uid: true,
-          title: true,
-          summary: true,
-          contentHtml: true,
-          imageUrl: true,
-          sourceUrl: true,
-          sourceUrls: true,
-          sourceDomain: true,
-          eventType: true,
-          tags: true,
-          team: { select: { uid: true, name: true, logo: { select: { url: true } } } },
-          ...TEAM_NEWS_IMAGE_SELECT,
-        },
-      }),
-      this.prisma.labosDigestChoice.findMany({
-        where: { memberUid: link.m, newsItemUid: { in: link.n }, undoneAt: null },
-        select: { newsItemUid: true, choice: true },
-      }),
-      this.forum.read(link.p),
-      this.prisma.follow.findMany({
-        where: { memberUid: link.m, entityType: 'TEAM' },
-        select: { entityUid: true },
-      }),
-      this.prisma.feedComment.groupBy({
-        by: ['newsItemUid'],
-        where: { newsItemUid: { in: link.n } },
-        _count: { _all: true },
-      }),
-      this.prisma.teamMemberRole.count({
-        where: { memberUid: link.m, OR: [{ endDate: null }, { endDate: { gte: now } }] },
-      }),
-    ]);
+    const [member, items, choices, forum, follows, comments, activeRoles, vocabulary, choosable, topicScores] =
+      await Promise.all([
+        this.prisma.member.findUnique({ where: { uid: link.m }, select: { name: true, preferences: true } }),
+        this.prisma.teamNewsItem.findMany({
+          where: { uid: { in: link.n } },
+          select: {
+            uid: true,
+            title: true,
+            summary: true,
+            contentHtml: true,
+            imageUrl: true,
+            sourceUrl: true,
+            sourceUrls: true,
+            sourceDomain: true,
+            eventType: true,
+            tags: true,
+            team: { select: { uid: true, name: true, logo: { select: { url: true } } } },
+            ...TEAM_NEWS_IMAGE_SELECT,
+          },
+        }),
+        this.prisma.labosDigestChoice.findMany({
+          where: { memberUid: link.m, newsItemUid: { in: link.n }, undoneAt: null },
+          select: { newsItemUid: true, choice: true },
+        }),
+        this.forum.read(link.p),
+        this.prisma.follow.findMany({
+          where: { memberUid: link.m, entityType: 'TEAM' },
+          select: { entityUid: true },
+        }),
+        this.prisma.feedComment.groupBy({
+          by: ['newsItemUid'],
+          where: { newsItemUid: { in: link.n } },
+          _count: { _all: true },
+        }),
+        this.prisma.teamMemberRole.count({
+          where: { memberUid: link.m, OR: [{ endDate: null }, { endDate: { gte: now } }] },
+        }),
+        this.tagVocabulary.getVocabulary(),
+        this.newsQuery.listNewsTags(now),
+        this.prisma.memberInterestProfileEntry.findMany({
+          where: { memberUid: link.m, kind: 'TOPIC' },
+          select: { key: true, score: true },
+        }),
+      ]);
     if (!member) throw new NotFoundException('Digest not found');
+    // Same tags News preferences shows as ticked: the saved list, else the starting tags. Reading stores nothing.
+    const followedSlugs =
+      readChosenNewsTags(member.preferences) ?? (await this.tagVocabulary.seedTagsForMember(link.m));
 
     const itemByUid = new Map(items.map((item) => [item.uid, item]));
     const choiceByUid = new Map<string, LabosDigestChoiceValue>(
@@ -145,6 +159,12 @@ export class LabosDigestPageService {
       forumUnavailable: forum.unavailable,
       isTeamMember: activeRoles > 0,
       nextSendAt: nextDigestSendAt(link.f, now).toISOString(),
+      topics: digestTopics(
+        followedSlugs,
+        choosable,
+        vocabulary,
+        new Map(topicScores.map((entry) => [entry.key, entry.score]))
+      ),
     };
   }
 

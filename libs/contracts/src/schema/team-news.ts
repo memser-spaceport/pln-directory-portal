@@ -796,6 +796,14 @@ export const LabosDigestPageSchema = z.object({
   isTeamMember: z.boolean(),
   /** When the next digest of this frequency goes out, ISO 8601. */
   nextSendAt: z.string(),
+  /**
+   * The link member's news topics (LAB-3289): the tags they follow (their saved list, else their starting
+   * tags), and the choosable tags they don't follow, highest interest weight first.
+   */
+  topics: z.object({
+    followed: z.array(TeamNewsTagSchema),
+    suggested: z.array(TeamNewsTagSchema),
+  }),
 });
 
 export const LabosDigestChoiceRequestSchema = z.object({

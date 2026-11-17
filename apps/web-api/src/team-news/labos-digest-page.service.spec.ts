@@ -8,6 +8,7 @@ import { buildNewsTagVocabulary } from './news-tag-vocabulary.service';
 import { DigestLinkError, issueDigestLinkToken } from './labos-digest-link-token.util';
 import { LabosDigestPageService } from './labos-digest-page.service';
 import { LabosDigestPublicController } from './labos-digest-public.controller';
+import { digestTopics } from './labos-digest-topics.util';
 
 /** LAB-3263: the public digest page read, and the guards in front of More / Less. */
 const item = (uid: string, extra: Record<string, unknown> = {}) => ({
@@ -27,12 +28,15 @@ const item = (uid: string, extra: Record<string, unknown> = {}) => ({
 
 function build(
   opts: {
-    member?: { name: string } | null;
+    member?: { name: string; preferences?: unknown } | null;
     items?: unknown[];
     choices?: unknown[];
     follows?: string[];
     comments?: Record<string, number>;
     activeRoles?: number;
+    seeds?: string[];
+    scores?: Record<string, number>;
+    choosable?: { slug: string; title: string; children: { slug: string; title: string }[] }[];
   } = {}
 ) {
   const prisma = {
@@ -49,15 +53,42 @@ function build(
       ),
     },
     teamMemberRole: { count: jest.fn(async () => opts.activeRoles ?? 0) },
+    memberInterestProfileEntry: {
+      findMany: jest.fn(async () => Object.entries(opts.scores ?? {}).map(([key, score]) => ({ key, score }))),
+    },
     $transaction: jest.fn(),
   };
   const vocabulary = {
-    getVocabulary: jest.fn(async () => buildNewsTagVocabulary([{ uid: 'fa-ai', title: 'AI', parentUid: null }])),
+    getVocabulary: jest.fn(async () =>
+      buildNewsTagVocabulary([
+        { uid: 'fa-ai', title: 'AI', parentUid: null },
+        { uid: 'fa-llm', title: 'LLMs', parentUid: 'fa-ai' },
+        { uid: 'fa-defi', title: 'DeFi', parentUid: null },
+        { uid: 'fa-desci', title: 'DeSci', parentUid: null },
+      ])
+    ),
+    seedTagsForMember: jest.fn(async () => opts.seeds ?? []),
+  };
+  const newsQuery = {
+    listNewsTags: jest.fn(
+      async () =>
+        opts.choosable ?? [
+          { slug: 'ai', title: 'AI', children: [{ slug: 'llms', title: 'LLMs' }] },
+          { slug: 'defi', title: 'DeFi', children: [] },
+          { slug: 'desci', title: 'DeSci', children: [] },
+        ]
+    ),
   };
   const forum = { read: jest.fn(async () => ({ posts: [], unavailable: false })) };
   const cache = { reset: jest.fn() };
-  const service = new LabosDigestPageService(prisma as any, vocabulary as any, forum as any, cache as any);
-  return { service, prisma, forum };
+  const service = new LabosDigestPageService(
+    prisma as any,
+    vocabulary as any,
+    forum as any,
+    cache as any,
+    newsQuery as any
+  );
+  return { service, prisma, forum, vocabulary };
 }
 
 const token = (extra: Record<string, unknown> = {}) =>
@@ -138,6 +169,25 @@ describe('LabosDigestPageService', () => {
       expect((await service.read(token())).isTeamMember).toBe(false);
     });
 
+    it('returns saved topics and suggests the rest by interest weight (LAB-3289)', async () => {
+      const { service, vocabulary } = build({
+        member: { name: 'Ada', preferences: { newsTags: ['defi', 'not-a-tag'] } },
+        scores: { desci: 2, llms: 5, ai: -1 },
+      });
+      const { topics } = await service.read(token());
+      expect(topics.followed).toEqual([{ slug: 'defi', title: 'DeFi' }]);
+      expect(topics.suggested.map((t) => t.slug)).toEqual(['llms', 'desci', 'ai']);
+      expect(vocabulary.seedTagsForMember).not.toHaveBeenCalled();
+    });
+
+    it('follows the starting tags when nothing is saved, and never suggests what a followed parent covers', async () => {
+      const { service, vocabulary } = build({ member: { name: 'Ada', preferences: { newsTags: [] } }, seeds: ['ai'] });
+      const { topics } = await service.read(token());
+      expect(vocabulary.seedTagsForMember).toHaveBeenCalledWith('m1');
+      expect(topics.followed).toEqual([{ slug: 'ai', title: 'AI' }]);
+      expect(topics.suggested.map((t) => t.slug)).toEqual(['defi', 'desci']);
+    });
+
     it('is not found for a member who no longer exists', async () => {
       const { service } = build({ member: null });
       await expect(service.read(token())).rejects.toBeInstanceOf(NotFoundException);
@@ -214,5 +264,24 @@ describe('LabosDigestPublicController', () => {
     await expect(controller.choose({ token: 't', newsItemUid: 'a', choice: 'love' })).rejects.toBeInstanceOf(
       BadRequestException
     );
+  });
+});
+
+describe('digestTopics (LAB-3289)', () => {
+  const vocabulary = buildNewsTagVocabulary([
+    { uid: 'a', title: 'Beta', parentUid: null },
+    { uid: 'b', title: 'Alpha', parentUid: null },
+  ]);
+  const choosable = [
+    { slug: 'beta', title: 'Beta', children: [] },
+    { slug: 'alpha', title: 'Alpha', children: [] },
+  ];
+
+  it('orders unweighted suggestions by title', () => {
+    expect(digestTopics([], choosable, vocabulary, new Map()).suggested.map((t) => t.slug)).toEqual(['alpha', 'beta']);
+  });
+
+  it('suggests nothing when every choosable tag is followed', () => {
+    expect(digestTopics(['alpha', 'beta'], choosable, vocabulary, new Map()).suggested).toEqual([]);
   });
 });
