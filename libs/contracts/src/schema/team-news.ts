@@ -742,6 +742,12 @@ export const LabosDigestPageRequestSchema = z.object({
 
 export const LabosDigestChoiceValueSchema = z.enum(['more', 'less']);
 
+export const LabosDigestPageSourceSchema = z.object({
+  url: z.string(),
+  /** The outlet's domain, without `www.`; null when the URL does not parse. */
+  domain: z.string().nullable(),
+});
+
 export const LabosDigestPageStorySchema = z.object({
   uid: z.string(),
   position: z.number().int(),
@@ -755,6 +761,14 @@ export const LabosDigestPageStorySchema = z.object({
   sourceDomain: z.string().nullable(),
   teamUid: z.string(),
   teamName: z.string(),
+  /** The team's logo URL, for the team header (LAB-3288). */
+  teamLogoUrl: z.string().nullable(),
+  /** True when the link's member follows the team. */
+  followsTeam: z.boolean(),
+  /** Every source of the story, main source first, without duplicates. */
+  sources: z.array(LabosDigestPageSourceSchema),
+  /** Feed comments on the story, replies included. */
+  commentCount: z.number().int(),
   eventType: NewsEventTypeSchema,
   tags: z.array(z.string()),
   choice: LabosDigestChoiceValueSchema.nullable(),
@@ -778,6 +792,10 @@ export const LabosDigestPageSchema = z.object({
   stories: z.array(LabosDigestPageStorySchema),
   forumPosts: z.array(LabosDigestPageForumPostSchema),
   forumUnavailable: z.boolean(),
+  /** True when the link's member belongs to at least one team now (LAB-3288). */
+  isTeamMember: z.boolean(),
+  /** When the next digest of this frequency goes out, ISO 8601. */
+  nextSendAt: z.string(),
 });
 
 export const LabosDigestChoiceRequestSchema = z.object({
@@ -795,6 +813,7 @@ export const LabosDigestChoiceResponseSchema = z.object({
 export type LabosDigestPage = z.infer<typeof LabosDigestPageSchema>;
 export type LabosDigestPageStory = z.infer<typeof LabosDigestPageStorySchema>;
 export type LabosDigestPageForumPost = z.infer<typeof LabosDigestPageForumPostSchema>;
+export type LabosDigestPageSource = z.infer<typeof LabosDigestPageSourceSchema>;
 export type LabosDigestChoiceValue = z.infer<typeof LabosDigestChoiceValueSchema>;
 export type LabosDigestChoiceRequest = z.infer<typeof LabosDigestChoiceRequestSchema>;
 export type LabosDigestChoiceResponse = z.infer<typeof LabosDigestChoiceResponseSchema>;
