@@ -1321,7 +1321,15 @@ export class PLEventGuestsService {
    *                          Can be 'memberName', 'teamName', or 'eventName'.
    * @returns {string} SQL orderBy clause to apply the sorting.
    */
-  applySorting(sortBy: string, sortDirection: string, uid: string) {
+  applySorting(sortBy: string, sortDirection: any, uid: string) {
+    // Only 'asc' | 'desc' may reach SQL; arrays resolve like buildOuterOrderBy (last non-empty item), junk -> asc.
+    // uid is interpolated below, so it must look like an id or it is ignored.
+    const last = Array.isArray(sortDirection)
+      ? [...sortDirection].reverse().find((x) => typeof x === 'string' && x.trim().length > 0) ??
+        sortDirection[sortDirection.length - 1]
+      : sortDirection;
+    sortDirection = String(last ?? '').trim().toLowerCase() === 'desc' ? 'desc' : 'asc';
+    uid = typeof uid === 'string' && /^[A-Za-z0-9_-]+$/.test(uid) ? uid : '';
     // Apply sorting based on the selected field
     switch (sortBy) {
       case 'member':
