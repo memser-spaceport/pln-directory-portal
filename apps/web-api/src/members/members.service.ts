@@ -212,9 +212,11 @@ export class MembersService {
       email: string;
       policies: any[];
       effectivePermissions: any[];
+      isTeamMember: boolean;
     }>
   > {
     try {
+      const now = new Date();
       const members = await this.prisma.member.findMany({
         where: {
           uid: {
@@ -257,6 +259,13 @@ export class MembersService {
               permission: true,
             },
           },
+          // LAB-3290: the digest email's "Got news from your team?" card. Same rule as the digest page's
+          // isTeamMember: a team role with no end date or one that hasn't passed.
+          teamMemberRoles: {
+            where: { OR: [{ endDate: null }, { endDate: { gte: now } }] },
+            select: { teamUid: true },
+            take: 1,
+          },
         },
       });
 
@@ -271,6 +280,7 @@ export class MembersService {
             email: member.email!,
             policies: authorization.policies,
             effectivePermissions: authorization.effectivePermissions,
+            isTeamMember: member.teamMemberRoles.length > 0,
           };
         });
     } catch (error) {
