@@ -815,6 +815,25 @@ export const LabosDigestNetworkNewsSchema = z.object({
   teamName: z.string(),
 });
 
+/** One row of Upcoming events (LAB-3292). */
+export const LabosDigestEventSchema = z.object({
+  uid: z.string(),
+  name: z.string(),
+  startDate: z.string(),
+  endDate: z.string(),
+  /** "Lisbon, Portugal", or null when the gathering has none. */
+  location: z.string().nullable(),
+  /** The gathering, for links that open the event. */
+  locationUid: z.string().nullable(),
+  /** The pln-events id: the calendar opens the event from `/embed/program#<externalId>`. */
+  externalId: z.string().nullable(),
+  logoUrl: z.string().nullable(),
+  /** IN_PERSON, VIRTUAL or INVITE_ONLY; null when not set. */
+  type: z.string().nullable(),
+  /** Distinct listed members going, as the event drawer counts them; null when the event hides it (invite-only). */
+  goingCount: z.number().int().nullable(),
+});
+
 export const LabosDigestPageSchema = z.object({
   frequency: LabosDigestFrequencySchema,
   sentAt: z.string(),
@@ -838,6 +857,8 @@ export const LabosDigestPageSchema = z.object({
   issues: z.array(LabosDigestPageIssueSchema),
   /** More from the network (LAB-3291), at most 5, newest first; empty hides the section. */
   networkNews: z.array(LabosDigestNetworkNewsSchema),
+  /** Upcoming events (LAB-3292): the next 4 weeks from now, soonest first, at most 5, and how many the window holds. */
+  events: z.object({ items: z.array(LabosDigestEventSchema), total: z.number().int() }),
 });
 
 export const LabosDigestChoiceRequestSchema = z.object({
@@ -882,6 +903,7 @@ export type LabosDigestPageForumPost = z.infer<typeof LabosDigestPageForumPostSc
 export type LabosDigestPageSource = z.infer<typeof LabosDigestPageSourceSchema>;
 export type LabosDigestPageIssue = z.infer<typeof LabosDigestPageIssueSchema>;
 export type LabosDigestNetworkNews = z.infer<typeof LabosDigestNetworkNewsSchema>;
+export type LabosDigestEvent = z.infer<typeof LabosDigestEventSchema>;
 export type RecordLabosDigestIssuesRequest = z.infer<typeof RecordLabosDigestIssuesRequestSchema>;
 export type LabosDigestChoiceValue = z.infer<typeof LabosDigestChoiceValueSchema>;
 export type LabosDigestChoiceRequest = z.infer<typeof LabosDigestChoiceRequestSchema>;

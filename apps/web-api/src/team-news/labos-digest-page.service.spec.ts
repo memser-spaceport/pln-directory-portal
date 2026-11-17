@@ -46,6 +46,9 @@ function build(
     }[];
     members?: string[];
     networkNews?: any[];
+    events?: any[];
+    eventTotal?: number;
+    guests?: Array<{ eventUid: string; memberUid: string }>;
   } = {}
 ) {
   const prisma = {
@@ -68,6 +71,11 @@ function build(
       findUnique: jest.fn(async () => ({ tags: ['ai'] })),
     },
     labosDigestChoice: { findMany: jest.fn(async () => opts.choices ?? []) },
+    pLEvent: {
+      findMany: jest.fn(async () => opts.events ?? []),
+      count: jest.fn(async () => opts.eventTotal ?? (opts.events ?? []).length),
+    },
+    pLEventGuest: { groupBy: jest.fn(async () => opts.guests ?? []) },
     follow: { findMany: jest.fn(async () => (opts.follows ?? []).map((entityUid) => ({ entityUid }))) },
     feedComment: {
       groupBy: jest.fn(async () =>
@@ -256,6 +264,69 @@ describe('LabosDigestPageService', () => {
             teamName: 'Team',
           },
           expect.objectContaining({ uid: 'y', domain: 'medtechdive.com', imageUrl: 'https://img/y.png' }),
+        ]);
+      });
+    });
+
+    describe('upcoming events (LAB-3292)', () => {
+      const event = (uid: string, extra: Record<string, unknown> = {}) => ({
+        uid,
+        name: `Event ${uid}`,
+        startDate: new Date('2026-11-20T10:00:00.000Z'),
+        endDate: new Date('2026-11-20T18:00:00.000Z'),
+        locationUid: 'loc1',
+        externalId: `ext-${uid}`,
+        type: 'IN_PERSON',
+        logo: { url: `https://logo/${uid}.png` },
+        location: { location: 'Lisbon, Portugal' },
+        ...extra,
+      });
+
+      it('asks for the next 28 days from now, soonest first, at most 5, and counts the window', async () => {
+        const { service, prisma } = build({ items: [item('a'), item('b')], eventTotal: 9 });
+        const { events } = await service.read(token());
+        const args = prisma.pLEvent.findMany.mock.calls[0][0];
+        const before = Date.now();
+        const { gt, lte } = args.where.startDate;
+        expect(Math.abs(gt.getTime() - before)).toBeLessThan(5000);
+        expect(lte.getTime() - gt.getTime()).toBe(28 * 24 * 60 * 60 * 1000);
+        expect(args.where.isDeleted).toBe(false);
+        expect(args.orderBy).toEqual({ startDate: 'asc' });
+        expect(args.take).toBe(5);
+        expect(prisma.pLEvent.count).toHaveBeenCalledWith({ where: args.where });
+        expect(events.total).toBe(9);
+      });
+
+      it('returns each event with distinct going members, hiding the count of an invite-only one', async () => {
+        const { service, prisma } = build({
+          items: [item('a'), item('b')],
+          events: [event('e1'), event('e2', { type: 'INVITE_ONLY', logo: null, location: null, externalId: null })],
+          guests: [
+            { eventUid: 'e1', memberUid: 'x' },
+            { eventUid: 'e1', memberUid: 'y' },
+          ],
+        });
+        const { events } = await service.read(token());
+        expect(prisma.pLEventGuest.groupBy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            by: ['eventUid', 'memberUid'],
+            where: expect.objectContaining({ eventUid: { in: ['e1'] } }),
+          })
+        );
+        expect(events.items).toEqual([
+          {
+            uid: 'e1',
+            name: 'Event e1',
+            startDate: '2026-11-20T10:00:00.000Z',
+            endDate: '2026-11-20T18:00:00.000Z',
+            location: 'Lisbon, Portugal',
+            locationUid: 'loc1',
+            externalId: 'ext-e1',
+            logoUrl: 'https://logo/e1.png',
+            type: 'IN_PERSON',
+            goingCount: 2,
+          },
+          expect.objectContaining({ uid: 'e2', location: null, logoUrl: null, externalId: null, goingCount: null }),
         ]);
       });
     });
