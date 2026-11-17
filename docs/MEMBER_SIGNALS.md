@@ -2,7 +2,7 @@
 
 The member signal log (`MemberSignal`) is an append-only history of what logged-in members do in the directory. The
 member interest profile ([MEMBER_INTEREST_PROFILE.md](./MEMBER_INTEREST_PROFILE.md)) is built from it. Tickets:
-LAB-3121 (stored actions + backfill), LAB-3123 (views and clicks). Spec: `openspec/specs/member-signals`.
+LAB-3121 (stored actions + backfill), LAB-3123 (views and clicks), LAB-3267 (news, job and event views). Spec: `openspec/specs/member-signals`.
 
 Code: `apps/web-api/src/member-signals/`.
 
@@ -12,7 +12,7 @@ Code: `apps/web-api/src/member-signals/`.
 | ------------ | --------------------------------------------------------------------------------------------- |
 | `memberUid`  | The acting member. Rows cascade when the member is deleted; nothing else deletes or updates.  |
 | `action`     | One of `MEMBER_SIGNAL_ACTIONS` (`member-signals.constants.ts`). Text, so no migration needed. |
-| `entityType` | `TEAM`, `MEMBER`, `PROJECT`, `NEWS_ITEM`, `JOB_OPENING`.                                      |
+| `entityType` | `TEAM`, `MEMBER`, `PROJECT`, `NEWS_ITEM`, `JOB_OPENING`, `EVENT` (a `PLEvent` uid).           |
 | `entityUid`  | Uid of the entity. Not checked for existence on the endpoint.                                 |
 | `own`        | The entity is the member, one of their teams (current or past), or belongs to them / a team.  |
 | `sourceKey`  | `backfill:<table>:<uid>` for backfilled rows; `null` for live rows.                           |
@@ -40,20 +40,48 @@ row only when something was deleted. Services call `void memberSignals.record(..
 Logged-in only (`UserTokenValidation`); the member comes from the session. Body `{ action, entityType, entityId }`,
 schema `MemberSignalBodySchema` in `libs/contracts/src/schema/member-signal.ts`.
 
-| Action                 | Allowed `entityType`        |
-| ---------------------- | --------------------------- |
-| `view`                 | `member`, `team`, `project` |
-| `search-result-click`  | `member`, `team`, `project` |
-| `contact-click`        | `member`                    |
-| `contact-copy`         | `member`                    |
-| `github-project-click` | `member`                    |
-| `team-contact-click`   | `team`                      |
-| `project-link-click`   | `project`                   |
+| Action                 | Allowed `entityType`                                             |
+| ---------------------- | ---------------------------------------------------------------- |
+| `view`                 | `member`, `team`, `project`, `news-item`, `job-opening`, `event` |
+| `search-result-click`  | `member`, `team`, `project`, `event`                             |
+| `contact-click`        | `member`                                                         |
+| `contact-copy`         | `member`                                                         |
+| `github-project-click` | `member`                                                         |
+| `team-contact-click`   | `team`                                                           |
+| `project-link-click`   | `project`                                                        |
+| `job-apply-click`      | `job-opening`                                                    |
+
+The stored entity type is the upper-case form: `news-item` → `NEWS_ITEM`, `job-opening` → `JOB_OPENING`, `event` →
+`EVENT`.
+
+- **News.** Opening a news item sends `view` on `news-item`. A click through to the item's source sends the same
+  `view`, so an open and a source click on one UTC day are one row.
+- **Jobs.** Opening a job sends `view` on `job-opening`. Clicking Apply sends `job-apply-click`, for the in-app form
+  and for an application on another site.
+- **Events.** Opening the event drawer sends `view` on `event`; clicking an event in the search results sends
+  `search-result-click`. The drawer exists only where the frontend has `NEXT_PUBLIC_SHOW_EVENT_DRAWER` on.
 
 Answers: `204` (also when the member is excluded or the view was already logged today), `400` for an unknown action /
 entity type, a pair not in the table, an empty or > 64 character `entityId`, or extra fields; `401` without a valid
 session. A valid session with no active directory member gets `204` and records nothing: a `401` would make the
-frontend fetch wrapper sign that user out. `view` is kept to one row per member, entity and UTC day; clicks and copies are never deduplicated.
+frontend fetch wrapper sign that user out.
+
+`view` is kept to one row per member, entity and UTC day; clicks and copies are never deduplicated.
+
+## Own rows
+
+`MemberSignalOwnershipResolver` (`member-signal-ownership.ts`) sets `own`:
+
+| Entity        | Own when                                                                                |
+| ------------- | --------------------------------------------------------------------------------------- |
+| `MEMBER`      | it is the member                                                                        |
+| `TEAM`        | the member has a role on it, current or past                                            |
+| `PROJECT`     | the member created it, or one of their teams maintains it                               |
+| `NEWS_ITEM`   | the member posted it, or it is news of one of their teams                               |
+| `JOB_OPENING` | it is a job of one of their teams                                                       |
+| `EVENT`       | the member, or one of their teams, is linked to it as host, co-host, speaker or sponsor |
+
+A team or member linked to an event only as an attendee does not make the event own.
 
 ## Exclusions
 

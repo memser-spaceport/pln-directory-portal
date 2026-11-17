@@ -5041,7 +5041,7 @@ model MemberSignal {
   memberUid  String
   member     Member   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
   action     String
-  /// TEAM | MEMBER | PROJECT | NEWS_ITEM | JOB_OPENING
+  /// TEAM | MEMBER | PROJECT | NEWS_ITEM | JOB_OPENING | EVENT
   entityType String
   entityUid  String
   /// The entity is the member, one of the member's teams, or something they own.
