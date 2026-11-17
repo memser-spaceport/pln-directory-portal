@@ -51,6 +51,13 @@ export const SOURCE_WEIGHTS = {
   ownCommentExpertise: 1,
 } as const;
 
+/**
+ * How much one "More like this" / "Less like this" on the digest page (LAB-3263) moves each of the story's topics.
+ * More adds it, Less takes it off (never below 0). An active choice counts at full weight, with no decay, until the
+ * member undoes it.
+ */
+export const DIGEST_CHOICE_WEIGHT_STEP = 2;
+
 /** Share of a contribution that reaches indirect targets. */
 export const INDIRECT_FACTORS = {
   /** News item → its team as an entity. */

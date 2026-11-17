@@ -31,8 +31,8 @@ function buildService(opts: {
   forYouTeams?: Record<string, string[]>;
   ownTeams?: Record<string, string[]>;
   tags?: Record<string, string[]>;
-  muted?: Record<string, string[]>;
   preferences?: Record<string, unknown>;
+  weights?: Record<string, Record<string, number>>;
 }) {
   const getForYouTeamUidsForMembers = jest.fn(
     async (uids: string[]) => new Map(uids.map((uid) => [uid, opts.forYouTeams?.[uid] ?? []]))
@@ -44,9 +44,6 @@ function buildService(opts: {
   const getEffectiveTagsForMembers = jest.fn(
     async (uids: string[]) => new Map(uids.map((uid) => [uid, new Set(opts.tags?.[uid] ?? [])]))
   );
-  const getMutedTagsForMembers = jest.fn(
-    async (uids: string[]) => new Map(uids.map((uid) => [uid, new Set(opts.muted?.[uid] ?? [])]))
-  );
   const prisma = {
     teamNewsItem: { findMany: jest.fn(async () => opts.rows), findFirst: jest.fn(async () => null) },
     member: {
@@ -55,13 +52,20 @@ function buildService(opts: {
       ),
     },
     focusArea: { findMany: jest.fn(async () => []) },
+    memberInterestProfileEntry: {
+      findMany: jest.fn(async () =>
+        Object.entries(opts.weights ?? {}).flatMap(([memberUid, w]) =>
+          Object.entries(w).map(([key, score]) => ({ memberUid, key, score }))
+        )
+      ),
+    },
     teamNewsForumLink: { findMany: jest.fn(async () => []) },
     teamNewsUpvote: { groupBy: jest.fn(async () => []), findMany: jest.fn(async () => []) },
   };
   const service = new TeamNewsQueryService(
     prisma as unknown as PrismaService,
     { getForYouTeamUidsForMembers, getForYouTeamUids, getOwnTeamUidsForMembers } as never,
-    { getEffectiveTagsForMembers, getMutedTagsForMembers } as never
+    { getEffectiveTagsForMembers } as never
   );
   return { service, getOwnTeamUidsForMembers, getEffectiveTagsForMembers };
 }
@@ -180,6 +184,38 @@ describe('getDigestNewsPicks by news tags (LAB-2999)', () => {
       expect(await picksOf(service)).toEqual(['ai-unrelated', 'own-story', 'launch-only']);
     });
 
+    describe('ordered by topic weights (LAB-3263)', () => {
+      const weighted = [
+        row('ai-1', 'team-a', ['ai'], 18),
+        row('ai-2', 'team-b', ['ai'], 17),
+        row('desci-1', 'team-c', ['desci'], 16),
+        row('desci-2', 'team-d', ['desci', 'ai'], 15),
+      ];
+
+      it('without weights keeps newest first', async () => {
+        const { service } = buildService({ rows: weighted, tags: { m1: ['ai', 'desci'] } });
+        expect(await picksOf(service)).toEqual(['ai-1', 'ai-2', 'desci-1']);
+      });
+
+      it('orders by the summed weights before the cut, so a lowered topic can drop out', async () => {
+        const { service } = buildService({
+          rows: weighted,
+          tags: { m1: ['ai', 'desci'] },
+          weights: { m1: { ai: 0.5, desci: 6 } },
+        });
+        expect(await picksOf(service)).toEqual(['desci-2', 'desci-1', 'ai-1']);
+      });
+
+      it('keeps the saved tags deciding what can be picked: a weight alone adds nothing', async () => {
+        const { service } = buildService({
+          rows: [...weighted, row('web3-1', 'team-e', ['web3'], 19)],
+          tags: { m1: ['ai'] },
+          weights: { m1: { web3: 50 } },
+        });
+        expect(await picksOf(service)).toEqual(['ai-1', 'ai-2', 'desci-2']);
+      });
+    });
+
     it('leaves topStory and windowCount as they are', async () => {
       const { service } = buildService({ rows, tags: { m1: ['ai'] } });
 
@@ -232,59 +268,5 @@ describe('listGroupedByFocusArea For You tag fields (LAB-2999)', () => {
     expect(result.forYouOwnTeamUids).toEqual([]);
     expect(result.forYouCategories).toEqual([]);
     expect(getEffectiveTagsForMembers).not.toHaveBeenCalled();
-  });
-});
-
-describe('getDigestNewsPicks skips muted tags (LAB-3263)', () => {
-  const original = process.env.NEWS_TAG_PICKS_ENABLED;
-  afterEach(() => {
-    if (original === undefined) delete process.env.NEWS_TAG_PICKS_ENABLED;
-    else process.env.NEWS_TAG_PICKS_ENABLED = original;
-  });
-
-  const rows = [
-    row('ai-unrelated', 'team-x', ['ai'], 18),
-    row('ai-followed', 'team-followed', ['ai'], 17),
-    row('desci-unrelated', 'team-y', ['desci'], 16),
-    row('launch-only', 'team-z', ['launch'], 14),
-  ];
-
-  it('leaves out a story with a muted tag from an unrelated team', async () => {
-    process.env.NEWS_TAG_PICKS_ENABLED = 'true';
-    const { service } = buildService({ rows, tags: { m1: ['ai', 'desci'] }, muted: { m1: ['ai'] } });
-    expect(await picksOf(service)).toEqual(['desci-unrelated']);
-  });
-
-  it('keeps a story with a muted tag from a followed team', async () => {
-    process.env.NEWS_TAG_PICKS_ENABLED = 'true';
-    const { service } = buildService({
-      rows,
-      ownTeams: { m1: ['team-followed'] },
-      tags: { m1: [] },
-      muted: { m1: ['ai'] },
-    });
-    expect(await picksOf(service)).toEqual(['ai-followed']);
-  });
-
-  it('leaves muted stories out of the newest-stories fallback too', async () => {
-    process.env.NEWS_TAG_PICKS_ENABLED = 'true';
-    const { service } = buildService({ rows, tags: { m1: [] }, muted: { m1: ['ai'] } });
-    expect(await picksOf(service)).toEqual(['desci-unrelated', 'launch-only']);
-  });
-
-  it('changes nothing when the member muted nothing', async () => {
-    process.env.NEWS_TAG_PICKS_ENABLED = 'true';
-    const { service } = buildService({ rows, tags: { m1: [] } });
-    expect(await picksOf(service)).toEqual(['ai-unrelated', 'ai-followed', 'desci-unrelated']);
-  });
-
-  it('ignores muted tags when tag picks are disabled', async () => {
-    delete process.env.NEWS_TAG_PICKS_ENABLED;
-    const { service } = buildService({
-      rows,
-      forYouTeams: { m1: ['team-x'] },
-      muted: { m1: ['ai'] },
-    });
-    expect(await picksOf(service)).toEqual(['ai-unrelated']);
   });
 });
