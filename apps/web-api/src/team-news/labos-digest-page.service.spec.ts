@@ -25,7 +25,16 @@ const item = (uid: string, extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
-function build(opts: { member?: { name: string } | null; items?: unknown[]; choices?: unknown[] } = {}) {
+function build(
+  opts: {
+    member?: { name: string } | null;
+    items?: unknown[];
+    choices?: unknown[];
+    follows?: string[];
+    comments?: Record<string, number>;
+    activeRoles?: number;
+  } = {}
+) {
   const prisma = {
     member: { findUnique: jest.fn(async () => (opts.member === undefined ? { name: 'Ada Lovelace' } : opts.member)) },
     teamNewsItem: {
@@ -33,6 +42,13 @@ function build(opts: { member?: { name: string } | null; items?: unknown[]; choi
       findUnique: jest.fn(async () => ({ tags: ['ai'] })),
     },
     labosDigestChoice: { findMany: jest.fn(async () => opts.choices ?? []) },
+    follow: { findMany: jest.fn(async () => (opts.follows ?? []).map((entityUid) => ({ entityUid }))) },
+    feedComment: {
+      groupBy: jest.fn(async () =>
+        Object.entries(opts.comments ?? {}).map(([newsItemUid, all]) => ({ newsItemUid, _count: { _all: all } }))
+      ),
+    },
+    teamMemberRole: { count: jest.fn(async () => opts.activeRoles ?? 0) },
     $transaction: jest.fn(),
   };
   const vocabulary = {
@@ -75,6 +91,51 @@ describe('LabosDigestPageService', () => {
       ]);
       expect(page).toMatchObject({ frequency: 'weekly', firstName: 'Ada', forumPosts: [], forumUnavailable: false });
       expect(forum.read).toHaveBeenCalledWith([101]);
+    });
+
+    it('adds the team header, sources, comment counts, team membership and next send (LAB-3288)', async () => {
+      const { service, prisma } = build({
+        items: [
+          item('a', {
+            sourceUrls: ['https://www.src/a/', 'https://press.example/a', ' '],
+            team: { uid: 'team-a', name: 'Team a', logo: { url: 'https://img/a.png' } },
+          }),
+          item('b'),
+        ],
+        follows: ['team-a'],
+        comments: { a: 3 },
+        activeRoles: 1,
+      });
+
+      const page = await service.read(token());
+
+      const a = page.stories.find((s) => s.uid === 'a');
+      const b = page.stories.find((s) => s.uid === 'b');
+      expect(a).toMatchObject({
+        teamLogoUrl: 'https://img/a.png',
+        followsTeam: true,
+        commentCount: 3,
+        sources: [
+          { url: 'https://src/a', domain: 'src' },
+          { url: 'https://press.example/a', domain: 'press.example' },
+        ],
+      });
+      expect(b).toMatchObject({
+        teamLogoUrl: null,
+        followsTeam: false,
+        commentCount: 0,
+        sources: [{ url: 'https://src/b', domain: 'src' }],
+      });
+      expect(page.isTeamMember).toBe(true);
+      expect(new Date(page.nextSendAt).getTime()).toBeGreaterThan(Date.now());
+      expect(prisma.follow.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { memberUid: 'm1', entityType: 'TEAM' } })
+      );
+    });
+
+    it('is not a team member without an active role', async () => {
+      const { service } = build({ items: [item('a')] });
+      expect((await service.read(token())).isTeamMember).toBe(false);
     });
 
     it('is not found for a member who no longer exists', async () => {

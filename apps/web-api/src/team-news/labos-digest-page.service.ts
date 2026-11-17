@@ -4,6 +4,7 @@ import type {
   LabosDigestChoiceResponse,
   LabosDigestChoiceValue,
   LabosDigestPage,
+  LabosDigestPageSource,
 } from 'libs/contracts/src/schema/team-news';
 import { PrismaService } from '../shared/prisma.service';
 import { CacheService } from '../utils/cache/cache.service';
@@ -23,11 +24,26 @@ import {
   MIN_STORED_SCORE,
 } from '../member-interest-profile/member-interest-profile.constants';
 import { TEAM_NEWS_IMAGE_SELECT, toNewsImageDto } from './utils/news-image-variants';
+import { extractDomain, normalizeSourceUrl } from './utils/url-normalize';
+import { nextDigestSendAt } from './labos-digest-schedule.util';
 
 const toChoiceValue = (kind: LabosDigestChoiceKind): LabosDigestChoiceValue => (kind === 'MORE' ? 'more' : 'less');
 const toChoiceKind = (value: LabosDigestChoiceValue): LabosDigestChoiceKind => (value === 'more' ? 'MORE' : 'LESS');
 
 type Tx = Prisma.TransactionClient;
+
+/** The story's main source, then its other sources, each once (compared after URL normalization). */
+export function storySources(sourceUrl: string, sourceUrls: string[] | null | undefined): LabosDigestPageSource[] {
+  const seen = new Set<string>();
+  return [sourceUrl, ...(sourceUrls ?? [])].flatMap((raw) => {
+    const url = raw?.trim();
+    if (!url) return [];
+    const key = normalizeSourceUrl(url);
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return [{ url, domain: extractDomain(url) }];
+  });
+}
 
 /**
  * The public digest page (LAB-3263): reads one member's digest from a signed email link, and saves their
@@ -46,7 +62,8 @@ export class LabosDigestPageService {
   /** @throws DigestLinkError for a bad token; NotFoundException when the member no longer exists. */
   async read(token: string): Promise<LabosDigestPage> {
     const link = verifyDigestLinkToken(token);
-    const [member, items, choices, forum] = await Promise.all([
+    const now = new Date();
+    const [member, items, choices, forum, follows, comments, activeRoles] = await Promise.all([
       this.prisma.member.findUnique({ where: { uid: link.m }, select: { name: true } }),
       this.prisma.teamNewsItem.findMany({
         where: { uid: { in: link.n } },
@@ -57,10 +74,11 @@ export class LabosDigestPageService {
           contentHtml: true,
           imageUrl: true,
           sourceUrl: true,
+          sourceUrls: true,
           sourceDomain: true,
           eventType: true,
           tags: true,
-          team: { select: { uid: true, name: true } },
+          team: { select: { uid: true, name: true, logo: { select: { url: true } } } },
           ...TEAM_NEWS_IMAGE_SELECT,
         },
       }),
@@ -69,6 +87,18 @@ export class LabosDigestPageService {
         select: { newsItemUid: true, choice: true },
       }),
       this.forum.read(link.p),
+      this.prisma.follow.findMany({
+        where: { memberUid: link.m, entityType: 'TEAM' },
+        select: { entityUid: true },
+      }),
+      this.prisma.feedComment.groupBy({
+        by: ['newsItemUid'],
+        where: { newsItemUid: { in: link.n } },
+        _count: { _all: true },
+      }),
+      this.prisma.teamMemberRole.count({
+        where: { memberUid: link.m, OR: [{ endDate: null }, { endDate: { gte: now } }] },
+      }),
     ]);
     if (!member) throw new NotFoundException('Digest not found');
 
@@ -76,6 +106,8 @@ export class LabosDigestPageService {
     const choiceByUid = new Map<string, LabosDigestChoiceValue>(
       choices.map((c) => [c.newsItemUid, toChoiceValue(c.choice)])
     );
+    const followedTeams = new Set(follows.map((f) => f.entityUid));
+    const commentsByUid = new Map(comments.map((c) => [c.newsItemUid, c._count._all]));
     const stories = link.n.flatMap((uid, position): LabosDigestPage['stories'] => {
       const item = itemByUid.get(uid);
       if (!item) return [];
@@ -93,6 +125,10 @@ export class LabosDigestPageService {
           sourceDomain: item.sourceDomain,
           teamUid: item.team.uid,
           teamName: item.team.name,
+          teamLogoUrl: item.team.logo?.url ?? null,
+          followsTeam: followedTeams.has(item.team.uid),
+          sources: storySources(item.sourceUrl, item.sourceUrls),
+          commentCount: commentsByUid.get(item.uid) ?? 0,
           eventType: item.eventType as NewsEventType,
           tags: item.tags,
           choice: choiceByUid.get(item.uid) ?? null,
@@ -107,6 +143,8 @@ export class LabosDigestPageService {
       stories,
       forumPosts: forum.posts,
       forumUnavailable: forum.unavailable,
+      isTeamMember: activeRoles > 0,
+      nextSendAt: nextDigestSendAt(link.f, now).toISOString(),
     };
   }
 
