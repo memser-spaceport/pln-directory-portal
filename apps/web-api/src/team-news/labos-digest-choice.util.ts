@@ -1,91 +1,86 @@
 /**
- * The preference maths behind "More like this", "Less like this" and Undo on the digest page (LAB-3263).
- * Pure: the service reads the member's stored lists under a row lock, calls these, and writes the result.
+ * The weight maths behind "More like this", "Less like this" and Undo on the digest page (LAB-3263).
+ *
+ * A choice moves the member's interest profile `TOPIC` weights for the story's focus-area tags: More adds one step,
+ * Less takes one step off, never below 0. It never changes the member's saved news tags. Pure: the page service reads
+ * the weights under a row lock, calls these and writes the result; the daily profile rebuild calls
+ * `digestChoiceTopicDeltas` to keep active choices in the rebuilt profile.
  */
 
-/** What is stored now: `undefined` means the key is absent from `Member.preferences`. */
-export type StoredNewsLists = { newsTags: string[] | undefined; muted: string[] | undefined };
+/** Topic weights, focus-area slug → score. A missing slug is 0 (the profile stores no row below its minimum). */
+export type TopicWeights = Record<string, number>;
 
-export type NewsLists = { newsTags: string[]; muted: string[] };
+export type DigestChoiceValue = 'more' | 'less';
 
-export type ChoiceDelta = {
-  addedTags: string[];
-  removedTags: string[];
-  mutedAdded: string[];
-  mutedRemoved: string[];
-};
+/** Two weights closer than this are the same (the rebuild rounds scores to 4 decimals). */
+const EPSILON = 0.0001;
 
-export type AppliedChoice = { after: NewsLists; delta: ChoiceDelta; changed: boolean };
+const round = (score: number) => Math.round(score * 10000) / 10000;
 
-const without = (list: string[], drop: Iterable<string>): string[] => {
-  const dropSet = new Set(drop);
-  return list.filter((tag) => !dropSet.has(tag));
-};
-
-const union = (list: string[], add: Iterable<string>): string[] => {
-  const result = [...list];
-  for (const tag of add) if (!result.includes(tag)) result.push(tag);
-  return result;
-};
-
-const sameList = (a: string[] | undefined, b: string[] | undefined): boolean =>
-  (a === undefined && b === undefined) ||
-  (a !== undefined && b !== undefined && a.length === b.length && a.every((tag, i) => tag === b[i]));
+const weightOf = (weights: TopicWeights, slug: string) => weights[slug] ?? 0;
 
 /** The story's tags that are focus-area slugs, de-duplicated, in story order. */
 export function storyFocusTags(tags: string[] | null | undefined, isFocusArea: (slug: string) => boolean): string[] {
   return [...new Set((tags ?? []).map((tag) => tag.trim().toLowerCase()).filter(isFocusArea))];
 }
 
-/**
- * Applies More or Less to the stored lists. The base is the saved news tags, or the starting tags (minus muted)
- * when the member has none saved; the result is always written as an explicit list.
- */
-export function applyChoice(
-  stored: StoredNewsLists,
-  startingTags: string[],
-  storyTags: string[],
-  choice: 'more' | 'less'
-): AppliedChoice {
-  const mutedBefore = stored.muted ?? [];
-  const hasSaved = (stored.newsTags ?? []).length > 0;
-  const base = hasSaved ? (stored.newsTags as string[]) : without(startingTags, mutedBefore);
-
-  const after: NewsLists =
-    choice === 'more'
-      ? { newsTags: union(base, storyTags), muted: without(mutedBefore, storyTags) }
-      : { newsTags: without(base, storyTags), muted: union(mutedBefore, storyTags) };
-
-  const storedTags = stored.newsTags ?? [];
-  const delta: ChoiceDelta = {
-    addedTags: without(after.newsTags, storedTags),
-    removedTags: without(storedTags, after.newsTags),
-    mutedAdded: without(after.muted, mutedBefore),
-    mutedRemoved: without(mutedBefore, after.muted),
-  };
-  const changed =
-    delta.addedTags.length + delta.removedTags.length + delta.mutedAdded.length + delta.mutedRemoved.length > 0;
-  return { after, delta, changed };
+/** The weights of `topics` after one press: + step for More, - step for Less, never below 0. */
+export function applyChoiceToWeights(
+  current: TopicWeights,
+  topics: string[],
+  choice: DigestChoiceValue,
+  step: number
+): TopicWeights {
+  const delta = choice === 'more' ? step : -step;
+  return Object.fromEntries(topics.map((slug) => [slug, round(Math.max(0, weightOf(current, slug) + delta))]));
 }
 
 /**
- * Undoes one choice. When the stored lists are still exactly what the choice left, the lists from before the
- * choice come back as they were, including an absent key. Otherwise only the choice's own delta is reverted,
- * so later changes stay.
+ * Undoes one choice, topic by topic. A weight that is still what the choice left goes back to what it was before.
+ * A weight that changed since (a later choice, or the daily rebuild) loses only this choice's own change, so later
+ * changes stay. Never below 0.
  */
-export function undoChoice(
-  current: StoredNewsLists,
-  recorded: { before: StoredNewsLists; after: NewsLists; delta: ChoiceDelta }
-): StoredNewsLists {
-  if (sameList(current.newsTags, recorded.after.newsTags) && sameList(current.muted, recorded.after.muted)) {
-    return { newsTags: recorded.before.newsTags, muted: recorded.before.muted };
+export function undoChoiceWeights(current: TopicWeights, before: TopicWeights, after: TopicWeights): TopicWeights {
+  const slugs = new Set([...Object.keys(before), ...Object.keys(after)]);
+  return Object.fromEntries(
+    [...slugs].map((slug) => {
+      const now = weightOf(current, slug);
+      const left = weightOf(after, slug);
+      if (Math.abs(now - left) < EPSILON) return [slug, weightOf(before, slug)];
+      return [slug, round(Math.max(0, now - (left - weightOf(before, slug))))];
+    })
+  );
+}
+
+/**
+ * What the active choices add to each topic in the daily rebuild: + step per More, - step per Less, no decay.
+ * The rebuild adds these to the built scores and keeps each score at 0 or more.
+ */
+export function digestChoiceTopicDeltas(
+  choices: { choice: 'MORE' | 'LESS'; tags: string[] | null | undefined }[],
+  isFocusArea: (slug: string) => boolean,
+  step: number
+): Map<string, number> {
+  const deltas = new Map<string, number>();
+  for (const { choice, tags } of choices) {
+    const delta = choice === 'MORE' ? step : -step;
+    for (const slug of storyFocusTags(tags, isFocusArea)) deltas.set(slug, (deltas.get(slug) ?? 0) + delta);
   }
-  const newsTags = union(without(current.newsTags ?? [], recorded.delta.addedTags), recorded.delta.removedTags);
-  const muted = union(without(current.muted ?? [], recorded.delta.mutedAdded), recorded.delta.mutedRemoved);
-  return { newsTags, muted };
+  return deltas;
 }
 
-/** Reads a `before*` / `after*` JSON column back into a list, or `undefined` for null. */
-export function jsonToList(value: unknown): string[] | undefined {
-  return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : undefined;
+/** Reads a stored `beforeWeights` / `afterWeights` JSON object, or undefined for rows saved before weights. */
+export function jsonToWeights(value: unknown): TopicWeights | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).filter(
+      (entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isFinite(entry[1])
+    )
+  );
+}
+
+/** True when the two weight maps differ on any slug. */
+export function weightsDiffer(a: TopicWeights, b: TopicWeights): boolean {
+  const slugs = new Set([...Object.keys(a), ...Object.keys(b)]);
+  return [...slugs].some((slug) => Math.abs(weightOf(a, slug) - weightOf(b, slug)) >= EPSILON);
 }

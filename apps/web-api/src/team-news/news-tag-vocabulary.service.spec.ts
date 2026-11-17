@@ -251,38 +251,6 @@ describe('NewsTagVocabularyService', () => {
     });
   });
 
-  describe('muted tags (LAB-3263)', () => {
-    it('removes a muted starting tag from the effective tags', async () => {
-      const prisma = buildPrisma({ m1: ['AI', 'Data Ownership'] }, { m1: { newsTagsMuted: ['ai'] } });
-      const service = new NewsTagVocabularyService(prisma as any);
-
-      const tags = await service.getEffectiveTagsForMembers(['m1']);
-
-      expect([...(tags.get('m1') ?? [])]).toEqual(['data-ownership']);
-    });
-
-    it('removes the children of a muted parent', async () => {
-      const service = new NewsTagVocabularyService(
-        buildPrisma({}, { m1: { newsTags: ['digital-human-rights'], newsTagsMuted: ['digital-human-rights'] } }) as any
-      );
-
-      const tags = await service.getEffectiveTagsForMembers(['m1']);
-
-      expect([...(tags.get('m1') ?? [])]).toEqual([]);
-    });
-
-    it('returns each member muted tags, expanded, with an empty set for the rest', async () => {
-      const service = new NewsTagVocabularyService(
-        buildPrisma({}, { m1: { newsTagsMuted: ['digital-human-rights'] } }) as any
-      );
-
-      const muted = await service.getMutedTagsForMembers(['m1', 'm2']);
-
-      expect([...(muted.get('m1') ?? [])].sort()).toEqual(['data-ownership', 'digital-human-rights']);
-      expect([...(muted.get('m2') ?? [])]).toEqual([]);
-    });
-  });
-
   describe('AI tags (LAB-3249)', () => {
     const flag = process.env.NEWS_PROFILE_STARTING_TAGS_ENABLED;
     afterEach(() => {

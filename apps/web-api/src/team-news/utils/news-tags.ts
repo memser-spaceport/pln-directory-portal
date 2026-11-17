@@ -48,31 +48,17 @@ export function readChosenNewsTags(preferences: unknown): string[] | undefined {
 }
 
 /**
- * The member's muted news tags (LAB-3263, "Less like this"): focus-area slugs
- * stored as `Member.preferences.newsTagsMuted`. A missing key is an empty list.
- */
-export function readMutedNewsTags(preferences: unknown): string[] {
-  if (!preferences || typeof preferences !== 'object') return [];
-  const stored = (preferences as Record<string, unknown>).newsTagsMuted;
-  if (!Array.isArray(stored)) return [];
-  return stored.filter((v): v is string => typeof v === 'string');
-}
-
-/**
  * What the preferences GET returns for news tags: the saved list, or, for a
  * member with no saved tags (never saved, or saved an empty list), the
- * starting tags from `seed` marked as seeded. Muted tags are left out of both
- * (LAB-3263), so a muted tag never comes back as a starting tag. Reading never
- * stores anything.
+ * starting tags from `seed` marked as seeded. Reading never stores anything.
  */
 export async function resolveNewsTags(
   preferences: unknown,
   seed: () => Promise<string[]>
 ): Promise<{ newsTags: string[]; newsTagsSeeded?: true }> {
-  const muted = new Set(readMutedNewsTags(preferences));
   const chosen = readChosenNewsTags(preferences);
-  if (chosen) return { newsTags: chosen.filter((tag) => !muted.has(tag)) };
-  return { newsTags: (await seed()).filter((tag) => !muted.has(tag)), newsTagsSeeded: true };
+  if (chosen) return { newsTags: chosen };
+  return { newsTags: await seed(), newsTagsSeeded: true };
 }
 
 /**

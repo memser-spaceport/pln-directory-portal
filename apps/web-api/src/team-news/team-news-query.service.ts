@@ -21,7 +21,7 @@ import type {
 import { buildTeamNewsEventDateWhere } from './team-news-event-date.where';
 import { TEAM_NEWS_EXCLUDED_TEAM_NAMES } from './team-news-public-list.config';
 import { TeamNewsSuggestionsService } from './team-news-suggestions.service';
-import { selectForYouNewsItems, selectNewsItemsByTagsAndTeams, skipMutedNewsItems } from './select-for-you-news-items';
+import { selectForYouNewsItems, selectNewsItemsByTagsAndTeams } from './select-for-you-news-items';
 import { readNewsCategoryTags } from './utils/news-category-tags';
 import { narrowsNews, readNewsCategories } from './utils/news-categories';
 import { groupUsedNewsTags, NewsTagVocabularyService } from './news-tag-vocabulary.service';
@@ -701,25 +701,19 @@ export class TeamNewsQueryService {
     const fallback = items.slice(0, limit);
     const picks: Record<string, TeamNewsItemDto[]> = {};
     if (memberUids.length === 0) return picks;
-    const vocabularyService = this.tagVocabulary as NewsTagVocabularyService;
-    const [tagsByMember, ownByMember, categoriesByMember, mutedByMember] = await Promise.all([
-      vocabularyService.getEffectiveTagsForMembers(memberUids),
+    const [tagsByMember, ownByMember, categoriesByMember] = await Promise.all([
+      (this.tagVocabulary as NewsTagVocabularyService).getEffectiveTagsForMembers(memberUids),
       (this.suggestionsService as TeamNewsSuggestionsService).getOwnTeamUidsForMembers(memberUids),
       this.loadNewsCategoryTags(memberUids),
-      vocabularyService.getMutedTagsForMembers(memberUids),
     ]);
     for (const memberUid of memberUids) {
-      const own = ownByMember.get(memberUid) ?? new Set<string>();
-      const muted = mutedByMember.get(memberUid) ?? new Set<string>();
-      // LAB-3263: a story with a muted tag is left out, fallback included, unless it is from an own or followed team.
-      const memberItems: TeamNewsItemDto[] = skipMutedNewsItems<TeamNewsItemDto>(items, own, muted);
       const matched = selectNewsItemsByTagsAndTeams(
-        memberItems,
-        own,
+        items,
+        ownByMember.get(memberUid) ?? new Set(),
         tagsByMember.get(memberUid) ?? new Set(),
         new Set(categoriesByMember.get(memberUid) ?? [])
       ).slice(0, limit);
-      picks[memberUid] = matched.length > 0 ? matched : muted.size > 0 ? memberItems.slice(0, limit) : fallback;
+      picks[memberUid] = matched.length > 0 ? matched : fallback;
     }
     return picks;
   }
