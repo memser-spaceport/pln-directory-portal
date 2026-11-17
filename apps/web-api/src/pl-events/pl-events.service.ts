@@ -18,12 +18,19 @@ import { ResponseUpcomingEvents } from '@protocol-labs-network/contracts';
 import { EventsToolingService } from '../events/events-tooling.service';
 import { CacheService } from '../utils/cache/cache.service';
 import {IrlGatheringPushCandidatesService} from "./push/irl-gathering-push-candidates.service";
-import { UpcomingEventsOptions, toUpcomingEvent, upcomingEventsFindArgs } from './upcoming-events-query';
+import {
+  UpcomingEventsOptions,
+  countableUpcomingEventUids,
+  goingCountsByEvent,
+  toUpcomingEvent,
+  upcomingEventsFindArgs,
+} from './upcoming-events-query';
 import {
   GUEST_PERSON_SELECT,
   facesFindArgs,
   hidesAttendance,
   listedGuestWhere,
+  listedGuestsWhereIn,
   toPLEventDetail,
 } from './pl-event-detail';
 import type { ResponsePLEventDetail } from 'libs/contracts/src/schema/pl-event-attendance';
@@ -410,6 +417,7 @@ export class PLEventsService {
             externalId: true,
             locationUid: true,
             websiteURL: true,
+            type: true,
             startDate: true,
             endDate: true,
             logo: {
@@ -431,7 +439,16 @@ export class PLEventsService {
         take ? this.prisma.pLEvent.count({ where }) : Promise.resolve(undefined),
       ]);
 
-      const items = events.map(toUpcomingEvent);
+      // LAB-3271: the drawer's going count for each card, in one query.
+      const counted = countableUpcomingEventUids(events);
+      const goingGroups = counted.length
+        ? await this.prisma.pLEventGuest.groupBy({ by: ['eventUid', 'memberUid'], where: listedGuestsWhereIn(counted) })
+        : [];
+      const counts = goingCountsByEvent(goingGroups);
+      const countedSet = new Set(counted);
+      const items = events.map((event) =>
+        toUpcomingEvent(event, countedSet.has(event.uid) ? counts.get(event.uid) ?? 0 : null)
+      );
       return { items, total: total ?? items.length };
     } catch (err) {
       return this.handleErrors(err);

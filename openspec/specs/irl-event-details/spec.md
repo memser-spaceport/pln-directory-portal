@@ -134,3 +134,19 @@ Every row of `GET /v1/irl/events/upcoming` SHALL include `locationUid`: the even
 - **GIVEN** an upcoming event in gathering G
 - **WHEN** `GET /v1/irl/events/upcoming` is called
 - **THEN** its row has `locationUid` equal to G's uid
+
+### Requirement: Upcoming events carry their going count
+
+Every row of `GET /v1/irl/events/upcoming` SHALL include `goingCount` (LAB-3271). It is the number of distinct listed members who go, the same count as the event drawer. The endpoint has no viewer, so it SHALL follow the signed-out rule: an invite-only event SHALL return `goingCount: null`. An event with no listed guests SHALL return 0. The count SHALL use one grouped query for the whole page. All other fields SHALL stay as they are.
+
+#### Scenario: An open event with guests
+
+- **GIVEN** an upcoming open event with 3 listed members who go, one of them listed twice
+- **WHEN** `GET /v1/irl/events/upcoming` is called
+- **THEN** its row has `goingCount` equal to 3
+
+#### Scenario: An invite-only event
+
+- **GIVEN** an upcoming invite-only event with listed guests
+- **WHEN** `GET /v1/irl/events/upcoming` is called
+- **THEN** its row has `goingCount` null
