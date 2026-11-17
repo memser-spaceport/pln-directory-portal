@@ -41,6 +41,7 @@ function sources(overrides: Partial<ProfileSources> = {}): ProfileSources {
     declaredInterests: [],
     savedNewsTags: [],
     ownPosts: [],
+    digestChoices: [],
     ...overrides,
   };
 }
@@ -263,6 +264,33 @@ describe('buildProfile (LAB-3122)', () => {
       OPTIONS
     );
     expect(profile).toEqual([]);
+  });
+
+  describe('digest page choices (LAB-3263)', () => {
+    it('More adds the step to the story topics, on top of other sources, with no decay', () => {
+      const profile = buildProfile(
+        sources({ savedNewsTags: ['ai'], digestChoices: [{ choice: 'MORE', tags: ['ai', 'defi', 'launch'] }] }),
+        lookups(),
+        OPTIONS
+      );
+      expect(score(profile, 'TOPIC', 'ai')).toBe(6);
+      expect(score(profile, 'TOPIC', 'defi')).toBe(2);
+      expect(score(profile, 'TOPIC', 'launch')).toBeUndefined();
+    });
+
+    it('Less lowers a saved tag topic without removing the saved tag, and never below 0', () => {
+      const input = sources({
+        savedNewsTags: ['ai'],
+        digestChoices: [
+          { choice: 'LESS', tags: ['ai'] },
+          { choice: 'LESS', tags: ['defi'] },
+        ],
+      });
+      const profile = buildProfile(input, lookups(), OPTIONS);
+      expect(score(profile, 'TOPIC', 'ai')).toBe(2);
+      expect(score(profile, 'TOPIC', 'defi')).toBeUndefined();
+      expect(input.savedNewsTags).toEqual(['ai']);
+    });
   });
 });
 

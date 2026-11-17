@@ -1,5 +1,7 @@
 import { MEMBER_SIGNAL_REMOVALS, MemberSignalAction } from '../member-signals/member-signals.constants';
+import { digestChoiceTopicDeltas } from '../team-news/labos-digest-choice.util';
 import {
+  DIGEST_CHOICE_WEIGHT_STEP,
   INDIRECT_FACTORS,
   MIN_STORED_SCORE,
   ProfileEntityType,
@@ -20,6 +22,8 @@ import {
  * - the current team adds its focus areas at a low weight, never itself
  * - own posts and own-team comments add to expertise only
  * - an event counts through its linked teams: the team in full, its focus areas in part
+ * - active digest page choices (LAB-3263) apply last: More adds DIGEST_CHOICE_WEIGHT_STEP to the story's
+ *   topics, Less takes it off, never below 0, no decay
  */
 export type SignalRow = {
   action: string;
@@ -42,6 +46,8 @@ export type ProfileSources = {
   declaredInterests: string[];
   savedNewsTags: string[];
   ownPosts: { tags: string[]; createdAt: Date }[];
+  /** Active (not undone) "More like this" / "Less like this" choices on the digest page, with the story's tags. */
+  digestChoices: { choice: 'MORE' | 'LESS'; tags: string[] }[];
 };
 
 export type ProfileLookups = {
@@ -184,6 +190,18 @@ export function buildProfile(
 
   for (const { tags, createdAt } of sources.ownPosts) {
     addTopics(tags, SOURCE_WEIGHTS.ownPostExpertise * decay(createdAt), 'EXPERTISE');
+  }
+
+  // Digest page choices last, so Less can lower a topic whatever its source. Never below 0.
+  for (const [slug, delta] of digestChoiceTopicDeltas(
+    sources.digestChoices,
+    lookups.isTopic,
+    DIGEST_CHOICE_WEIGHT_STEP
+  )) {
+    const id = `TOPIC|${slug}`;
+    const entry = scores.get(id) ?? { kind: 'TOPIC' as const, key: slug, score: 0 };
+    entry.score = Math.max(0, entry.score + delta);
+    scores.set(id, entry);
   }
 
   return [...scores.values()]

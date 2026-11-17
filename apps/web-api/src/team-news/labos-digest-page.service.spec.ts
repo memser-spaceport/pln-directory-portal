@@ -37,7 +37,6 @@ function build(opts: { member?: { name: string } | null; items?: unknown[]; choi
   };
   const vocabulary = {
     getVocabulary: jest.fn(async () => buildNewsTagVocabulary([{ uid: 'fa-ai', title: 'AI', parentUid: null }])),
-    seedTagsForMember: jest.fn(async () => []),
   };
   const forum = { read: jest.fn(async () => ({ posts: [], unavailable: false })) };
   const cache = { reset: jest.fn() };

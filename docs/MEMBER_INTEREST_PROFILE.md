@@ -1,9 +1,9 @@
 # Member interest profile
 
 A stored, per-member profile of topics, entities and expertise (LAB-3122), built daily from the member signal log
-([MEMBER_SIGNALS.md](./MEMBER_SIGNALS.md)) and the interests members declare. v0 only collects: **no member-facing
-endpoint returns it, and one feature reads it, behind a flag that is off by default**
-([News starting tags](#news-starting-tags)), until the LAB-3124 pilot passes. Spec: `openspec/specs/member-interest-profile`.
+([MEMBER_SIGNALS.md](./MEMBER_SIGNALS.md)) and the interests members declare. **No member-facing endpoint returns it.**
+Two features read it: [News starting tags](#news-starting-tags), behind a flag that is off by default, and the order of the
+digest tag picks (LAB-3263, with `NEWS_TAG_PICKS_ENABLED`). The digest page "More like this" / "Less like this" write it. Spec: `openspec/specs/member-interest-profile`.
 
 Code: `apps/web-api/src/member-interest-profile/`. All tunables are in `member-interest-profile.constants.ts`; all
 scoring rules are in the pure `build-profile.ts`.
@@ -35,6 +35,13 @@ instances.
 - **Declared**: skills, custom skills and office hours interests that match a focus area (no decay).
 - **Saved news tags** (`preferences.newsTags`): read only, never changed (no decay).
 - **Expertise**: the member's own news posts, and their comments on own-team news.
+- **Digest page choices** (LAB-3263): active "More like this" / "Less like this" on a digest story
+  (`LabosDigestChoice`, `undoneAt` null). More adds `DIGEST_CHOICE_WEIGHT_STEP` (2) to each of the story's topics,
+  Less takes it off. Applied after every other source, never below 0, no decay; Undo ends it. A choice never
+  changes `preferences.newsTags`.
+
+The digest tag picks (`NEWS_TAG_PICKS_ENABLED`) read the `TOPIC` weights too: a member's matching stories are ordered by
+the sum of their weights for each story's tags before the limit (LAB-3263).
 
 ## Rules
 
@@ -54,7 +61,10 @@ instances.
 - Cron `MEMBER_INTEREST_PROFILE_CRON`, default `0 4 * * *` UTC. One instance wins the claim (advisory lock + the run
   table); a cron run is skipped when a cron rebuild already finished that UTC day. A RUNNING row older than 3 hours is
   treated as crashed.
-- Members are processed in uid order, 500 per batch; each batch's rows are replaced in one transaction. Rows of
+- Members are processed in uid order, 500 per batch; each batch's rows are replaced in one transaction. A digest page
+  choice also writes the member's topic rows at once (same transaction as the choice), so it shows before the next
+  rebuild; the rebuild then applies it again from the choice table. A choice saved while its member's batch is being
+  rebuilt shows from the next rebuild. Rows of
   members that were deleted or became excluded are removed at the end.
 - Each finished run sends `member-interest-profile-computed` (`membersCount`, `nonEmptyCount`, `durationMs`).
 
