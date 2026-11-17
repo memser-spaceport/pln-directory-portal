@@ -802,6 +802,19 @@ export const LabosDigestPageIssueSchema = z.object({
   isLinkIssue: z.boolean(),
 });
 
+/** One row of More from the network (LAB-3291): other press about network teams in the issue's week. */
+export const LabosDigestNetworkNewsSchema = z.object({
+  uid: z.string(),
+  title: z.string(),
+  url: z.string(),
+  /** The outlet, as the source's domain. */
+  domain: z.string().nullable(),
+  image: TeamNewsImageSchema.nullable(),
+  imageUrl: z.string().nullable(),
+  eventDate: z.string(),
+  teamName: z.string(),
+});
+
 export const LabosDigestPageSchema = z.object({
   frequency: LabosDigestFrequencySchema,
   sentAt: z.string(),
@@ -823,6 +836,8 @@ export const LabosDigestPageSchema = z.object({
   }),
   /** The member's latest issues, newest first, at most 8, the link's own issue always among them (LAB-3294). */
   issues: z.array(LabosDigestPageIssueSchema),
+  /** More from the network (LAB-3291), at most 5, newest first; empty hides the section. */
+  networkNews: z.array(LabosDigestNetworkNewsSchema),
 });
 
 export const LabosDigestChoiceRequestSchema = z.object({
@@ -866,6 +881,7 @@ export type LabosDigestPageStory = z.infer<typeof LabosDigestPageStorySchema>;
 export type LabosDigestPageForumPost = z.infer<typeof LabosDigestPageForumPostSchema>;
 export type LabosDigestPageSource = z.infer<typeof LabosDigestPageSourceSchema>;
 export type LabosDigestPageIssue = z.infer<typeof LabosDigestPageIssueSchema>;
+export type LabosDigestNetworkNews = z.infer<typeof LabosDigestNetworkNewsSchema>;
 export type RecordLabosDigestIssuesRequest = z.infer<typeof RecordLabosDigestIssuesRequestSchema>;
 export type LabosDigestChoiceValue = z.infer<typeof LabosDigestChoiceValueSchema>;
 export type LabosDigestChoiceRequest = z.infer<typeof LabosDigestChoiceRequestSchema>;

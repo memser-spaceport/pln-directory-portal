@@ -4,6 +4,7 @@ import type {
   LabosDigestChoiceResponse,
   LabosDigestChoiceValue,
   LabosDigestPage,
+  LabosDigestNetworkNews,
   LabosDigestPageIssue,
   LabosDigestPageSource,
   RecordLabosDigestIssuesRequest,
@@ -30,6 +31,7 @@ import { extractDomain, normalizeSourceUrl } from './utils/url-normalize';
 import { nextDigestSendAt } from './labos-digest-schedule.util';
 import { digestTopics } from './labos-digest-topics.util';
 import { TeamNewsQueryService } from './team-news-query.service';
+import { excludedTeamsWhere } from './labos-digest.service';
 import { readChosenNewsTags } from './utils/news-tags';
 
 const toChoiceValue = (kind: LabosDigestChoiceKind): LabosDigestChoiceValue => (kind === 'MORE' ? 'more' : 'less');
@@ -37,6 +39,10 @@ const toChoiceKind = (value: LabosDigestChoiceValue): LabosDigestChoiceKind => (
 const toFrequencyKind = (value: 'daily' | 'weekly'): LabosDigestFrequency => (value === 'weekly' ? 'WEEKLY' : 'DAILY');
 const toFrequencyValue = (kind: LabosDigestFrequency): 'daily' | 'weekly' => (kind === 'WEEKLY' ? 'weekly' : 'daily');
 const sameInstant = (a: string, b: string): boolean => Date.parse(a) === Date.parse(b);
+
+/** More from the network (LAB-3291): how many rows, and how far before the issue's send time they may be added. */
+export const NETWORK_NEWS_LIMIT = 5;
+export const NETWORK_NEWS_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** How many issues Past issues lists (LAB-3294). */
 export const PAST_ISSUES_LIMIT = 8;
@@ -82,51 +88,64 @@ export class LabosDigestPageService {
     const link = verifyDigestLinkToken(token);
     const issue = await this.issueOf(link, issueKey);
     const now = new Date();
-    const [member, items, choices, forum, follows, comments, activeRoles, vocabulary, choosable, topicScores, issues] =
-      await Promise.all([
-        this.prisma.member.findUnique({ where: { uid: link.m }, select: { name: true, preferences: true } }),
-        this.prisma.teamNewsItem.findMany({
-          where: { uid: { in: issue.n } },
-          select: {
-            uid: true,
-            title: true,
-            summary: true,
-            contentHtml: true,
-            imageUrl: true,
-            sourceUrl: true,
-            sourceUrls: true,
-            sourceDomain: true,
-            eventType: true,
-            tags: true,
-            team: { select: { uid: true, name: true, logo: { select: { url: true } } } },
-            ...TEAM_NEWS_IMAGE_SELECT,
-          },
-        }),
-        this.prisma.labosDigestChoice.findMany({
-          where: { memberUid: link.m, newsItemUid: { in: issue.n }, undoneAt: null },
-          select: { newsItemUid: true, choice: true },
-        }),
-        this.forum.read(issue.p),
-        this.prisma.follow.findMany({
-          where: { memberUid: link.m, entityType: 'TEAM' },
-          select: { entityUid: true },
-        }),
-        this.prisma.feedComment.groupBy({
-          by: ['newsItemUid'],
-          where: { newsItemUid: { in: issue.n } },
-          _count: { _all: true },
-        }),
-        this.prisma.teamMemberRole.count({
-          where: { memberUid: link.m, OR: [{ endDate: null }, { endDate: { gte: now } }] },
-        }),
-        this.tagVocabulary.getVocabulary(),
-        this.newsQuery.listNewsTags(now),
-        this.prisma.memberInterestProfileEntry.findMany({
-          where: { memberUid: link.m, kind: 'TOPIC' },
-          select: { key: true, score: true },
-        }),
-        this.listIssues(link),
-      ]);
+    const [
+      member,
+      items,
+      choices,
+      forum,
+      follows,
+      comments,
+      activeRoles,
+      vocabulary,
+      choosable,
+      topicScores,
+      issues,
+      networkNews,
+    ] = await Promise.all([
+      this.prisma.member.findUnique({ where: { uid: link.m }, select: { name: true, preferences: true } }),
+      this.prisma.teamNewsItem.findMany({
+        where: { uid: { in: issue.n } },
+        select: {
+          uid: true,
+          title: true,
+          summary: true,
+          contentHtml: true,
+          imageUrl: true,
+          sourceUrl: true,
+          sourceUrls: true,
+          sourceDomain: true,
+          eventType: true,
+          tags: true,
+          team: { select: { uid: true, name: true, logo: { select: { url: true } } } },
+          ...TEAM_NEWS_IMAGE_SELECT,
+        },
+      }),
+      this.prisma.labosDigestChoice.findMany({
+        where: { memberUid: link.m, newsItemUid: { in: issue.n }, undoneAt: null },
+        select: { newsItemUid: true, choice: true },
+      }),
+      this.forum.read(issue.p),
+      this.prisma.follow.findMany({
+        where: { memberUid: link.m, entityType: 'TEAM' },
+        select: { entityUid: true },
+      }),
+      this.prisma.feedComment.groupBy({
+        by: ['newsItemUid'],
+        where: { newsItemUid: { in: issue.n } },
+        _count: { _all: true },
+      }),
+      this.prisma.teamMemberRole.count({
+        where: { memberUid: link.m, OR: [{ endDate: null }, { endDate: { gte: now } }] },
+      }),
+      this.tagVocabulary.getVocabulary(),
+      this.newsQuery.listNewsTags(now),
+      this.prisma.memberInterestProfileEntry.findMany({
+        where: { memberUid: link.m, kind: 'TOPIC' },
+        select: { key: true, score: true },
+      }),
+      this.listIssues(link),
+      this.listNetworkNews(issue),
+    ]);
     if (!member) throw new NotFoundException('Digest not found');
     // Same tags News preferences shows as ticked: the saved list, else the starting tags. Reading stores nothing.
     const followedSlugs =
@@ -176,6 +195,7 @@ export class LabosDigestPageService {
       isTeamMember: activeRoles > 0,
       nextSendAt: nextDigestSendAt(issue.f, now).toISOString(),
       issues,
+      networkNews,
       topics: digestTopics(
         followedSlugs,
         choosable,
@@ -238,6 +258,46 @@ export class LabosDigestPageService {
       skipDuplicates: true,
     });
     return { recorded: count };
+  }
+
+  /**
+   * More from the network (LAB-3291): ingested press (not posted by a member) about network teams, added in the week
+   * before the issue went out, that isn't one of the issue's stories. Teams the feed hides are left out. Newest event
+   * first, at most NETWORK_NEWS_LIMIT.
+   */
+  private async listNetworkNews(issue: DigestIssue): Promise<LabosDigestNetworkNews[]> {
+    const sentAt = new Date(issue.s);
+    const excluded = excludedTeamsWhere();
+    const rows = await this.prisma.teamNewsItem.findMany({
+      where: {
+        postedByMemberUid: null,
+        createdAt: { gt: new Date(sentAt.getTime() - NETWORK_NEWS_WINDOW_MS), lte: sentAt },
+        uid: { notIn: issue.n },
+        ...(excluded ?? {}),
+      },
+      orderBy: [{ eventDate: 'desc' }, { createdAt: 'desc' }],
+      take: NETWORK_NEWS_LIMIT,
+      select: {
+        uid: true,
+        title: true,
+        sourceUrl: true,
+        sourceDomain: true,
+        imageUrl: true,
+        eventDate: true,
+        team: { select: { name: true } },
+        ...TEAM_NEWS_IMAGE_SELECT,
+      },
+    });
+    return rows.map((row) => ({
+      uid: row.uid,
+      title: row.title,
+      url: row.sourceUrl,
+      domain: row.sourceDomain ?? extractDomain(row.sourceUrl) ?? null,
+      image: toNewsImageDto(row.image),
+      imageUrl: row.imageUrl,
+      eventDate: row.eventDate.toISOString(),
+      teamName: row.team.name,
+    }));
   }
 
   /** The link's own issue, or the member's stored issue sent at `issueKey`. */

@@ -45,6 +45,7 @@ function build(
       forumTids?: number[];
     }[];
     members?: string[];
+    networkNews?: any[];
   } = {}
 ) {
   const prisma = {
@@ -61,7 +62,9 @@ function build(
       createMany: jest.fn(async ({ data }: any) => ({ count: data.length })),
     },
     teamNewsItem: {
-      findMany: jest.fn(async () => opts.items ?? []),
+      findMany: jest.fn(async ({ where }: any = {}) =>
+        where?.postedByMemberUid === null ? opts.networkNews ?? [] : opts.items ?? []
+      ),
       findUnique: jest.fn(async () => ({ tags: ['ai'] })),
     },
     labosDigestChoice: { findMany: jest.fn(async () => opts.choices ?? []) },
@@ -205,6 +208,56 @@ describe('LabosDigestPageService', () => {
       expect(vocabulary.seedTagsForMember).toHaveBeenCalledWith('m1');
       expect(topics.followed).toEqual([{ slug: 'ai', title: 'AI' }]);
       expect(topics.suggested.map((t) => t.slug)).toEqual(['defi', 'desci']);
+    });
+
+    describe('more from the network (LAB-3291)', () => {
+      const press = (uid: string, extra: Record<string, unknown> = {}) => ({
+        uid,
+        title: `Press ${uid}`,
+        sourceUrl: `https://www.outlet.example/${uid}`,
+        sourceDomain: null,
+        imageUrl: null,
+        image: null,
+        eventDate: new Date('2026-11-14T00:00:00.000Z'),
+        team: { name: 'Team' },
+        ...extra,
+      });
+
+      it('asks for ingested press of the issue week that is not a story, newest first, at most 5', async () => {
+        const { service, prisma } = build({ items: [item('a'), item('b')] });
+        await service.read(token());
+        const call = prisma.teamNewsItem.findMany.mock.calls
+          .map(([args]: any) => args)
+          .find((args: any) => args?.where?.postedByMemberUid === null);
+        expect(call.where).toMatchObject({
+          postedByMemberUid: null,
+          createdAt: { gt: new Date('2026-11-09T09:00:00.000Z'), lte: new Date('2026-11-16T09:00:00.000Z') },
+          uid: { notIn: ['b', 'a', 'gone'] },
+        });
+        expect(call.orderBy).toEqual([{ eventDate: 'desc' }, { createdAt: 'desc' }]);
+        expect(call.take).toBe(5);
+      });
+
+      it('returns each row with its link, outlet and date, the outlet from the URL when unknown', async () => {
+        const { service } = build({
+          items: [item('a'), item('b')],
+          networkNews: [press('x'), press('y', { sourceDomain: 'medtechdive.com', imageUrl: 'https://img/y.png' })],
+        });
+        const { networkNews } = await service.read(token());
+        expect(networkNews).toEqual([
+          {
+            uid: 'x',
+            title: 'Press x',
+            url: 'https://www.outlet.example/x',
+            domain: 'outlet.example',
+            image: null,
+            imageUrl: null,
+            eventDate: '2026-11-14T00:00:00.000Z',
+            teamName: 'Team',
+          },
+          expect.objectContaining({ uid: 'y', domain: 'medtechdive.com', imageUrl: 'https://img/y.png' }),
+        ]);
+      });
     });
 
     describe('past issues (LAB-3294)', () => {
