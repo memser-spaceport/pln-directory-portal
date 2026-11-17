@@ -30,7 +30,7 @@ import { MembersHooksService } from './members.hooks.service';
 import { toPreferencePatch } from './member-preferences';
 import { NewsTagVocabularyService } from '../team-news/news-tag-vocabulary.service';
 import { resolveNewsTags } from '../team-news/utils/news-tags';
-import { readNewsCategoryTags } from '../team-news/utils/news-category-tags';
+import { defaultCategoryTagsForTagSave, resolveNewsCategoryTags } from '../team-news/utils/news-category-tags';
 import { readNewsCategories } from '../team-news/utils/news-categories';
 import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
 import { OfficeHoursService } from '../office-hours/office-hours.service';
@@ -1819,9 +1819,22 @@ export class MembersService {
         : undefined;
     const patch = toPreferencePatch(preferences, vocabulary);
 
+    /* LAB-3284: a member's first saved news tags also store the default category tags,
+       when they have no saved news tags and no saved category tags. The check is on the
+       row being updated, so a category save landing at the same time is not overwritten. */
+    const firstTagSaveDefaults = defaultCategoryTagsForTagSave(patch) ?? {};
+
     const updated = await this.prisma.$executeRaw`
       UPDATE "Member"
       SET "preferences" = COALESCE("preferences", '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb
+        || CASE
+             WHEN (CASE WHEN jsonb_typeof("preferences"->'newsTags') = 'array'
+                        THEN jsonb_array_length("preferences"->'newsTags') ELSE 0 END) = 0
+              AND (CASE WHEN jsonb_typeof("preferences"->'newsCategoryTags') = 'array'
+                        THEN jsonb_array_length("preferences"->'newsCategoryTags') ELSE 0 END) = 0
+             THEN ${JSON.stringify(firstTagSaveDefaults)}::jsonb
+             ELSE '{}'::jsonb
+           END
       WHERE uid = ${id}
     `;
     if (updated === 0) {
@@ -1937,8 +1950,9 @@ export class MembersService {
     preferences.subscription = !!member.isSubscribedToNewsletter;
     // Always present (LAB-2940): the stored list, or every category by default.
     preferences.newsCategories = readNewsCategories(member.preferences);
-    // Always present (LAB-3140). Missing key is [], so an old newsCategories value stays off.
-    preferences.newsCategoryTags = readNewsCategoryTags(member.preferences);
+    /* Always present (LAB-3140, LAB-3284): the saved category tags, or every category tag for a
+       member with no saved news tags. An old newsCategories value never turns them on. */
+    preferences.newsCategoryTags = resolveNewsCategoryTags(member.preferences);
     return preferences;
   }
 

@@ -80,6 +80,12 @@ an empty one (removed every tag). The starting tags come from the first source t
 - A saved empty list stays stored as `[]`, and the member gets starting tags again on every read. A member cannot keep
   "no tags".
 - Saved tags feed the profile as declared topics (see Sources); starting tags do not.
+- A member with no saved news tags and no saved category tags (`preferences.newsCategoryTags` missing or empty) also
+  gets the default category tags Funding, Launch and Announcement, in the preferences read, in For You and in the
+  digest tag picks. They do not come from the profile: it holds no categories. A member who picked 1 or more
+  categories keeps them; a member with saved tags and no category tags has none.
+- The first save of 1 or more news tags by such a member also stores the three default categories (unless the same
+  request carries `newsCategoryTags`), so the categories shown as selected stay after the first topic save.
 - The flag is read on every call; anything but `true` is off, and then the profile table is not queried. It stays off
   in an environment until the LAB-3124 pilot passes.
 
