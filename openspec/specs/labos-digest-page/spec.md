@@ -1,6 +1,7 @@
 # labos-digest-page Specification
 
 ## Purpose
+
 The public digest page API (LAB-3263): a signed link in the LabOS digest email opens that member's digest on one page without sign-in, and lets them press More like this, Less like this and Undo on each story.
 
 ## Requirements
