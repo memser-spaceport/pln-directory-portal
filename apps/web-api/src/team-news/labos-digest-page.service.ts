@@ -1,10 +1,12 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { LabosDigestChoiceKind, NewsEventType, Prisma } from '@prisma/client';
+import { LabosDigestChoiceKind, LabosDigestFrequency, NewsEventType, Prisma } from '@prisma/client';
 import type {
   LabosDigestChoiceResponse,
   LabosDigestChoiceValue,
   LabosDigestPage,
+  LabosDigestPageIssue,
   LabosDigestPageSource,
+  RecordLabosDigestIssuesRequest,
 } from 'libs/contracts/src/schema/team-news';
 import { PrismaService } from '../shared/prisma.service';
 import { CacheService } from '../utils/cache/cache.service';
@@ -32,6 +34,15 @@ import { readChosenNewsTags } from './utils/news-tags';
 
 const toChoiceValue = (kind: LabosDigestChoiceKind): LabosDigestChoiceValue => (kind === 'MORE' ? 'more' : 'less');
 const toChoiceKind = (value: LabosDigestChoiceValue): LabosDigestChoiceKind => (value === 'more' ? 'MORE' : 'LESS');
+const toFrequencyKind = (value: 'daily' | 'weekly'): LabosDigestFrequency => (value === 'weekly' ? 'WEEKLY' : 'DAILY');
+const toFrequencyValue = (kind: LabosDigestFrequency): 'daily' | 'weekly' => (kind === 'WEEKLY' ? 'weekly' : 'daily');
+const sameInstant = (a: string, b: string): boolean => Date.parse(a) === Date.parse(b);
+
+/** How many issues Past issues lists (LAB-3294). */
+export const PAST_ISSUES_LIMIT = 8;
+
+/** One issue's content, as the link token carries it. */
+type DigestIssue = Pick<DigestLinkPayload, 'f' | 's' | 'n' | 'l' | 'p'>;
 
 type Tx = Prisma.TransactionClient;
 
@@ -63,15 +74,19 @@ export class LabosDigestPageService {
     private readonly newsQuery: TeamNewsQueryService
   ) {}
 
-  /** @throws DigestLinkError for a bad token; NotFoundException when the member no longer exists. */
-  async read(token: string): Promise<LabosDigestPage> {
+  /**
+   * The link's digest, or with `issueKey` (a send time) one of the same member's past issues (LAB-3294).
+   * @throws DigestLinkError for a bad token; NotFoundException when the member or that issue doesn't exist.
+   */
+  async read(token: string, issueKey?: string): Promise<LabosDigestPage> {
     const link = verifyDigestLinkToken(token);
+    const issue = await this.issueOf(link, issueKey);
     const now = new Date();
-    const [member, items, choices, forum, follows, comments, activeRoles, vocabulary, choosable, topicScores] =
+    const [member, items, choices, forum, follows, comments, activeRoles, vocabulary, choosable, topicScores, issues] =
       await Promise.all([
         this.prisma.member.findUnique({ where: { uid: link.m }, select: { name: true, preferences: true } }),
         this.prisma.teamNewsItem.findMany({
-          where: { uid: { in: link.n } },
+          where: { uid: { in: issue.n } },
           select: {
             uid: true,
             title: true,
@@ -88,17 +103,17 @@ export class LabosDigestPageService {
           },
         }),
         this.prisma.labosDigestChoice.findMany({
-          where: { memberUid: link.m, newsItemUid: { in: link.n }, undoneAt: null },
+          where: { memberUid: link.m, newsItemUid: { in: issue.n }, undoneAt: null },
           select: { newsItemUid: true, choice: true },
         }),
-        this.forum.read(link.p),
+        this.forum.read(issue.p),
         this.prisma.follow.findMany({
           where: { memberUid: link.m, entityType: 'TEAM' },
           select: { entityUid: true },
         }),
         this.prisma.feedComment.groupBy({
           by: ['newsItemUid'],
-          where: { newsItemUid: { in: link.n } },
+          where: { newsItemUid: { in: issue.n } },
           _count: { _all: true },
         }),
         this.prisma.teamMemberRole.count({
@@ -110,6 +125,7 @@ export class LabosDigestPageService {
           where: { memberUid: link.m, kind: 'TOPIC' },
           select: { key: true, score: true },
         }),
+        this.listIssues(link),
       ]);
     if (!member) throw new NotFoundException('Digest not found');
     // Same tags News preferences shows as ticked: the saved list, else the starting tags. Reading stores nothing.
@@ -122,14 +138,14 @@ export class LabosDigestPageService {
     );
     const followedTeams = new Set(follows.map((f) => f.entityUid));
     const commentsByUid = new Map(comments.map((c) => [c.newsItemUid, c._count._all]));
-    const stories = link.n.flatMap((uid, position): LabosDigestPage['stories'] => {
+    const stories = issue.n.flatMap((uid, position): LabosDigestPage['stories'] => {
       const item = itemByUid.get(uid);
       if (!item) return [];
       return [
         {
           uid: item.uid,
           position,
-          isTopStory: link.l === item.uid,
+          isTopStory: issue.l === item.uid,
           title: item.title,
           summary: item.summary,
           contentHtml: item.contentHtml,
@@ -151,14 +167,15 @@ export class LabosDigestPageService {
     });
 
     return {
-      frequency: link.f,
-      sentAt: link.s,
+      frequency: issue.f,
+      sentAt: issue.s,
       firstName: member.name?.trim().split(/\s+/)[0] || null,
       stories,
       forumPosts: forum.posts,
       forumUnavailable: forum.unavailable,
       isTeamMember: activeRoles > 0,
-      nextSendAt: nextDigestSendAt(link.f, now).toISOString(),
+      nextSendAt: nextDigestSendAt(issue.f, now).toISOString(),
+      issues,
       topics: digestTopics(
         followedSlugs,
         choosable,
@@ -175,10 +192,12 @@ export class LabosDigestPageService {
   async choose(
     token: string,
     newsItemUid: string,
-    choice: LabosDigestChoiceValue | 'none'
+    choice: LabosDigestChoiceValue | 'none',
+    issueKey?: string
   ): Promise<LabosDigestChoiceResponse> {
     const link = verifyDigestLinkToken(token);
-    if (!link.n.includes(newsItemUid)) throw new BadRequestException('This story is not in the digest');
+    const issue = await this.issueOf(link, issueKey);
+    if (!issue.n.includes(newsItemUid)) throw new BadRequestException('This story is not in the digest');
 
     const [item, vocabulary] = await Promise.all([
       this.prisma.teamNewsItem.findUnique({ where: { uid: newsItemUid }, select: { tags: true } }),
@@ -190,6 +209,96 @@ export class LabosDigestPageService {
     const result = await this.prisma.$transaction((tx) => this.chooseLocked(tx, link, newsItemUid, choice, topics));
     if (result.changed) await this.cache.reset({ service: 'members' });
     return result;
+  }
+
+  /**
+   * Records the issues the notification service sent (LAB-3294), once each: a repeat of the same member, frequency
+   * and send time is skipped. Issues of members that no longer exist are left out.
+   */
+  async recordIssues(issues: RecordLabosDigestIssuesRequest['issues']): Promise<{ recorded: number }> {
+    const known = new Set(
+      (
+        await this.prisma.member.findMany({
+          where: { uid: { in: [...new Set(issues.map((i) => i.memberUid))] } },
+          select: { uid: true },
+        })
+      ).map((m) => m.uid)
+    );
+    const { count } = await this.prisma.labosDigestIssue.createMany({
+      data: issues
+        .filter((i) => known.has(i.memberUid))
+        .map((i) => ({
+          memberUid: i.memberUid,
+          frequency: toFrequencyKind(i.frequency),
+          sentAt: new Date(i.sentAt),
+          newsItemUids: i.n,
+          leadUid: i.l && i.n.includes(i.l) ? i.l : null,
+          forumTids: i.p,
+        })),
+      skipDuplicates: true,
+    });
+    return { recorded: count };
+  }
+
+  /** The link's own issue, or the member's stored issue sent at `issueKey`. */
+  private async issueOf(link: DigestLinkPayload, issueKey?: string): Promise<DigestIssue> {
+    const own: DigestIssue = { f: link.f, s: link.s, n: link.n, l: link.l, p: link.p };
+    if (!issueKey || sameInstant(issueKey, link.s)) return own;
+    const row = await this.prisma.labosDigestIssue.findFirst({
+      where: { memberUid: link.m, sentAt: new Date(issueKey) },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!row) throw new NotFoundException('Issue not found');
+    return {
+      f: toFrequencyValue(row.frequency),
+      s: row.sentAt.toISOString(),
+      n: row.newsItemUids,
+      l: row.leadUid ?? undefined,
+      p: row.forumTids,
+    };
+  }
+
+  /**
+   * The member's latest issues, newest first, at most PAST_ISSUES_LIMIT. The link's own issue is always listed, even
+   * when it was sent before issues were recorded; each is titled by its top story, else its first story.
+   */
+  private async listIssues(link: DigestLinkPayload): Promise<LabosDigestPageIssue[]> {
+    const rows = await this.prisma.labosDigestIssue.findMany({
+      where: { memberUid: link.m },
+      orderBy: { sentAt: 'desc' },
+      take: PAST_ISSUES_LIMIT,
+      select: { frequency: true, sentAt: true, newsItemUids: true, leadUid: true },
+    });
+    const listed = rows.map((row) => ({
+      sentAt: row.sentAt.toISOString(),
+      frequency: toFrequencyValue(row.frequency),
+      titleUid: row.leadUid ?? row.newsItemUids[0] ?? null,
+      isLinkIssue: sameInstant(row.sentAt.toISOString(), link.s),
+    }));
+    if (!listed.some((issue) => issue.isLinkIssue)) {
+      listed.push({
+        sentAt: new Date(link.s).toISOString(),
+        frequency: link.f,
+        titleUid: link.l ?? link.n[0] ?? null,
+        isLinkIssue: true,
+      });
+      listed.sort((a, b) => Date.parse(b.sentAt) - Date.parse(a.sentAt));
+      // One too many now: drop the oldest that isn't the link's, so the link's issue stays listed.
+      if (listed.length > PAST_ISSUES_LIMIT) {
+        const oldest = listed.map((issue) => issue.isLinkIssue).lastIndexOf(false);
+        listed.splice(oldest, 1);
+      }
+    }
+    const titleUids = [...new Set(listed.flatMap((issue) => (issue.titleUid ? [issue.titleUid] : [])))];
+    const titles = new Map(
+      (
+        await this.prisma.teamNewsItem.findMany({
+          where: { uid: { in: titleUids } },
+          select: { uid: true, title: true },
+        })
+      ).map((item) => [item.uid, item.title])
+    );
+    return listed.map(({ titleUid, ...issue }) => ({ ...issue, title: (titleUid && titles.get(titleUid)) || null }));
   }
 
   private async chooseLocked(

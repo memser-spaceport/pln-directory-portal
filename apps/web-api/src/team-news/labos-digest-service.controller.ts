@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, HttpCode, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiTooManyRequestsResponse, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { applyDecorators } from '@nestjs/common';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
@@ -10,10 +10,13 @@ import {
   LabosDigestSendsQuerySchema,
   LabosDigestServiceNewsResponseSchema,
   LabosDigestViewSchema,
+  RecordLabosDigestIssuesRequestSchema,
+  RecordLabosDigestIssuesResponseSchema,
 } from 'libs/contracts/src/schema/team-news';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { ServiceAuthGuard } from '../guards/service-auth.guard';
+import { LabosDigestPageService } from './labos-digest-page.service';
 import { LabosDigestService } from './labos-digest.service';
 
 /** The global throttler skips v1/service. This limit applies only to the newsletter read API. */
@@ -32,7 +35,7 @@ const serviceDocs = (schema: ZodType) =>
 @UseGuards(ServiceAuthGuard, ThrottlerGuard)
 @Throttle(LABOS_DIGEST_SERVICE_THROTTLE_LIMIT, LABOS_DIGEST_SERVICE_THROTTLE_TTL_SECONDS)
 export class LabosDigestServiceController {
-  constructor(private readonly labosDigest: LabosDigestService) {}
+  constructor(private readonly labosDigest: LabosDigestService, private readonly page: LabosDigestPageService) {}
 
   @Get('top-stories')
   @NoCache()
@@ -53,6 +56,15 @@ export class LabosDigestServiceController {
   @serviceDocs(LabosDigestSendListSchema)
   sends(@Query() query: Record<string, unknown>) {
     return this.labosDigest.listSends(parseInput(LabosDigestSendsQuerySchema, query));
+  }
+
+  /** Each member's issue as sent, for Past issues on the digest page (LAB-3294). Repeats are skipped. */
+  @Post('issues')
+  @HttpCode(200)
+  @NoCache()
+  @serviceDocs(RecordLabosDigestIssuesResponseSchema)
+  recordIssues(@Body() body: unknown) {
+    return this.page.recordIssues(parseInput(RecordLabosDigestIssuesRequestSchema, body).issues);
   }
 
   @Get('sends/:uid')
