@@ -1,9 +1,11 @@
 # labos-digest-page Specification
 
 ## Purpose
+
 The public digest page API (LAB-3263): a signed link in the LabOS digest email opens that member's digest on one page without sign-in, and lets them press More like this, Less like this and Undo on each story.
 
 ## Requirements
+
 ### Requirement: Signed digest link
 
 A digest link token SHALL have the form `v1.<body>.<signature>`. `<body>` is the base64url JSON of `{ "purpose": "digest", "m": <member uid>, "f": "daily" | "weekly", "s": <send time, ISO 8601>, "n": [<news item uids, in email order>], "l": <the top story uid, when the email showed one>, "p": [<forum topic ids, in email order>], "iat": <issued at, Unix seconds> }`. `<signature>` is the base64url HMAC-SHA256 of `v1.<body>` with `DIGEST_LINK_SECRET`. The backend SHALL accept a token only when the signature matches (constant-time compare), the purpose is `digest`, `m` and `f` are present, and `iat` is at most 90 days old. When `DIGEST_LINK_SECRET` is not set, every page call SHALL return 503 and no data.
@@ -75,27 +77,39 @@ The page read SHALL NOT change any preference or choice. Only `POST v1/labos-dig
 
 ### Requirement: More like this and Less like this
 
-`POST v1/labos-digest/choices` with `{ token, newsItemUid, choice }` SHALL save the choice for the token's member. `newsItemUid` MUST be in the token's `n`, or the call returns 400. `choice` MUST be `more`, `less` or `none`. The story's tags are its `tags` that are focus-area slugs.
+`POST v1/labos-digest/choices` with `{ token, newsItemUid, choice }` SHALL save the choice for the token's member. `newsItemUid` MUST be in the token's `n`, or the call returns 400. `choice` MUST be `more`, `less` or `none`. The story's topics are its `tags` that are focus-area slugs.
 
-- `more` SHALL add the story's tags to the member's news tags and remove them from the muted tags.
-- `less` SHALL remove the story's tags from the member's news tags and add them to the muted tags.
-- When the member has no saved news tags, their starting tags SHALL be the base that `more` and `less` change, and the result SHALL be saved.
-- A choice SHALL change no other preference.
+- `more` SHALL raise the member's interest profile `TOPIC` weight of each story topic by one step (`DIGEST_CHOICE_WEIGHT_STEP`). A topic with no weight yet SHALL start at the step.
+- `less` SHALL lower each of those weights by one step, never below 0.
+- A choice SHALL NOT change the member's news tags or any other preference.
+- The weights SHALL change in the same transaction as the choice, and the daily profile rebuild SHALL apply every active choice again on top of the built scores (no decay, never below 0).
 - `none` SHALL undo the active choice (see Undo).
 
-The response SHALL return the story's active `choice` and whether any tag changed (`changed`). A story with no focus-area tag SHALL be saved as a choice with `changed: false`.
-
-#### Scenario: More from starting tags
-
-- **GIVEN** a member with no saved news tags, starting tags `["desci"]`, and a story tagged `["ai", "launch"]`
-- **WHEN** they choose `more` on it
-- **THEN** their saved news tags are `["desci", "ai"]`, `ai` is not muted, and `launch` is ignored
+The response SHALL return the story's active `choice` and whether any weight changed (`changed`). A story with no focus-area tag SHALL be saved as a choice with `changed: false`.
 
 #### Scenario: Less
 
-- **GIVEN** a member with news tags `["ai", "desci"]` and a story tagged `["ai"]`
-- **WHEN** they choose `less` on it
-- **THEN** their news tags are `["desci"]` and their muted tags contain `ai`
+- **GIVEN** a member with news tags `["ai"]` and an `ai` weight of 6
+- **WHEN** they choose `less` on a story tagged `["ai"]`
+- **THEN** their `ai` weight is 4 and their news tags are still `["ai"]`
+
+#### Scenario: More from starting tags
+
+- **GIVEN** a member with no saved news tags, no `web3` weight, and a story tagged `["web3", "launch"]`
+- **WHEN** they choose `more` on it
+- **THEN** their `web3` weight is 2, `launch` is ignored, and they still have no saved news tags
+
+#### Scenario: Less never goes below 0
+
+- **GIVEN** a member with an `ai` weight of 1
+- **WHEN** they choose `less` on a story tagged `["ai"]`
+- **THEN** their `ai` weight is 0
+
+#### Scenario: The rebuild keeps the choice
+
+- **GIVEN** a member chose `less` on a story tagged `["ai"]`
+- **WHEN** the daily profile rebuild runs
+- **THEN** their `ai` weight is the built score minus one step, not below 0
 
 #### Scenario: Story not in the link
 
@@ -114,23 +128,22 @@ Each member SHALL have at most one active choice per news item. The same choice 
 
 #### Scenario: Switch from More to Less
 
-- **GIVEN** a member with news tags `["desci"]` chose `more` on a story tagged `["ai"]`
+- **GIVEN** a member with an `ai` weight of 6 chose `more` on a story tagged `["ai"]` (weight 8)
 - **WHEN** they choose `less` on it
-- **THEN** their news tags are `["desci"]` and `ai` is muted
+- **THEN** their `ai` weight is 4
 
 ### Requirement: Undo
 
-Undo (`choice: none`) SHALL revert only what the active choice changed: it removes the tags the choice added, puts back the tags it removed, and resets the muted tags it changed. When the member's news tags and muted tags still equal exactly what the choice left, Undo SHALL restore the stored values from before the choice, including no saved list. Changes the member made after the choice SHALL be kept. Undo with no active choice SHALL change nothing and return `choice: null`.
+Undo (`choice: none`) SHALL revert only what the active choice changed. Each choice SHALL store the weights of the story's topics before and after it. A weight that still equals what the choice left SHALL go back to its value from before. A weight that changed since (another choice or the daily rebuild) SHALL lose only this choice's own change, never going below 0. Undo with no active choice SHALL change nothing and return `choice: null`. An active choice saved before weights SHALL be ended without changing any weight.
 
 #### Scenario: Undo right after More
 
-- **GIVEN** a member with no saved news tags chose `more` on a story
+- **GIVEN** a member with no `web3` weight chose `more` on a story tagged `["web3"]`
 - **WHEN** they undo it
-- **THEN** they again have no saved news tags and get starting tags
+- **THEN** they again have no `web3` weight
 
 #### Scenario: Undo after another change
 
-- **GIVEN** a member chose `less` on a story tagged `ai`, then chose `more` on a story tagged `web3`
-- **WHEN** they undo the first choice
-- **THEN** `ai` is back in their news tags and no longer muted, and `web3` stays
-
+- **GIVEN** a member with an `ai` weight of 6 chose `less` (weight 4), and the rebuild then set it to 5
+- **WHEN** they undo the choice
+- **THEN** their `ai` weight is 7

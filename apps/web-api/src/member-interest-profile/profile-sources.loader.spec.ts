@@ -35,6 +35,7 @@ describe('loadProfileBatch (LAB-3122)', () => {
         ]),
       },
       projectFocusArea: { findMany: findMany() },
+      labosDigestChoice: { findMany: findMany() },
     };
   }
 

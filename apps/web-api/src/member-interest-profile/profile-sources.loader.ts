@@ -17,6 +17,7 @@ type LoaderPrisma = Pick<
   | 'jobOpening'
   | 'teamFocusArea'
   | 'projectFocusArea'
+  | 'labosDigestChoice'
 >;
 
 export type ProfileMember = {
@@ -42,7 +43,7 @@ export async function loadProfileBatch(
 ): Promise<{ sources: ProfileSources[]; lookups: ProfileLookups }> {
   const uids = members.map((m) => m.uid);
 
-  const [signals, roles, meetings, guests, referrals, ownPosts] = await Promise.all([
+  const [signals, roles, meetings, guests, referrals, ownPosts, digestChoices] = await Promise.all([
     prisma.memberSignal.findMany({
       where: { memberUid: { in: uids } },
       select: { memberUid: true, action: true, entityType: true, entityUid: true, own: true, createdAt: true },
@@ -76,6 +77,11 @@ export async function loadProfileBatch(
     prisma.teamNewsItem.findMany({
       where: { postedByMemberUid: { in: uids } },
       select: { postedByMemberUid: true, tags: true, createdAt: true },
+    }),
+    // LAB-3263: active digest page More / Less choices.
+    prisma.labosDigestChoice.findMany({
+      where: { memberUid: { in: uids }, undoneAt: null },
+      select: { memberUid: true, choice: true, newsItem: { select: { tags: true } } },
     }),
   ]);
 
@@ -185,6 +191,12 @@ export async function loadProfileBatch(
     (p) => p
   );
 
+  const choicesBy = groupBy(
+    digestChoices,
+    (c) => c.memberUid,
+    (c) => ({ choice: c.choice, tags: c.newsItem.tags })
+  );
+
   const sources = members.map((member): ProfileSources => {
     const memberRoles = rolesBy.get(member.uid) ?? [];
     return {
@@ -207,6 +219,7 @@ export async function loadProfileBatch(
       declaredInterests: [...member.skills.map((s) => s.title), ...member.customSkills, ...member.ohInterest],
       savedNewsTags: readStoredNewsTags(member.preferences) ?? [],
       ownPosts: (postsBy.get(member.uid) ?? []).map((p) => ({ tags: p.tags, createdAt: p.createdAt })),
+      digestChoices: choicesBy.get(member.uid) ?? [],
     };
   });
 

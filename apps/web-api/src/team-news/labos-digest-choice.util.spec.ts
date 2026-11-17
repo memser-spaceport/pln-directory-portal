@@ -1,6 +1,13 @@
-import { applyChoice, storyFocusTags, undoChoice } from './labos-digest-choice.util';
+import {
+  applyChoiceToWeights,
+  digestChoiceTopicDeltas,
+  jsonToWeights,
+  storyFocusTags,
+  undoChoiceWeights,
+  weightsDiffer,
+} from './labos-digest-choice.util';
 
-/** LAB-3263: More / Less like this on the digest page, and Undo. */
+/** LAB-3263: More / Less like this on the digest page move topic weights, and Undo. */
 describe('storyFocusTags', () => {
   it('keeps focus-area slugs only, lower-cased and de-duplicated', () => {
     const known = new Set(['ai', 'desci']);
@@ -9,55 +16,72 @@ describe('storyFocusTags', () => {
   });
 });
 
-describe('applyChoice', () => {
-  it('More adds the story tags to the saved tags and unmutes them', () => {
-    const { after, delta, changed } = applyChoice({ newsTags: ['desci'], muted: ['ai', 'web3'] }, [], ['ai'], 'more');
-    expect(after).toEqual({ newsTags: ['desci', 'ai'], muted: ['web3'] });
-    expect(delta).toEqual({ addedTags: ['ai'], removedTags: [], mutedAdded: [], mutedRemoved: ['ai'] });
-    expect(changed).toBe(true);
+describe('applyChoiceToWeights', () => {
+  it('More adds one step to each story topic, including one with no weight yet', () => {
+    expect(applyChoiceToWeights({ ai: 6 }, ['ai', 'desci'], 'more', 2)).toEqual({ ai: 8, desci: 2 });
   });
 
-  it('Less removes the story tags from the saved tags and mutes them', () => {
-    const { after, delta } = applyChoice({ newsTags: ['ai', 'desci'], muted: undefined }, [], ['ai'], 'less');
-    expect(after).toEqual({ newsTags: ['desci'], muted: ['ai'] });
-    expect(delta).toEqual({ addedTags: [], removedTags: ['ai'], mutedAdded: ['ai'], mutedRemoved: [] });
+  it('Less takes one step off and never goes below 0', () => {
+    expect(applyChoiceToWeights({ ai: 6, desci: 1 }, ['ai', 'desci', 'web3'], 'less', 2)).toEqual({
+      ai: 4,
+      desci: 0,
+      web3: 0,
+    });
   });
 
-  it('starts from the starting tags, minus muted, for a member with no saved tags', () => {
-    const { after } = applyChoice({ newsTags: undefined, muted: ['web3'] }, ['ai', 'web3', 'desci'], ['ai'], 'less');
-    expect(after).toEqual({ newsTags: ['desci'], muted: ['web3', 'ai'] });
-  });
-
-  it('treats a saved empty list like no saved tags (LAB-3243)', () => {
-    const { after } = applyChoice({ newsTags: [], muted: undefined }, ['desci'], ['ai'], 'more');
-    expect(after.newsTags).toEqual(['desci', 'ai']);
-  });
-
-  it('reports no change for a story with no focus-area tag on an already explicit list', () => {
-    expect(applyChoice({ newsTags: ['ai'], muted: [] }, [], [], 'less').changed).toBe(false);
+  it('a story with no focus-area tag changes nothing', () => {
+    expect(applyChoiceToWeights({ ai: 6 }, [], 'less', 2)).toEqual({});
   });
 });
 
-describe('undoChoice', () => {
-  it('restores the lists from before, absent keys included, when nothing changed since', () => {
-    const before = { newsTags: undefined, muted: undefined };
-    const applied = applyChoice(before, ['ai', 'desci'], ['ai'], 'less');
-    expect(undoChoice(applied.after, { before, ...applied })).toEqual(before);
+describe('undoChoiceWeights', () => {
+  it('restores the weights from before when nothing changed since, including a floored Less', () => {
+    const before = { ai: 6, desci: 1 };
+    const after = applyChoiceToWeights(before, ['ai', 'desci'], 'less', 2);
+    expect(undoChoiceWeights({ ...before, ...after }, before, after)).toEqual(before);
   });
 
-  it('reverts only its own delta when the lists changed since, keeping later changes', () => {
-    const before = { newsTags: ['ai', 'desci'], muted: [] };
-    const applied = applyChoice(before, [], ['ai'], 'less');
-    // Later the member adds web3 on News preferences.
-    const current = { newsTags: ['desci', 'web3'], muted: ['ai'] };
-    expect(undoChoice(current, { before, ...applied })).toEqual({ newsTags: ['desci', 'web3', 'ai'], muted: [] });
+  it('removes only its own change when the weight moved since, keeping the later change', () => {
+    const before = { ai: 6 };
+    const after = applyChoiceToWeights(before, ['ai'], 'less', 2); // ai 4
+    // The daily rebuild then puts ai at 4.5 (a new upvote).
+    expect(undoChoiceWeights({ ai: 4.5 }, before, after)).toEqual({ ai: 6.5 });
   });
 
-  it('switching More to Less on the same story ends with Less only', () => {
-    const before = { newsTags: ['desci'], muted: [] };
-    const more = applyChoice(before, [], ['ai'], 'more');
-    const reverted = undoChoice(more.after, { before, ...more });
-    const less = applyChoice(reverted, [], ['ai'], 'less');
-    expect(less.after).toEqual({ newsTags: ['desci'], muted: ['ai'] });
+  it('switching More to Less on the same story ends one step below the start', () => {
+    const start = { ai: 6 };
+    const more = applyChoiceToWeights(start, ['ai'], 'more', 2);
+    const reverted = undoChoiceWeights({ ...start, ...more }, start, more);
+    expect(applyChoiceToWeights(reverted, ['ai'], 'less', 2)).toEqual({ ai: 4 });
+  });
+});
+
+describe('digestChoiceTopicDeltas', () => {
+  it('sums + step per More and - step per Less, on focus-area tags only', () => {
+    const known = new Set(['ai', 'desci']);
+    const deltas = digestChoiceTopicDeltas(
+      [
+        { choice: 'MORE', tags: ['AI', 'launch'] },
+        { choice: 'MORE', tags: ['ai', 'desci'] },
+        { choice: 'LESS', tags: ['desci'] },
+      ],
+      (s) => known.has(s),
+      2
+    );
+    expect(Object.fromEntries(deltas)).toEqual({ ai: 4, desci: 0 });
+  });
+});
+
+describe('jsonToWeights and weightsDiffer', () => {
+  it('reads stored weights and ignores rows saved before weights', () => {
+    expect(jsonToWeights({ ai: 2, bad: 'x' })).toEqual({ ai: 2 });
+    expect(jsonToWeights(null)).toBeUndefined();
+    expect(jsonToWeights(['ai'])).toBeUndefined();
+  });
+
+  it('treats a missing slug as 0', () => {
+    expect(weightsDiffer({ ai: 0 }, {})).toBe(false);
+    expect(weightsDiffer({ ai: 2 }, { ai: 2.00001 })).toBe(false);
+    expect(weightsDiffer({ ai: 2 }, {})).toBe(true);
   });
 });

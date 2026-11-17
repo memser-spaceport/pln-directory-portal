@@ -3,7 +3,9 @@
 ## Purpose
 
 The team-news seed ranks a 14-day window into Top stories and Popular this week. Top stories use `editorialRank`. Popular this week uses synthetic upvotes from that seed. The news feed still lists every story. It also covers the news tags members can choose, and how the API stores and returns each member's tags for For You and the digest. It also covers the resized copies of each news image that the API returns for `srcset`.
+
 ## Requirements
+
 ### Requirement: Story picking uses Claude Opus 5.5
 
 `POST /v1/service/team-news/seed-trending` SHALL rank stories with Claude Opus 5.5 (`claude-opus-5-5`). The call SHALL use the Anthropic provider. The call SHALL NOT follow `AI_PROVIDER` or `CLAUDE_MODEL`. The model SHALL reply with one JSON object whose keys are `editorialUids`, `likedUids`, and `excludedUids`. The system SHALL store ranks only when that object matches the ranking schema. A reply that does not match SHALL leave the current ranks unchanged.
@@ -394,7 +396,7 @@ The system SHALL record `team-news-default-tags-generated` when the job stores A
 
 ### Requirement: Digest picks by news tags
 
-When news tag picks are enabled, a member's digest picks SHALL be stories from teams they belong to or follow, plus stories sharing any of their effective tags, plus stories whose category is one of their `newsCategoryTags`, newest first, at most one per team, up to the limit, falling back to the newest network stories when that set is empty. An empty `newsCategoryTags` SHALL add no stories. The stored `newsCategories` list SHALL NOT narrow these picks. When disabled, picks SHALL be exactly as before. The top story SHALL be the same either way.
+When news tag picks are enabled, a member's digest picks SHALL be stories from teams they belong to or follow, plus stories sharing any of their effective tags, plus stories whose category is one of their `newsCategoryTags`, at most one per team (its newest story), ordered by the member's interest in them, up to the limit, falling back to the newest network stories when that set is empty. The member's interest in a story SHALL be the sum of their interest profile `TOPIC` weights for the story's tags, highest first, newest first on a tie; the order SHALL be set before the limit, so a weight change can bring a story in or push one out. Weights SHALL only order the picks: a topic weight alone SHALL NOT make a story eligible. An empty `newsCategoryTags` SHALL add no stories. The stored `newsCategories` list SHALL NOT narrow these picks. When disabled, picks SHALL be exactly as before. The top story SHALL be the same either way.
 
 #### Scenario: Tag match from an unrelated team
 
@@ -425,6 +427,18 @@ When news tag picks are enabled, a member's digest picks SHALL be stories from t
 - **GIVEN** news tag picks are disabled
 - **WHEN** digest picks are built
 - **THEN** they are the same as before this change, including the news-category narrowing
+
+#### Scenario: Less lowers a story out of the digest
+
+- **GIVEN** news tag picks are enabled, a member with tags `ai` and `desci`, an `ai` weight of 0.5 and a `desci` weight of 6
+- **WHEN** four matching stories are in the window, two tagged `ai` (newer) and two tagged `desci`, and the limit is 3
+- **THEN** the picks are the two `desci` stories first, then the newest `ai` story
+
+#### Scenario: A weight alone adds no story
+
+- **GIVEN** news tag picks are enabled and a member with the tag `ai` and a high `web3` weight
+- **WHEN** a story tagged only `web3` from an unrelated team is in the window
+- **THEN** it is not picked
 
 ### Requirement: Admin top stories for the next digest
 
@@ -555,47 +569,3 @@ The backfill script `yarn api:backfill-team-news-images -- --variants` SHALL mak
 - **WHEN** an admin runs the backfill with `--variants`
 - **THEN** only items with an `eventDate` in the last 90 days, an `imageUrl` and no copy get copies
 - **AND** a second run does nothing for the items that got copies
-
-### Requirement: Muted news tags
-
-A member's muted news tags SHALL be stored as `newsTagsMuted`, a list of focus-area slugs, next to `newsTags`. Saving preferences with `newsTagsMuted` SHALL validate it the same way as `newsTags`: a slug that is not a focus area is rejected with 400 and nothing is stored. A member's effective news tags SHALL be their saved or starting tags, expanded as before, minus their muted tags and the children of a muted parent. A muted tag SHALL NOT come back as a starting tag. Saving `newsTags` without `newsTagsMuted` SHALL unmute every tag in the saved list, so a tag the member picks again on News preferences counts again.
-
-#### Scenario: Muted starting tag
-
-- **GIVEN** a member with no saved news tags, starting tags `["ai", "desci"]` and muted tags `["ai"]`
-- **WHEN** their effective tags are read
-- **THEN** they are `["desci"]`
-
-#### Scenario: Picked again on News preferences
-
-- **GIVEN** a member who muted `ai`
-- **WHEN** they save `newsTags` `["ai", "desci"]`
-- **THEN** `ai` is no longer muted
-
-#### Scenario: Unknown muted slug
-
-- **WHEN** a member saves `newsTagsMuted` `["not-a-focus-area"]`
-- **THEN** the request is rejected with 400 and nothing is stored
-
-### Requirement: Digest tag picks skip muted tags
-
-When news tag picks are enabled, a member's digest picks SHALL leave out every story that has one of the member's muted tags, unless the story is from a team the member belongs to or follows. The fallback to the newest network stories SHALL leave those stories out as well. When news tag picks are disabled, picks SHALL be exactly as before. The top story SHALL be the same for everyone.
-
-#### Scenario: Muted tag from an unrelated team
-
-- **GIVEN** news tag picks are enabled and a member who muted `ai`
-- **WHEN** a story tagged `ai` from a team they neither belong to nor follow is in the window
-- **THEN** it is not picked for them, not even as a fallback
-
-#### Scenario: Muted tag from a followed team
-
-- **GIVEN** news tag picks are enabled and a member who muted `ai` and follows team T
-- **WHEN** team T has a story tagged `ai` in the window
-- **THEN** it can still be picked for them
-
-#### Scenario: Picks disabled
-
-- **GIVEN** news tag picks are disabled and a member who muted `ai`
-- **WHEN** digest picks are built
-- **THEN** they are the same as before this change
-
