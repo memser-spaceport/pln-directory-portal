@@ -10,8 +10,18 @@ import { CacheService } from '../utils/cache/cache.service';
 import { NewsTagVocabularyService } from './news-tag-vocabulary.service';
 import { LabosDigestForumReader } from './labos-digest-forum.reader';
 import { DigestLinkPayload, verifyDigestLinkToken } from './labos-digest-link-token.util';
-import { applyChoice, jsonToList, storyFocusTags, StoredNewsLists, undoChoice } from './labos-digest-choice.util';
-import { readMutedNewsTags, readStoredNewsTags } from './utils/news-tags';
+import {
+  applyChoiceToWeights,
+  jsonToWeights,
+  storyFocusTags,
+  TopicWeights,
+  undoChoiceWeights,
+  weightsDiffer,
+} from './labos-digest-choice.util';
+import {
+  DIGEST_CHOICE_WEIGHT_STEP,
+  MIN_STORED_SCORE,
+} from '../member-interest-profile/member-interest-profile.constants';
 import { TEAM_NEWS_IMAGE_SELECT, toNewsImageDto } from './utils/news-image-variants';
 
 const toChoiceValue = (kind: LabosDigestChoiceKind): LabosDigestChoiceValue => (kind === 'MORE' ? 'more' : 'less');
@@ -22,6 +32,7 @@ type Tx = Prisma.TransactionClient;
 /**
  * The public digest page (LAB-3263): reads one member's digest from a signed email link, and saves their
  * "More like this" / "Less like this" choices. Reading never changes anything, so email link scanners are safe.
+ * A choice moves the member's interest profile topic weights; it never changes their saved news tags.
  */
 @Injectable()
 export class LabosDigestPageService {
@@ -116,13 +127,9 @@ export class LabosDigestPageService {
       this.tagVocabulary.getVocabulary(),
     ]);
     if (!item) throw new NotFoundException('Story not found');
-    const storyTags = storyFocusTags(item.tags, (slug) => vocabulary.has(slug));
-    // Read outside the transaction: starting tags only matter for a member with no saved tags.
-    const startingTags = await this.tagVocabulary.seedTagsForMember(link.m);
+    const topics = storyFocusTags(item.tags, (slug) => vocabulary.has(slug));
 
-    const result = await this.prisma.$transaction((tx) =>
-      this.chooseLocked(tx, link, newsItemUid, choice, storyTags, startingTags)
-    );
+    const result = await this.prisma.$transaction((tx) => this.chooseLocked(tx, link, newsItemUid, choice, topics));
     if (result.changed) await this.cache.reset({ service: 'members' });
     return result;
   }
@@ -132,19 +139,11 @@ export class LabosDigestPageService {
     link: DigestLinkPayload,
     newsItemUid: string,
     choice: LabosDigestChoiceValue | 'none',
-    storyTags: string[],
-    startingTags: string[]
+    topics: string[]
   ): Promise<LabosDigestChoiceResponse> {
-    // One writer per member at a time, so two fast presses can't interleave their read-modify-write.
-    const locked = await tx.$queryRaw<{ preferences: unknown }[]>`
-      SELECT "preferences" FROM "Member" WHERE uid = ${link.m} FOR UPDATE
-    `;
+    // One writer per member at a time, so two fast presses can't interleave their read-modify-write of the weights.
+    const locked = await tx.$queryRaw<{ uid: string }[]>`SELECT uid FROM "Member" WHERE uid = ${link.m} FOR UPDATE`;
     if (locked.length === 0) throw new NotFoundException('Digest not found');
-    let current: StoredNewsLists = {
-      newsTags: readStoredNewsTags(locked[0].preferences),
-      muted: hasKey(locked[0].preferences, 'newsTagsMuted') ? readMutedNewsTags(locked[0].preferences) : undefined,
-    };
-    const initial = current;
 
     const active = await tx.labosDigestChoice.findFirst({
       where: { memberUid: link.m, newsItemUid, undoneAt: null },
@@ -152,63 +151,75 @@ export class LabosDigestPageService {
     if (active && choice !== 'none' && toChoiceValue(active.choice) === choice) {
       return { newsItemUid, choice, changed: false };
     }
+    // Rows saved before weights (the tag version on dev) have no weights to undo.
+    const activeBefore = active ? jsonToWeights(active.beforeWeights) : undefined;
+    const activeAfter = active ? jsonToWeights(active.afterWeights) : undefined;
+
+    const slugs = [...new Set([...topics, ...Object.keys(activeBefore ?? {}), ...Object.keys(activeAfter ?? {})])];
+    const initial = await readTopicWeights(tx, link.m, slugs);
+    let current = initial;
+
     if (active) {
-      current = undoChoice(current, {
-        before: { newsTags: jsonToList(active.beforeNewsTags), muted: jsonToList(active.beforeMuted) },
-        after: { newsTags: jsonToList(active.afterNewsTags) ?? [], muted: jsonToList(active.afterMuted) ?? [] },
-        delta: {
-          addedTags: active.addedTags,
-          removedTags: active.removedTags,
-          mutedAdded: active.mutedAdded,
-          mutedRemoved: active.mutedRemoved,
-        },
-      });
+      if (activeBefore && activeAfter) {
+        current = { ...current, ...undoChoiceWeights(current, activeBefore, activeAfter) };
+      }
       await tx.labosDigestChoice.update({ where: { uid: active.uid }, data: { undoneAt: new Date() } });
     }
 
     if (choice === 'none') {
-      await writeLists(tx, link.m, initial, current);
+      await writeTopicWeights(tx, link.m, initial, current);
       return { newsItemUid, choice: null, changed: Boolean(active) };
     }
 
-    const applied = applyChoice(current, startingTags, storyTags, choice);
+    const after = applyChoiceToWeights(current, topics, choice, DIGEST_CHOICE_WEIGHT_STEP);
+    const before = Object.fromEntries(topics.map((slug) => [slug, current[slug] ?? 0]));
     await tx.labosDigestChoice.create({
       data: {
         memberUid: link.m,
         newsItemUid,
         choice: toChoiceKind(choice),
-        ...applied.delta,
-        beforeNewsTags: current.newsTags ?? Prisma.DbNull,
-        beforeMuted: current.muted ?? Prisma.DbNull,
-        afterNewsTags: applied.after.newsTags,
-        afterMuted: applied.after.muted,
+        beforeWeights: before,
+        afterWeights: after,
+        // Tag-era columns, kept until a later cleanup; a weights choice never touches tags.
+        addedTags: [],
+        removedTags: [],
+        mutedAdded: [],
+        mutedRemoved: [],
+        afterNewsTags: [],
+        afterMuted: [],
       },
     });
-    await writeLists(tx, link.m, initial, applied.after);
-    return { newsItemUid, choice, changed: applied.changed || Boolean(active) };
+    const final = { ...current, ...after };
+    await writeTopicWeights(tx, link.m, initial, final);
+    return { newsItemUid, choice, changed: Boolean(active) || weightsDiffer(initial, final) };
   }
 }
 
-function hasKey(preferences: unknown, key: string): boolean {
-  return Boolean(preferences && typeof preferences === 'object' && key in (preferences as object));
+/** The member's `TOPIC` weights for these slugs. A slug with no row is left out (it reads as 0). */
+async function readTopicWeights(tx: Tx, memberUid: string, slugs: string[]): Promise<TopicWeights> {
+  if (slugs.length === 0) return {};
+  const rows = await tx.memberInterestProfileEntry.findMany({
+    where: { memberUid, kind: 'TOPIC', key: { in: slugs } },
+    select: { key: true, score: true },
+  });
+  return Object.fromEntries(rows.map((row) => [row.key, row.score]));
 }
 
 /**
- * Writes `newsTags` and `newsTagsMuted` with a top-level jsonb merge (every other preference stays), removing a
- * key whose new value is `undefined`. Skips the write when nothing changed.
+ * Writes the weights that changed: an upsert, or a delete for a weight below the profile's minimum (the rebuild
+ * stores no such row either). Every other profile row stays.
  */
-async function writeLists(tx: Tx, memberUid: string, before: StoredNewsLists, after: StoredNewsLists): Promise<void> {
-  const same = (a?: string[], b?: string[]) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
-  if (same(before.newsTags, after.newsTags) && same(before.muted, after.muted)) return;
-  const set: Record<string, string[]> = {};
-  const remove: string[] = [];
-  if (after.newsTags === undefined) remove.push('newsTags');
-  else set.newsTags = after.newsTags;
-  if (after.muted === undefined) remove.push('newsTagsMuted');
-  else set.newsTagsMuted = after.muted;
-  await tx.$executeRaw`
-    UPDATE "Member"
-    SET "preferences" = (COALESCE("preferences", '{}'::jsonb) - ${remove}::text[]) || ${JSON.stringify(set)}::jsonb
-    WHERE uid = ${memberUid}
-  `;
+async function writeTopicWeights(tx: Tx, memberUid: string, before: TopicWeights, after: TopicWeights): Promise<void> {
+  for (const [key, score] of Object.entries(after)) {
+    if (!weightsDiffer({ [key]: before[key] ?? 0 }, { [key]: score })) continue;
+    if (score < MIN_STORED_SCORE) {
+      await tx.memberInterestProfileEntry.deleteMany({ where: { memberUid, kind: 'TOPIC', key } });
+    } else {
+      await tx.memberInterestProfileEntry.upsert({
+        where: { memberUid_kind_key: { memberUid, kind: 'TOPIC', key } },
+        create: { memberUid, kind: 'TOPIC', key, score },
+        update: { score },
+      });
+    }
+  }
 }

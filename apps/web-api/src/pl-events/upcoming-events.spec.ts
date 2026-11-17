@@ -1,5 +1,11 @@
 import { BadRequestException } from '@nestjs/common';
-import { parseUpcomingEventsQuery, toUpcomingEvent, upcomingEventsFindArgs } from './upcoming-events-query';
+import {
+  countableUpcomingEventUids,
+  goingCountsByEvent,
+  parseUpcomingEventsQuery,
+  toUpcomingEvent,
+  upcomingEventsFindArgs,
+} from './upcoming-events-query';
 
 describe('parseUpcomingEventsQuery (LAB-3071)', () => {
   it('reads nothing from an empty query', () => {
@@ -71,6 +77,7 @@ describe('upcomingEventsFindArgs and toUpcomingEvent (LAB-3071)', () => {
       flag: 'PT',
       startDate: '2026-11-07T09:00:00.000Z',
       endDate: '2026-11-08T18:00:00.000Z',
+      goingCount: null,
     });
   });
 
@@ -87,5 +94,41 @@ describe('upcomingEventsFindArgs and toUpcomingEvent (LAB-3071)', () => {
     });
     expect(row.externalId).toBeNull();
     expect(row.locationUid).toBeNull();
+  });
+});
+
+describe('going count on upcoming events (LAB-3271)', () => {
+  it('counts every event except invite-only ones', () => {
+    expect(
+      countableUpcomingEventUids([
+        { uid: 'open', type: 'OPEN' },
+        { uid: 'invite', type: 'INVITE_ONLY' },
+        { uid: 'none', type: null },
+      ])
+    ).toEqual(['open', 'none']);
+  });
+
+  it('counts distinct members per event', () => {
+    const counts = goingCountsByEvent([{ eventUid: 'e1' }, { eventUid: 'e1' }, { eventUid: 'e2' }, { eventUid: null }]);
+    expect(counts.get('e1')).toBe(2);
+    expect(counts.get('e2')).toBe(1);
+    expect(counts.has('e3')).toBe(false);
+  });
+
+  it('puts the count on the row', () => {
+    const row = toUpcomingEvent(
+      {
+        uid: 'e1',
+        name: 'FIL Lisbon',
+        externalId: null,
+        websiteURL: null,
+        startDate: new Date('2026-11-07T09:00:00Z'),
+        endDate: new Date('2026-11-08T18:00:00Z'),
+        logo: null,
+        location: null,
+      },
+      12
+    );
+    expect(row.goingCount).toBe(12);
   });
 });

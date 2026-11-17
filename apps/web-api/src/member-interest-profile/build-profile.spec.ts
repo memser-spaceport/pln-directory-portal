@@ -20,6 +20,8 @@ function lookups(overrides: Partial<ProfileLookups> = {}): ProfileLookups {
         } as Record<string, { teamUid: string; tags: string[] }>
       )[uid]),
     jobTeam: (uid) => (uid === 'j1' ? 'ai_team' : undefined),
+    eventTeams: (uid) =>
+      (({ e_ai: ['ai_team'], e_mixed: ['own_team', 'ai_team'], e_bare: [] } as Record<string, string[]>)[uid] ?? []),
     isTopic: (slug) => TOPICS.has(slug),
     slugify: (value) => value.trim().toLowerCase().replace(/\s+/g, '-'),
     isExcludedMember: (uid) => uid === 'bot',
@@ -39,6 +41,7 @@ function sources(overrides: Partial<ProfileSources> = {}): ProfileSources {
     declaredInterests: [],
     savedNewsTags: [],
     ownPosts: [],
+    digestChoices: [],
     ...overrides,
   };
 }
@@ -261,5 +264,131 @@ describe('buildProfile (LAB-3122)', () => {
       OPTIONS
     );
     expect(profile).toEqual([]);
+  });
+
+  describe('digest page choices (LAB-3263)', () => {
+    it('More adds the step to the story topics, on top of other sources, with no decay', () => {
+      const profile = buildProfile(
+        sources({ savedNewsTags: ['ai'], digestChoices: [{ choice: 'MORE', tags: ['ai', 'defi', 'launch'] }] }),
+        lookups(),
+        OPTIONS
+      );
+      expect(score(profile, 'TOPIC', 'ai')).toBe(6);
+      expect(score(profile, 'TOPIC', 'defi')).toBe(2);
+      expect(score(profile, 'TOPIC', 'launch')).toBeUndefined();
+    });
+
+    it('Less lowers a saved tag topic without removing the saved tag, and never below 0', () => {
+      const input = sources({
+        savedNewsTags: ['ai'],
+        digestChoices: [
+          { choice: 'LESS', tags: ['ai'] },
+          { choice: 'LESS', tags: ['defi'] },
+        ],
+      });
+      const profile = buildProfile(input, lookups(), OPTIONS);
+      expect(score(profile, 'TOPIC', 'ai')).toBe(2);
+      expect(score(profile, 'TOPIC', 'defi')).toBeUndefined();
+      expect(input.savedNewsTags).toEqual(['ai']);
+    });
+  });
+});
+
+describe('buildProfile: news, job and event signals (LAB-3267)', () => {
+  const build = (signals: SignalRow[], overrides: Partial<ProfileSources> = {}) =>
+    buildProfile(sources({ signals, ...overrides }), lookups(), OPTIONS);
+
+  it('an opened news item adds its tags and half its weight to the news team', () => {
+    const profile = build([signal('view', 'NEWS_ITEM', 'n_other', 0)]);
+
+    expect(score(profile, 'TOPIC', 'ai')).toBe(1);
+    expect(score(profile, 'ENTITY', 'TEAM:ai_team')).toBe(0.5);
+  });
+
+  it('a job view and an Apply click each add the job team, with their own weights', () => {
+    const profile = build([signal('view', 'JOB_OPENING', 'j1', 0), signal('job-apply-click', 'JOB_OPENING', 'j1', 0)]);
+
+    expect(score(profile, 'ENTITY', 'TEAM:ai_team')).toBe(6);
+    expect(score(profile, 'TOPIC', 'ai')).toBe(6);
+  });
+
+  it('a job with no team adds nothing', () => {
+    expect(build([signal('view', 'JOB_OPENING', 'j_no_team', 0)])).toEqual([]);
+  });
+
+  it("an event adds its linked team in full and that team's focus areas at half", () => {
+    const profile = build([signal('view', 'EVENT', 'e_ai', 0)]);
+
+    expect(score(profile, 'ENTITY', 'TEAM:ai_team')).toBe(1);
+    expect(score(profile, 'TOPIC', 'ai')).toBe(0.5);
+  });
+
+  it('an event search click has its own weight', () => {
+    const profile = build([signal('search-result-click', 'EVENT', 'e_ai', 0)]);
+
+    expect(score(profile, 'ENTITY', 'TEAM:ai_team')).toBe(2);
+    expect(score(profile, 'TOPIC', 'ai')).toBe(1);
+  });
+
+  it('an event with no linked team, or an unknown event, adds nothing', () => {
+    expect(build([signal('view', 'EVENT', 'e_bare', 0), signal('view', 'EVENT', 'ghost', 0)])).toEqual([]);
+  });
+
+  it('an event skips the current team of the member and keeps the other linked teams', () => {
+    const profile = build([signal('view', 'EVENT', 'e_mixed', 0)], { currentTeamUids: ['own_team'] });
+
+    expect(score(profile, 'ENTITY', 'TEAM:own_team')).toBeUndefined();
+    expect(score(profile, 'ENTITY', 'TEAM:ai_team')).toBe(1);
+    // storage comes only from the fixed current-team weight, not from the event.
+    expect(score(profile, 'TOPIC', 'storage')).toBe(1);
+  });
+
+  it('damps repeat views of the same news item and decays an old event view', () => {
+    const repeats = build([
+      signal('view', 'NEWS_ITEM', 'n_other', 0),
+      signal('view', 'NEWS_ITEM', 'n_other', 0),
+      signal('view', 'NEWS_ITEM', 'n_other', 0),
+    ]);
+    const old = build([signal('view', 'EVENT', 'e_ai', 90)]);
+
+    expect(score(repeats, 'TOPIC', 'ai')).toBe(1.75);
+    expect(score(old, 'ENTITY', 'TEAM:ai_team')).toBeCloseTo(0.5, 4);
+  });
+
+  it('own news, job and event rows add nothing', () => {
+    const profile = build([
+      signal('view', 'NEWS_ITEM', 'n_other', 0, true),
+      signal('view', 'JOB_OPENING', 'j1', 0, true),
+      signal('job-apply-click', 'JOB_OPENING', 'j1', 0, true),
+      signal('view', 'EVENT', 'e_ai', 0, true),
+    ]);
+
+    expect(profile).toEqual([]);
+  });
+
+  it('a news view weight changes news views only', () => {
+    jest.resetModules();
+    jest.doMock('./member-interest-profile.constants', () => {
+      const actual = jest.requireActual('./member-interest-profile.constants');
+      const weights = { ...actual.SIGNAL_ENTITY_WEIGHTS, 'view:NEWS_ITEM': 3 };
+      return {
+        ...actual,
+        SIGNAL_ENTITY_WEIGHTS: weights,
+        signalWeight: (action: string, entityType: string) =>
+          weights[`${action}:${entityType}`] ?? actual.SIGNAL_WEIGHTS[action] ?? 0,
+      };
+    });
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { buildProfile: tuned } = require('./build-profile') as typeof import('./build-profile');
+
+    const profile = tuned(
+      sources({ signals: [signal('view', 'NEWS_ITEM', 'n_other', 0), signal('view', 'PROJECT', 'p1', 0)] }),
+      lookups(),
+      OPTIONS
+    );
+    jest.dontMock('./member-interest-profile.constants');
+
+    expect(score(profile, 'TOPIC', 'ai')).toBe(3);
+    expect(score(profile, 'ENTITY', 'PROJECT:p1')).toBe(1);
   });
 });

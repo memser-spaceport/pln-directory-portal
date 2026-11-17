@@ -2905,7 +2905,8 @@ enum LabosDigestChoiceKind {
 }
 
 /// A "More like this" / "Less like this" choice a member made on a digest story (LAB-3263).
-/// Records exactly what the choice changed in `Member.preferences`, so Undo reverts only that.
+/// An active choice moves the member's interest profile TOPIC weights for the story's topics (the daily rebuild
+/// re-applies it). `beforeWeights` / `afterWeights` record exactly what it changed, so Undo reverts only that.
 /// At most one active (`undoneAt` null) choice per member and story: a partial unique index in the migration.
 model LabosDigestChoice {
   uid            String                @id @default(cuid())
@@ -2914,7 +2915,11 @@ model LabosDigestChoice {
   newsItemUid    String
   newsItem       TeamNewsItem          @relation(fields: [newsItemUid], references: [uid], onDelete: Cascade)
   choice         LabosDigestChoiceKind
-  /// Tags this choice added to / removed from `newsTags`, and added to / removed from `newsTagsMuted`.
+  /// Topic weights (focus-area slug → score) of the story's topics before and after the choice. Null on rows saved
+  /// before weights.
+  beforeWeights  Json?
+  afterWeights   Json?
+  /// Unused since choices move weights, not tags: new rows write empty lists. Kept until a later cleanup.
   addedTags      String[]
   removedTags    String[]
   mutedAdded     String[]
@@ -5036,7 +5041,7 @@ model MemberSignal {
   memberUid  String
   member     Member   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
   action     String
-  /// TEAM | MEMBER | PROJECT | NEWS_ITEM | JOB_OPENING
+  /// TEAM | MEMBER | PROJECT | NEWS_ITEM | JOB_OPENING | EVENT
   entityType String
   entityUid  String
   /// The entity is the member, one of the member's teams, or something they own.

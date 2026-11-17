@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { toPreferencePatch, unmutePickedNewsTags } from './member-preferences';
+import { toPreferencePatch } from './member-preferences';
 import { buildNewsTagVocabulary } from '../team-news/news-tag-vocabulary.service';
 
 /**
@@ -64,33 +64,5 @@ describe('toPreferencePatch with newsCategoryTags', () => {
 
   it('rejects a category that is not offered, so nothing reaches the blob', () => {
     expect(() => toPreferencePatch({ newsCategoryTags: ['FUNDING', 'PARTNERSHIP'] })).toThrow(BadRequestException);
-  });
-});
-
-describe('newsTagsMuted (LAB-3263)', () => {
-  it('stores valid muted tags', () => {
-    expect(merge({ newsTags: ['desci'] }, { newsTagsMuted: ['ai'] })).toEqual({
-      newsTags: ['desci'],
-      newsTagsMuted: ['ai'],
-    });
-  });
-
-  it('rejects an unknown muted slug', () => {
-    expect(() => toPreferencePatch({ newsTagsMuted: ['not-a-focus-area'] }, vocabulary)).toThrow(BadRequestException);
-  });
-
-  it('unmutes a tag the member picks again', () => {
-    expect(unmutePickedNewsTags({ newsTags: ['ai', 'desci'] }, { newsTagsMuted: ['ai', 'web3'] })).toEqual({
-      newsTagsMuted: ['web3'],
-    });
-  });
-
-  it('changes nothing when no picked tag is muted', () => {
-    expect(unmutePickedNewsTags({ newsTags: ['desci'] }, { newsTagsMuted: ['ai'] })).toEqual({});
-    expect(unmutePickedNewsTags({ showEmail: true }, { newsTagsMuted: ['ai'] })).toEqual({});
-  });
-
-  it('leaves an explicit newsTagsMuted in the same save alone', () => {
-    expect(unmutePickedNewsTags({ newsTags: ['ai'], newsTagsMuted: ['ai'] }, { newsTagsMuted: ['ai'] })).toEqual({});
   });
 });
