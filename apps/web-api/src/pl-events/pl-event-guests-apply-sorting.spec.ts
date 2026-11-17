@@ -1,3 +1,17 @@
+
+// Loading the real collaborators makes ts-jest's type check overflow the stack (TS 4.7), so they are stubbed here,
+// as in pl-event-attendance.spec.ts. Only applySorting is under test.
+jest.mock('../members/members.service', () => ({ MembersService: class {} }));
+jest.mock('../teams/teams.service', () => ({ TeamsService: class {} }));
+jest.mock('./pl-events.service', () => ({ PLEventsService: class {} }));
+jest.mock('./pl-event-sync.service', () => ({ PLEventSyncService: class {} }));
+jest.mock('./pl-event-locations.service', () => ({ PLEventLocationsService: class {} }));
+jest.mock('../utils/aws/aws.service', () => ({ AwsService: class {} }));
+jest.mock('./push/irl-gathering-push-candidates.service', () => ({ IrlGatheringPushCandidatesService: class {} }));
+jest.mock('../utils/cache/cache.service', () => ({ CacheService: class {} }));
+jest.mock('../shared/prisma.service', () => ({ PrismaService: class {} }));
+jest.mock('../shared/log.service', () => ({ LogService: class {} }));
+
 import { PLEventGuestsService } from './pl-event-guests.service';
 
 const applySorting = (sortBy: string, dir: any, uid: string): string =>
