@@ -12,6 +12,7 @@ import { LabosDigestAdminController } from './labos-digest-admin.controller';
 import { LabosDigestServiceController } from './labos-digest-service.controller';
 import { LabosDigestPublicController } from './labos-digest-public.controller';
 import { LabosDigestPageService } from './labos-digest-page.service';
+import { LabosDigestEnvSeedService } from './labos-digest-env-seed.service';
 import { LabosDigestForumReader } from './labos-digest-forum.reader';
 import { LabosDigestService } from './labos-digest.service';
 import { TeamNewsService } from './team-news.service';
@@ -47,6 +48,7 @@ import { NewsDefaultTagsJob } from './news-default-tags.job';
     JwtService,
     LabosDigestService,
     LabosDigestPageService,
+    LabosDigestEnvSeedService,
     LabosDigestForumReader,
     TeamNewsService,
     TeamNewsQueryService,
