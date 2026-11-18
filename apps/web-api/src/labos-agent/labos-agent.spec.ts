@@ -4,6 +4,8 @@ jest.mock('../guards/user-token-validation.guard', () => ({ UserTokenValidation:
 jest.mock('../husky/husky-ai.service', () => ({ HuskyAiService: jest.fn() }));
 jest.mock('../team-news/team-news-query.service', () => ({ TeamNewsQueryService: jest.fn() }));
 jest.mock('../team-news/team-news-suggestions.service', () => ({ TeamNewsSuggestionsService: jest.fn() }));
+jest.mock('../mcp/mcp-tool-catalog', () => ({ McpToolCatalog: jest.fn() }));
+jest.mock('../access-control-v2/services/access-control-v2.service', () => ({ AccessControlV2Service: jest.fn() }));
 jest.mock('ai', () => ({ tool: (def: unknown) => def }));
 
 import { GUARDS_METADATA } from '@nestjs/common/constants';
@@ -40,13 +42,24 @@ function setup(env = APP_ENV.DEV as string) {
   const stream = { pipeTo: jest.fn().mockResolvedValue(undefined) };
   const husky = { createContextualToolsResponse: jest.fn().mockResolvedValue(stream) };
   const query = { getTeamNewsItemDto: jest.fn().mockResolvedValue(NEWS_ITEM), listTeamNews: jest.fn() };
-  const suggestions = { getForYouTeamUids: jest.fn() };
+  const names = ['list_news', 'get_news_item', 'get_my_profile', 'list_my_experiences', 'delete_experience'];
+  const names2 = ['update_my_profile', 'add_experience', 'update_experience', 'update_team'];
+  const defs = [...names, ...names2].map((name) => ({
+    name,
+    description: name,
+    visibility: 'always',
+    execute: jest.fn(),
+  }));
+  const catalog = { forPermissions: jest.fn(() => defs) };
+  const accessControl = { getMemberAccess: jest.fn().mockResolvedValue({ effectivePermissions: ['forum.read'] }) };
   const service = new LabosAgentService(
     prisma as any,
     new LabosAgentAccessService(),
     husky as any,
     query as any,
-    suggestions as any
+    catalog as any,
+    accessControl as any,
+    {} as any
   );
   const controller = new LabosAgentController(service);
   const res = {
@@ -57,7 +70,7 @@ function setup(env = APP_ENV.DEV as string) {
     destroy: jest.fn(),
   };
   const req = { userEmail: 'ada@example.com' };
-  return { prisma, husky, query, stream, controller, res, req };
+  return { prisma, husky, query, stream, controller, res, req, catalog };
 }
 
 async function chatError(body: unknown, env?: string) {
@@ -74,8 +87,9 @@ describe('LabosAgentController', () => {
     process.env.ENVIRONMENT = originalEnv;
   });
 
-  it('uses the UserTokenValidation guard on both routes, so the guard returns 401', () => {
-    for (const handler of [LabosAgentController.prototype.chat, LabosAgentController.prototype.access]) {
+  it('uses the UserTokenValidation guard on every route, so the guard returns 401', () => {
+    const { chat, access, confirm } = LabosAgentController.prototype;
+    for (const handler of [chat, access, confirm]) {
       expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toEqual([UserTokenValidation]);
     }
   });
@@ -118,8 +132,8 @@ describe('LabosAgentController', () => {
     expect(res.flushHeaders).not.toHaveBeenCalled();
   });
 
-  it('streams the AI search answer with the story context, the news tools and proposals []', async () => {
-    const { controller, query, husky, stream, res, req } = setup();
+  it('streams the AI search answer with the story context, the tools and proposals []', async () => {
+    const { controller, query, husky, stream, res, req, catalog } = setup();
     const body = { ...VALID, context: { page: 'news-story', newsUid: 'news-1' } };
     await controller.chat(body, req, res as any);
 
@@ -130,7 +144,18 @@ describe('LabosAgentController', () => {
     expect(email).toBe('ada@example.com');
     expect(options.promptContext).toContain('Team X raises a seed round');
     expect(options.promptContext).toContain('news-1');
-    expect(Object.keys(options.extraTools).sort()).toEqual(['get_news_item', 'list_news']);
+    // The member's real RBAC permissions pick the tools from the shared MCP list (LAB-3299).
+    expect(catalog.forPermissions).toHaveBeenCalledWith(new Set(['forum.read']));
+    expect(Object.keys(options.extraTools).sort()).toEqual([
+      'add_experience',
+      'get_my_profile',
+      'get_news_item',
+      'list_my_experiences',
+      'list_news',
+      'update_experience',
+      'update_my_profile',
+      'update_team',
+    ]);
     expect(options.extraResponseFields).toEqual({ proposals: [] });
     expect(options.persistHistory).toBe(false);
 
