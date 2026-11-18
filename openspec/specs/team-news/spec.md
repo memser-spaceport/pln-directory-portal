@@ -130,7 +130,7 @@ A member's chosen news category tags SHALL be stored as `newsCategoryTags`. The 
 
 ### Requirement: Starting tags
 
-When a member has no saved news tags (they never saved a list, or their saved list is empty), reading their preferences SHALL return starting tags and `newsTagsSeeded: true`. When profile starting tags are enabled and the member's interest profile has topics with a positive score that are news tags, the starting tags SHALL be the 5 highest-scored of those topics. Otherwise the starting tags SHALL be the slugs of the focus areas of the teams they belong to. Reading SHALL NOT store anything. Once the member saves a list with 1 or more tags, that list SHALL be returned without the seeded marker.
+When a member has no saved news tags (they never saved a list, or their saved list is empty), reading their preferences SHALL return starting tags and `newsTagsSeeded: true`. The starting tags SHALL come from the first of these sources that has a news tag: (1) when profile starting tags are enabled, the 5 highest-scored topics of the member's interest profile that have a positive score and are news tags; (2) the member's stored AI news tags; (3) the slugs of the focus areas of the teams they belong to. Reading SHALL NOT store anything. Once the member saves a list with 1 or more tags, that list SHALL be returned without the seeded marker.
 
 #### Scenario: Never saved
 
@@ -198,10 +198,27 @@ When a member has no saved news tags (they never saved a list, or their saved li
 - **WHEN** they load the grouped home feed, or their digest picks are built with news tag picks enabled
 - **THEN** their effective tags are `ai` and the focus areas under it, the same starting tags the preferences read returns
 
+#### Scenario: Stored AI tags, on a team
+
+- **GIVEN** a member of a team with the focus area DeSci, who never saved news tags, has the stored AI tags `ai` and `defi`, and profile starting tags are disabled
+- **WHEN** their preferences are read
+- **THEN** `newsTags` is `["ai", "defi"]` and `newsTagsSeeded` is `true`
+
+#### Scenario: Profile topics win over AI tags
+
+- **GIVEN** profile starting tags are enabled and a member who never saved news tags has the profile topic `desci` and the stored AI tags `ai` and `defi`
+- **WHEN** their preferences are read
+- **THEN** `newsTags` is `["desci"]` and `newsTagsSeeded` is `true`
+
+#### Scenario: AI tags in For You and the digest
+
+- **GIVEN** a member who never saved news tags and did not answer the tag card has the stored AI tag `ai`
+- **WHEN** they load the grouped home feed, or their digest picks are built with news tag picks enabled
+- **THEN** their effective tags are `ai` and the focus areas under it
+
 ### Requirement: For You tag fields
 
 The home feed's grouped news response SHALL include, for a signed-in viewer, the viewer's effective news tags (their saved tags, or their starting tags when they have no saved tags, with every parent focus area expanded to the focus areas under it) and the uids of the teams they belong to or follow. For a signed-out viewer both SHALL be empty. The existing For You team list SHALL be unchanged.
-
 
 #### Scenario: Signed-in viewer
 
@@ -226,9 +243,160 @@ The home feed's grouped news response SHALL include, for a signed-in viewer, the
 - **WHEN** they load the grouped home feed
 - **THEN** `forYouCategories` is `["FUNDING", "LAUNCH"]`
 
+### Requirement: Default news tags
+
+`GET /v1/team-news/default-tags` SHALL return, for the signed-in member, the news tags the system uses for them, with `source`, `approved`, `approvedAt` and `generatedAt`. `source` SHALL be `member-set` for a saved list of 1 or more tags, otherwise the source of the starting tags: `interest-profile`, `ai` or `team`. The read SHALL store nothing and SHALL NOT call a language model. A request with no valid sign-in SHALL be rejected with 401.
+
+#### Scenario: Stored AI tags
+
+- **GIVEN** a signed-in member with no saved tags, no usable profile topic and the stored AI tags `ai` and `desci`
+- **WHEN** they request the default tags
+- **THEN** the response holds those two tags with their titles, `source` `ai`, `approved` `false` and the time the tags were generated, and no model is called
+
+#### Scenario: Saved list
+
+- **GIVEN** a signed-in member who saved the tags `ai` and `defi`
+- **WHEN** they request the default tags
+- **THEN** `source` is `member-set`, `approved` is `true` and `tags` are `ai` and `defi`
+
+#### Scenario: No AI tags yet
+
+- **GIVEN** a signed-in member of a team with the focus area DeSci, with no saved tags and no stored AI tags, and profile starting tags are disabled
+- **WHEN** they request the default tags
+- **THEN** `tags` is `desci`, `source` is `team` and `approved` is `false`
+
+#### Scenario: Interest profile
+
+- **GIVEN** profile starting tags are enabled and a signed-in member with no saved tags has the profile topic `ai`
+- **WHEN** they request the default tags
+- **THEN** `tags` is `ai` and `source` is `interest-profile`
+
+#### Scenario: Signed-out request
+
+- **WHEN** a visitor who is not signed in requests the default tags
+- **THEN** the request is rejected with 401
+
+### Requirement: Default news tags approval
+
+`POST /v1/team-news/default-tags/approve` SHALL record the signed-in member's answer to the tag card and return the default tags after the call. Without `tags` it SHALL set the approval time and leave the tags as they are. With `tags` (1 or more news tag slugs) it SHALL save them as the member's own news tags and set the approval time. Any other `tags` value SHALL be rejected with 400, and nothing SHALL be stored.
+
+#### Scenario: Approve as shown
+
+- **GIVEN** a signed-in member whose default tags are the AI tags `ai` and `desci`, not approved
+- **WHEN** they approve with no `tags`
+- **THEN** the response has `approved` `true`, the same tags and `source` `ai`, and their saved news tags are unchanged
+
+#### Scenario: Replace
+
+- **GIVEN** a signed-in member whose default tags are `ai` and `desci`
+- **WHEN** they approve with `tags` `["ai"]`
+- **THEN** the response has `tags` `ai`, `source` `member-set` and `approved` `true`, and reading their preferences returns `newsTags` `["ai"]` with no seeded marker
+
+#### Scenario: Unknown slug
+
+- **WHEN** a member approves with `tags` `["ai", "not-a-tag"]`
+- **THEN** the request is rejected with 400, their saved tags are unchanged and no approval time is set
+
+#### Scenario: Empty list
+
+- **WHEN** a member approves with `tags` `[]`
+- **THEN** the request is rejected with 400 and nothing is stored
+
+### Requirement: Approval only records the answer
+
+The first answer SHALL set the approval time, and a later answer SHALL keep it. The approval SHALL NOT change which tags For You and the digest use: default tags are used whether the member approved them or not.
+
+#### Scenario: Approve twice
+
+- **GIVEN** a member who approved yesterday
+- **WHEN** they approve again
+- **THEN** the response is 200 and `approvedAt` is still yesterday's time
+
+#### Scenario: Not approved tags are used
+
+- **GIVEN** a member with the stored AI tag `ai`, no saved tags and no approval
+- **WHEN** they load the grouped home feed
+- **THEN** their tags include `ai`
+
+### Requirement: AI news tags generation
+
+An hourly job SHALL make AI news tags for members with no saved news tags and no usable interest-profile topic. It SHALL skip deleted members, bots and test accounts. A language model SHALL pick the tags from the member's own directory data (bio, skills, office hours topics, teams and projects). Only news tags SHALL be kept, at most 6. A reply with fewer than 3 news tags, or a failed call, SHALL store no tags and keep the member's earlier AI tags.
+
+#### Scenario: New member with a bio
+
+- **GIVEN** generation is enabled and a member with a bio, no saved tags and no AI tags
+- **WHEN** the job runs and the model picks `cryptography`, `ai`, `defi` and `not-a-tag`
+- **THEN** the member's AI tags are `cryptography`, `ai` and `defi`
+
+#### Scenario: Too few tags
+
+- **GIVEN** a member with the AI tags `ai`, `desci` and `defi` whose data changed
+- **WHEN** the job runs and the model returns 2 news tags
+- **THEN** the member's AI tags are still `ai`, `desci` and `defi`, and the job tries again the next day
+
+#### Scenario: Member with saved tags
+
+- **GIVEN** a member who saved the tag `ai`
+- **WHEN** the job runs
+- **THEN** no model is called for that member
+
+#### Scenario: Nothing to read
+
+- **GIVEN** a member with no bio, skill, office hours topic, team or project
+- **WHEN** the job runs
+- **THEN** no model is called for that member and no tags are stored
+
+#### Scenario: Profile starting tags disabled
+
+- **GIVEN** profile starting tags are disabled
+- **WHEN** the job runs
+- **THEN** the interest profile is not read, and every member with no saved tags is a candidate
+
+### Requirement: AI news tags refresh and limits
+
+The job SHALL run only where AI news tags generation is enabled. It SHALL make tags again for a member only when the member's data changed and 7 days passed since it last looked at that member. The same data SHALL be tried at most 3 times, at most once a day. One run SHALL make at most 50 model calls. Two API instances SHALL NOT process the same member in the same run.
+
+#### Scenario: Unchanged member
+
+- **GIVEN** a member whose AI tags were made 8 days ago and whose data did not change
+- **WHEN** the job runs
+- **THEN** no model is called for that member and the tags stay
+
+#### Scenario: Changed member
+
+- **GIVEN** a member whose AI tags were made 8 days ago and who changed their bio since
+- **WHEN** the job runs
+- **THEN** the model is called and the AI tags are replaced
+
+#### Scenario: Generation disabled
+
+- **GIVEN** AI news tags generation is not enabled in the environment
+- **WHEN** the hour passes
+- **THEN** no member is processed and no model is called
+
+#### Scenario: Retry after a failure
+
+- **GIVEN** a member whose generation failed today
+- **WHEN** the job runs in the next hour, and again the next day
+- **THEN** the model is not called in the next hour, and is called the next day
+
+### Requirement: Default news tags events
+
+The system SHALL record `team-news-default-tags-generated` when the job stores AI tags for a member, `team-news-default-tags-generation-failed` when a generation stores none, `team-news-default-tags-approved` when a member approves the tags as shown, and `team-news-default-tags-replaced` when a member approves with their own tags. The events SHALL hold the member uid, counts, the source, the model and the duration, and SHALL NOT hold an email, a bio or any other free text.
+
+#### Scenario: Generation recorded
+
+- **WHEN** the job stores 5 AI tags for a member who had none
+- **THEN** `team-news-default-tags-generated` is recorded with the member uid, 5 tags, the model, the duration and trigger `created`
+
+#### Scenario: Approval recorded
+
+- **WHEN** a member approves 5 shown AI tags
+- **THEN** `team-news-default-tags-approved` is recorded with the member uid, source `ai` and 5 tags
+
 ### Requirement: Digest picks by news tags
 
-When news tag picks are enabled, a member's digest picks SHALL be stories from teams they belong to or follow, plus stories sharing any of their effective tags, plus stories whose category is one of their `newsCategoryTags`, newest first, at most one per team, up to the limit, falling back to the newest network stories when that set is empty. An empty `newsCategoryTags` SHALL add no stories. The stored `newsCategories` list SHALL NOT narrow these picks. When disabled, picks SHALL be exactly as before. The top story SHALL be the same either way.
+When news tag picks are enabled, a member's digest picks SHALL be stories from teams they belong to or follow, plus stories sharing any of their effective tags, plus stories whose category is one of their `newsCategoryTags`, at most one per team (its newest story), ordered by the member's interest in them, up to the limit, falling back to the newest network stories when that set is empty. The member's interest in a story SHALL be the sum of their interest profile `TOPIC` weights for the story's tags, highest first, newest first on a tie; the order SHALL be set before the limit, so a weight change can bring a story in or push one out. Weights SHALL only order the picks: a topic weight alone SHALL NOT make a story eligible. An empty `newsCategoryTags` SHALL add no stories. The stored `newsCategories` list SHALL NOT narrow these picks. When disabled, picks SHALL be exactly as before. The top story SHALL be the same either way.
 
 #### Scenario: Tag match from an unrelated team
 
@@ -259,6 +427,18 @@ When news tag picks are enabled, a member's digest picks SHALL be stories from t
 - **GIVEN** news tag picks are disabled
 - **WHEN** digest picks are built
 - **THEN** they are the same as before this change, including the news-category narrowing
+
+#### Scenario: Less lowers a story out of the digest
+
+- **GIVEN** news tag picks are enabled, a member with tags `ai` and `desci`, an `ai` weight of 0.5 and a `desci` weight of 6
+- **WHEN** four matching stories are in the window, two tagged `ai` (newer) and two tagged `desci`, and the limit is 3
+- **THEN** the picks are the two `desci` stories first, then the newest `ai` story
+
+#### Scenario: A weight alone adds no story
+
+- **GIVEN** news tag picks are enabled and a member with the tag `ai` and a high `web3` weight
+- **WHEN** a story tagged only `web3` from an unrelated team is in the window
+- **THEN** it is not picked
 
 ### Requirement: Admin top stories for the next digest
 

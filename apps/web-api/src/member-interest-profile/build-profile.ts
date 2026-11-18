@@ -1,12 +1,14 @@
 import { MEMBER_SIGNAL_REMOVALS, MemberSignalAction } from '../member-signals/member-signals.constants';
+import { digestChoiceTopicDeltas } from '../team-news/labos-digest-choice.util';
 import {
+  DIGEST_CHOICE_WEIGHT_STEP,
   INDIRECT_FACTORS,
   MIN_STORED_SCORE,
   ProfileEntityType,
   ProfileKind,
   REPEAT_FACTOR,
-  SIGNAL_WEIGHTS,
   SOURCE_WEIGHTS,
+  signalWeight,
 } from './member-interest-profile.constants';
 
 /**
@@ -19,6 +21,9 @@ import {
  * - own rows (own profile, own teams, own posts) add nothing to interests
  * - the current team adds its focus areas at a low weight, never itself
  * - own posts and own-team comments add to expertise only
+ * - an event counts through its linked teams: the team in full, its focus areas in part
+ * - active digest page choices (LAB-3263) apply last: More adds DIGEST_CHOICE_WEIGHT_STEP to the story's
+ *   topics, Less takes it off, never below 0, no decay
  */
 export type SignalRow = {
   action: string;
@@ -41,6 +46,8 @@ export type ProfileSources = {
   declaredInterests: string[];
   savedNewsTags: string[];
   ownPosts: { tags: string[]; createdAt: Date }[];
+  /** Active (not undone) "More like this" / "Less like this" choices on the digest page, with the story's tags. */
+  digestChoices: { choice: 'MORE' | 'LESS'; tags: string[] }[];
 };
 
 export type ProfileLookups = {
@@ -51,6 +58,8 @@ export type ProfileLookups = {
   memberTeams: (memberUid: string) => readonly string[];
   newsItem: (uid: string) => { teamUid: string; tags: readonly string[] } | undefined;
   jobTeam: (jobUid: string) => string | undefined;
+  /** Teams linked to an event as host, co-host, speaker or sponsor; none for a deleted event. */
+  eventTeams: (eventUid: string) => readonly string[];
   /** Is this slug a focus area? */
   isTopic: (slug: string) => boolean;
   /** Slug of a free-text value, for declared interests and IRL topics. */
@@ -128,6 +137,14 @@ export function buildProfile(
           if (teamUid) addTeam(teamUid, weight);
           break;
         }
+        case 'EVENT': {
+          for (const teamUid of new Set(lookups.eventTeams(entityUid))) {
+            if (currentTeams.has(teamUid)) continue;
+            add('ENTITY', entityKey('TEAM', teamUid), weight);
+            addTopics(lookups.teamTopics(teamUid), weight * INDIRECT_FACTORS.eventTeamTopics);
+          }
+          break;
+        }
       }
     }
   }
@@ -175,6 +192,18 @@ export function buildProfile(
     addTopics(tags, SOURCE_WEIGHTS.ownPostExpertise * decay(createdAt), 'EXPERTISE');
   }
 
+  // Digest page choices last, so Less can lower a topic whatever its source. Never below 0.
+  for (const [slug, delta] of digestChoiceTopicDeltas(
+    sources.digestChoices,
+    lookups.isTopic,
+    DIGEST_CHOICE_WEIGHT_STEP
+  )) {
+    const id = `TOPIC|${slug}`;
+    const entry = scores.get(id) ?? { kind: 'TOPIC' as const, key: slug, score: 0 };
+    entry.score = Math.max(0, entry.score + delta);
+    scores.set(id, entry);
+  }
+
   return [...scores.values()]
     .map((entry) => ({ ...entry, score: Math.round(entry.score * 10000) / 10000 }))
     .filter((entry) => entry.score >= MIN_STORED_SCORE);
@@ -207,7 +236,7 @@ export function weighSignals(
   }
 
   return [...groups.values()].map((group) => {
-    const base = SIGNAL_WEIGHTS[group.action as MemberSignalAction] ?? 0;
+    const base = signalWeight(group.action, group.entityType);
     return {
       action: group.action,
       entityType: group.entityType,

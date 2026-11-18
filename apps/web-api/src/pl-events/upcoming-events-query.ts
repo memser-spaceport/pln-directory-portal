@@ -1,3 +1,4 @@
+import { hidesAttendance } from './pl-event-detail';
 import { BadRequestException } from '@nestjs/common';
 
 /**
@@ -62,14 +63,37 @@ type UpcomingEventRow = {
   externalId: string | null;
   locationUid?: string | null;
   websiteURL: string | null;
+  type?: string | null;
   startDate: Date;
   endDate: Date;
   logo: { url: string } | null;
   location: { location: string | null; flag: string | null } | null;
 };
 
-/** One row as the endpoint has always answered it. */
-export function toUpcomingEvent(event: UpcomingEventRow) {
+/**
+ * The uids whose attendee count the list can show (LAB-3271). The list has no viewer, so it follows the signed-out
+ * rule of the drawer: an invite-only event hides its attendance.
+ */
+export function countableUpcomingEventUids(events: Array<{ uid: string; type?: string | null }>): string[] {
+  return events.filter((event) => !hidesAttendance(event.type, false)).map((event) => event.uid);
+}
+
+/** Distinct listed members per event, from `groupBy(['eventUid', 'memberUid'])` rows. */
+export function goingCountsByEvent(groups: Array<{ eventUid: string | null }>): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const row of groups) {
+    if (row.eventUid) {
+      counts.set(row.eventUid, (counts.get(row.eventUid) ?? 0) + 1);
+    }
+  }
+  return counts;
+}
+
+/**
+ * One row as the endpoint has always answered it, plus `goingCount` (LAB-3271): the drawer's count of distinct listed
+ * members, or null when the event hides its attendance (invite-only).
+ */
+export function toUpcomingEvent(event: UpcomingEventRow, goingCount: number | null = null) {
   return {
     uid: event.uid,
     name: event.name,
@@ -84,5 +108,6 @@ export function toUpcomingEvent(event: UpcomingEventRow) {
     flag: event.location?.flag ?? null,
     startDate: new Date(event.startDate).toISOString(),
     endDate: new Date(event.endDate).toISOString(),
+    goingCount,
   };
 }

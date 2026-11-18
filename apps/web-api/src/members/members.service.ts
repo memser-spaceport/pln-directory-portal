@@ -139,7 +139,9 @@ export class MembersService {
       const filteredMembers = members.map((member: any) => {
         return omitJobSearchStatus({
           ...member,
-          teamMemberRoles: member.teamMemberRoles?.filter((role) => role?.team?.accessLevel !== 'L0'),
+          teamMemberRoles: member.teamMemberRoles?.filter(
+            (role) => role?.team?.accessLevel !== 'L0' && role?.team?.status !== 'INACTIVE'
+          ),
         });
       });
 
@@ -212,9 +214,11 @@ export class MembersService {
       email: string;
       policies: any[];
       effectivePermissions: any[];
+      isTeamMember: boolean;
     }>
   > {
     try {
+      const now = new Date();
       const members = await this.prisma.member.findMany({
         where: {
           uid: {
@@ -257,6 +261,13 @@ export class MembersService {
               permission: true,
             },
           },
+          // LAB-3290: the digest email's "Got news from your team?" card. Same rule as the digest page's
+          // isTeamMember: a team role with no end date or one that hasn't passed.
+          teamMemberRoles: {
+            where: { OR: [{ endDate: null }, { endDate: { gte: now } }] },
+            select: { teamUid: true },
+            take: 1,
+          },
         },
       });
 
@@ -271,6 +282,7 @@ export class MembersService {
             email: member.email!,
             policies: authorization.policies,
             effectivePermissions: authorization.effectivePermissions,
+            isTeamMember: member.teamMemberRoles.length > 0,
           };
         });
     } catch (error) {
@@ -508,6 +520,12 @@ export class MembersService {
                 },
               },
             }, //TODO - docuble check with frontend
+            // A deleted team (status INACTIVE) is not in the member's Teams section (LAB-3192).
+            where: {
+              team: {
+                status: { not: 'INACTIVE' },
+              },
+            },
             // where: {
             //   team: {
             //     accessLevel: {

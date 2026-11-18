@@ -1,5 +1,5 @@
-import { ForbiddenException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Prisma, TeamStatus } from '@prisma/client';
 
 /**
  * The access level whose teams a logged-out visitor can't open: `findTeamByUid` answers them with
@@ -46,4 +46,21 @@ export function toTeamCrawlIndex(rows: { uid: string; updatedAt: Date }[]) {
   return {
     teams: rows.map((row) => ({ uid: row.uid, updatedAt: row.updatedAt.toISOString() })),
   };
+}
+
+/**
+ * A deleted team (status INACTIVE, LAB-3192) answers 404 to everyone except a directory admin, who can still open it.
+ */
+export async function enforceDeletedTeamHidden(
+  team: { uid: string; status?: TeamStatus | string | null },
+  userEmail: string | undefined,
+  isDirectoryAdmin: (userEmail: string) => Promise<boolean>
+): Promise<void> {
+  if (team.status !== TeamStatus.INACTIVE) {
+    return;
+  }
+  if (userEmail && (await isDirectoryAdmin(userEmail))) {
+    return;
+  }
+  throw new NotFoundException(`Team not found with uid ${team.uid}.`);
 }

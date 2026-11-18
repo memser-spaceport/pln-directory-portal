@@ -32,6 +32,7 @@ function buildService(opts: {
   ownTeams?: Record<string, string[]>;
   tags?: Record<string, string[]>;
   preferences?: Record<string, unknown>;
+  weights?: Record<string, Record<string, number>>;
 }) {
   const getForYouTeamUidsForMembers = jest.fn(
     async (uids: string[]) => new Map(uids.map((uid) => [uid, opts.forYouTeams?.[uid] ?? []]))
@@ -51,6 +52,13 @@ function buildService(opts: {
       ),
     },
     focusArea: { findMany: jest.fn(async () => []) },
+    memberInterestProfileEntry: {
+      findMany: jest.fn(async () =>
+        Object.entries(opts.weights ?? {}).flatMap(([memberUid, w]) =>
+          Object.entries(w).map(([key, score]) => ({ memberUid, key, score }))
+        )
+      ),
+    },
     teamNewsForumLink: { findMany: jest.fn(async () => []) },
     teamNewsUpvote: { groupBy: jest.fn(async () => []), findMany: jest.fn(async () => []) },
   };
@@ -174,6 +182,38 @@ describe('getDigestNewsPicks by news tags (LAB-2999)', () => {
       const { service } = buildService({ rows, ownTeams: { m1: [] }, tags: { m1: [] } });
 
       expect(await picksOf(service)).toEqual(['ai-unrelated', 'own-story', 'launch-only']);
+    });
+
+    describe('ordered by topic weights (LAB-3263)', () => {
+      const weighted = [
+        row('ai-1', 'team-a', ['ai'], 18),
+        row('ai-2', 'team-b', ['ai'], 17),
+        row('desci-1', 'team-c', ['desci'], 16),
+        row('desci-2', 'team-d', ['desci', 'ai'], 15),
+      ];
+
+      it('without weights keeps newest first', async () => {
+        const { service } = buildService({ rows: weighted, tags: { m1: ['ai', 'desci'] } });
+        expect(await picksOf(service)).toEqual(['ai-1', 'ai-2', 'desci-1']);
+      });
+
+      it('orders by the summed weights before the cut, so a lowered topic can drop out', async () => {
+        const { service } = buildService({
+          rows: weighted,
+          tags: { m1: ['ai', 'desci'] },
+          weights: { m1: { ai: 0.5, desci: 6 } },
+        });
+        expect(await picksOf(service)).toEqual(['desci-2', 'desci-1', 'ai-1']);
+      });
+
+      it('keeps the saved tags deciding what can be picked: a weight alone adds nothing', async () => {
+        const { service } = buildService({
+          rows: [...weighted, row('web3-1', 'team-e', ['web3'], 19)],
+          tags: { m1: ['ai'] },
+          weights: { m1: { web3: 50 } },
+        });
+        expect(await picksOf(service)).toEqual(['ai-1', 'ai-2', 'desci-2']);
+      });
     });
 
     it('leaves topStory and windowCount as they are', async () => {

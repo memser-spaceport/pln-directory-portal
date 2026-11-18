@@ -10,6 +10,9 @@ import { TeamNewsController } from './team-news.controller';
 import { TeamNewsServiceController } from './team-news-service.controller';
 import { LabosDigestAdminController } from './labos-digest-admin.controller';
 import { LabosDigestServiceController } from './labos-digest-service.controller';
+import { LabosDigestPublicController } from './labos-digest-public.controller';
+import { LabosDigestPageService } from './labos-digest-page.service';
+import { LabosDigestForumReader } from './labos-digest-forum.reader';
 import { LabosDigestService } from './labos-digest.service';
 import { TeamNewsService } from './team-news.service';
 import { TeamNewsQueryService } from './team-news-query.service';
@@ -21,6 +24,11 @@ import { TeamNewsImpressionsService } from './team-news-impressions.service';
 import { TeamNewsPostSummaryService } from './team-news-post-summary.service';
 import { TeamNewsImageService } from './team-news-image.service';
 import { NewsTagVocabularyService } from './news-tag-vocabulary.service';
+import { NewsDefaultTagsService } from './news-default-tags.service';
+import { NewsDefaultTagsJob } from './news-default-tags.job';
+
+import { NotificationServiceClient } from '../notifications/notification-service.client';
+import { LabosDigestEmailSettingsService } from './labos-digest-email-settings.service';
 
 @Module({
   imports: [
@@ -35,11 +43,17 @@ import { NewsTagVocabularyService } from './news-tag-vocabulary.service';
     TeamNewsServiceController,
     LabosDigestAdminController,
     LabosDigestServiceController,
+    LabosDigestPublicController,
   ],
   providers: [
+    LabosDigestEmailSettingsService,
+    // Stateless HTTP client; NotificationsModule would bring its Bull queue and PLEvents along.
+    NotificationServiceClient,
     AdminAuthGuard,
     JwtService,
     LabosDigestService,
+    LabosDigestPageService,
+    LabosDigestForumReader,
     TeamNewsService,
     TeamNewsQueryService,
     TeamNewsEnrichmentService,
@@ -50,6 +64,8 @@ import { NewsTagVocabularyService } from './news-tag-vocabulary.service';
     TeamNewsPostSummaryService,
     TeamNewsImageService,
     NewsTagVocabularyService,
+    NewsDefaultTagsService,
+    NewsDefaultTagsJob,
   ],
   exports: [
     TeamNewsService,

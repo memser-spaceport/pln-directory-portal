@@ -1,5 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 import { isExcludedMember } from '../member-signals/member-exclusion';
+import { EVENT_LINK_ROLES } from '../member-signals/member-signals.constants';
 import { readStoredNewsTags } from '../team-news/utils/news-tags';
 import { NewsTagVocabulary } from '../team-news/news-tag-vocabulary.service';
 import { slugify } from '../utils/helper/helper';
@@ -17,6 +18,8 @@ type LoaderPrisma = Pick<
   | 'jobOpening'
   | 'teamFocusArea'
   | 'projectFocusArea'
+  | 'pLEventAssociation'
+  | 'labosDigestChoice'
 >;
 
 export type ProfileMember = {
@@ -42,7 +45,7 @@ export async function loadProfileBatch(
 ): Promise<{ sources: ProfileSources[]; lookups: ProfileLookups }> {
   const uids = members.map((m) => m.uid);
 
-  const [signals, roles, meetings, guests, referrals, ownPosts] = await Promise.all([
+  const [signals, roles, meetings, guests, referrals, ownPosts, digestChoices] = await Promise.all([
     prisma.memberSignal.findMany({
       where: { memberUid: { in: uids } },
       select: { memberUid: true, action: true, entityType: true, entityUid: true, own: true, createdAt: true },
@@ -77,6 +80,11 @@ export async function loadProfileBatch(
       where: { postedByMemberUid: { in: uids } },
       select: { postedByMemberUid: true, tags: true, createdAt: true },
     }),
+    // LAB-3263: active digest page More / Less choices.
+    prisma.labosDigestChoice.findMany({
+      where: { memberUid: { in: uids }, undoneAt: null },
+      select: { memberUid: true, choice: true, newsItem: { select: { tags: true } } },
+    }),
   ]);
 
   // Entities the sources point at.
@@ -84,16 +92,18 @@ export async function loadProfileBatch(
   const newsUids = new Set<string>();
   const jobUids = new Set<string>();
   const projectUids = new Set<string>();
+  const eventUids = new Set<string>();
   for (const s of signals) {
     if (s.entityType === 'MEMBER') targetMembers.add(s.entityUid);
     if (s.entityType === 'NEWS_ITEM') newsUids.add(s.entityUid);
     if (s.entityType === 'JOB_OPENING') jobUids.add(s.entityUid);
     if (s.entityType === 'PROJECT') projectUids.add(s.entityUid);
+    if (s.entityType === 'EVENT') eventUids.add(s.entityUid);
   }
   for (const m of meetings) if (m.targetMemberUid) targetMembers.add(m.targetMemberUid);
   for (const r of referrals) if (r.referredMemberUid) targetMembers.add(r.referredMemberUid);
 
-  const [targetRows, targetRoles, newsRows, jobRows] = await Promise.all([
+  const [targetRows, targetRoles, newsRows, jobRows, eventLinks] = await Promise.all([
     prisma.member.findMany({
       where: { uid: { in: [...targetMembers] } },
       select: { uid: true, signUpSource: true, email: true, deletedAt: true },
@@ -107,6 +117,16 @@ export async function loadProfileBatch(
       select: { uid: true, teamUid: true, tags: true },
     }),
     prisma.jobOpening.findMany({ where: { uid: { in: [...jobUids] } }, select: { uid: true, teamUid: true } }),
+    prisma.pLEventAssociation.findMany({
+      where: {
+        eventUid: { in: [...eventUids] },
+        entityType: 'TEAM',
+        teamUid: { not: null },
+        role: { in: [...EVENT_LINK_ROLES] },
+        event: { isDeleted: false },
+      },
+      select: { eventUid: true, teamUid: true },
+    }),
   ]);
 
   const teamUids = new Set<string>();
@@ -114,6 +134,7 @@ export async function loadProfileBatch(
   for (const r of [...roles, ...targetRoles]) teamUids.add(r.teamUid);
   for (const n of newsRows) teamUids.add(n.teamUid);
   for (const j of jobRows) if (j.teamUid) teamUids.add(j.teamUid);
+  for (const e of eventLinks) if (e.teamUid) teamUids.add(e.teamUid);
   for (const r of referrals) if (r.jobOpening?.teamUid) teamUids.add(r.jobOpening.teamUid);
 
   const [teamAreas, projectAreas] = await Promise.all([
@@ -142,6 +163,11 @@ export async function loadProfileBatch(
   );
   const news = new Map(newsRows.map((n) => [n.uid, { teamUid: n.teamUid, tags: n.tags }]));
   const jobs = new Map(jobRows.map((j) => [j.uid, j.teamUid ?? undefined]));
+  const eventTeams = groupBy(
+    eventLinks.filter((e) => !!e.teamUid),
+    (e) => e.eventUid,
+    (e) => e.teamUid as string
+  );
 
   const lookups: ProfileLookups = {
     teamTopics: (uid) => teamTopics.get(uid) ?? [],
@@ -149,6 +175,7 @@ export async function loadProfileBatch(
     memberTeams: (uid) => memberTeams.get(uid) ?? [],
     newsItem: (uid) => news.get(uid),
     jobTeam: (uid) => jobs.get(uid),
+    eventTeams: (uid) => eventTeams.get(uid) ?? [],
     isTopic: (slug) => vocabulary.has(slug),
     slugify: (value) => slugify(value),
     isExcludedMember: (uid) => excludedTargets.has(uid),
@@ -185,6 +212,12 @@ export async function loadProfileBatch(
     (p) => p
   );
 
+  const choicesBy = groupBy(
+    digestChoices,
+    (c) => c.memberUid,
+    (c) => ({ choice: c.choice, tags: c.newsItem.tags })
+  );
+
   const sources = members.map((member): ProfileSources => {
     const memberRoles = rolesBy.get(member.uid) ?? [];
     return {
@@ -207,6 +240,7 @@ export async function loadProfileBatch(
       declaredInterests: [...member.skills.map((s) => s.title), ...member.customSkills, ...member.ohInterest],
       savedNewsTags: readStoredNewsTags(member.preferences) ?? [],
       ownPosts: (postsBy.get(member.uid) ?? []).map((p) => ({ tags: p.tags, createdAt: p.createdAt })),
+      digestChoices: choicesBy.get(member.uid) ?? [],
     };
   });
 

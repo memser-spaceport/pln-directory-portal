@@ -302,6 +302,8 @@ model Member {
   teamNewsUpvotes           TeamNewsUpvote[]        @relation("MemberTeamNewsUpvotes")
   feedComments              FeedComment[]           @relation("MemberFeedComments")
   feedNewsLikes             FeedNewsLike[]          @relation("MemberFeedNewsLikes")
+  labosDigestChoices        LabosDigestChoice[]     @relation("MemberLabosDigestChoices")
+  labosDigestIssues         LabosDigestIssue[]      @relation("MemberLabosDigestIssues")
 
   /// Read-only Affinity CRM sidecar (task 02). Optional 1:1 when linked.
   affinityPerson               AffinityPerson?
@@ -314,6 +316,7 @@ model Member {
   cvImport          MemberCvImport?
   memberSignals     MemberSignal[]
   interestProfile   MemberInterestProfileEntry[]
+  newsTagSuggestion MemberNewsTagSuggestion?
 }
 
 model MemberApproval {
@@ -2829,6 +2832,7 @@ model TeamNewsItem {
   feedLikes              FeedNewsLike[]
   networkOverviews       NetworkOverview[]
   labosDigestSendStories LabosDigestSendStory[]
+  labosDigestChoices     LabosDigestChoice[]
 
   @@index([teamUid])
   @@index([eventDate])
@@ -2893,6 +2897,63 @@ model LabosDigestSendStory {
   isLead      Boolean
 
   @@unique([sendId, position])
+  @@index([newsItemUid])
+}
+
+/// One member's digest issue as the notification service sent it (LAB-3294): the same stories, top story and forum
+/// topics as the email's signed link, so the digest page can list past issues and open them again.
+model LabosDigestIssue {
+  uid          String               @id @default(cuid())
+  memberUid    String
+  member       Member               @relation("MemberLabosDigestIssues", fields: [memberUid], references: [uid], onDelete: Cascade)
+  frequency    LabosDigestFrequency
+  sentAt       DateTime
+  /// News item uids, in email order.
+  newsItemUids String[]
+  /// The top story uid, when the email showed one.
+  leadUid      String?
+  /// Forum topic ids, in email order.
+  forumTids    Int[]
+  createdAt    DateTime             @default(now())
+
+  @@unique([memberUid, frequency, sentAt])
+  @@index([memberUid, sentAt])
+}
+
+enum LabosDigestChoiceKind {
+  MORE
+  LESS
+}
+
+/// A "More like this" / "Less like this" choice a member made on a digest story (LAB-3263).
+/// An active choice moves the member's interest profile TOPIC weights for the story's topics (the daily rebuild
+/// re-applies it). `beforeWeights` / `afterWeights` record exactly what it changed, so Undo reverts only that.
+/// At most one active (`undoneAt` null) choice per member and story: a partial unique index in the migration.
+model LabosDigestChoice {
+  uid            String                @id @default(cuid())
+  memberUid      String
+  member         Member                @relation("MemberLabosDigestChoices", fields: [memberUid], references: [uid], onDelete: Cascade)
+  newsItemUid    String
+  newsItem       TeamNewsItem          @relation(fields: [newsItemUid], references: [uid], onDelete: Cascade)
+  choice         LabosDigestChoiceKind
+  /// Topic weights (focus-area slug → score) of the story's topics before and after the choice. Null on rows saved
+  /// before weights.
+  beforeWeights  Json?
+  afterWeights   Json?
+  /// Unused since choices move weights, not tags: new rows write empty lists. Kept until a later cleanup.
+  addedTags      String[]
+  removedTags    String[]
+  mutedAdded     String[]
+  mutedRemoved   String[]
+  /// The stored lists before and after the choice. Null in `before*` means the key was absent.
+  beforeNewsTags Json?
+  beforeMuted    Json?
+  afterNewsTags  Json
+  afterMuted     Json
+  createdAt      DateTime              @default(now())
+  undoneAt       DateTime?
+
+  @@index([memberUid, newsItemUid])
   @@index([newsItemUid])
 }
 
@@ -5001,7 +5062,7 @@ model MemberSignal {
   memberUid  String
   member     Member   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
   action     String
-  /// TEAM | MEMBER | PROJECT | NEWS_ITEM | JOB_OPENING
+  /// TEAM | MEMBER | PROJECT | NEWS_ITEM | JOB_OPENING | EVENT
   entityType String
   entityUid  String
   /// The entity is the member, one of the member's teams, or something they own.
@@ -5031,6 +5092,32 @@ model MemberInterestProfileEntry {
 
   @@unique([memberUid, kind, key])
   @@index([kind, key])
+}
+
+/// A member's AI news tags and their answer to the Home tag card (LAB-3249).
+/// The hourly job writes `tags` for a member with no saved tags; they are the
+/// member's default tags until the member saves a list. One row per member.
+model MemberNewsTagSuggestion {
+  id             Int       @id @default(autoincrement())
+  memberUid      String    @unique
+  member         Member    @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  /// Focus-area slugs, best match first. Empty until the first generation.
+  tags           String[]  @default([])
+  /// Hash of the member data the last generation attempt read.
+  inputHash      String?
+  /// The model that picked the tags.
+  model          String?
+  generatedAt    DateTime?
+  /// When the job last looked at this member (also the job's claim on the row).
+  lastAttemptAt  DateTime?
+  /// Failed generations for the current inputHash.
+  failedAttempts Int       @default(0)
+  /// When the member answered the tag card. Does not freeze the tags.
+  approvedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([lastAttemptAt])
 }
 
 /// One member interest profile rebuild (LAB-3122). Also serializes rebuilds

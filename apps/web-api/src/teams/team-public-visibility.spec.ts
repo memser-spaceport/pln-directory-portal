@@ -1,5 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
 import {
+  enforceDeletedTeamHidden,
   enforceTeamPublicVisibility,
   isTeamHiddenFromPublic,
   PUBLICLY_VISIBLE_TEAM_WHERE,
@@ -77,5 +78,38 @@ describe('enforceTeamPublicVisibility (GET /v1/teams/:uid and GET /v1/teams/:uid
       ).resolves.toBeUndefined();
     }
     expect(validate).not.toHaveBeenCalled();
+  });
+});
+
+describe('enforceDeletedTeamHidden (LAB-3192)', () => {
+  it('answers 404 for a deleted team when signed out', async () => {
+    const isAdmin = jest.fn();
+    await expect(enforceDeletedTeamHidden({ uid: 't1', status: 'INACTIVE' }, undefined, isAdmin)).rejects.toThrow(
+      'Team not found with uid t1.'
+    );
+    expect(isAdmin).not.toHaveBeenCalled();
+  });
+
+  it('answers 404 for a deleted team to a signed-in member who is not an admin', async () => {
+    const isAdmin = jest.fn(async () => false);
+    await expect(enforceDeletedTeamHidden({ uid: 't1', status: 'INACTIVE' }, 'a@b.c', isAdmin)).rejects.toThrow(
+      'Team not found with uid t1.'
+    );
+    expect(isAdmin).toHaveBeenCalledWith('a@b.c');
+  });
+
+  it('lets a directory admin open a deleted team', async () => {
+    const isAdmin = jest.fn(async () => true);
+    await expect(
+      enforceDeletedTeamHidden({ uid: 't1', status: 'INACTIVE' }, 'admin@b.c', isAdmin)
+    ).resolves.toBeUndefined();
+  });
+
+  it('does nothing for an active team, or no status', async () => {
+    const isAdmin = jest.fn();
+    for (const status of ['ACTIVE', null, undefined]) {
+      await expect(enforceDeletedTeamHidden({ uid: 't1', status }, undefined, isAdmin)).resolves.toBeUndefined();
+    }
+    expect(isAdmin).not.toHaveBeenCalled();
   });
 });

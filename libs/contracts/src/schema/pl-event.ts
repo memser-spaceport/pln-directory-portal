@@ -82,6 +82,11 @@ export const ResponseUpcomingEventSchema = z.object({
   flag: z.string().nullable(),
   startDate: z.string(),
   endDate: z.string(),
+  /**
+   * Distinct listed members who go, the same count as the event drawer (LAB-3271). Null when the event hides its
+   * attendance (invite-only). 0 when nobody goes yet.
+   */
+  goingCount: z.number().int().nullable(),
 });
 
 export const PLEventRelationalFields = ResponsePLEventSchemaWithRelationsSchema.pick({
