@@ -1,10 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  InternalServerErrorException,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 
 export interface AffinityMemberEnrichmentClientResult {
   runId: string;
@@ -35,15 +29,20 @@ export class DataEnrichmentClientService {
     return url.replace(/\/+$/, '');
   }
 
-  async triggerAffinityMemberEnrichment(
-    affinityPersonId: string,
-  ): Promise<AffinityMemberEnrichmentClientResult> {
-    const url = `${this.baseUrl()}/api/v1/affinity-enrichment/members/${encodeURIComponent(affinityPersonId)}/run`;
-    const headers: Record<string, string> = { Accept: 'application/json' };
+  private authorizationHeader(): string {
     const apiKey = process.env.DATA_ENRICHMENT_API_KEY?.trim();
-    if (apiKey) {
-      headers.Authorization = `Bearer ${apiKey}`;
+    if (!apiKey) {
+      throw new InternalServerErrorException('DATA_ENRICHMENT_API_KEY is not configured');
     }
+    return `Bearer ${apiKey}`;
+  }
+
+  async triggerAffinityMemberEnrichment(affinityPersonId: string): Promise<AffinityMemberEnrichmentClientResult> {
+    const url = `${this.baseUrl()}/api/v1/affinity-enrichment/members/${encodeURIComponent(affinityPersonId)}/run`;
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      Authorization: this.authorizationHeader(),
+    };
 
     const res = await fetch(url, { method: 'POST', headers });
     const text = await res.text();
@@ -60,14 +59,14 @@ export class DataEnrichmentClientService {
       throw new NotFoundException(
         typeof body === 'object' && body && 'message' in body
           ? String((body as { message: string }).message)
-          : `Affinity person ${affinityPersonId} not found in founder lists`,
+          : `Affinity person ${affinityPersonId} not found in founder lists`
       );
     }
     if (res.status === 409) {
       throw new ConflictException(
         typeof body === 'object' && body && 'message' in body
           ? String((body as { message: string }).message)
-          : `Affinity enrichment already in progress for person ${affinityPersonId}`,
+          : `Affinity enrichment already in progress for person ${affinityPersonId}`
       );
     }
     if (!res.ok) {
@@ -79,13 +78,14 @@ export class DataEnrichmentClientService {
   }
 
   async triggerWarmIntroInvestorRefresh(investorProfileUid: string, runUid: string): Promise<void> {
-    const url = `${this.baseUrl()}/api/v1/warm-intros-v2/investors/${encodeURIComponent(investorProfileUid)}/regenerate`;
+    const url = `${this.baseUrl()}/api/v1/warm-intros-v2/investors/${encodeURIComponent(
+      investorProfileUid
+    )}/regenerate`;
     const headers: Record<string, string> = {
       Accept: 'application/json',
       'Content-Type': 'application/json',
+      Authorization: this.authorizationHeader(),
     };
-    const apiKey = process.env.DATA_ENRICHMENT_API_KEY?.trim();
-    if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
 
     const res = await fetch(url, {
       method: 'POST',

@@ -1,7 +1,10 @@
 import type { PrismaClient } from '@prisma/client';
-import type { MemberSignalEntityType } from './member-signals.constants';
+import { EVENT_LINK_ROLES, MemberSignalEntityType } from './member-signals.constants';
 
-type OwnershipPrisma = Pick<PrismaClient, 'teamMemberRole' | 'project' | 'teamNewsItem' | 'jobOpening'>;
+type OwnershipPrisma = Pick<
+  PrismaClient,
+  'teamMemberRole' | 'project' | 'teamNewsItem' | 'jobOpening' | 'pLEventAssociation'
+>;
 
 /**
  * Decides the `own` flag of a signal row: the entity is the member, a team the
@@ -12,6 +15,7 @@ type OwnershipPrisma = Pick<PrismaClient, 'teamMemberRole' | 'project' | 'teamNe
  * - PROJECT: created by the member, or maintained by one of their teams
  * - NEWS_ITEM: posted by the member, or news of one of their teams
  * - JOB_OPENING: a role on one of their teams
+ * - EVENT: the member, or one of their teams, is host, co-host, speaker or sponsor
  *
  * Lookups are cached for the lifetime of the resolver; the live writer uses a
  * fresh one per signal. The backfill migration
@@ -22,6 +26,7 @@ export class MemberSignalOwnershipResolver {
   private readonly projects = new Map<string, Promise<{ createdBy: string; maintainingTeamUid: string } | null>>();
   private readonly newsItems = new Map<string, Promise<{ teamUid: string; postedByMemberUid: string | null } | null>>();
   private readonly jobOpenings = new Map<string, Promise<{ teamUid: string | null } | null>>();
+  private readonly eventLinks = new Map<string, Promise<{ memberUid: string | null; teamUid: string | null }[]>>();
 
   constructor(private readonly prisma: OwnershipPrisma) {}
 
@@ -56,6 +61,19 @@ export class MemberSignalOwnershipResolver {
           this.prisma.jobOpening.findUnique({ where: { uid: entityUid }, select: { teamUid: true } })
         );
         return !!job?.teamUid && (await this.memberTeams(memberUid)).has(job.teamUid);
+      }
+      case 'EVENT': {
+        const links = await this.cached(this.eventLinks, entityUid, () =>
+          this.prisma.pLEventAssociation.findMany({
+            where: { eventUid: entityUid, role: { in: [...EVENT_LINK_ROLES] } },
+            select: { memberUid: true, teamUid: true },
+          })
+        );
+        if (links.some((link) => link.memberUid === memberUid)) return true;
+        const teamUids = links.map((link) => link.teamUid).filter((uid): uid is string => !!uid);
+        if (teamUids.length === 0) return false;
+        const teams = await this.memberTeams(memberUid);
+        return teamUids.some((uid) => teams.has(uid));
       }
       default:
         return false;

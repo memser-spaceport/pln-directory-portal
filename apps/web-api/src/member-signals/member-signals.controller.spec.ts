@@ -41,6 +41,29 @@ describe('MemberSignalsController (LAB-3123)', () => {
     expect(record).toHaveBeenCalledWith({ memberUid: 'm1', action: 'view', entityType: 'TEAM', entityUid: 't1' });
   });
 
+  it.each([
+    ['view', 'news-item', 'NEWS_ITEM'],
+    ['view', 'job-opening', 'JOB_OPENING'],
+    ['job-apply-click', 'job-opening', 'JOB_OPENING'],
+    ['view', 'event', 'EVENT'],
+    ['search-result-click', 'event', 'EVENT'],
+  ])('records %s on %s as %s', async (action, entityType, stored) => {
+    await controller.recordMemberSignal({ action, entityType, entityId: 'x1' }, {
+      userEmail: 'ada@protocol.ai',
+    } as never);
+
+    expect(record).toHaveBeenCalledWith({ memberUid: 'm1', action, entityType: stored, entityUid: 'x1' });
+  });
+
+  it('answers 400 for an Apply click on something that is not a job', async () => {
+    await expect(
+      controller.recordMemberSignal({ action: 'job-apply-click', entityType: 'news-item', entityId: 'n1' }, {
+        userEmail: 'ada@protocol.ai',
+      } as never)
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(record).not.toHaveBeenCalled();
+  });
+
   it('answers 400 (not 500) for a pair that is not allowed, and records nothing', async () => {
     await expect(
       controller.recordMemberSignal({ action: 'contact-copy', entityType: 'team', entityId: 't1' }, {

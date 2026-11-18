@@ -1,4 +1,4 @@
-import type { MemberSignalAction } from '../member-signals/member-signals.constants';
+import type { MemberSignalAction, MemberSignalEntityType } from '../member-signals/member-signals.constants';
 
 /**
  * Every tunable of the member interest profile (LAB-3122) lives here so the
@@ -22,6 +22,7 @@ export const SIGNAL_WEIGHTS: Readonly<Partial<Record<MemberSignalAction, number>
   'team-interest': 6,
   follow: 5,
   'contact-copy': 5,
+  'job-apply-click': 5,
   'job-interest': 4,
   'contact-click': 4,
   'team-contact-click': 4,
@@ -34,6 +35,25 @@ export const SIGNAL_WEIGHTS: Readonly<Partial<Record<MemberSignalAction, number>
   'github-project-click': 2,
   view: 1,
 };
+
+/**
+ * Base weight of an action on one entity type (LAB-3267). It wins over the
+ * action's weight in SIGNAL_WEIGHTS, so news, job and event signals are tuned
+ * apart from member, team and project ones.
+ */
+export const SIGNAL_ENTITY_WEIGHTS: Readonly<
+  Partial<Record<`${MemberSignalAction}:${MemberSignalEntityType}`, number>>
+> = {
+  'view:NEWS_ITEM': 1,
+  'view:JOB_OPENING': 1,
+  'view:EVENT': 1,
+  'search-result-click:EVENT': 2,
+};
+
+export function signalWeight(action: string, entityType: string): number {
+  const byEntity = (SIGNAL_ENTITY_WEIGHTS as Record<string, number | undefined>)[`${action}:${entityType}`];
+  return byEntity ?? (SIGNAL_WEIGHTS as Record<string, number | undefined>)[action] ?? 0;
+}
 
 /** Weights of the stored (not logged) sources. */
 export const SOURCE_WEIGHTS = {
@@ -64,6 +84,8 @@ export const INDIRECT_FACTORS = {
   newsTeamEntity: 0.5,
   /** Member entity → the focus areas of that member's teams. */
   memberTeamTopics: 0.5,
+  /** Event → the focus areas of its linked teams. */
+  eventTeamTopics: 0.5,
 } as const;
 
 /** Scores below this are not stored. */

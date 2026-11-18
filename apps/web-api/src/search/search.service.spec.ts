@@ -8,7 +8,10 @@ describe('SearchService email lookup (LAB-2881)', () => {
   const memberFindMany = jest.fn();
   const searchWithLimit = jest.fn();
 
-  const prismaMock = { member: { findMany: memberFindMany } } as unknown as PrismaService;
+  const prismaMock = {
+    member: { findMany: memberFindMany },
+    team: { findMany: jest.fn().mockResolvedValue([]) },
+  } as unknown as PrismaService;
   const openSearchMock = { searchWithLimit } as unknown as OpenSearchService;
 
   const osHits = (index: string, hits: Array<{ _id: string; _source: Record<string, unknown> }>) =>
@@ -184,5 +187,37 @@ describe('SearchService.addAdminAccessFields (LAB-3252)', () => {
     expect(await service.addAdminAccessFields(empty)).toBe(empty);
     expect(teamFindMany).not.toHaveBeenCalled();
     expect(memberFindMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('SearchService.removeDeletedTeams (LAB-3192)', () => {
+  const teamFindMany = jest.fn();
+  const prismaMock = { team: { findMany: teamFindMany } } as unknown as PrismaService;
+  const service = new SearchService({} as OpenSearchService, prismaMock);
+  const item = (uid: string, index: string) => ({ uid, name: uid, image: '', index, matches: [] });
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('drops deleted teams from teams and top, and keeps other results', async () => {
+    teamFindMany.mockResolvedValue([{ uid: 'team-deleted' }]);
+    const result = await service.removeDeletedTeams({
+      teams: [item('team-deleted', 'teams'), item('team-ok', 'teams')],
+      members: [item('team-deleted', 'members')],
+      top: [item('team-deleted', 'teams'), item('team-ok', 'teams'), item('m1', 'members')],
+    } as any);
+
+    expect(teamFindMany).toHaveBeenCalledWith({
+      where: { uid: { in: ['team-deleted', 'team-ok'] }, status: 'INACTIVE' },
+      select: { uid: true },
+    });
+    expect(result.teams.map((t) => t.uid)).toEqual(['team-ok']);
+    expect(result.top.map((t) => t.uid)).toEqual(['team-ok', 'm1']);
+    expect(result.members.map((t) => t.uid)).toEqual(['team-deleted']);
+  });
+
+  it('skips the query when there are no team results', async () => {
+    const input = { teams: [], members: [item('m1', 'members')], top: [item('m1', 'members')] } as any;
+    await expect(service.removeDeletedTeams(input)).resolves.toBe(input);
+    expect(teamFindMany).not.toHaveBeenCalled();
   });
 });

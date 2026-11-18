@@ -11,10 +11,13 @@ const ENTITY_TYPES: Record<MemberSignalBody['entityType'], MemberSignalEntityTyp
   member: 'MEMBER',
   team: 'TEAM',
   project: 'PROJECT',
+  'news-item': 'NEWS_ITEM',
+  'job-opening': 'JOB_OPENING',
+  event: 'EVENT',
 };
 
 /**
- * POST /v1/member-signals (LAB-3123): views and clicks of the logged-in member.
+ * POST /v1/member-signals (LAB-3123, LAB-3267): views and clicks of the logged-in member.
  * The member comes from the session only. The frontend fires and forgets, so
  * the answer is always an empty 204 once the request is valid.
  */
