@@ -13,8 +13,8 @@ import { HuskyAiToolsModule } from './tools/husky-ai-tools.module';
  * directly (no forwardRef needed) by ~10 unrelated modules for its narrower
  * services (HuskyRevalidationService, HuskyGenerationService, etc.); if this
  * module's heavier dependencies lived there too, every one of those consumers
- * would risk a require()-time circular-dependency crash. Only AppModule
- * imports this module.
+ * would risk a require()-time circular-dependency crash. Only AppModule and
+ * LabosAgentModule (itself imported only by AppModule) import this module.
  */
 @Module({
   imports: [HuskyModule, HuskyAiToolsModule],

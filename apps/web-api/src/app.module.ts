@@ -42,6 +42,7 @@ import { MemberFollowUpsModule } from './member-follow-ups/member-follow-ups.mod
 import { MemberFeedbacksModule } from './member-feedbacks/member-feedbacks.module';
 import { HuskyModule } from './husky/husky.module';
 import { HuskySearchModule } from './husky/husky-search.module';
+import { LabosAgentModule } from './labos-agent/labos-agent.module';
 import { HomeModule } from './home/home.module';
 import { InternalsModule } from './internals/internals.module';
 import { MemberSubscriptionsModule } from './member-subscriptions/member-subscriptions.module';
@@ -161,6 +162,7 @@ import { McpModule } from './mcp/mcp.module';
     MemberFeedbacksModule,
     HuskyModule,
     HuskySearchModule,
+    LabosAgentModule,
     HomeModule,
     InternalsModule,
     MemberSubscriptionsModule,
