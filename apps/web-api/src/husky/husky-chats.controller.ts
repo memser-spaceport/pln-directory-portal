@@ -3,14 +3,14 @@ import { HuskyService } from './husky.service';
 import { HuskyChatDto, HuskyFeedbackDto } from '../../../../libs/contracts/src/schema/husky-chat';
 import { Response } from 'express';
 import { HuskyAiService } from './husky-ai.service';
-import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { OptionalUserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { UserAccessTokenValidateGuard } from '../guards/user-access-token-validate.guard';
 
 @Controller()
 export class HuskyChatsController {
   constructor(private huskyService: HuskyService, private huskyAiService: HuskyAiService) {}
 
-  @UseGuards(UserTokenCheckGuard)
+  @UseGuards(OptionalUserTokenCheckGuard)
   @Post('v1/husky/chat/contextual-tools')
   async huskyChatAssistantTools(@Body() body: HuskyChatDto, @Res() res: Response, @Req() req) {
     const stream = await this.huskyAiService.createContextualToolsResponse({ ...body }, !!req.userEmail, req.userEmail);

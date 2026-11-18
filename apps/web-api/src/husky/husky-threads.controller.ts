@@ -3,7 +3,7 @@ import { HuskyService } from "./husky.service";
 import { HuskyAiService } from "./husky-ai.service";
 import { NoCache } from "../decorators/no-cache.decorator";
 import { UserAccessTokenValidateGuard } from "../guards/user-access-token-validate.guard";
-import { UserTokenCheckGuard } from "../guards/user-token-check.guard";
+import { OptionalUserTokenCheckGuard, StrictOptionalUserTokenCheckGuard } from "../guards/user-token-check.guard";
 @Controller('v1/husky/threads')
 export class HuskyThreadsController {
 
@@ -21,14 +21,14 @@ export class HuskyThreadsController {
       return await this.huskyAiService.getThreadsByEmail(req?.userEmail);
     }
   
-    @UseGuards(UserTokenCheckGuard)
+    @UseGuards(OptionalUserTokenCheckGuard)
     @NoCache()
     @Get(':threadId')
     async getThreadById(@Param('threadId') threadId: string, @Req() req) {
       return await this.huskyAiService.getThreadById(threadId, req?.userEmail);
     }
 
-    @UseGuards(UserTokenCheckGuard)
+    @UseGuards(StrictOptionalUserTokenCheckGuard)
     @Post(':threadId')
     async duplicateThread(@Param('threadId') threadId: string, @Req() req, @Body() body: { guestUserId?: string }) {
       return await this.huskyAiService.duplicateThread(threadId, req?.userEmail, body?.guestUserId);

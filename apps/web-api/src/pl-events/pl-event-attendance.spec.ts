@@ -439,3 +439,113 @@ describe('Strict attendee list (GET /v1/irl/locations/:uid/guests?eventUid=, LAB
     expect(args.eventUids).toEqual(['A', 'B']);
   });
 });
+
+describe('getPLEventGuestsByLocationAndType query allow-list', () => {
+  const EVENTS = [
+    { uid: 'A', type: 'IN_PERSON', startDate: '2026-12-01', endDate: '2026-12-02' },
+    { uid: 'B', type: 'IN_PERSON', startDate: '2026-12-03', endDate: '2026-12-04' },
+    { uid: 'X', type: 'INVITE_ONLY', startDate: '2026-12-05', endDate: '2026-12-06' },
+  ];
+
+  function listService() {
+    const { prisma } = makeStore();
+    const { service } = makeService(prisma, { locationEvents: EVENTS });
+    const fetchAttendees = jest.spyOn(service, 'fetchAttendees').mockResolvedValue([] as any);
+    return { service, fetchAttendees };
+  }
+
+  it('ignores eventUids from the query and uses the location events', async () => {
+    const { service, fetchAttendees } = listService();
+    await service.getPLEventGuestsByLocationAndType(
+      LOC,
+      { type: 'upcoming', eventUids: ['evil-event', 'A'], includeLocationOnlyGuests: false, locationUid: 'other' },
+      null
+    );
+    const args = fetchAttendees.mock.calls[0][0];
+    expect(args.eventUids).toEqual(['A', 'B']);
+    expect(args.locationUid).toBe(LOC);
+    expect(args.includeLocationOnlyGuests).toBe(true);
+  });
+
+  it('ignores an unknown query key', async () => {
+    const { service, fetchAttendees } = listService();
+    await service.getPLEventGuestsByLocationAndType(
+      LOC,
+      { type: 'upcoming', notARealFilter: 'secret', loggedInMemberUid: 'attacker' },
+      null
+    );
+    const args = fetchAttendees.mock.calls[0][0];
+    expect(args).not.toHaveProperty('notARealFilter');
+    expect(args.loggedInMemberUid).toBeNull();
+    expect(args.eventUids).toEqual(['A', 'B']);
+  });
+
+  it('caps limit=100000 to the max', async () => {
+    const { service, fetchAttendees } = listService();
+    await service.getPLEventGuestsByLocationAndType(LOC, { type: 'upcoming', limit: '100000' }, null);
+    expect(fetchAttendees.mock.calls[0][0].limit).toBe(100);
+    await service.getPLEventGuestsByLocationAndType(LOC, { type: 'upcoming', limit: 100000 }, null);
+    expect(fetchAttendees.mock.calls[1][0].limit).toBe(100);
+  });
+
+  it('uses the default limit when limit is missing or invalid', async () => {
+    const { service, fetchAttendees } = listService();
+    await service.getPLEventGuestsByLocationAndType(LOC, { type: 'upcoming' }, null);
+    expect(fetchAttendees.mock.calls[0][0].limit).toBe(10);
+    expect(fetchAttendees.mock.calls[0][0].page).toBe(1);
+    await service.getPLEventGuestsByLocationAndType(LOC, { type: 'upcoming', limit: 'nope', page: '0' }, null);
+    expect(fetchAttendees.mock.calls[1][0].limit).toBe(10);
+    expect(fetchAttendees.mock.calls[1][0].page).toBe(1);
+  });
+
+  it('returns the same result for a valid request', async () => {
+    const { prisma } = makeStore();
+    const { service } = makeService(prisma, { locationEvents: EVENTS });
+    const rows = [
+      {
+        memberUid: 'other',
+        member: { preferences: { showTelegram: true }, officeHours: 'mon', telegramHandler: '@a' },
+        officeHours: 'mon',
+        telegramId: '1',
+      },
+    ];
+    const fetchAttendees = jest.spyOn(service, 'fetchAttendees').mockResolvedValue(rows as any);
+    const result = await service.getPLEventGuestsByLocationAndType(
+      LOC,
+      {
+        type: 'upcoming',
+        search: 'ada',
+        sortBy: 'memberName',
+        sortDirection: 'desc',
+        page: '2',
+        limit: '20',
+        isHost: 'true',
+        isSpeaker: 'false',
+        isSponsor: 'false',
+        topics: ['ai'],
+        filteredEvents: ['A'],
+      },
+      ME
+    );
+    expect(result).toBe(rows);
+    expect(fetchAttendees.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        locationUid: LOC,
+        eventUids: ['A'],
+        search: 'ada',
+        sortBy: 'memberName',
+        sortDirection: 'desc',
+        page: 2,
+        limit: 20,
+        isHost: 'true',
+        isSpeaker: 'false',
+        isSponsor: 'false',
+        topics: ['ai'],
+        filteredEvents: ['A'],
+        type: 'upcoming',
+        includeLocationOnlyGuests: true,
+        loggedInMemberUid: ME.uid,
+      })
+    );
+  });
+});

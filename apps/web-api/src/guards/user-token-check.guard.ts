@@ -16,22 +16,28 @@ export class UserTokenCheckGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const token = this.extractTokenFromHeader(request);
 
+    // A missing token is not a session. Public routes use OptionalUserTokenCheckGuard.
+    if (!token) {
+      throw new UnauthorizedException('Invalid Session. Please login and try again');
+    }
+
     // If token validation fails throw Exception
     try {
-      if (token) {
-        const validationResult: any = await axios.post(`${process.env.AUTH_API_URL}/auth/introspect`, { token: token });
-        if (!validationResult?.data?.active) {
-          throw new UnauthorizedException('Invalid Session. Please login and try again');
-        }
+      const validationResult: any = await axios.post(`${process.env.AUTH_API_URL}/auth/introspect`, { token: token });
+      if (!validationResult?.data?.active) {
+        throw new UnauthorizedException('Invalid Session. Please login and try again');
+      }
 
-        // If user email is available in token set it in request. No Validation error if no email.
-        if (validationResult?.data?.email) {
-          request['userEmail'] = validationResult.data.email;
-          request['userUid'] = validationResult.data.sub;
-          request['userAccessToken'] = token;
-        }
+      // If user email is available in token set it in request. No Validation error if no email.
+      if (validationResult?.data?.email) {
+        request['userEmail'] = validationResult.data.email;
+        request['userUid'] = validationResult.data.sub;
+        request['userAccessToken'] = token;
       }
     } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
       // If known error, handle it
       if (error?.response?.data?.message && error?.response?.status) {
         throw new HttpException(error?.response?.data?.message, error?.response?.status);
@@ -73,6 +79,48 @@ export class OptionalUserTokenCheckGuard implements CanActivate {
       }
     } catch {
       // Treat as anonymous for public endpoints
+    }
+    return true;
+  }
+
+  private extractTokenFromHeader(request): string | undefined {
+    const [type, token] = request.headers.authorization?.split(' ') ?? [];
+    return type === 'Bearer' ? token : undefined;
+  }
+}
+
+/**
+ * Public writes. No token stays anonymous.
+ * A token that is present but invalid or expired returns 401, so the write is not saved without a member.
+ */
+@Injectable()
+export class StrictOptionalUserTokenCheckGuard implements CanActivate {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest();
+    const token = this.extractTokenFromHeader(request);
+    if (!token) {
+      return true;
+    }
+    try {
+      const validationResult: any = await axios.post(`${process.env.AUTH_API_URL}/auth/introspect`, { token: token });
+      if (!validationResult?.data?.active) {
+        throw new UnauthorizedException('Invalid Session. Please login and try again');
+      }
+      if (validationResult?.data?.email) {
+        request['userEmail'] = validationResult.data.email;
+        request['userUid'] = validationResult.data.sub;
+        request['userAccessToken'] = token;
+      }
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      if (error?.response?.data?.message && error?.response?.status) {
+        throw new HttpException(error?.response?.data?.message, error?.response?.status);
+      } else if (error?.response?.message && error?.status) {
+        throw new HttpException(error?.response?.message, error?.status);
+      }
+      throw new InternalServerErrorException('Unexpected Error');
     }
     return true;
   }

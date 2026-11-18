@@ -84,6 +84,7 @@ export const GUARD_AUDIENCE: Record<string, DocAudience> = {
   UserTokenValidation: DocAudience.USER,
   UserTokenCheckGuard: DocAudience.USER,
   OptionalUserTokenCheckGuard: DocAudience.USER,
+  StrictOptionalUserTokenCheckGuard: DocAudience.USER,
   UserAccessTokenValidateGuard: DocAudience.USER,
   UserAuthValidateGuard: DocAudience.USER,
   UserAuthTokenValidation: DocAudience.USER,
