@@ -88,6 +88,8 @@ import { PrismaService } from '../shared/prisma.service';
 import { TeamNewsQueryService } from '../team-news/team-news-query.service';
 import { TeamNewsSuggestionsService } from '../team-news/team-news-suggestions.service';
 import { McpToolDef, toolsForPermissions, WHOAMI_TOOL, warmIntroTools } from './mcp-tools';
+import { McpAdminCaps, McpStoredLevels } from './mcp-scopes.service';
+import { appTools, McpPlannedTool, planTools } from './mcp-tool-plan';
 /**
  * The one MCP tool list (LAB-3299). The MCP server (`mcp.controller.ts`) and the LabOS in-app agent
  * read their tools from here, so both get the same tools and the same RBAC visibility rules.
@@ -248,5 +250,18 @@ export class McpToolCatalog {
   /** The tools the member's RBAC permissions allow (`toolsForPermissions`). Scope levels apply on top in MCP. */
   forPermissions(permissions: Set<string>): McpToolDef[] {
     return toolsForPermissions(permissions, this.all());
+  }
+
+  /** RBAC, then the connection's scope levels capped by admins (`planTools`). The MCP server uses this. */
+  plan(permissions: Set<string>, stored: McpStoredLevels, caps: McpAdminCaps | null): McpPlannedTool[] {
+    return planTools(this.forPermissions(permissions), stored, caps);
+  }
+
+  /**
+   * RBAC, then the admin caps, for a caller with no MCP connection (the LabOS agent, LAB-3299). Only tools that run.
+   * `caps` null (settings unreadable) hides every scoped tool, as on the MCP server.
+   */
+  forApp(permissions: Set<string>, caps: McpAdminCaps | null): McpToolDef[] {
+    return appTools(this.forPermissions(permissions), caps);
   }
 }

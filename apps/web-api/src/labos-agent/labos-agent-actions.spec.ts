@@ -28,12 +28,18 @@ jest.mock('ai', () => ({ tool: (def: unknown) => def }));
 
 import { APP_ENV } from '../utils/constants';
 import { experienceTools } from '../mcp/mcp-member-action-tools';
+import { MCP_SCOPE_KEYS } from 'libs/contracts/src/schema/mcp-scopes';
+import { appTools } from '../mcp/mcp-tool-plan';
 import { toolsForPermissions } from '../mcp/mcp-tools';
 import { directoryWriteTools, profileTools } from '../mcp/mcp-write-tools';
 import { LabosAgentAccessService } from './labos-agent-access.service';
 import { LabosAgentController } from './labos-agent.controller';
-import { LabosAgentProposalStore } from './labos-agent-proposals';
+import { LabosAgentProposalStore, proposalRecordKey } from './labos-agent-proposals';
 import { LabosAgentService } from './labos-agent.service';
+
+const WRITE_TOOLS = ['update_my_profile', 'add_experience', 'update_experience', 'update_team'];
+/** Admin caps with no limit: every scope at write. */
+const ALL_WRITE = Object.fromEntries(MCP_SCOPE_KEYS.map((key) => [key, 'write']));
 
 const NOW = Date.parse('2026-11-18T12:00:00.000Z');
 const VALID = { threadId: 'thread-1', chatId: 'chat-1', message: 'Change my bio' };
@@ -108,13 +114,31 @@ function setup() {
     update: jest.fn(async (uid, data) => ({ ...experience, ...data })),
   };
   const teams = { updateTeamProfileFields: jest.fn(async (uid, data) => ({ ...team, ...data })) };
+  /** Names of the write tools whose real `execute` ran. */
+  const runs: string[] = [];
+  const forPermissions = (permissions: Set<string>) =>
+    toolsForPermissions(permissions, [
+      ...profileTools(members as any, hooks as any, prisma as any),
+      ...experienceTools(experiences as any, prisma as any),
+      ...directoryWriteTools(teams as any, {} as any, members as any, prisma as any),
+    ]).map((def) => ({
+      ...def,
+      execute: (ctx: any, args: any) => {
+        if (WRITE_TOOLS.includes(def.name)) runs.push(def.name);
+        return def.execute(ctx, args);
+      },
+    }));
+  // The real caps step (`appTools` = `planTools` with app levels), as McpToolCatalog.forApp runs it.
   const catalog = {
-    forPermissions: (permissions: Set<string>) =>
-      toolsForPermissions(permissions, [
-        ...profileTools(members as any, hooks as any, prisma as any),
-        ...experienceTools(experiences as any, prisma as any),
-        ...directoryWriteTools(teams as any, {} as any, members as any, prisma as any),
-      ]),
+    forPermissions,
+    forApp: (permissions: Set<string>, caps: any) => appTools(forPermissions(permissions), caps),
+  };
+  let caps: Record<string, string> | Error = ALL_WRITE;
+  const scopes = {
+    adminCaps: jest.fn(async () => {
+      if (caps instanceof Error) throw caps;
+      return caps;
+    }),
   };
   const accessControl = { getMemberAccess: jest.fn().mockResolvedValue({ effectivePermissions: [] }) };
   const cache = fakeCache();
@@ -126,7 +150,8 @@ function setup() {
     {} as any,
     catalog as any,
     accessControl as any,
-    new LabosAgentProposalStore(cache as any)
+    new LabosAgentProposalStore(cache as any),
+    scopes as any
   );
   const controller = new LabosAgentController(service);
   const req = { userEmail: 'ada@example.com' };
@@ -145,6 +170,7 @@ function setup() {
     const text = await turn.tools[name].execute(args);
     return { text, proposal: turn.proposals[0] };
   };
+  const stored = (proposalId: string) => cache.data.get(proposalRecordKey(proposalId)) as Record<string, any>;
   const confirm = (proposalId: string, decision = 'confirm') =>
     controller.confirm({ proposalId, decision }, req).catch((error) => error);
   const writes = () =>
@@ -162,11 +188,16 @@ function setup() {
     teams,
     prisma,
     cache,
+    runs,
+    chat,
+    stored,
+    setCaps: (next: Record<string, string> | Error) => (caps = next),
     setCaller: (uid: string) => (callerUid = uid),
   };
 }
 
-const body = (error: any) => ({ status: error.getStatus(), ...error.getResponse() });
+/** The error body as the client gets it; `statusCode` is the HTTP status. */
+const body = (error: any) => ({ ...error.getResponse(), statusCode: error.getStatus() });
 
 describe('LabOS agent action proposals (LAB-3299)', () => {
   const originalEnv = process.env.ENVIRONMENT;
@@ -192,7 +223,7 @@ describe('LabOS agent action proposals (LAB-3299)', () => {
       ],
       expiresAt: '2026-11-18T12:15:00.000Z',
     });
-    expect(h.cache.data.get(`labos-agent:proposal:${proposal.proposalId}`)).toEqual(
+    expect(h.stored(proposal.proposalId)).toEqual(
       expect.objectContaining({ memberUid: 'member-1', tool: 'update_my_profile', status: 'open' })
     );
     expect(h.writes()).toBe(0);
@@ -274,7 +305,7 @@ describe('C2 POST /v1/labos-agent/actions/confirm (LAB-3299)', () => {
       summary: 'Your profile is updated: Bio.',
       result: expect.objectContaining({ updated: ['bio'] }),
     });
-    expect(body(closed)).toEqual(expect.objectContaining({ status: 409, code: 'PROPOSAL_CLOSED' }));
+    expect(body(closed)).toEqual(expect.objectContaining({ statusCode: 409, code: 'PROPOSAL_CLOSED' }));
     expect(h.members.updateMemberByUid).toHaveBeenCalledTimes(1);
     expect(h.members.updateMemberByUid).toHaveBeenCalledWith('member-1', { bio: 'New bio' });
     expect(body(await h.confirm(proposal.proposalId))).toEqual(expect.objectContaining({ code: 'PROPOSAL_CLOSED' }));
@@ -290,19 +321,19 @@ describe('C2 POST /v1/labos-agent/actions/confirm (LAB-3299)', () => {
       summary: 'Cancelled. Nothing changed.',
       result: {},
     });
-    expect(body(await h.confirm(proposal.proposalId))).toEqual(expect.objectContaining({ status: 409 }));
+    expect(body(await h.confirm(proposal.proposalId))).toEqual(expect.objectContaining({ statusCode: 409 }));
     expect(h.writes()).toBe(0);
   });
 
   it('returns 404 PROPOSAL_NOT_FOUND for an unknown id and for another member', async () => {
     const h = setup();
     expect(body(await h.confirm('ap_missing'))).toEqual(
-      expect.objectContaining({ status: 404, code: 'PROPOSAL_NOT_FOUND' })
+      expect.objectContaining({ statusCode: 404, code: 'PROPOSAL_NOT_FOUND' })
     );
     const { proposal } = await h.propose('update_my_profile', { bio: 'New bio' });
     h.setCaller('member-2');
     expect(body(await h.confirm(proposal.proposalId))).toEqual(
-      expect.objectContaining({ status: 404, code: 'PROPOSAL_NOT_FOUND' })
+      expect.objectContaining({ statusCode: 404, code: 'PROPOSAL_NOT_FOUND' })
     );
     expect(h.writes()).toBe(0);
   });
@@ -312,7 +343,7 @@ describe('C2 POST /v1/labos-agent/actions/confirm (LAB-3299)', () => {
     const { proposal } = await h.propose('update_my_profile', { bio: 'New bio' });
     jest.spyOn(Date, 'now').mockReturnValue(NOW + 15 * 60 * 1000 + 1);
     expect(body(await h.confirm(proposal.proposalId))).toEqual(
-      expect.objectContaining({ status: 410, code: 'PROPOSAL_EXPIRED' })
+      expect.objectContaining({ statusCode: 410, code: 'PROPOSAL_EXPIRED' })
     );
     expect(h.writes()).toBe(0);
   });
@@ -322,9 +353,77 @@ describe('C2 POST /v1/labos-agent/actions/confirm (LAB-3299)', () => {
     const { proposal } = await h.propose('update_team', { teamUid: 'team-led', shortDescription: 'New pitch' });
     h.leads.clear();
     expect(body(await h.confirm(proposal.proposalId))).toEqual(
-      expect.objectContaining({ status: 403, code: 'ACTION_NOT_ALLOWED' })
+      expect.objectContaining({ statusCode: 403, code: 'ACTION_NOT_ALLOWED' })
     );
     expect(h.teams.updateTeamProfileFields).not.toHaveBeenCalled();
+  });
+
+  it('rechecks the lead role at confirm time: the tool never runs and the proposal stays open', async () => {
+    // The update_team tool has its own lead check, so a 403 alone does not prove the C2 recheck. Without the
+    // recheck, C2 claims the proposal and runs the tool, which refuses: `runs` gets update_team and the status is failed.
+    const h = setup();
+    const { proposal } = await h.propose('update_team', { teamUid: 'team-led', shortDescription: 'New pitch' });
+    h.leads.clear();
+    expect(body(await h.confirm(proposal.proposalId))).toEqual(
+      expect.objectContaining({ statusCode: 403, code: 'ACTION_NOT_ALLOWED' })
+    );
+    expect(h.runs).toEqual([]);
+    expect(h.stored(proposal.proposalId).status).toBe('open');
+  });
+
+  it.each([
+    ['confirm first', ['confirm', 'cancel']],
+    ['cancel first', ['cancel', 'confirm']],
+  ])(
+    'races Cancel against Confirm (%s): one wins, the tool runs at most once, the loser gets 409 with status',
+    async (_n, order) => {
+      const h = setup();
+      const { proposal } = await h.propose('update_my_profile', { bio: 'New bio' });
+      const results = await Promise.all(order.map((decision) => h.confirm(proposal.proposalId, decision)));
+      const winners = results.filter((result) => !(result instanceof Error));
+      const losers = results.filter((result) => result instanceof Error);
+      expect(winners).toHaveLength(1);
+      expect(losers).toHaveLength(1);
+      expect(body(losers[0])).toEqual(
+        expect.objectContaining({ statusCode: 409, code: 'PROPOSAL_CLOSED', status: winners[0].status })
+      );
+      expect(h.runs.length).toBeLessThanOrEqual(1);
+      expect(h.members.updateMemberByUid).toHaveBeenCalledTimes(winners[0].status === 'done' ? 1 : 0);
+      expect(h.stored(proposal.proposalId).status).toBe(winners[0].status);
+    }
+  );
+
+  it('gives the stored status in the 409 body: done, cancelled or failed', async () => {
+    const h = setup();
+    const done = (await h.propose('update_my_profile', { bio: 'New bio' })).proposal;
+    await h.confirm(done.proposalId);
+    expect(body(await h.confirm(done.proposalId))).toEqual({
+      statusCode: 409,
+      code: 'PROPOSAL_CLOSED',
+      message: 'The proposal is closed',
+      status: 'done',
+    });
+    const cancelled = (await h.propose('update_my_profile', { bio: 'Other bio' })).proposal;
+    await h.confirm(cancelled.proposalId, 'cancel');
+    expect(body(await h.confirm(cancelled.proposalId, 'cancel'))).toEqual(
+      expect.objectContaining({ statusCode: 409, status: 'cancelled' })
+    );
+    const failed = (await h.propose('update_my_profile', { skills: ['Nope'] })).proposal;
+    await h.confirm(failed.proposalId);
+    expect(body(await h.confirm(failed.proposalId))).toEqual(
+      expect.objectContaining({ statusCode: 409, status: 'failed' })
+    );
+  });
+
+  it('gives status pending when another request holds the proposal and has not finished', async () => {
+    const h = setup();
+    const { proposal } = await h.propose('update_my_profile', { bio: 'New bio' });
+    // The other request claimed the proposal (deleted the open key) and its write still runs.
+    for (const key of [...h.cache.data.keys()]) if (key.includes('proposal-open')) h.cache.data.delete(key);
+    expect(body(await h.confirm(proposal.proposalId))).toEqual(
+      expect.objectContaining({ statusCode: 409, code: 'PROPOSAL_CLOSED', status: 'pending' })
+    );
+    expect(h.runs).toEqual([]);
   });
 
   it('confirms a team change for a lead through the real update_team tool', async () => {
@@ -347,12 +446,12 @@ describe('C2 POST /v1/labos-agent/actions/confirm (LAB-3299)', () => {
     const error = await h.confirm(proposal.proposalId);
     expect(body(error)).toEqual(
       expect.objectContaining({
-        status: 422,
+        statusCode: 422,
         code: 'ACTION_FAILED',
         message: expect.stringContaining('Unknown skills'),
       })
     );
-    expect(body(await h.confirm(proposal.proposalId))).toEqual(expect.objectContaining({ status: 409 }));
+    expect(body(await h.confirm(proposal.proposalId))).toEqual(expect.objectContaining({ statusCode: 409 }));
     expect(h.prisma.skill.findMany).toHaveBeenCalledTimes(1);
     expect(h.writes()).toBe(0);
   });
@@ -360,10 +459,58 @@ describe('C2 POST /v1/labos-agent/actions/confirm (LAB-3299)', () => {
   it('returns 400 VALIDATION_ERROR for a bad body and 403 AGENT_NOT_ENABLED outside the gate', async () => {
     const h = setup();
     expect(body(await h.confirm('ap_1', 'maybe'))).toEqual(
-      expect.objectContaining({ status: 400, code: 'VALIDATION_ERROR' })
+      expect.objectContaining({ statusCode: 400, code: 'VALIDATION_ERROR' })
     );
     process.env.ENVIRONMENT = APP_ENV.PRODUCTION;
-    expect(body(await h.confirm('ap_1'))).toEqual(expect.objectContaining({ status: 403, code: 'AGENT_NOT_ENABLED' }));
+    expect(body(await h.confirm('ap_1'))).toEqual(
+      expect.objectContaining({ statusCode: 403, code: 'AGENT_NOT_ENABLED' })
+    );
     process.env.ENVIRONMENT = APP_ENV.DEV;
+  });
+});
+
+describe('Admin MCP caps in the LabOS agent (LAB-3299)', () => {
+  beforeEach(() => jest.spyOn(Date, 'now').mockReturnValue(NOW));
+  afterEach(() => jest.restoreAllMocks());
+
+  it('drops the profile propose tools in C1 when an admin sets profile to read, and keeps the reads', async () => {
+    const h = setup();
+    h.setCaps({ ...ALL_WRITE, profile: 'read' });
+    const names = Object.keys((await h.chat()).tools);
+    expect(names).toEqual(expect.arrayContaining(['get_my_profile', 'list_my_experiences', 'update_team']));
+    for (const name of ['update_my_profile', 'add_experience', 'update_experience']) {
+      expect(names).not.toContain(name);
+    }
+  });
+
+  it('returns 403 ACTION_NOT_ALLOWED in C2 when the admin caps changed after the proposal', async () => {
+    const h = setup();
+    const { proposal } = await h.propose('update_my_profile', { bio: 'New bio' });
+    h.setCaps({ ...ALL_WRITE, profile: 'read' });
+    expect(body(await h.confirm(proposal.proposalId))).toEqual(
+      expect.objectContaining({ statusCode: 403, code: 'ACTION_NOT_ALLOWED' })
+    );
+    expect(h.runs).toEqual([]);
+    expect(h.writes()).toBe(0);
+  });
+
+  it('fails closed when the caps cannot be read: no LabOS tools in C1 (as on MCP) and 403 in C2', async () => {
+    const h = setup();
+    const { proposal } = await h.propose('update_my_profile', { bio: 'New bio' });
+    h.setCaps(new Error('db down'));
+    expect(Object.keys((await h.chat()).tools)).toEqual([]);
+    expect(body(await h.confirm(proposal.proposalId))).toEqual(
+      expect.objectContaining({ statusCode: 403, code: 'ACTION_NOT_ALLOWED' })
+    );
+    expect(h.writes()).toBe(0);
+  });
+
+  it('keeps proposal keys under the environment prefix', async () => {
+    const h = setup();
+    const { proposal } = await h.propose('update_my_profile', { bio: 'New bio' });
+    expect([...h.cache.data.keys()].sort()).toEqual([
+      `development:labos-agent:proposal-open:${proposal.proposalId}`,
+      `development:labos-agent:proposal:${proposal.proposalId}`,
+    ]);
   });
 });

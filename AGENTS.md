@@ -65,7 +65,7 @@
 
 - Prefer shared contracts/types from `libs/contracts` over redefining request/response shapes.
 - Backend is modular by domain; keep new functionality inside an existing domain module or a new isolated module.
-- MCP tools live in one list, `McpToolCatalog` (`apps/web-api/src/mcp/mcp-tool-catalog.ts`). The MCP server and the LabOS in-app agent both read it. Add a new MCP tool there; `mcp-tool-catalog.spec.ts` pins the tool names per test role.
+- MCP tools live in one list, `McpToolCatalog` (`apps/web-api/src/mcp/mcp-tool-catalog.ts`). The MCP server and the LabOS in-app agent both read it. Add a new MCP tool there; `mcp-tool-catalog.spec.ts` pins the tool names per test role. The MCP server plans tools with `catalog.plan` (RBAC, connection scopes, admin caps). The LabOS agent uses `catalog.forApp` (RBAC and admin caps only).
 - Frontend data fetching should flow through `hooks/*` + `utils/services/*`, not directly in page components.
 - Because this frontend is Next Pages Router, add routes under `pages/*` and API handlers under `pages/api/*`.
 

@@ -65,6 +65,8 @@ jest.mock('../team-pitches/team-pitch-engagement.service', () => ({ TeamPitchEng
 
 import { McpToolCatalog } from './mcp-tool-catalog';
 import { toolsForPermissions } from './mcp-tools';
+import { appTools, MCP_APP_LEVELS, planTools } from './mcp-tool-plan';
+import { MCP_SCOPE_KEYS } from 'libs/contracts/src/schema/mcp-scopes';
 import BEFORE from './mcp-tool-catalog.spec.fixture.json';
 
 /**
@@ -98,5 +100,28 @@ describe('McpToolCatalog (LAB-3299)', () => {
   it('has unique tool names', () => {
     const names = catalog.all().map((tool) => tool.name);
     expect(new Set(names).size).toBe(names.length);
+  });
+
+  it('plan() is planTools over forPermissions, so the MCP server keeps the same plan', () => {
+    const permissions = new Set(ROLES.forum_writer);
+    const caps = Object.fromEntries(MCP_SCOPE_KEYS.map((key) => [key, 'read'])) as any;
+    const stored = { forum: 'write' as const };
+    const summary = (plan: ReturnType<typeof planTools>) => plan.map((item) => `${item.tool.name}:${item.mode}`);
+    expect(summary(catalog.plan(permissions, stored, caps))).toEqual(
+      summary(planTools(catalog.forPermissions(permissions), stored, caps))
+    );
+  });
+
+  it('forApp() applies admin caps only, and hides every scoped tool when caps are unreadable', () => {
+    const permissions = new Set(ROLES.forum_writer);
+    const caps = Object.fromEntries(MCP_SCOPE_KEYS.map((key) => [key, 'write'])) as any;
+    const all = catalog.forApp(permissions, caps).map((tool) => tool.name);
+    expect(all).toEqual(appTools(catalog.forPermissions(permissions), caps).map((tool) => tool.name));
+    expect(all).toContain('update_my_profile');
+    const profileRead = catalog.forApp(permissions, { ...caps, profile: 'read' }).map((tool) => tool.name);
+    expect(profileRead).toContain('get_my_profile');
+    expect(profileRead).not.toContain('update_my_profile');
+    expect(catalog.forApp(permissions, null).map((tool) => tool.name)).toEqual(['whoami']);
+    expect(Object.values(MCP_APP_LEVELS).every((level) => level === 'write')).toBe(true);
   });
 });

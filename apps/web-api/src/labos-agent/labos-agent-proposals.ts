@@ -25,8 +25,13 @@ export type StoredProposal = {
   status: 'open' | 'cancelled' | 'done' | 'failed';
 };
 
-const recordKey = (id: string) => `labos-agent:proposal:${id}`;
-const openKey = (id: string) => `labos-agent:proposal-open:${id}`;
+/**
+ * Keys start with the app environment (`ENVIRONMENT`), the same `<env>:` prefix as member proofs and member access.
+ * Feature envs share the dev Redis, so one env never reads or closes another env's proposal.
+ */
+const keyPrefix = () => `${process.env.ENVIRONMENT ?? 'local'}:labos-agent`;
+export const proposalRecordKey = (id: string) => `${keyPrefix()}:proposal:${id}`;
+const openKey = (id: string) => `${keyPrefix()}:proposal-open:${id}`;
 
 /** Proposals in the shared cache (Redis). No database table (contract assumption 5). */
 @Injectable()
@@ -35,12 +40,12 @@ export class LabosAgentProposalStore {
 
   async save(stored: StoredProposal): Promise<void> {
     const id = stored.proposal.proposalId;
-    await this.cache.set(recordKey(id), stored, { ttl: RECORD_TTL_SECONDS });
+    await this.cache.set(proposalRecordKey(id), stored, { ttl: RECORD_TTL_SECONDS });
     await this.cache.set(openKey(id), 1, { ttl: RECORD_TTL_SECONDS });
   }
 
   async load(id: string): Promise<StoredProposal | undefined> {
-    return (await this.cache.get<StoredProposal>(recordKey(id))) ?? undefined;
+    return (await this.cache.get<StoredProposal>(proposalRecordKey(id))) ?? undefined;
   }
 
   /** Redis DEL answers 1 to exactly one caller, so only one confirm or cancel closes a proposal (as member proofs). */
@@ -49,7 +54,11 @@ export class LabosAgentProposalStore {
   }
 
   async close(stored: StoredProposal, status: StoredProposal['status']): Promise<void> {
-    await this.cache.set(recordKey(stored.proposal.proposalId), { ...stored, status }, { ttl: RECORD_TTL_SECONDS });
+    await this.cache.set(
+      proposalRecordKey(stored.proposal.proposalId),
+      { ...stored, status },
+      { ttl: RECORD_TTL_SECONDS }
+    );
   }
 }
 

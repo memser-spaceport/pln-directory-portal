@@ -26,7 +26,7 @@ import { McpLimitDecision } from './mcp-limits.config';
 import { McpToolDef, toolInputSchema } from './mcp-tools';
 import { McpAdminCaps, McpScopesService, resolveScope } from './mcp-scopes.service';
 import { McpAccessRequestsService } from './mcp-access-requests.service';
-import { calledToolNames, MCP_NEEDS_WRITE_NOTE, McpRefusalReason, planTools, refusalText } from './mcp-tool-plan';
+import { calledToolNames, MCP_NEEDS_WRITE_NOTE, McpRefusalReason, refusalText } from './mcp-tool-plan';
 import { toolCallType, toolScope } from './mcp-scopes.registry';
 import { mcpSettingsUrl } from './mcp.constants';
 import { McpToolCatalog } from './mcp-tool-catalog';
@@ -76,7 +76,7 @@ export class McpController {
       // Fail closed (LAB-2995): without admin caps only `whoami` runs.
       this.logger.error(`MCP scope settings unavailable: ${String(error)}`);
     }
-    const plan = planTools(this.catalog.forPermissions(permissions), actor.scopeLevels, caps);
+    const plan = this.catalog.plan(permissions, actor.scopeLevels, caps);
     const calledTools = calledToolNames(req.body);
 
     const server = new McpServer({ name: 'LabOS', version: '1.0.0' });

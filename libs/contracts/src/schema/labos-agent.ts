@@ -71,6 +71,20 @@ export const LabosAgentConfirmRequestSchema = z.object({
 });
 export type LabosAgentConfirmRequest = z.infer<typeof LabosAgentConfirmRequestSchema>;
 
+/**
+ * `status` in the C2 409 `PROPOSAL_CLOSED` body: how the proposal closed. `pending` means another request closed it
+ * and its write has not finished yet.
+ */
+export type LabosAgentClosedStatus = 'done' | 'cancelled' | 'failed' | 'pending';
+
+/** Body of a C2 409 `PROPOSAL_CLOSED` error. */
+export type LabosAgentProposalClosedError = {
+  statusCode: 409;
+  code: typeof LABOS_AGENT_ERROR_CODES.PROPOSAL_CLOSED;
+  message: string;
+  status: LabosAgentClosedStatus;
+};
+
 /** Response 200 of C2. */
 export type LabosAgentConfirmResponse = {
   proposalId: string;

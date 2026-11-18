@@ -124,6 +124,6 @@ import { JwtService } from '../utils/jwt/jwt.service';
     McpToolCatalog,
     JwtService,
   ],
-  exports: [McpToolCatalog],
+  exports: [McpToolCatalog, McpScopesService],
 })
 export class McpModule {}

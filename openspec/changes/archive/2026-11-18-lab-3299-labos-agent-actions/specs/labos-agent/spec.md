@@ -2,7 +2,7 @@
 
 ### Requirement: Real permissions and the shared tool list
 
-The agent SHALL get its MCP tools from `McpToolCatalog`, the same tool list as the MCP server. It SHALL use the member's effective RBAC permissions from `AccessControlV2Service.getMemberAccess`, the same as the MCP server. MCP connection scopes SHALL NOT apply.
+The agent SHALL get its MCP tools from `McpToolCatalog.forApp`, the same tool list as the MCP server. It SHALL use the member's effective RBAC permissions from `AccessControlV2Service.getMemberAccess`, the same as the MCP server. The admin MCP caps (`McpScopesService.adminCaps`) SHALL apply through `planTools`, the same step as the MCP server, in the chat (read and propose tools) and again in C2 confirm. Per-connection MCP scope levels SHALL NOT apply: the agent has no connection, so every scope starts at `write` and only the admin cap and the registry maximum limit it. When the admin caps cannot be read, the agent SHALL fail closed as the MCP server does: every scoped tool is hidden, so the chat has no LabOS tools and C2 confirm returns 403 `ACTION_NOT_ALLOWED`.
 
 #### Scenario: Tool visibility
 
@@ -10,9 +10,24 @@ The agent SHALL get its MCP tools from `McpToolCatalog`, the same tool list as t
 - **WHEN** the member chats with the agent
 - **THEN** the agent does not get that tool
 
+#### Scenario: Admin sets profile to read
+
+- **GIVEN** an admin set the `profile` scope to `read`
+- **WHEN** the member chats with the agent
+- **THEN** the agent gets `get_my_profile` and `list_my_experiences`
+- **AND** the agent gets no `update_my_profile`, `add_experience` or `update_experience` proposal tool
+- **AND** C2 confirm of an older profile proposal returns HTTP 403 `ACTION_NOT_ALLOWED` and writes nothing
+
+#### Scenario: Admin caps cannot be read
+
+- **GIVEN** the admin MCP caps cannot be read
+- **WHEN** the member chats or confirms a proposal
+- **THEN** the chat has no LabOS MCP tools
+- **AND** C2 confirm returns HTTP 403 `ACTION_NOT_ALLOWED` and writes nothing
+
 ### Requirement: Propose-only tools
 
-`update_my_profile`, `add_experience`, `update_experience` and `update_team` SHALL be propose only in the chat. A call SHALL check the arguments against the tool's own input schema and refuse unknown fields. It SHALL compute `changes` (`field`, `label`, `oldValue`, `newValue`) from the member's current data. It SHALL store the proposal in the cache with the member uid, tool, arguments and status `open`, under a `proposalId` that starts with `ap_`. The proposal SHALL be open for 15 minutes (`expiresAt`). The model SHALL get a short text, and the proposal SHALL go into the stream body `proposals`.
+`update_my_profile`, `add_experience`, `update_experience` and `update_team` SHALL be propose only in the chat. A call SHALL check the arguments against the tool's own input schema and refuse unknown fields. It SHALL compute `changes` (`field`, `label`, `oldValue`, `newValue`) from the member's current data. It SHALL store the proposal in the cache with the member uid, tool, arguments and status `open`, under a `proposalId` that starts with `ap_`. The cache keys SHALL start with the `ENVIRONMENT` value (`<env>:labos-agent:`), as member proof keys do, so environments that share one Redis do not share proposals. The proposal SHALL be open for 15 minutes (`expiresAt`). The model SHALL get a short text, and the proposal SHALL go into the stream body `proposals`.
 
 #### Scenario: Unknown field
 
@@ -34,7 +49,7 @@ A member who is not a lead of the team, and is not a directory admin, SHALL get 
 
 ### Requirement: C2 confirm
 
-`POST /v1/labos-agent/actions/confirm` SHALL take `{ proposalId, decision }` with `decision` `confirm` or `cancel`. It SHALL use the same guard and pilot gate as the chat. Cancel SHALL close the proposal and write nothing. Confirm SHALL check the member's current permissions and lead status again, close the proposal, then run the real MCP tool once with the stored arguments. Closing SHALL use one atomic cache delete, so two confirms run the tool once. The response SHALL be `{ proposalId, status, tool, summary, result }` with `status` `done` or `cancelled`.
+`POST /v1/labos-agent/actions/confirm` SHALL take `{ proposalId, decision }` with `decision` `confirm` or `cancel`. It SHALL use the same guard and pilot gate as the chat. Cancel SHALL close the proposal and write nothing. Confirm SHALL check the member's current permissions, the admin MCP caps and the lead status again, before it closes the proposal, then run the real MCP tool once with the stored arguments. A failed recheck SHALL leave the proposal open and SHALL NOT run the tool. Closing SHALL use one atomic cache delete, so two confirms run the tool once. The response SHALL be `{ proposalId, status, tool, summary, result }` with `status` `done` or `cancelled`.
 
 #### Scenario: Confirm twice
 
@@ -44,9 +59,17 @@ A member who is not a lead of the team, and is not a directory admin, SHALL get 
 - **AND** the other response is HTTP 409 `PROPOSAL_CLOSED`
 - **AND** the tool runs one time
 
+#### Scenario: Cancel and confirm at once
+
+- **GIVEN** an open proposal
+- **WHEN** the member sends cancel and confirm at the same time
+- **THEN** exactly one request wins
+- **AND** the tool runs at most one time
+- **AND** the other request gets HTTP 409 `PROPOSAL_CLOSED` with the `status` of the winner
+
 ### Requirement: C2 errors
 
-C2 SHALL return HTTP 400 `VALIDATION_ERROR` for a bad body, 403 `AGENT_NOT_ENABLED` outside the gate, 403 `ACTION_NOT_ALLOWED` when the member cannot do the action now, 404 `PROPOSAL_NOT_FOUND` for an unknown id or another member's proposal, 409 `PROPOSAL_CLOSED` for a confirmed, cancelled or failed proposal, 410 `PROPOSAL_EXPIRED` after 15 minutes, and 422 `ACTION_FAILED` with `message` when the tool refuses the values. The cache SHALL keep the proposal record for 24 hours, so 409 and 410 are different from 404.
+C2 SHALL return HTTP 400 `VALIDATION_ERROR` for a bad body, 403 `AGENT_NOT_ENABLED` outside the gate, 403 `ACTION_NOT_ALLOWED` when the member cannot do the action now, 404 `PROPOSAL_NOT_FOUND` for an unknown id or another member's proposal, 409 `PROPOSAL_CLOSED` for a confirmed, cancelled or failed proposal, 410 `PROPOSAL_EXPIRED` after 15 minutes, and 422 `ACTION_FAILED` with `message` when the tool refuses the values. The cache SHALL keep the proposal record for 24 hours, so 409 and 410 are different from 404. The 409 body SHALL have `status`: the stored status `done`, `cancelled` or `failed`, or `pending` when another request closed the proposal and its write has not finished.
 
 #### Scenario: No longer a lead
 
@@ -55,6 +78,13 @@ C2 SHALL return HTTP 400 `VALIDATION_ERROR` for a bad body, 403 `AGENT_NOT_ENABL
 - **WHEN** the member confirms it
 - **THEN** the response is HTTP 403 `ACTION_NOT_ALLOWED`
 - **AND** the team is not changed
+- **AND** the tool does not run and the proposal stays open
+
+#### Scenario: Retry after a lost response
+
+- **GIVEN** a proposal that C2 already confirmed
+- **WHEN** the client sends confirm again
+- **THEN** the response is HTTP 409 `PROPOSAL_CLOSED` with `status: "done"`
 
 ## RENAMED Requirements
 

@@ -4,6 +4,7 @@ import {
   GoneException,
   HttpException,
   Injectable,
+  Logger,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -11,6 +12,7 @@ import {
   LABOS_AGENT_ERROR_CODES,
   LABOS_AGENT_PROPOSE_TOOLS,
   LabosAgentChatRequest,
+  LabosAgentClosedStatus,
   LabosAgentConfirmRequest,
   LabosAgentConfirmResponse,
   LabosAgentProposal,
@@ -19,7 +21,8 @@ import { AccessControlV2Service } from '../access-control-v2/services/access-con
 import { HuskyAiService } from '../husky/husky-ai.service';
 import { newsRow } from '../mcp/mcp-news-tools';
 import { McpToolCatalog } from '../mcp/mcp-tool-catalog';
-import { McpActorContext } from '../mcp/mcp-tools';
+import { McpAdminCaps, McpScopesService } from '../mcp/mcp-scopes.service';
+import { McpActorContext, McpToolDef } from '../mcp/mcp-tools';
 import { PrismaService } from '../shared/prisma.service';
 import { resolveLiveMemberUidByEmail } from '../shared/resolve-live-member-uid.util';
 import { TeamNewsQueryService } from '../team-news/team-news-query.service';
@@ -31,8 +34,14 @@ import { canChangeTeam, LabosAgentProposalStore, proposeTool, StoredProposal } f
 const READ_TOOLS = ['list_news', 'get_news_item', 'get_my_profile', 'list_my_experiences'];
 const PROPOSE_TOOLS: readonly string[] = LABOS_AGENT_PROPOSE_TOOLS;
 
-function agentError(Exception: new (body: object) => HttpException, statusCode: number, code: string, message: string) {
-  return new Exception({ statusCode, code, message });
+function agentError(
+  Exception: new (body: object) => HttpException,
+  statusCode: number,
+  code: string,
+  message: string,
+  extra: Record<string, unknown> = {}
+) {
+  return new Exception({ statusCode, code, message, ...extra });
 }
 
 /**
@@ -48,8 +57,11 @@ export class LabosAgentService {
     private teamNewsQuery: TeamNewsQueryService,
     private catalog: McpToolCatalog,
     private accessControl: AccessControlV2Service,
-    private proposalStore: LabosAgentProposalStore
+    private proposalStore: LabosAgentProposalStore,
+    private scopes: McpScopesService
   ) {}
+
+  private readonly logger = new Logger(LabosAgentService.name);
 
   async isEnabled(email: string | undefined): Promise<boolean> {
     return this.access.isEnabled(await resolveLiveMemberUidByEmail(this.prisma, email));
@@ -60,8 +72,8 @@ export class LabosAgentService {
     const memberUid = await this.enabledMember(email);
     const promptContext = await this.pageContext(body, memberUid);
     const ctx = await this.actor(memberUid, email);
-    // The member's real RBAC permissions pick the tools, from the same list as the MCP server (LAB-3299).
-    const allowed = this.catalog.forPermissions(ctx.permissions);
+    // The member's real RBAC permissions and the admin MCP caps pick the tools, as on the MCP server (LAB-3299).
+    const allowed = await this.tools(ctx);
     const reads = allowed.filter((def) => READ_TOOLS.includes(def.name));
     const proposals: LabosAgentProposal[] = [];
     const deps = {
@@ -98,25 +110,26 @@ export class LabosAgentService {
     if (!stored || stored.memberUid !== memberUid) {
       throw agentError(NotFoundException, 404, LABOS_AGENT_ERROR_CODES.PROPOSAL_NOT_FOUND, 'Proposal not found');
     }
-    if (stored.status !== 'open') throw this.closedError();
+    if (stored.status !== 'open') throw this.closedError(stored.status);
     if (Date.now() > Date.parse(stored.proposal.expiresAt)) {
       throw agentError(GoneException, 410, LABOS_AGENT_ERROR_CODES.PROPOSAL_EXPIRED, 'The proposal expired');
     }
     const reply = { proposalId: stored.proposal.proposalId, tool: stored.tool };
 
     if (body.decision === 'cancel') {
-      if (!(await this.proposalStore.claim(body.proposalId))) throw this.closedError();
+      if (!(await this.proposalStore.claim(body.proposalId))) throw await this.lostClaim(body.proposalId);
       await this.proposalStore.close(stored, 'cancelled');
       return { ...reply, status: 'cancelled', summary: 'Cancelled. Nothing changed.', result: {} };
     }
 
     const ctx = await this.actor(memberUid, email);
-    const def = this.catalog.forPermissions(ctx.permissions).find((item) => item.name === stored.tool);
+    // The same tools as the chat: RBAC and admin caps now (an admin may have set the scope to read since the turn).
+    const def = (await this.tools(ctx)).find((item) => item.name === stored.tool);
     const allowed =
       !!def && (stored.tool !== 'update_team' || (await canChangeTeam(this.prisma, ctx, String(stored.args.teamUid))));
     if (!allowed) throw this.notAllowed('You cannot do this action now');
     // Claim before the write: only one confirm runs the tool.
-    if (!(await this.proposalStore.claim(body.proposalId))) throw this.closedError();
+    if (!(await this.proposalStore.claim(body.proposalId))) throw await this.lostClaim(body.proposalId);
 
     let result: Record<string, unknown>;
     try {
@@ -134,8 +147,31 @@ export class LabosAgentService {
     return { ...reply, status: 'done', summary: summary(stored), result };
   }
 
-  private closedError() {
-    return agentError(ConflictException, 409, LABOS_AGENT_ERROR_CODES.PROPOSAL_CLOSED, 'The proposal is closed');
+  /**
+   * The MCP tools for the member: RBAC (`forPermissions`) and the admin MCP caps (`planTools`), from McpToolCatalog.
+   * Unreadable caps hide every scoped tool, so the chat gets no LabOS tools and C2 refuses: fail closed, as on MCP.
+   */
+  private async tools(ctx: McpActorContext): Promise<McpToolDef[]> {
+    let caps: McpAdminCaps | null = null;
+    try {
+      caps = await this.scopes.adminCaps();
+    } catch (error) {
+      this.logger.error(`MCP scope settings unavailable for the LabOS agent: ${String(error)}`);
+    }
+    return this.catalog.forApp(ctx.permissions, caps);
+  }
+
+  /** 409 with the stored status, so a retry knows the outcome (`done`, `cancelled`, `failed`). */
+  private closedError(status: LabosAgentClosedStatus) {
+    return agentError(ConflictException, 409, LABOS_AGENT_ERROR_CODES.PROPOSAL_CLOSED, 'The proposal is closed', {
+      status,
+    });
+  }
+
+  /** Another request closed the proposal first. `pending` means its write has not finished yet. */
+  private async lostClaim(proposalId: string) {
+    const status = (await this.proposalStore.load(proposalId))?.status;
+    return this.closedError(!status || status === 'open' ? 'pending' : status);
   }
 
   private notAllowed(message: string) {

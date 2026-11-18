@@ -50,7 +50,9 @@ function setup(env = APP_ENV.DEV as string) {
     visibility: 'always',
     execute: jest.fn(),
   }));
-  const catalog = { forPermissions: jest.fn(() => defs) };
+  const catalog = { forApp: jest.fn(() => defs) };
+  const caps = { profile: 'write' };
+  const scopes = { adminCaps: jest.fn().mockResolvedValue(caps) };
   const accessControl = { getMemberAccess: jest.fn().mockResolvedValue({ effectivePermissions: ['forum.read'] }) };
   const service = new LabosAgentService(
     prisma as any,
@@ -59,7 +61,8 @@ function setup(env = APP_ENV.DEV as string) {
     query as any,
     catalog as any,
     accessControl as any,
-    {} as any
+    {} as any,
+    scopes as any
   );
   const controller = new LabosAgentController(service);
   const res = {
@@ -70,7 +73,7 @@ function setup(env = APP_ENV.DEV as string) {
     destroy: jest.fn(),
   };
   const req = { userEmail: 'ada@example.com' };
-  return { prisma, husky, query, stream, controller, res, req, catalog };
+  return { prisma, husky, query, stream, controller, res, req, catalog, caps };
 }
 
 async function chatError(body: unknown, env?: string) {
@@ -133,7 +136,7 @@ describe('LabosAgentController', () => {
   });
 
   it('streams the AI search answer with the story context, the tools and proposals []', async () => {
-    const { controller, query, husky, stream, res, req, catalog } = setup();
+    const { controller, query, husky, stream, res, req, catalog, caps } = setup();
     const body = { ...VALID, context: { page: 'news-story', newsUid: 'news-1' } };
     await controller.chat(body, req, res as any);
 
@@ -144,8 +147,8 @@ describe('LabosAgentController', () => {
     expect(email).toBe('ada@example.com');
     expect(options.promptContext).toContain('Team X raises a seed round');
     expect(options.promptContext).toContain('news-1');
-    // The member's real RBAC permissions pick the tools from the shared MCP list (LAB-3299).
-    expect(catalog.forPermissions).toHaveBeenCalledWith(new Set(['forum.read']));
+    // The member's real RBAC permissions and the admin MCP caps pick the tools from the shared MCP list (LAB-3299).
+    expect(catalog.forApp).toHaveBeenCalledWith(new Set(['forum.read']), caps);
     expect(Object.keys(options.extraTools).sort()).toEqual([
       'add_experience',
       'get_my_profile',
