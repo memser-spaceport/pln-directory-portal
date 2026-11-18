@@ -24,6 +24,7 @@ jest.mock('../follows/follows.service', () => ({ FollowsService: jest.fn() }));
 jest.mock('../job-openings/job-openings-saved.service', () => ({ JobOpeningsSavedService: jest.fn() }));
 jest.mock('../job-openings/job-openings-query.service', () => ({ JobOpeningsQueryService: jest.fn() }));
 jest.mock('../job-alerts/job-alerts.service', () => ({ JobAlertsService: jest.fn() }));
+jest.mock('../intro-requests/intro-requests.service', () => ({ IntroRequestsService: jest.fn() }));
 jest.mock('ai', () => ({ tool: (def: unknown) => def }));
 
 import { APP_ENV } from '../utils/constants';
@@ -151,7 +152,8 @@ function setup() {
     catalog as any,
     accessControl as any,
     new LabosAgentProposalStore(cache as any),
-    scopes as any
+    scopes as any,
+    { findAgentTargetName: jest.fn(), findEligibleRequester: jest.fn() } as any
   );
   const controller = new LabosAgentController(service);
   const req = { userEmail: 'ada@example.com' };
@@ -498,7 +500,8 @@ describe('Admin MCP caps in the LabOS agent (LAB-3299)', () => {
     const h = setup();
     const { proposal } = await h.propose('update_my_profile', { bio: 'New bio' });
     h.setCaps(new Error('db down'));
-    expect(Object.keys((await h.chat()).tools)).toEqual([]);
+    // draft_intro (LAB-3300) is an agent tool, not an MCP tool, so the admin MCP caps do not apply to it.
+    expect(Object.keys((await h.chat()).tools).filter((name) => name !== 'draft_intro')).toEqual([]);
     expect(body(await h.confirm(proposal.proposalId))).toEqual(
       expect.objectContaining({ statusCode: 403, code: 'ACTION_NOT_ALLOWED' })
     );

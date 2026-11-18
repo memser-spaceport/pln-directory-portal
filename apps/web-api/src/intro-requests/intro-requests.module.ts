@@ -7,5 +7,7 @@ import { IntroRequestsService } from './intro-requests.service';
 @Module({
   controllers: [IntroRequestsController],
   providers: [IntroRequestsService, IntroRequestsJob, IntroRequestTelegram],
+  // The LabOS agent (LAB-3300) reuses the sender rule and the target lookup.
+  exports: [IntroRequestsService],
 })
 export class IntroRequestsModule {}
