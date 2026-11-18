@@ -2,7 +2,7 @@
 
 ### Requirement: Digest email settings from the signed link
 
-`POST /v1/labos-digest/email-settings/read` with `{ token }` SHALL return `{ firstName, enabled, frequency }` for the member in the token: `enabled` is the member's `forumDigestEnabled` and `frequency` is `daily` for `forumDigestFrequency` 1 and `weekly` for 7. A member with no stored setting SHALL read as enabled and daily, the notification service's defaults. Reading SHALL change nothing.
+`POST /v1/labos-digest/email-settings/read` with `{ token }` SHALL return `{ firstName, enabled, frequency }` for the member in the token: `enabled` is the member's `forumDigestEnabled` and `frequency` is `daily` for `forumDigestFrequency` 1 and `weekly` for 7. A member with no stored setting SHALL read as off and daily, the notification service's defaults (the digest is opt-in). A stored frequency other than 1 or 7 SHALL read as daily, and turning the digest on without a frequency SHALL then store daily. Reading SHALL change nothing.
 
 `POST /v1/labos-digest/email-settings` with `{ token, enabled?, frequency? }` SHALL save the given fields for the member in the token through the notification service, the same store the signed-in email settings page writes, and return the settings after the change. At least one of `enabled` and `frequency` SHALL be present; otherwise the call returns 400. Both endpoints SHALL check the token as the page read does and act only on the member in `m`, whoever is signed in.
 

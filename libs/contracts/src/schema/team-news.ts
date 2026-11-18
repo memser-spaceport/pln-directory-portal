@@ -792,6 +792,25 @@ export const LabosDigestChoiceResponseSchema = z.object({
   changed: z.boolean(),
 });
 
+/** LAB-3310: the digest email settings a signed digest link can read and change, without sign-in. */
+export const LabosDigestEmailFrequencySchema = z.enum(['daily', 'weekly']);
+
+export const LabosDigestEmailSettingsSchema = z.object({
+  firstName: z.string().nullable(),
+  enabled: z.boolean(),
+  frequency: LabosDigestEmailFrequencySchema,
+});
+
+export const LabosDigestEmailSettingsChangeSchema = LabosDigestPageRequestSchema.extend({
+  enabled: z.boolean().optional(),
+  frequency: LabosDigestEmailFrequencySchema.optional(),
+}).refine((body) => body.enabled !== undefined || body.frequency !== undefined, {
+  message: 'Send enabled, frequency or both',
+});
+
+export type LabosDigestEmailFrequency = z.infer<typeof LabosDigestEmailFrequencySchema>;
+export type LabosDigestEmailSettings = z.infer<typeof LabosDigestEmailSettingsSchema>;
+
 export type LabosDigestPage = z.infer<typeof LabosDigestPageSchema>;
 export type LabosDigestPageStory = z.infer<typeof LabosDigestPageStorySchema>;
 export type LabosDigestPageForumPost = z.infer<typeof LabosDigestPageForumPostSchema>;
