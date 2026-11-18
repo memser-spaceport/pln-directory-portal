@@ -27,6 +27,9 @@ import { NewsTagVocabularyService } from './news-tag-vocabulary.service';
 import { NewsDefaultTagsService } from './news-default-tags.service';
 import { NewsDefaultTagsJob } from './news-default-tags.job';
 
+import { NotificationServiceClient } from '../notifications/notification-service.client';
+import { LabosDigestEmailSettingsService } from './labos-digest-email-settings.service';
+
 @Module({
   imports: [
     SharedModule,
@@ -43,6 +46,9 @@ import { NewsDefaultTagsJob } from './news-default-tags.job';
     LabosDigestPublicController,
   ],
   providers: [
+    LabosDigestEmailSettingsService,
+    // Stateless HTTP client; NotificationsModule would bring its Bull queue and PLEvents along.
+    NotificationServiceClient,
     AdminAuthGuard,
     JwtService,
     LabosDigestService,
