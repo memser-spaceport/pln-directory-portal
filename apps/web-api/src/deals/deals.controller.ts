@@ -3,7 +3,7 @@ import { Request } from 'express';
 import { DealsService } from './deals.service';
 import { ListDealsQueryDto, ReportDealIssueDto, SubmitDealDto } from './deals.dto';
 import { NoCache } from '../decorators/no-cache.decorator';
-import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { StrictOptionalUserTokenCheckGuard, UserTokenCheckGuard } from '../guards/user-token-check.guard';
 
 @Controller('v1/deals')
 export class DealsController {
@@ -25,7 +25,7 @@ export class DealsController {
     return this.dealsService.listForUser(req['userEmail'], query);
   }
 
-  @UseGuards(UserTokenCheckGuard)
+  @UseGuards(StrictOptionalUserTokenCheckGuard)
   @Post('submissions')
   async submitDeal(@Req() req: Request, @Body() body: SubmitDealDto) {
     return this.dealsService.submitDeal(req['userEmail'] ?? null, body);
