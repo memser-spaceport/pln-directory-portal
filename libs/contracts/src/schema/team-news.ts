@@ -736,11 +736,24 @@ export type SeedTeamNewsTrendingResponse = z.infer<typeof SeedTeamNewsTrendingRe
 
 /* LAB-3263: the public digest page and its More / Less like this choices. The link token is the only credential. */
 
+/** A past issue of the link's member, by its send time (LAB-3294). Left out, the page reads the link's own issue. */
+const LabosDigestIssueKeySchema = z
+  .string()
+  .max(40)
+  .refine((value) => !Number.isNaN(Date.parse(value)), { message: 'must be a date' });
+
 export const LabosDigestPageRequestSchema = z.object({
   token: z.string().min(1).max(4000),
+  issue: LabosDigestIssueKeySchema.optional(),
 });
 
 export const LabosDigestChoiceValueSchema = z.enum(['more', 'less']);
+
+export const LabosDigestPageSourceSchema = z.object({
+  url: z.string(),
+  /** The outlet's domain, without `www.`; null when the URL does not parse. */
+  domain: z.string().nullable(),
+});
 
 export const LabosDigestPageStorySchema = z.object({
   uid: z.string(),
@@ -755,6 +768,14 @@ export const LabosDigestPageStorySchema = z.object({
   sourceDomain: z.string().nullable(),
   teamUid: z.string(),
   teamName: z.string(),
+  /** The team's logo URL, for the team header (LAB-3288). */
+  teamLogoUrl: z.string().nullable(),
+  /** True when the link's member follows the team. */
+  followsTeam: z.boolean(),
+  /** Every source of the story, main source first, without duplicates. */
+  sources: z.array(LabosDigestPageSourceSchema),
+  /** Feed comments on the story, replies included. */
+  commentCount: z.number().int(),
   eventType: NewsEventTypeSchema,
   tags: z.array(z.string()),
   choice: LabosDigestChoiceValueSchema.nullable(),
@@ -769,6 +790,50 @@ export const LabosDigestPageForumPostSchema = z.object({
   authorAvatarUrl: z.string().nullable(),
   contentHtml: z.string(),
   url: z.string(),
+  /** Replies to the thread now, for "From the forum" (LAB-3293): the forum's post count less the opening post. */
+  replyCount: z.number().int(),
+});
+
+/** One issue in the page's Past issues list (LAB-3294), newest first. */
+export const LabosDigestPageIssueSchema = z.object({
+  sentAt: z.string(),
+  frequency: LabosDigestFrequencySchema,
+  /** The issue's top story title (else its first story's), null when that story is gone. */
+  title: z.string().nullable(),
+  /** The link's own issue: the page opens it without `issue`. */
+  isLinkIssue: z.boolean(),
+});
+
+/** One row of More from the network (LAB-3291): other press about network teams in the issue's week. */
+export const LabosDigestNetworkNewsSchema = z.object({
+  uid: z.string(),
+  title: z.string(),
+  url: z.string(),
+  /** The outlet, as the source's domain. */
+  domain: z.string().nullable(),
+  image: TeamNewsImageSchema.nullable(),
+  imageUrl: z.string().nullable(),
+  eventDate: z.string(),
+  teamName: z.string(),
+});
+
+/** One row of Upcoming events (LAB-3292). */
+export const LabosDigestEventSchema = z.object({
+  uid: z.string(),
+  name: z.string(),
+  startDate: z.string(),
+  endDate: z.string(),
+  /** "Lisbon, Portugal", or null when the gathering has none. */
+  location: z.string().nullable(),
+  /** The gathering, for links that open the event. */
+  locationUid: z.string().nullable(),
+  /** The pln-events id: the calendar opens the event from `/embed/program#<externalId>`. */
+  externalId: z.string().nullable(),
+  logoUrl: z.string().nullable(),
+  /** IN_PERSON, VIRTUAL or INVITE_ONLY; null when not set. */
+  type: z.string().nullable(),
+  /** Distinct listed members going, as the event drawer counts them; null when the event hides it (invite-only). */
+  goingCount: z.number().int().nullable(),
 });
 
 export const LabosDigestPageSchema = z.object({
@@ -778,13 +843,55 @@ export const LabosDigestPageSchema = z.object({
   stories: z.array(LabosDigestPageStorySchema),
   forumPosts: z.array(LabosDigestPageForumPostSchema),
   forumUnavailable: z.boolean(),
+  /** True when the link's member belongs to at least one team now (LAB-3288). */
+  isTeamMember: z.boolean(),
+  /** When the next digest of this frequency goes out, ISO 8601. */
+  nextSendAt: z.string(),
+  /**
+   * The link member's news topics (LAB-3289): the tags they follow (their saved list, else their starting
+   * tags), and the choosable tags they don't follow, highest interest weight first.
+   */
+  topics: z.object({
+    followed: z.array(TeamNewsTagSchema),
+    suggested: z.array(TeamNewsTagSchema),
+  }),
+  /** The member's latest issues, newest first, at most 8, the link's own issue always among them (LAB-3294). */
+  issues: z.array(LabosDigestPageIssueSchema),
+  /** More from the network (LAB-3291), at most 5, newest first; empty hides the section. */
+  networkNews: z.array(LabosDigestNetworkNewsSchema),
+  /** Upcoming events (LAB-3292): the next 4 weeks from now, soonest first, at most 5, and how many the window holds. */
+  events: z.object({ items: z.array(LabosDigestEventSchema), total: z.number().int() }),
 });
 
 export const LabosDigestChoiceRequestSchema = z.object({
   token: z.string().min(1).max(4000),
   newsItemUid: z.string().min(1),
   choice: z.enum(['more', 'less', 'none']),
+  /** The past issue the story is in (LAB-3294), when the page shows one. */
+  issue: LabosDigestIssueKeySchema.optional(),
 });
+
+/** The notification service records each member's sent issue (LAB-3294). Same fields as the link token. */
+export const RecordLabosDigestIssuesRequestSchema = z.object({
+  issues: z
+    .array(
+      z.object({
+        memberUid: z.string().min(1),
+        frequency: LabosDigestFrequencySchema,
+        sentAt: z
+          .string()
+          .max(40)
+          .refine((value) => !Number.isNaN(Date.parse(value)), { message: 'must be a date' }),
+        n: z.array(z.string().min(1)).max(50),
+        l: z.string().min(1).optional(),
+        p: z.array(z.number().int().positive()).max(50),
+      })
+    )
+    .min(1)
+    .max(500),
+});
+
+export const RecordLabosDigestIssuesResponseSchema = z.object({ recorded: z.number().int() });
 
 export const LabosDigestChoiceResponseSchema = z.object({
   newsItemUid: z.string(),
@@ -795,6 +902,11 @@ export const LabosDigestChoiceResponseSchema = z.object({
 export type LabosDigestPage = z.infer<typeof LabosDigestPageSchema>;
 export type LabosDigestPageStory = z.infer<typeof LabosDigestPageStorySchema>;
 export type LabosDigestPageForumPost = z.infer<typeof LabosDigestPageForumPostSchema>;
+export type LabosDigestPageSource = z.infer<typeof LabosDigestPageSourceSchema>;
+export type LabosDigestPageIssue = z.infer<typeof LabosDigestPageIssueSchema>;
+export type LabosDigestNetworkNews = z.infer<typeof LabosDigestNetworkNewsSchema>;
+export type LabosDigestEvent = z.infer<typeof LabosDigestEventSchema>;
+export type RecordLabosDigestIssuesRequest = z.infer<typeof RecordLabosDigestIssuesRequestSchema>;
 export type LabosDigestChoiceValue = z.infer<typeof LabosDigestChoiceValueSchema>;
 export type LabosDigestChoiceRequest = z.infer<typeof LabosDigestChoiceRequestSchema>;
 export type LabosDigestChoiceResponse = z.infer<typeof LabosDigestChoiceResponseSchema>;

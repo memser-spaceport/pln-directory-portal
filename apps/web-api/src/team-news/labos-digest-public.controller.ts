@@ -35,8 +35,8 @@ export class LabosDigestPublicController {
   @ApiOkResponseFromZod(LabosDigestPageSchema)
   @ApiUnauthorizedResponse({ description: 'The link is broken, expired or not signed by LabOS.' })
   async read(@Body() body: unknown) {
-    const { token } = parseInput(LabosDigestPageRequestSchema, body);
-    return withLinkErrors(() => this.page.read(token));
+    const { token, issue } = parseInput(LabosDigestPageRequestSchema, body);
+    return withLinkErrors(() => this.page.read(token, issue));
   }
 
   @Post('choices')
@@ -45,8 +45,8 @@ export class LabosDigestPublicController {
   @ApiOkResponseFromZod(LabosDigestChoiceResponseSchema)
   @ApiUnauthorizedResponse({ description: 'The link is broken, expired or not signed by LabOS.' })
   async choose(@Body() body: unknown) {
-    const { token, newsItemUid, choice } = parseInput(LabosDigestChoiceRequestSchema, body);
-    return withLinkErrors(() => this.page.choose(token, newsItemUid, choice));
+    const { token, newsItemUid, choice, issue } = parseInput(LabosDigestChoiceRequestSchema, body);
+    return withLinkErrors(() => this.page.choose(token, newsItemUid, choice, issue));
   }
 }
 
