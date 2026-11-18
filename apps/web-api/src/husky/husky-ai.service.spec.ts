@@ -548,6 +548,33 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
     // The hand-over is summarised before the new question is sent to the model.
     expect(generateTextMock.mock.invocationCallOrder[0]).toBeLessThan(streamTextMock.mock.invocationCallOrder[0]);
   });
+
+  it('applies the caller options: page context, extra tools, extra response fields and no MongoDB writes', async () => {
+    toolsService.getTools.mockReturnValue({ getTeamNews: 'news-tool' });
+    streamTextMock.mockReturnValue(answerStream(['Hello']));
+    streamObjectMock.mockReturnValue(structuredStream(['{}']));
+
+    const out = await readAll(
+      await service.createContextualToolsResponse(chatInfo, false, undefined, {
+        promptContext: 'The member is reading story news-1.',
+        extraTools: { list_news: 'list-tool' } as any,
+        extraResponseFields: { proposals: [] },
+        persistHistory: false,
+      })
+    );
+    await flushBackgroundWork();
+
+    const body = JSON.parse(out);
+    expect(body.content).toBe('Hello');
+    expect(body.proposals).toEqual([]);
+    expect(streamTextMock.mock.calls[0][0].tools).toEqual({ getTeamNews: 'news-tool', list_news: 'list-tool' });
+    expect(streamTextMock.mock.calls[0][0].prompt).toContain('pageContext: The member is reading story news-1.');
+    expect(streamObjectMock.mock.calls[0][0].prompt).toContain('pageContext: The member is reading story news-1.');
+    expect(cache.set).toHaveBeenCalledWith('thread-1:summary', 'summary text');
+    expect(persistent.create).not.toHaveBeenCalled();
+    expect(persistent.upsertByKeyValue).not.toHaveBeenCalled();
+    expect(persistent.updateDocByKeyValue).not.toHaveBeenCalled();
+  });
 });
 
 describe('HuskyAiService.getThreadById', () => {

@@ -2,7 +2,7 @@ import { ForbiddenException, Injectable, NotFoundException, BadRequestException 
 import { RedisCacheDbService } from './db/redis-cache-db.service';
 import { MongoPersistantDbService } from './db/mongo-persistant-db.service';
 import { LogService } from '../shared/log.service';
-import { generateText, LanguageModel, streamObject, streamText } from 'ai';
+import { CoreTool, generateText, LanguageModel, streamObject, streamText } from 'ai';
 import { HuskyChatInterface, HuskyResponseContextSchema, HuskySourceRef } from 'libs/contracts/src/schema/husky-chat';
 import {
   HUSKY_CHAT_SUMMARY_SYSTEM_PROMPT,
@@ -57,6 +57,23 @@ interface AnswerInput {
   historyPrompt: string;
   question: string;
   currentDate: string;
+  /** Prompt lines from ContextualToolsOptions.promptContext, or ''. */
+  pageContext: string;
+}
+
+/**
+ * Optional extension point for callers other than AI search (the LabOS agent, LAB-3298).
+ * AI search passes nothing and keeps its behavior.
+ */
+export interface ContextualToolsOptions {
+  /** Extra prompt lines for every model call, for example the page the member is on. */
+  promptContext?: string;
+  /** Extra tools for the answer model, next to the AI search tools. */
+  extraTools?: Record<string, CoreTool>;
+  /** Extra fields added to the end of the streamed JSON object, for example `proposals`. */
+  extraResponseFields?: Record<string, unknown>;
+  /** False: keep the thread summary in the cache only, and write nothing to MongoDB. Default true. */
+  persistHistory?: boolean;
 }
 
 interface AnswerResult {
@@ -183,14 +200,21 @@ export class HuskyAiService {
    * cut off (stall, token limit, content filter) is continued once from where it
    * stopped before the structured tail is generated.
    */
-  async createContextualToolsResponse(chatInfo: HuskyChatInterface, isLoggedIn: boolean, userEmail?: string) {
+  async createContextualToolsResponse(
+    chatInfo: HuskyChatInterface,
+    isLoggedIn: boolean,
+    userEmail?: string,
+    options: ContextualToolsOptions = {}
+  ) {
     const { question, threadId, chatId, chatSummary } = chatInfo;
+    const persistHistory = options.persistHistory !== false;
+    const pageContext = options.promptContext ? `  - pageContext: ${options.promptContext}` : '';
     const currentDate = new Date().toISOString().split('T')[0];
     const auth = await this.resolveAuthContext(isLoggedIn, userEmail);
 
     // A conversation started elsewhere (e.g. a blog embed) is handed over with its
     // first exchange so the thread keeps that context.
-    if (chatSummary) {
+    if (chatSummary && persistHistory) {
       await this.updateChatSummary(threadId, chatSummary);
       await this.persistContextualHistory(
         threadId,
@@ -237,8 +261,16 @@ export class HuskyAiService {
           enqueue('{ "steps": [');
           pushStep(UNDERSTANDING_STEP);
 
-          const input: AnswerInput = { historyPrompt, question, currentDate };
-          const answer = await this.streamAnswer(model, auth, input, { kind: 'initial' }, emitText, pushStep);
+          const input: AnswerInput = { historyPrompt, question, currentDate, pageContext };
+          const answer = await this.streamAnswer(
+            model,
+            auth,
+            input,
+            { kind: 'initial' },
+            emitText,
+            pushStep,
+            options.extraTools
+          );
           content = answer.text;
           let toolResults = answer.toolResults;
 
@@ -252,7 +284,15 @@ export class HuskyAiService {
               content || toolResults
                 ? { kind: 'continuation', partialAnswer: content, toolResults }
                 : { kind: 'initial' };
-            const continuation = await this.streamAnswer(model, auth, input, mode, emitText, pushStep);
+            const continuation = await this.streamAnswer(
+              model,
+              auth,
+              input,
+              mode,
+              emitText,
+              pushStep,
+              options.extraTools
+            );
             content += continuation.text;
             toolResults += continuation.toolResults;
             if (!continuation.complete) {
@@ -278,15 +318,18 @@ export class HuskyAiService {
               currentDate,
               content,
               toolResults,
+              pageContext,
             },
-            enqueue
+            enqueue,
+            options.extraResponseFields
           );
 
           controller.close();
 
           this.updateChatSummary(threadId, { user: question, system: content })
-            .then((summary) => this.updateChatSummaryInMongo(threadId, summary))
+            .then((summary) => (persistHistory ? this.updateChatSummaryInMongo(threadId, summary) : undefined))
             .catch((error) => this.logger.error(`Failed to update chat summary for thread ${threadId}:`, error));
+          if (!persistHistory) return;
           this.persistContextualHistory(
             threadId,
             chatId,
@@ -319,7 +362,8 @@ export class HuskyAiService {
     input: AnswerInput,
     mode: AnswerMode,
     enqueue: (text: string) => void,
-    pushStep: (label: string) => void
+    pushStep: (label: string) => void,
+    extraTools?: Record<string, CoreTool>
   ): Promise<AnswerResult> {
     const watchdog = new StallWatchdog(this.getStallTimeoutMs());
     let text = '';
@@ -358,12 +402,13 @@ export class HuskyAiService {
       mode.kind === 'initial'
         ? {
             system: HUSKY_CONTEXTUAL_TOOLS_SYSTEM_PROMPT,
-            tools: this.huskyAiToolsService.getTools(auth),
+            tools: { ...this.huskyAiToolsService.getTools(auth), ...extraTools },
             maxSteps: 5,
             prompt: `
           ${input.historyPrompt}
             - question: ${input.question}
             - currentDate: ${input.currentDate}
+          ${input.pageContext}
           `,
           }
         : {
@@ -374,6 +419,7 @@ export class HuskyAiService {
             - currentDate: ${input.currentDate}
             - context: ${mode.toolResults}
             - partialAnswer: ${mode.partialAnswer}
+          ${input.pageContext}
           `,
           };
 
@@ -463,8 +509,16 @@ export class HuskyAiService {
    */
   private async streamResponseContext(
     model: LanguageModel,
-    input: { historyPrompt: string; question: string; currentDate: string; content: string; toolResults: string },
-    enqueue: (text: string) => void
+    input: {
+      historyPrompt: string;
+      question: string;
+      currentDate: string;
+      content: string;
+      toolResults: string;
+      pageContext: string;
+    },
+    enqueue: (text: string) => void,
+    extraResponseFields?: Record<string, unknown>
   ): Promise<HuskyStoredContext> {
     const watchdog = new StallWatchdog(this.getStallTimeoutMs());
     try {
@@ -478,6 +532,7 @@ export class HuskyAiService {
             - currentDate: ${input.currentDate}
             - content: ${input.content}
             - context: ${input.toolResults}
+          ${input.pageContext}
           `,
         ...this.searchCallOptions(),
         abortSignal: watchdog.signal,
@@ -498,7 +553,7 @@ export class HuskyAiService {
       watchdog.touch();
       const object = await watchdog.race(objectPromise);
       const payload = this.withSourceRefs(object, input);
-      enqueue(JSON.stringify(payload).substring(1));
+      enqueue(JSON.stringify({ ...payload, ...extraResponseFields }).substring(1));
       return payload;
     } catch (error) {
       if (watchdog.stalled) {
@@ -507,7 +562,7 @@ export class HuskyAiService {
         this.logger.error('Husky structured response generation failed:', error);
       }
       const payload = this.withSourceRefs(EMPTY_RESPONSE_CONTEXT, input);
-      enqueue(JSON.stringify(payload).substring(1));
+      enqueue(JSON.stringify({ ...payload, ...extraResponseFields }).substring(1));
       return payload;
     } finally {
       watchdog.stop();
