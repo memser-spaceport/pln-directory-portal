@@ -20,6 +20,10 @@ describe('team-news-body-html.util', () => {
     expect(stripHtmlToPlainText('<p>Hello <em>world</em></p>')).toBe('Hello world');
   });
 
+  it('decodes &amp; last, so an escaped entity is not decoded twice', () => {
+    expect(stripHtmlToPlainText('<p>a &amp;lt;b&amp;gt; &amp; &lt;c&gt;</p>')).toBe('a &lt;b&gt; & <c>');
+  });
+
   it('detects rich text content', () => {
     expect(hasRichTextContent('<p>Hi</p>')).toBe(true);
     expect(hasRichTextContent('<p></p>')).toBe(false);

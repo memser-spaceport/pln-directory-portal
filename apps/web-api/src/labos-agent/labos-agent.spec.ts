@@ -7,6 +7,8 @@ jest.mock('../team-news/team-news-suggestions.service', () => ({ TeamNewsSuggest
 jest.mock('../mcp/mcp-tool-catalog', () => ({ McpToolCatalog: jest.fn() }));
 jest.mock('../access-control-v2/services/access-control-v2.service', () => ({ AccessControlV2Service: jest.fn() }));
 jest.mock('../intro-requests/intro-requests.service', () => ({ IntroRequestsService: jest.fn() }));
+// The service imports TeamsService as a value; its real module pulls cheerio and undici, which need ReadableStream.
+jest.mock('../teams/teams.service', () => ({ TeamsService: jest.fn() }));
 jest.mock('ai', () => ({ tool: (def: unknown) => def }));
 
 import { GUARDS_METADATA } from '@nestjs/common/constants';

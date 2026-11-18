@@ -9,6 +9,8 @@ jest.mock('../team-news/team-news-query.service', () => ({ TeamNewsQueryService:
 jest.mock('../team-news/team-news-suggestions.service', () => ({ TeamNewsSuggestionsService: jest.fn() }));
 jest.mock('../mcp/mcp-tool-catalog', () => ({ McpToolCatalog: jest.fn() }));
 jest.mock('../access-control-v2/services/access-control-v2.service', () => ({ AccessControlV2Service: jest.fn() }));
+// The test runs the real TeamsService visibility rule. Its enrichment dependency pulls cheerio and undici, which need ReadableStream.
+jest.mock('../team-enrichment/team-enrichment.service', () => ({ TeamEnrichmentService: jest.fn() }));
 jest.mock('ai', () => ({ tool: (def: unknown) => def }));
 
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
