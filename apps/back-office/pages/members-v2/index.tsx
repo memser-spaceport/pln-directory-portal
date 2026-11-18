@@ -357,6 +357,7 @@ const MembersPageV2 = () => {
           {activeTab !== 'POLICIES' && (
             <div className={s.filterDropdown}>
               <Select<SelectOption>
+                instanceId="members-source-filter"
                 menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
                 options={sourceOptions}
                 value={sourceOptions.find((o) => o.value === sourceFilter) ?? sourceOptions[0]}
@@ -374,6 +375,7 @@ const MembersPageV2 = () => {
             <>
               <div className={s.filterDropdown}>
                 <Select<SelectOption>
+                  instanceId="members-group-filter"
                   menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
                   options={groupOptions}
                   value={groupOptions.find((o) => o.value === groupFilter) ?? groupOptions[0]}
@@ -387,6 +389,7 @@ const MembersPageV2 = () => {
               </div>
               <div className={s.filterDropdown}>
                 <Select<SelectOption>
+                  instanceId="members-role-filter"
                   menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
                   options={roleOptions}
                   value={roleOptions.find((o) => o.value === roleFilter) ?? roleOptions[0]}
@@ -405,6 +408,7 @@ const MembersPageV2 = () => {
             <>
               <div className={s.filterDropdown}>
                 <Select<SelectOption>
+                  instanceId="policies-role-filter"
                   menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
                   options={policyRoleOptions}
                   value={policyRoleOptions.find((o) => o.value === policyRoleFilter) ?? policyRoleOptions[0]}
@@ -418,6 +422,7 @@ const MembersPageV2 = () => {
               </div>
               <div className={s.filterDropdown}>
                 <Select<SelectOption>
+                  instanceId="policies-group-filter"
                   menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
                   options={policyGroupOptions}
                   value={policyGroupOptions.find((o) => o.value === policyGroupFilter) ?? policyGroupOptions[0]}
