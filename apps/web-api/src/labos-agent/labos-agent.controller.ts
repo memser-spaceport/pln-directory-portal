@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Post, Req, Res, UseFilters, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import { ZodType, ZodTypeDef } from 'zod';
 import {
@@ -9,10 +9,13 @@ import {
   LabosAgentConfirmResponse,
 } from 'libs/contracts/src/schema/labos-agent';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
+import { LabosAgentExceptionFilter } from './labos-agent-exception.filter';
 import { LabosAgentService } from './labos-agent.service';
 
 /** LabOS in-app agent, contracts C1 and C2 (LAB-3272; slices S1 LAB-3298, S2 LAB-3299). */
 @Controller('v1/labos-agent')
+// Error bodies keep their `code` (LAB-3300). The global LogException drops it.
+@UseFilters(LabosAgentExceptionFilter)
 export class LabosAgentController {
   constructor(private readonly agent: LabosAgentService) {}
 

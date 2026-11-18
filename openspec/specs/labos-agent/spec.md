@@ -175,6 +175,16 @@ C2 SHALL return HTTP 400 `VALIDATION_ERROR` for a bad body, 403 `AGENT_NOT_ENABL
 - **WHEN** the client sends confirm again
 - **THEN** the response is HTTP 409 `PROPOSAL_CLOSED` with `status: "done"`
 
+### Requirement: Error bodies keep the code
+
+A C1 or C2 error body with a `code` SHALL reach the client as-is, with `statusCode`, `code`, `message` and its other fields (for example the 409 `status` and the 400 `errors`). `LabosAgentExceptionFilter`, scoped to the LabOS agent controller, does this (LAB-3300). The global `LogException` SHALL NOT change. An error with no `code` SHALL get the `LogException` body.
+
+#### Scenario: Unknown intro target over HTTP
+
+- **GIVEN** an intro target uid that does not exist
+- **WHEN** the member posts a chat turn for it
+- **THEN** the response body is `{ "statusCode": 404, "code": "INTRO_TARGET_NOT_FOUND", "message": "<text>" }`
+
 ### Requirement: Intro context
 
 When `context.page` is `intro`, the system SHALL look up `context.introTarget` with the agent target lookup (`IntroRequestsService.findAgentTargetName`) before the stream starts. A member target SHALL be a member with no `deletedAt`, as in C3. A team target SHALL be a team whose status is not `INACTIVE`. A deleted (`INACTIVE`) team SHALL be unknown, as `GET /v1/teams/:uid` gives a non-admin 404 for it. C3 (`findTargetName`) SHALL NOT change: it still accepts any team uid. An unknown target SHALL get HTTP 404 with code `INTRO_TARGET_NOT_FOUND`, and no stream starts. A found target (type, uid and the name from the database) SHALL go to the model as page context.
