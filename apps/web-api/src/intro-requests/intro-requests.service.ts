@@ -102,7 +102,7 @@ export class IntroRequestsService {
    * The intro sender rule, shared by C3 (`create`) and the LabOS agent `draft_intro` tool (LAB-3300): a live member
    * with a current role on a PL Portfolio team, or with the PL Infra policy. Returns the member, or null.
    */
-  async findEligibleRequester(email: string | undefined): Promise<RequesterRow | null> {
+  async findEligibleRequester(email: string | null | undefined): Promise<RequesterRow | null> {
     if (!email?.trim()) return null;
     const requester = (await this.prisma.member.findFirst({
       where: { email: email.toLowerCase().trim(), deletedAt: null },

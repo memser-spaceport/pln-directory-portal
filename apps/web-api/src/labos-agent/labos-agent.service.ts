@@ -15,10 +15,12 @@ import {
   LabosAgentClosedStatus,
   LabosAgentConfirmRequest,
   LabosAgentConfirmResponse,
+  LabosAgentDraft,
   LabosAgentProposal,
 } from 'libs/contracts/src/schema/labos-agent';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
 import { HuskyAiService } from '../husky/husky-ai.service';
+import { IntroRequestsService } from '../intro-requests/intro-requests.service';
 import { newsRow } from '../mcp/mcp-news-tools';
 import { McpToolCatalog } from '../mcp/mcp-tool-catalog';
 import { McpAdminCaps, McpScopesService } from '../mcp/mcp-scopes.service';
@@ -27,6 +29,7 @@ import { PrismaService } from '../shared/prisma.service';
 import { resolveLiveMemberUidByEmail } from '../shared/resolve-live-member-uid.util';
 import { TeamNewsQueryService } from '../team-news/team-news-query.service';
 import { LabosAgentAccessService } from './labos-agent-access.service';
+import { draftIntroTool, IntroTurnTarget } from './labos-agent-drafts';
 import { mcpToolsAsAgentTools } from './labos-agent-news.tools';
 import { canChangeTeam, LabosAgentProposalStore, proposeTool, StoredProposal } from './labos-agent-proposals';
 
@@ -58,7 +61,8 @@ export class LabosAgentService {
     private catalog: McpToolCatalog,
     private accessControl: AccessControlV2Service,
     private proposalStore: LabosAgentProposalStore,
-    private scopes: McpScopesService
+    private scopes: McpScopesService,
+    private introRequests: IntroRequestsService
   ) {}
 
   private readonly logger = new Logger(LabosAgentService.name);
@@ -70,7 +74,7 @@ export class LabosAgentService {
   /** Runs the checks that come before the stream (403, 404), then returns the stream. */
   async chat(email: string, body: LabosAgentChatRequest): Promise<ReadableStream> {
     const memberUid = await this.enabledMember(email);
-    const promptContext = await this.pageContext(body, memberUid);
+    const { promptContext, introTarget } = await this.pageContext(body, memberUid);
     const ctx = await this.actor(memberUid, email);
     // The member's real RBAC permissions and the admin MCP caps pick the tools, as on the MCP server (LAB-3299).
     const allowed = await this.tools(ctx);
@@ -85,6 +89,9 @@ export class LabosAgentService {
     const proposeTools = Object.fromEntries(
       allowed.filter((def) => PROPOSE_TOOLS.includes(def.name)).map((def) => [def.name, proposeTool(def, ctx, deps)])
     );
+    // S3 (LAB-3300): an agent-only tool, not in McpToolCatalog, so the admin MCP caps do not apply. It writes nothing.
+    const drafts: LabosAgentDraft[] = [];
+    const draftIntro = draftIntroTool(ctx, { introRequests: this.introRequests, target: introTarget, drafts });
 
     return this.huskyAiService.createContextualToolsResponse(
       { question: body.message, threadId: body.threadId, chatId: body.chatId },
@@ -92,9 +99,9 @@ export class LabosAgentService {
       email,
       {
         promptContext,
-        extraTools: { ...mcpToolsAsAgentTools(reads, ctx), ...proposeTools },
-        // The stream reads this array when it ends, so it holds the proposals the tools made in this turn.
-        extraResponseFields: { proposals },
+        extraTools: { ...mcpToolsAsAgentTools(reads, ctx), ...proposeTools, draft_intro: draftIntro },
+        // The stream reads these arrays when it ends, so they hold the proposals and drafts the tools made in this turn.
+        extraResponseFields: { proposals, drafts },
         persistHistory: false,
       }
     );
@@ -206,11 +213,15 @@ export class LabosAgentService {
     };
   }
 
-  private async pageContext(body: LabosAgentChatRequest, memberUid: string): Promise<string | undefined> {
+  private async pageContext(
+    body: LabosAgentChatRequest,
+    memberUid: string
+  ): Promise<{ promptContext?: string; introTarget?: IntroTurnTarget }> {
     const context = body.context;
-    if (!context) return undefined;
+    if (!context) return {};
+    if (context.page === 'intro' && context.introTarget) return this.introContext(context.introTarget);
     if (context.page !== 'news-story' || !context.newsUid) {
-      return 'The member is on the LabOS Home page.';
+      return { promptContext: 'The member is on the LabOS Home page.' };
     }
     const item = await this.teamNewsQuery.getTeamNewsItemDto(context.newsUid, new Set(), memberUid);
     if (!item) {
@@ -228,12 +239,35 @@ export class LabosAgentService {
       teamName: row.teamName,
       eventDate: row.eventDate,
     };
-    return (
+    const promptContext =
       'The member is reading this LabOS news story. "This story" means this item. ' +
       `Call get_news_item with uid ${row.uid} for its source before you answer about it. Story: ${JSON.stringify(
         story
-      )}`
-    );
+      )}`;
+    return { promptContext };
+  }
+
+  /** The intro page (LAB-3300): the target from the C3 lookup, or 404 INTRO_TARGET_NOT_FOUND before the stream. */
+  private async introContext(target: {
+    type: 'member' | 'team';
+    uid: string;
+  }): Promise<{ promptContext: string; introTarget: IntroTurnTarget }> {
+    const name = await this.introRequests.findTargetName(target.type === 'member' ? 'MEMBER' : 'TEAM', target.uid);
+    if (!name) {
+      throw agentError(
+        NotFoundException,
+        404,
+        LABOS_AGENT_ERROR_CODES.INTRO_TARGET_NOT_FOUND,
+        `Intro target not found: ${target.type} ${target.uid}`
+      );
+    }
+    const introTarget = { type: target.type, uid: target.uid, name };
+    const promptContext =
+      `The member wants to request an intro to this ${target.type}: ${JSON.stringify(introTarget)}. ` +
+      `To write the draft, call draft_intro with type "${target.type}" and targetUid "${target.uid}". ` +
+      'Ask the member for the reason when the message does not give one. ' +
+      'You never send the request. The member edits the draft and presses Send.';
+    return { promptContext, introTarget };
   }
 }
 

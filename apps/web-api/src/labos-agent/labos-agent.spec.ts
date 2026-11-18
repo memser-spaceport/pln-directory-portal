@@ -6,6 +6,7 @@ jest.mock('../team-news/team-news-query.service', () => ({ TeamNewsQueryService:
 jest.mock('../team-news/team-news-suggestions.service', () => ({ TeamNewsSuggestionsService: jest.fn() }));
 jest.mock('../mcp/mcp-tool-catalog', () => ({ McpToolCatalog: jest.fn() }));
 jest.mock('../access-control-v2/services/access-control-v2.service', () => ({ AccessControlV2Service: jest.fn() }));
+jest.mock('../intro-requests/intro-requests.service', () => ({ IntroRequestsService: jest.fn() }));
 jest.mock('ai', () => ({ tool: (def: unknown) => def }));
 
 import { GUARDS_METADATA } from '@nestjs/common/constants';
@@ -62,7 +63,8 @@ function setup(env = APP_ENV.DEV as string) {
     catalog as any,
     accessControl as any,
     {} as any,
-    scopes as any
+    scopes as any,
+    { findTargetName: jest.fn(), findEligibleRequester: jest.fn() } as any
   );
   const controller = new LabosAgentController(service);
   const res = {
@@ -106,6 +108,19 @@ describe('LabosAgentController', () => {
     ['message over 2000 characters', { ...VALID, message: 'x'.repeat(2001) }],
     ['unknown page', { ...VALID, context: { page: 'forum' } }],
     ['news-story without newsUid', { ...VALID, context: { page: 'news-story' } }],
+    ['intro without introTarget', { ...VALID, context: { page: 'intro' } }],
+    [
+      'introTarget on the home page',
+      { ...VALID, context: { page: 'home', introTarget: { type: 'member', uid: 'm' } } },
+    ],
+    [
+      'introTarget with a bad type',
+      { ...VALID, context: { page: 'intro', introTarget: { type: 'project', uid: 'm' } } },
+    ],
+    [
+      'introTarget uid over 64 characters',
+      { ...VALID, context: { page: 'intro', introTarget: { type: 'team', uid: 'x'.repeat(65) } } },
+    ],
   ])('returns 400 VALIDATION_ERROR for %s', async (_name, body) => {
     const error = await chatError(body);
     expect(error).toBeInstanceOf(BadRequestException);
@@ -151,6 +166,7 @@ describe('LabosAgentController', () => {
     expect(catalog.forApp).toHaveBeenCalledWith(new Set(['forum.read']), caps);
     expect(Object.keys(options.extraTools).sort()).toEqual([
       'add_experience',
+      'draft_intro',
       'get_my_profile',
       'get_news_item',
       'list_my_experiences',
@@ -159,7 +175,8 @@ describe('LabosAgentController', () => {
       'update_my_profile',
       'update_team',
     ]);
-    expect(options.extraResponseFields).toEqual({ proposals: [] });
+    // S3-R8: a turn without a draft has drafts [], next to the S1 and S2 fields.
+    expect(options.extraResponseFields).toEqual({ proposals: [], drafts: [] });
     expect(options.persistHistory).toBe(false);
 
     expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'application/json');
