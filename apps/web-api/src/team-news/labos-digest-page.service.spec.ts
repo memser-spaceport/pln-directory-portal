@@ -285,7 +285,7 @@ describe('LabosDigestPageService', () => {
       it('asks for the next 28 days from now, soonest first, at most 5, and counts the window', async () => {
         const { service, prisma } = build({ items: [item('a'), item('b')], eventTotal: 9 });
         const { events } = await service.read(token());
-        const args = prisma.pLEvent.findMany.mock.calls[0][0];
+        const args = (prisma.pLEvent.findMany.mock.calls[0] as any[])[0];
         const before = Date.now();
         const { gt, lte } = args.where.startDate;
         expect(Math.abs(gt.getTime() - before)).toBeLessThan(5000);
