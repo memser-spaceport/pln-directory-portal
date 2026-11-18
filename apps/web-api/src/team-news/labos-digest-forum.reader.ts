@@ -44,6 +44,7 @@ export function toDigestForumPost(payload: Row, webUiBase: string): LabosDigestP
     authorAvatarUrl: absoluteUrl(user.picture),
     contentHtml: content,
     url: `${webUiBase}/forum/topics/${cid}/${tid}`,
+    replyCount: Math.max(0, (asNumber(payload.postcount) ?? 1) - 1),
   };
 }
 
