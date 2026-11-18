@@ -790,6 +790,8 @@ export const LabosDigestPageForumPostSchema = z.object({
   authorAvatarUrl: z.string().nullable(),
   contentHtml: z.string(),
   url: z.string(),
+  /** Replies to the thread now, for "From the forum" (LAB-3293): the forum's post count less the opening post. */
+  replyCount: z.number().int(),
 });
 
 /** One issue in the page's Past issues list (LAB-3294), newest first. */
