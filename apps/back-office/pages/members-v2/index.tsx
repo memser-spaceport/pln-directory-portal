@@ -5,6 +5,7 @@ import { useCookie } from 'react-use';
 import clsx from 'clsx';
 import Select, { StylesConfig } from 'react-select';
 
+import { JOB_ASPIRANT_POLICY_CODE } from '../../utils/constants';
 import { ApprovalLayout } from '../../layout/approval-layout';
 import { AddMember } from '../../screens/members/components/AddMember/AddMember';
 import { MembersTableV2 } from '../../screens/members/components/MembersTableV2';
@@ -21,9 +22,6 @@ type MemberStateTab = 'PENDING' | 'VERIFIED' | 'APPROVED' | 'REJECTED' | 'JOB_AS
 type ActiveTab = MemberStateTab | 'POLICIES';
 
 const TAB_IDS: ActiveTab[] = ['PENDING', 'VERIFIED', 'APPROVED', 'REJECTED', 'JOB_ASPIRANT', 'POLICIES'];
-
-/** Must match JOB_ASPIRANT_POLICY_CODE in apps/web-api/src/access-control-v2/access-control-v2.constants.ts */
-const JOB_ASPIRANT_POLICY_CODE = 'job_aspirant';
 
 const MEMBER_STATE_TABS: { id: MemberStateTab; label: string }[] = [
   { id: 'PENDING', label: 'Pending Members (L0)' },
