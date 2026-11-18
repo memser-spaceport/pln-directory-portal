@@ -463,6 +463,15 @@ export class HuskyAiService {
           announceSearch(part.toolCallId, part.toolName);
         } else if (part.type === 'text-delta') {
           forward(part.textDelta);
+        } else if (part.type === 'error') {
+          // The provider error (quota, auth, 5xx) ends the stream with finish reason
+          // "unknown". Log its text, or the cut-off log line is the only trace.
+          const error = part.error as { statusCode?: number; message?: string } | undefined;
+          this.logger.error(
+            `Husky answer stream provider error${error?.statusCode ? ` (${error.statusCode})` : ''}: ${
+              error?.message ?? String(part.error)
+            }`
+          );
         }
       }
       release();

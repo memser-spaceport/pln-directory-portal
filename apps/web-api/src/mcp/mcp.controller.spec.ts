@@ -81,6 +81,7 @@ jest.mock('@modelcontextprotocol/sdk/server/streamableHttp.js', () => ({
 }));
 
 import { McpController } from './mcp.controller';
+import { McpToolCatalog } from './mcp-tool-catalog';
 import { McpScopesService } from './mcp-scopes.service';
 import { McpAccessRequestsService } from './mcp-access-requests.service';
 import { MCP_NEEDS_WRITE_NOTE } from './mcp-tool-plan';
@@ -172,73 +173,16 @@ function build(
   };
   const scopes = new McpScopesService(prisma as any, analytics as any, accessRequests);
   const stub = {} as any;
+  const catalog = new McpToolCatalog(...(Array(60).fill(stub) as ConstructorParameters<typeof McpToolCatalog>));
+  Object.assign(catalog, { aiApps });
   const controller = new McpController(
     oauth as any,
     accessControl as any,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    aiApps as any,
-    stub,
     analytics as any,
     scopes,
     accessRequests,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
     limits as any,
-    {} as any,
-    {} as any,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub,
-    stub
+    catalog
   );
   /** One MCP request: returns what `tools/list` would show and a way to call a tool by name. */
   const handle = async (body: unknown = { jsonrpc: '2.0', id: 1, method: 'tools/list' }) => {

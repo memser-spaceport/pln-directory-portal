@@ -1,4 +1,4 @@
-import { McpScopeKey } from 'libs/contracts/src/schema/mcp-scopes';
+import { MCP_SCOPE_KEYS, McpScopeKey } from 'libs/contracts/src/schema/mcp-scopes';
 import { McpToolDef } from './mcp-tools';
 import { levelAtLeast, MCP_UNSCOPED_TOOLS, scopeLabel, toolScope } from './mcp-scopes.registry';
 import { McpAdminCaps, McpStoredLevels, resolveScope } from './mcp-scopes.service';
@@ -53,6 +53,22 @@ export function planTools(tools: McpToolDef[], stored: McpStoredLevels, caps: Mc
     }
   }
   return plan;
+}
+
+/**
+ * Levels for a caller with no MCP connection, such as the LabOS in-app agent (LAB-3299): `write` everywhere, so only
+ * the admin caps and the registry maximum apply.
+ */
+export const MCP_APP_LEVELS = Object.fromEntries(MCP_SCOPE_KEYS.map((key) => [key, 'write'])) as McpStoredLevels;
+
+/**
+ * The tools that run for an in-app caller: `planTools` with `MCP_APP_LEVELS`, mode `run` only. With `caps` null
+ * (admin settings unreadable) every scoped tool is hidden, the same fail-closed rule as the MCP server.
+ */
+export function appTools(tools: McpToolDef[], caps: McpAdminCaps | null): McpToolDef[] {
+  return planTools(tools, MCP_APP_LEVELS, caps)
+    .filter((item) => item.mode === 'run')
+    .map((item) => item.tool);
 }
 
 /** The text an agent gets back for a refused call. */

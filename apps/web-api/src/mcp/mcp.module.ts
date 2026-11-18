@@ -54,6 +54,7 @@ import { McpController } from './mcp.controller';
 import { McpScopesService } from './mcp-scopes.service';
 import { McpAccessRequestsService } from './mcp-access-requests.service';
 import { McpLimitService } from './mcp-limit.service';
+import { McpToolCatalog } from './mcp-tool-catalog';
 import { ImagesModule } from '../images/images.module';
 import { JwtService } from '../utils/jwt/jwt.service';
 
@@ -120,7 +121,9 @@ import { JwtService } from '../utils/jwt/jwt.service';
     McpScopesService,
     McpAccessRequestsService,
     McpLimitService,
+    McpToolCatalog,
     JwtService,
   ],
+  exports: [McpToolCatalog, McpScopesService],
 })
 export class McpModule {}
