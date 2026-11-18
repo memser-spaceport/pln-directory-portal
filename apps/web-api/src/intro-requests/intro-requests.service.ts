@@ -11,7 +11,7 @@ const NOT_ELIGIBLE = 'Only members of portfolio teams and PL Infra can send an i
 const CLAIM_STALE_MS = 10 * 60 * 1000;
 const RETRY_BATCH = 20;
 
-type RequesterRow = {
+export type RequesterRow = {
   uid: string;
   name: string;
   teamMemberRoles: { mainTeam: boolean; team: { name: string } }[];
@@ -98,12 +98,30 @@ export class IntroRequestsService {
     });
   }
 
-  private async loadEligibleRequester(email: string): Promise<RequesterRow> {
+  /**
+   * The intro sender rule, shared by C3 (`create`) and the LabOS agent `draft_intro` tool (LAB-3300): a live member
+   * with a current role on a PL Portfolio team, or with the PL Infra policy. Returns the member, or null.
+   */
+  async findEligibleRequester(email: string | undefined): Promise<RequesterRow | null> {
+    if (!email?.trim()) return null;
     const requester = (await this.prisma.member.findFirst({
       where: { email: email.toLowerCase().trim(), deletedAt: null },
       select: this.requesterSelect(new Date()),
     })) as RequesterRow | null;
-    if (!requester || !this.isEligible(requester)) {
+    return requester && this.isEligible(requester) ? requester : null;
+  }
+
+  /**
+   * The intro target lookup, shared by C3 and the LabOS agent: a member with no `deletedAt`, or any team.
+   * Returns the target name, or null when the target does not exist.
+   */
+  async findTargetName(type: IntroRequestType, targetId: string): Promise<string | null> {
+    return this.lookupTargetName(type, targetId);
+  }
+
+  private async loadEligibleRequester(email: string): Promise<RequesterRow> {
+    const requester = await this.findEligibleRequester(email);
+    if (!requester) {
       throw new ForbiddenException(NOT_ELIGIBLE);
     }
     return requester;
@@ -114,7 +132,7 @@ export class IntroRequestsService {
   }
 
   private async requireTarget(type: IntroRequestType, targetId: string): Promise<void> {
-    const name = await this.lookupTargetName(type, targetId);
+    const name = await this.findTargetName(type, targetId);
     if (!name) {
       throw new NotFoundException(type === 'MEMBER' ? 'Member not found' : 'Team not found');
     }
