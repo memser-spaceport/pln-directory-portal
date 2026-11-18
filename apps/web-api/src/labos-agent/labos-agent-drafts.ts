@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { CoreTool, tool } from 'ai';
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
@@ -12,7 +13,12 @@ export const INTRO_NOT_ELIGIBLE_TEXT =
   'The member cannot request intros. Only members of portfolio teams and PL Infra can. ' +
   'Make no draft. Tell the member this.';
 
+/** A fixed text for an unexpected error. The error itself goes to the server log, never to the model. */
+export const INTRO_DRAFT_FAILED_TEXT =
+  'The draft failed because of a server error. Make no draft. Tell the member to try again later.';
+
 const { minLength: MIN, maxLength: MAX } = LABOS_AGENT_INTRO_DRAFT_LIMITS;
+const logger = new Logger('LabosAgentDrafts');
 
 export type DraftDeps = {
   introRequests: IntroRequestsService;
@@ -25,7 +31,8 @@ export type DraftDeps = {
 /**
  * `draft_intro` (LAB-3300, contract section 8.3). An agent tool only, not an MCP tool. Propose only: it reads the
  * sender rule and the target, and writes nothing (no IntroRequest row, no Telegram post, no cache entry). The member
- * edits the draft and sends it with C3. A refusal is a text for the model, and the turn has no draft.
+ * edits the draft and sends it with C3. A refusal is a text for the model, and the turn has no draft: each call
+ * first clears `drafts`, so a refused second call also removes the draft of the first call (S3-R8).
  */
 export function draftIntroTool(ctx: McpActorContext, deps: DraftDeps): CoreTool {
   return tool({
@@ -41,6 +48,8 @@ export function draftIntroTool(ctx: McpActorContext, deps: DraftDeps): CoreTool 
       text: z.string(),
     }),
     execute: async (args: { type: 'member' | 'team'; targetUid: string; text: string }) => {
+      // A refusal gives `drafts: []`, also after an earlier draft in this turn. Only a valid call adds a draft.
+      deps.drafts.splice(0, deps.drafts.length);
       const target = deps.target;
       // 1. Only the target of this turn.
       if (!target || target.type !== args.type || target.uid !== args.targetUid) {
@@ -52,8 +61,11 @@ export function draftIntroTool(ctx: McpActorContext, deps: DraftDeps): CoreTool 
       try {
         // 2. The C3 sender rule, the same code as C3.
         if (!(await deps.introRequests.findEligibleRequester(ctx.email))) return INTRO_NOT_ELIGIBLE_TEXT;
-        // 3. The target name from the C3 lookup, not from the model.
-        const name = await deps.introRequests.findTargetName(target.type === 'member' ? 'MEMBER' : 'TEAM', target.uid);
+        // 3. The target name from the agent lookup (C3 rule, and a deleted team is unknown), not from the model.
+        const name = await deps.introRequests.findAgentTargetName(
+          target.type === 'member' ? 'MEMBER' : 'TEAM',
+          target.uid
+        );
         if (!name) return `The draft was refused: the ${target.type} was not found. Make no draft.`;
         // 4. The limits of the intro modal.
         const text = (args.text ?? '').trim();
@@ -63,7 +75,7 @@ export function draftIntroTool(ctx: McpActorContext, deps: DraftDeps): CoreTool 
             `Write it again with ${MIN} to ${MAX} characters.`
           );
         }
-        // 5. One draft per turn: a second call replaces the first.
+        // 5. One draft per turn: a valid second call replaces the first.
         const draft: LabosAgentDraft = {
           draftId: `dr_${randomUUID()}`,
           kind: 'intro',
@@ -73,13 +85,14 @@ export function draftIntroTool(ctx: McpActorContext, deps: DraftDeps): CoreTool 
           maxLength: MAX,
           source: 'agent',
         };
-        deps.drafts.splice(0, deps.drafts.length, draft);
+        deps.drafts.push(draft);
         return (
           `Draft ${draft.draftId} is ready for ${name}. Nothing is sent. ` +
           'Tell the member to check the draft, edit it if needed, and press Send.'
         );
       } catch (error) {
-        return `The draft failed: ${error?.message ?? error}. Make no draft.`;
+        logger.error(`draft_intro failed: ${error instanceof Error ? error.stack ?? error.message : String(error)}`);
+        return INTRO_DRAFT_FAILED_TEXT;
       }
     },
   });

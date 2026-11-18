@@ -153,7 +153,7 @@ function setup() {
     accessControl as any,
     new LabosAgentProposalStore(cache as any),
     scopes as any,
-    { findTargetName: jest.fn(), findEligibleRequester: jest.fn() } as any
+    { findAgentTargetName: jest.fn(), findEligibleRequester: jest.fn() } as any
   );
   const controller = new LabosAgentController(service);
   const req = { userEmail: 'ada@example.com' };

@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { IntroRequestType, Prisma } from '@prisma/client';
+import { IntroRequestType, Prisma, TeamStatus } from '@prisma/client';
 import { CreateIntroRequestDto } from 'libs/contracts/src/schema';
 import { PL_INFRA_POLICY_CODE } from '../pl-infra-members/pl-infra-members.constants';
 import { PrismaService } from '../shared/prisma.service';
@@ -112,11 +112,25 @@ export class IntroRequestsService {
   }
 
   /**
-   * The intro target lookup, shared by C3 and the LabOS agent: a member with no `deletedAt`, or any team.
-   * Returns the target name, or null when the target does not exist.
+   * The C3 intro target lookup: a member with no `deletedAt`, or any team. Returns the target name, or null when the
+   * target does not exist. The LabOS agent uses `findAgentTargetName`, which shares the member rule.
    */
   async findTargetName(type: IntroRequestType, targetId: string): Promise<string | null> {
     return this.lookupTargetName(type, targetId);
+  }
+
+  /**
+   * The LabOS agent target lookup (LAB-3300 C1 and `draft_intro`): the same as `findTargetName`, but a deleted team
+   * (status INACTIVE, LAB-3192) is unknown. This mirrors `GET /v1/teams/:uid`, which gives a non-admin 404 for it
+   * (`enforceDeletedTeamHidden`). C3 keeps `findTargetName` and does not change.
+   */
+  async findAgentTargetName(type: IntroRequestType, targetId: string): Promise<string | null> {
+    if (type === 'MEMBER') return this.lookupTargetName(type, targetId);
+    const team = await this.prisma.team.findFirst({
+      where: { uid: targetId, status: { not: TeamStatus.INACTIVE } },
+      select: { name: true },
+    });
+    return team?.name ?? null;
   }
 
   private async loadEligibleRequester(email: string): Promise<RequesterRow> {

@@ -64,7 +64,7 @@ function setup(env = APP_ENV.DEV as string) {
     accessControl as any,
     {} as any,
     scopes as any,
-    { findTargetName: jest.fn(), findEligibleRequester: jest.fn() } as any
+    { findAgentTargetName: jest.fn(), findEligibleRequester: jest.fn() } as any
   );
   const controller = new LabosAgentController(service);
   const res = {

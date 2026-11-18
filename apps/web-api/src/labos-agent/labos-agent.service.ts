@@ -247,12 +247,12 @@ export class LabosAgentService {
     return { promptContext };
   }
 
-  /** The intro page (LAB-3300): the target from the C3 lookup, or 404 INTRO_TARGET_NOT_FOUND before the stream. */
+  /** The intro page (LAB-3300): the target from the agent lookup (deleted teams are unknown), or 404 INTRO_TARGET_NOT_FOUND before the stream. */
   private async introContext(target: {
     type: 'member' | 'team';
     uid: string;
   }): Promise<{ promptContext: string; introTarget: IntroTurnTarget }> {
-    const name = await this.introRequests.findTargetName(target.type === 'member' ? 'MEMBER' : 'TEAM', target.uid);
+    const name = await this.introRequests.findAgentTargetName(target.type === 'member' ? 'MEMBER' : 'TEAM', target.uid);
     if (!name) {
       throw agentError(
         NotFoundException,

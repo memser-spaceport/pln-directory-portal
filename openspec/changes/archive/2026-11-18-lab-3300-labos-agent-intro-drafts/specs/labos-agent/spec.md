@@ -2,7 +2,7 @@
 
 ### Requirement: Intro context
 
-When `context.page` is `intro`, the system SHALL look up `context.introTarget` with the C3 target lookup (`IntroRequestsService.findTargetName`) before the stream starts. A member target SHALL be a member with no `deletedAt`. A team target SHALL be any team uid. An unknown target SHALL get HTTP 404 with code `INTRO_TARGET_NOT_FOUND`, and no stream starts. A found target (type, uid and the name from the database) SHALL go to the model as page context.
+When `context.page` is `intro`, the system SHALL look up `context.introTarget` with the agent target lookup (`IntroRequestsService.findAgentTargetName`) before the stream starts. A member target SHALL be a member with no `deletedAt`, as in C3. A team target SHALL be a team whose status is not `INACTIVE`. A deleted (`INACTIVE`) team SHALL be unknown, as `GET /v1/teams/:uid` gives a non-admin 404 for it. C3 (`findTargetName`) SHALL NOT change: it still accepts any team uid. An unknown target SHALL get HTTP 404 with code `INTRO_TARGET_NOT_FOUND`, and no stream starts. A found target (type, uid and the name from the database) SHALL go to the model as page context.
 
 #### Scenario: Unknown intro target
 
@@ -11,9 +11,17 @@ When `context.page` is `intro`, the system SHALL look up `context.introTarget` w
 - **THEN** the response is HTTP 404 with code `INTRO_TARGET_NOT_FOUND`
 - **AND** no stream starts
 
+#### Scenario: Deleted team as intro target
+
+- **GIVEN** an `introTarget` team uid of a team with status `INACTIVE`
+- **WHEN** the member opens the chat on the intro page
+- **THEN** the response is HTTP 404 with code `INTRO_TARGET_NOT_FOUND`
+- **AND** no stream starts
+- **AND** C3 for the same team uid does not change
+
 ### Requirement: Intro drafts
 
-The chat SHALL have the agent tool `draft_intro` with the arguments `type` (`member` or `team`), `targetUid` and `text`. It SHALL NOT be an MCP tool and SHALL NOT be in `McpToolCatalog`, so the admin MCP caps do not apply to it. It SHALL write nothing: no `IntroRequest` row, no Telegram post and no cache entry. A call SHALL, in this order: refuse a `type` or `targetUid` that is not the `context.introTarget` of the turn; check the sender with the C3 rule (`IntroRequestsService.findEligibleRequester`, the same method as C3); load the target name with the C3 lookup; trim `text` and refuse a length below 20 or above 3500. Then it SHALL put one draft in `drafts`: `draftId` (`dr_` and a UUID), `kind` `intro`, `target` (`type`, `uid`, `name` from the database), `text`, `minLength` 20, `maxLength` 3500 and `source` `agent`. A second call in the same turn SHALL replace the first draft. A refusal SHALL be a text for the model, and the turn SHALL have `drafts: []`. The backend SHALL NOT store `source` or the draft.
+The chat SHALL have the agent tool `draft_intro` with the arguments `type` (`member` or `team`), `targetUid` and `text`. It SHALL NOT be an MCP tool and SHALL NOT be in `McpToolCatalog`, so the admin MCP caps do not apply to it. It SHALL write nothing: no `IntroRequest` row, no Telegram post and no cache entry. A call SHALL, in this order: refuse a `type` or `targetUid` that is not the `context.introTarget` of the turn; check the sender with the C3 rule (`IntroRequestsService.findEligibleRequester`, the same method as C3); load the target name with the agent target lookup (a deleted team is not found); trim `text` and refuse a length below 20 or above 3500. Then it SHALL put one draft in `drafts`: `draftId` (`dr_` and a UUID), `kind` `intro`, `target` (`type`, `uid`, `name` from the database), `text`, `minLength` 20, `maxLength` 3500 and `source` `agent`. A valid second call in the same turn SHALL replace the first draft. Each call SHALL first clear `drafts`. A refusal SHALL be a text for the model, and the turn SHALL have `drafts: []`, also when an earlier call made a draft. An unexpected error SHALL give the model a fixed text and SHALL go to the server log. The model SHALL NOT get the error message. The backend SHALL NOT store `source` or the draft.
 
 #### Scenario: Eligible member
 
@@ -40,6 +48,20 @@ The chat SHALL have the agent tool `draft_intro` with the arguments `type` (`mem
 - **GIVEN** an eligible member on the intro page
 - **WHEN** the model calls `draft_intro` with 10 or 3600 characters
 - **THEN** the model gets a refusal with the limits 20 to 3500
+- **AND** the body has `drafts: []`
+
+#### Scenario: A refused second call
+
+- **GIVEN** an eligible member on the intro page, and a first `draft_intro` call that made a draft
+- **WHEN** the model calls `draft_intro` again and the call is refused
+- **THEN** the body has `drafts: []`
+
+#### Scenario: An unexpected error
+
+- **GIVEN** an eligible member on the intro page
+- **WHEN** a `draft_intro` call fails with an error
+- **THEN** the model gets a fixed text that does not contain the error message
+- **AND** the error goes to the server log
 - **AND** the body has `drafts: []`
 
 ## MODIFIED Requirements
