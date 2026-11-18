@@ -128,7 +128,9 @@ function setup(sender: Partial<Person> = { roles: [portfolio()] }) {
     { getMemberAccess: jest.fn().mockResolvedValue({ effectivePermissions: [] }) } as any,
     new LabosAgentProposalStore(cache as any),
     { adminCaps: jest.fn(async () => Object.fromEntries(MCP_SCOPE_KEYS.map((key) => [key, 'write']))) } as any,
-    introRequests
+    introRequests,
+    {} as any,
+    {} as any
   );
   const controller = new LabosAgentController(service);
   const req = { userEmail: 'ada@example.com' };

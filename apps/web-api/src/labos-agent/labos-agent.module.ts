@@ -2,8 +2,10 @@ import { Module } from '@nestjs/common';
 import { AccessControlV2Module } from '../access-control-v2/access-control-v2.module';
 import { HuskySearchModule } from '../husky/husky-search.module';
 import { IntroRequestsModule } from '../intro-requests/intro-requests.module';
+import { JobOpeningsModule } from '../job-openings/job-openings.module';
 import { McpModule } from '../mcp/mcp.module';
 import { TeamNewsModule } from '../team-news/team-news.module';
+import { TeamsModule } from '../teams/teams.module';
 import { LabosAgentController } from './labos-agent.controller';
 import { LabosAgentService } from './labos-agent.service';
 import { LabosAgentAccessService } from './labos-agent-access.service';
@@ -12,9 +14,18 @@ import { LabosAgentProposalStore } from './labos-agent-proposals';
 /**
  * LabOS in-app agent (LAB-3272). Reuses the AI search stream from HuskySearchModule and the MCP tool list
  * (McpToolCatalog) from McpModule, and the intro sender rule and target lookup from IntroRequestsModule (LAB-3300).
+ * The page rules of the team and job pages come from TeamsModule and JobOpeningsModule (LAB-3302).
  */
 @Module({
-  imports: [HuskySearchModule, TeamNewsModule, McpModule, AccessControlV2Module, IntroRequestsModule],
+  imports: [
+    HuskySearchModule,
+    TeamNewsModule,
+    McpModule,
+    AccessControlV2Module,
+    IntroRequestsModule,
+    TeamsModule,
+    JobOpeningsModule,
+  ],
   controllers: [LabosAgentController],
   providers: [LabosAgentService, LabosAgentAccessService, LabosAgentProposalStore],
 })

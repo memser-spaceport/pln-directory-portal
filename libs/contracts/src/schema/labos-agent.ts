@@ -7,12 +7,19 @@ export const LabosAgentIntroTargetSchema = z.object({
 });
 export type LabosAgentIntroTarget = z.infer<typeof LabosAgentIntroTargetSchema>;
 
-/** The page the member is on when they ask (LAB-3272 contract C1). S1: `news-story`, `home`. S3: `intro`. */
+/**
+ * The page the member is on when they ask (LAB-3272 contract C1). S1: `news-story`, `home`. S3: `intro`.
+ * S5 (LAB-3302, contract section 9): `member`, `team`, `job` (no `jobUid` is the job board) and `profile` (no id: the
+ * backend reads the own member from the session).
+ */
 export const LabosAgentContextSchema = z
   .object({
-    page: z.enum(['news-story', 'home', 'intro']),
+    page: z.enum(['news-story', 'home', 'intro', 'member', 'team', 'job', 'profile']),
     newsUid: z.string().min(1).optional(),
     introTarget: LabosAgentIntroTargetSchema.optional(),
+    memberUid: z.string().min(1).max(64).optional(),
+    teamUid: z.string().min(1).max(64).optional(),
+    jobUid: z.string().min(1).max(64).optional(),
   })
   .refine((context) => context.page !== 'news-story' || !!context.newsUid, {
     message: 'newsUid is required when page is "news-story"',
@@ -21,6 +28,18 @@ export const LabosAgentContextSchema = z
   .refine((context) => (context.page === 'intro') === !!context.introTarget, {
     message: 'introTarget is required when page is "intro" and not allowed for other pages',
     path: ['introTarget'],
+  })
+  .refine((context) => (context.page === 'member') === !!context.memberUid, {
+    message: 'memberUid is required when page is "member" and not allowed for other pages',
+    path: ['memberUid'],
+  })
+  .refine((context) => (context.page === 'team') === !!context.teamUid, {
+    message: 'teamUid is required when page is "team" and not allowed for other pages',
+    path: ['teamUid'],
+  })
+  .refine((context) => context.page === 'job' || !context.jobUid, {
+    message: 'jobUid is allowed only when page is "job"',
+    path: ['jobUid'],
   });
 
 /** Body of `POST /v1/labos-agent/chat`. */
@@ -48,6 +67,9 @@ export const LABOS_AGENT_ERROR_CODES = {
   AGENT_NOT_ENABLED: 'AGENT_NOT_ENABLED',
   NEWS_NOT_FOUND: 'NEWS_NOT_FOUND',
   INTRO_TARGET_NOT_FOUND: 'INTRO_TARGET_NOT_FOUND',
+  MEMBER_NOT_FOUND: 'MEMBER_NOT_FOUND',
+  TEAM_NOT_FOUND: 'TEAM_NOT_FOUND',
+  JOB_NOT_FOUND: 'JOB_NOT_FOUND',
   ACTION_NOT_ALLOWED: 'ACTION_NOT_ALLOWED',
   PROPOSAL_NOT_FOUND: 'PROPOSAL_NOT_FOUND',
   PROPOSAL_CLOSED: 'PROPOSAL_CLOSED',
