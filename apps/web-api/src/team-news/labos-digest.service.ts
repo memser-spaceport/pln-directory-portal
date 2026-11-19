@@ -67,10 +67,7 @@ export type DigestTopSelection = {
 
 @Injectable()
 export class LabosDigestService {
-  constructor(
-    private readonly prisma: PrismaService,
-    @Optional() private readonly teamNews?: TeamNewsService
-  ) {}
+  constructor(private readonly prisma: PrismaService, @Optional() private readonly teamNews?: TeamNewsService) {}
 
   async getView(): Promise<LabosDigestView> {
     const [selection, states] = await Promise.all([
@@ -504,7 +501,8 @@ function parseDate(value: string, label: string): Date {
   return date;
 }
 
-function excludedTeamsWhere(): Prisma.TeamNewsItemWhereInput | null {
+/** The feed's hidden teams (TEAM_NEWS_EXCLUDED_TEAM_NAMES), as a news filter; null when there are none. */
+export function excludedTeamsWhere(): Prisma.TeamNewsItemWhereInput | null {
   if (TEAM_NEWS_EXCLUDED_TEAM_NAMES.length > 0) {
     return {
       NOT: {

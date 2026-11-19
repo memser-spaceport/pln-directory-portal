@@ -5,6 +5,7 @@ import clsx from 'clsx';
 
 import s from './RbacSection.module.scss';
 import { TMemberForm } from '../../../types/member';
+import { filterPoliciesForMemberState } from '../../../utils/filterPoliciesForMemberState';
 import { PolicyMultiSelect, PolicyOption, PolicySelection } from './PolicyMultiSelect/PolicyMultiSelect';
 import {
   ApprovedIcon,
@@ -148,9 +149,10 @@ export const RbacSection = ({ policyOptions, exceptionsOptions, isLoadingOptions
   const isApproved = memberStateStatus?.value === 'Approved';
 
   const handleMemberStateChange = (opt: SingleValue<SelectOption>) => {
-    setValue('memberStateStatus', opt as TMemberForm['memberStateStatus'], { shouldDirty: true });
-    if (opt?.value !== 'Approved') {
-      setValue('rbacPolicies', [], { shouldDirty: true });
+    const nextStatus = opt as TMemberForm['memberStateStatus'];
+    setValue('memberStateStatus', nextStatus, { shouldDirty: true });
+    if (nextStatus?.value !== 'Approved') {
+      setValue('rbacPolicies', filterPoliciesForMemberState(rbacPolicies, nextStatus?.value), { shouldDirty: true });
       setValue('rbacExceptions', [], { shouldDirty: true });
     }
   };
@@ -182,7 +184,7 @@ export const RbacSection = ({ policyOptions, exceptionsOptions, isLoadingOptions
           }}
         />
         {errors.memberStateStatus && <p className={s.errorMsg}>{errors.memberStateStatus.message}</p>}
-        <p className={s.hint}>Policies can only be assigned to Approved members.</p>
+        <p className={s.hint}>Pending and Verified members can only have the Job Aspirant policy. Rejected members have none.</p>
       </div>
 
       <div className={s.field}>
@@ -190,11 +192,10 @@ export const RbacSection = ({ policyOptions, exceptionsOptions, isLoadingOptions
           Policy
         </div>
         <PolicyMultiSelect
-          options={policyOptions}
+          options={filterPoliciesForMemberState(policyOptions, memberStateStatus?.value)}
           value={rbacPolicies}
           onChange={handlePoliciesChange}
           isLoading={isLoadingOptions}
-          isDisabled={!isApproved}
           placeholder="Select policies"
           ariaLabelledBy="policy-field-label"
         />

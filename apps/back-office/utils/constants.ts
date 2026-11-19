@@ -140,6 +140,9 @@ export const ADMIN_PERMISSIONS = {
   TOOLS_ACCESS: 'admin.tools.access',
 } as const;
 
+/** Must match JOB_ASPIRANT_POLICY_CODE in apps/web-api/src/access-control-v2/access-control-v2.constants.ts */
+export const JOB_ASPIRANT_POLICY_CODE = 'job_aspirant';
+
 export const AI_APPS_PERMISSIONS = {
   RESOURCES_MANAGE: 'ai_apps.resources.manage',
 } as const;

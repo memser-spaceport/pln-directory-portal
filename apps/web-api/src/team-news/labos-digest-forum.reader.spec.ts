@@ -5,6 +5,7 @@ const topic = (tid: number, extra: Record<string, unknown> = {}) => ({
   tid,
   cid: 7,
   title: 'Grants &amp; funding',
+  postcount: 4,
   posts: [
     {
       index: 0,
@@ -26,7 +27,13 @@ describe('toDigestForumPost', () => {
       authorAvatarUrl: 'https://x/a.png',
       contentHtml: '<p>Hello</p>',
       url: 'https://web/forum/topics/7/5',
+      replyCount: 3,
     });
+  });
+
+  it('counts replies without the opening post, and none when the forum gives no count (LAB-3293)', () => {
+    expect(toDigestForumPost(topic(5, { postcount: '1' }), '')?.replyCount).toBe(0);
+    expect(toDigestForumPost(topic(5, { postcount: undefined }), '')?.replyCount).toBe(0);
   });
 
   it('drops a deleted topic and a relative avatar', () => {
