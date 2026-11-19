@@ -257,11 +257,18 @@ The chat SHALL have the agent tool `draft_intro` with the arguments `type` (`mem
 
 ### Requirement: Page context for member, team, job and profile pages
 
-When `context.page` is `member`, `team` or `job` with a `jobUid`, the system SHALL look up the page before the stream starts, after the pilot gate. A member outside the gate SHALL get HTTP 403 `AGENT_NOT_ENABLED` and no lookup SHALL run. The `member` page SHALL use a member with no `deletedAt`; else HTTP 404 `MEMBER_NOT_FOUND`. The `team` page SHALL use the rule of `GET /v1/teams/:uid` (`TeamsService.assertTeamVisibleToViewer`); every case that hides the page (unknown, `INACTIVE` for a member who is not a directory admin, L0 for a member who is not a lead or admin) SHALL get HTTP 404 `TEAM_NOT_FOUND`, also where the GET gives 403. The `job` page SHALL use the rule of `GET /v1/job-openings/:uid` (`JobOpeningsQueryService.getJobOpening`); an unknown job, a hidden status or a job with no team SHALL get HTTP 404 `JOB_NOT_FOUND`. A job of an `INACTIVE` team SHALL show, as on the GET. `job` with no `jobUid` (the job board) and `profile` SHALL make no lookup. A `member` page with the session member's own uid SHALL be the `profile` page. The 404 body SHALL be `{ statusCode, code, message }`, and no model call SHALL run.
+When `context.page` is `member`, `team` or `job` with a `jobUid`, the system SHALL look up the page before the stream starts, after the pilot gate. A member outside the gate SHALL get HTTP 403 `AGENT_NOT_ENABLED` and no lookup SHALL run. The `member` page SHALL use a member with no `deletedAt` who is directory-visible (`directoryVisibleMemberWhere()` in `apps/web-api/src/members/member-visibility.ts`: approved, or `member.profile.visible` and not REJECTED); else HTTP 404 `MEMBER_NOT_FOUND`. The `team` page SHALL use the rule of `GET /v1/teams/:uid` (`TeamsService.assertTeamVisibleToViewer`); every case that hides the page (unknown, `INACTIVE` for a member who is not a directory admin, L0 for a member who is not a lead or admin) SHALL get HTTP 404 `TEAM_NOT_FOUND`, also where the GET gives 403. The `job` page SHALL use the rule of `GET /v1/job-openings/:uid` (`JobOpeningsQueryService.getJobOpening`); an unknown job, a hidden status or a job with no team SHALL get HTTP 404 `JOB_NOT_FOUND`. A job of an `INACTIVE` team SHALL show, as on the GET. `job` with no `jobUid` (the job board) and `profile` SHALL make no lookup. A `member` page with the session member's own uid SHALL be the `profile` page. The 404 body SHALL be `{ statusCode, code, message }`, and no model call SHALL run.
 
 #### Scenario: Deleted member page
 
 - **GIVEN** a `memberUid` of a member with `deletedAt` set
+- **WHEN** the member asks on that page
+- **THEN** the response is HTTP 404 with code `MEMBER_NOT_FOUND`
+- **AND** no stream starts
+
+#### Scenario: Member page of a member who is not directory-visible
+
+- **GIVEN** a `memberUid` of a member who is not approved and does not have `member.profile.visible`
 - **WHEN** the member asks on that page
 - **THEN** the response is HTTP 404 with code `MEMBER_NOT_FOUND`
 - **AND** no stream starts
@@ -334,11 +341,19 @@ The chat body SHALL take an optional top-level `mentions` list (next to `context
 
 ### Requirement: Mention lookups before the stream
 
-After the pilot gate and the `context` lookup, the system SHALL look up each mention in order with the S5 page rules: a member gives 404 `MEMBER_NOT_FOUND`, a team the member cannot see gives 404 `TEAM_NOT_FOUND`, and an unknown story gives 404 `NEWS_NOT_FOUND`. A mention 404 body SHALL also have `mentionIndex` (the index in `mentions`); a `context` 404 SHALL have no `mentionIndex`. With a bad `context` and a bad mention, the 404 SHALL be for `context`. A member mention with the session member's uid SHALL be the `profile` item, with no lookup. A mention with the same key as `context` SHALL be used once. On any error, no model call SHALL run.
+After the pilot gate and the `context` lookup, the system SHALL look up each mention in order with the S5 page rules: a member who is unknown, deleted or not directory-visible gives 404 `MEMBER_NOT_FOUND`, a team the member cannot see gives 404 `TEAM_NOT_FOUND`, and an unknown story gives 404 `NEWS_NOT_FOUND`. A mention 404 body SHALL also have `mentionIndex` (the index in `mentions`); a `context` 404 SHALL have no `mentionIndex`. With a bad `context` and a bad mention, the 404 SHALL be for `context`. A member mention of another member SHALL need `member.search.read`, the C4 rule; without it the mention SHALL get 404 `MEMBER_NOT_FOUND` (not 403, so the answer does not tell that the member exists) and no member lookup SHALL run. Team, news and page mentions need no `member.search.read`. A member mention with the session member's uid SHALL be the `profile` item, with no lookup. A mention with the same key as `context` SHALL be used once. On any error, no model call SHALL run.
 
 #### Scenario: Unknown member mention
 
 - **GIVEN** a second mention with an unknown member uid
+- **WHEN** the member posts the turn
+- **THEN** the response is HTTP 404 with code `MEMBER_NOT_FOUND` and `mentionIndex` 1
+- **AND** no stream starts
+
+#### Scenario: Member mention without member.search.read
+
+- **GIVEN** a member without `member.search.read`
+- **AND** a second mention of another member who is directory-visible
 - **WHEN** the member posts the turn
 - **THEN** the response is HTTP 404 with code `MEMBER_NOT_FOUND` and `mentionIndex` 1
 - **AND** no stream starts
@@ -353,4 +368,3 @@ The prompt context SHALL have the S5 page text first, then one line `Item <n> (<
 - **WHEN** the member asks a question
 - **THEN** the prompt has 3 item lines in the order of `mentions`
 - **AND** no line has an email, a social handle or a Telegram value
-
