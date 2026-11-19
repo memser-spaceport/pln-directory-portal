@@ -1,7 +1,9 @@
 import api from '../api';
 import { API_ROUTE } from '../constants';
 import type {
+  AccessControlPermission,
   AiAppAudienceResponse,
+  AiAppAudienceUpdate,
   AiAppDeployment,
   AiAppDeploymentsResponse,
   AiAppResourcesResponse,
@@ -60,12 +62,31 @@ export async function fetchAiAppAudience(params: AuthParams & { appId: string })
 }
 
 export async function updateAiAppAudience(
-  params: AuthParams & { appId: string; policyCodes: string[] }
+  params: AuthParams & { appId: string } & AiAppAudienceUpdate
 ): Promise<AiAppAudienceResponse> {
-  const response = await api.put<AiAppAudienceResponse>(
-    audienceUrl(params.appId),
-    { policyCodes: params.policyCodes },
-    { headers: authHeaders(params.authToken) }
-  );
+  const { authToken, appId, ...body } = params;
+  const response = await api.put<AiAppAudienceResponse>(audienceUrl(appId), body, { headers: authHeaders(authToken) });
   return response.data;
+}
+
+/** Access Control V2 permissions an app can be published to. */
+export async function fetchAccessControlPermissions(params: AuthParams): Promise<AccessControlPermission[]> {
+  const response = await api.get<AccessControlPermission[]>(API_ROUTE.ADMIN_ACCESS_CONTROL_V2_PERMISSIONS, {
+    headers: authHeaders(params.authToken),
+  });
+  return response.data ?? [];
+}
+
+/** Uploads an app icon through the admin image upload and returns its URL. */
+export async function uploadAiAppIcon(params: AuthParams & { file: File }): Promise<string> {
+  const body = new FormData();
+  body.append('file', params.file);
+  const response = await api.post(API_ROUTE.ADMIN_IMAGES, body, {
+    headers: { ...authHeaders(params.authToken), 'content-type': 'multipart/form-data' },
+  });
+  const image = response.data?.image ?? response.data;
+  if (!image?.url) {
+    throw new Error('The upload did not return an image URL');
+  }
+  return image.url as string;
 }

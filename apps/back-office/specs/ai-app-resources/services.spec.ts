@@ -5,15 +5,17 @@ import {
   fetchAiAppsList,
   resetAiAppResources,
   updateAiAppAudience,
+  fetchAccessControlPermissions,
+  uploadAiAppIcon,
   updateAiAppResources,
 } from '../../utils/services/ai-app-resources';
 
 jest.mock('../../utils/api', () => ({
   __esModule: true,
-  default: { get: jest.fn(), put: jest.fn(), delete: jest.fn() },
+  default: { get: jest.fn(), put: jest.fn(), delete: jest.fn(), post: jest.fn() },
 }));
 
-const mockedApi = api as unknown as { get: jest.Mock; put: jest.Mock; delete: jest.Mock };
+const mockedApi = api as unknown as { get: jest.Mock; put: jest.Mock; delete: jest.Mock; post: jest.Mock };
 const BASE = '/v1/admin/ai-app-resources';
 const headers = { authorization: 'Bearer token-1' };
 
@@ -71,20 +73,38 @@ describe('ai-app-resources service', () => {
     expect(mockedApi.get).toHaveBeenCalledWith('/v1/admin/ai-app-audience/playbook', { headers });
   });
 
-  it('saves the audience as a list of policy codes with PUT, and an empty list to limit the app to PL Infra', async () => {
+  it('saves the audience and LabOS settings with PUT', async () => {
     mockedApi.put.mockResolvedValue({ data: {} });
-    await updateAiAppAudience({ authToken: 'token-1', appId: 'app/1', policyCodes: ['investor_pl', 'founder_pl'] });
-    expect(mockedApi.put).toHaveBeenCalledWith(
-      '/v1/admin/ai-app-audience/app%2F1',
-      { policyCodes: ['investor_pl', 'founder_pl'] },
-      { headers }
-    );
+    const settings = {
+      policyCodes: ['investor_pl', 'founder_pl'],
+      permissionCodes: ['plaa.member'],
+      memberUids: ['m1'],
+      showInMore: false,
+      path: 'pla',
+      iconUrl: 'https://cdn.example.test/pla.png',
+      hideTopNav: true,
+    };
+    await updateAiAppAudience({ authToken: 'token-1', appId: 'app/1', ...settings });
+    expect(mockedApi.put).toHaveBeenCalledWith('/v1/admin/ai-app-audience/app%2F1', settings, { headers });
+  });
 
-    await updateAiAppAudience({ authToken: 'token-1', appId: 'playbook', policyCodes: [] });
-    expect(mockedApi.put).toHaveBeenLastCalledWith(
-      '/v1/admin/ai-app-audience/playbook',
-      { policyCodes: [] },
-      { headers }
-    );
+  it('lists Access Control V2 permissions', async () => {
+    mockedApi.get.mockResolvedValue({ data: [{ uid: 'p1', code: 'plaa.member', module: 'plaa', description: null }] });
+    await expect(fetchAccessControlPermissions({ authToken: 'token-1' })).resolves.toEqual([
+      { uid: 'p1', code: 'plaa.member', module: 'plaa', description: null },
+    ]);
+    expect(mockedApi.get).toHaveBeenCalledWith('/v2/admin/access-control-v2/permissions', { headers });
+  });
+
+  it('uploads an icon and returns its URL', async () => {
+    mockedApi.post.mockResolvedValue({ data: { image: { uid: 'img1', url: 'https://cdn.example.test/i.png' } } });
+    const file = new File(['x'], 'icon.png', { type: 'image/png' });
+    await expect(uploadAiAppIcon({ authToken: 'token-1', file })).resolves.toBe('https://cdn.example.test/i.png');
+    expect(mockedApi.post).toHaveBeenCalledWith('/v1/admin/images', expect.any(FormData), {
+      headers: { ...headers, 'content-type': 'multipart/form-data' },
+    });
+
+    mockedApi.post.mockResolvedValue({ data: {} });
+    await expect(uploadAiAppIcon({ authToken: 'token-1', file })).rejects.toThrow();
   });
 });

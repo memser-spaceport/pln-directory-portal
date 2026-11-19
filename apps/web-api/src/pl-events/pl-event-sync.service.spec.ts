@@ -52,6 +52,10 @@ describe('PLEventSyncService keeps event details (LAB-3214)', () => {
 
     expect(prisma.pLEvent.create).toHaveBeenCalledTimes(1);
     expect(prisma.pLEvent.create.mock.calls[0][0].data.additionalInfo).toEqual({ details });
+    // R1 (LAB-3332): the pull sync stores the events service's location_url.
+    expect(prisma.pLEvent.create.mock.calls[0][0].data.additionalInfo.details.locationUrl).toBe(
+      EVENTS_SERVICE_EVENT.location_url
+    );
   });
 
   it('replaces details on an event it updates and keeps other additionalInfo keys', async () => {
@@ -108,6 +112,10 @@ describe('PLEventSyncService.syncEventDetailsOnly (LAB-3214 backfill)', () => {
       where: { uid: 'ev-1' },
       data: { additionalInfo: { irlLink: 'x', details } },
     });
+    // R1, R5 (LAB-3332): the backfill adds the link and keeps irlLink.
+    expect(prisma.pLEvent.update.mock.calls[0][0].data.additionalInfo.details.locationUrl).toBe(
+      EVENTS_SERVICE_EVENT.location_url
+    );
     expect(prisma.pLEvent.create).not.toHaveBeenCalled();
     expect(prisma.pLEvent.updateMany).not.toHaveBeenCalled();
     expect(prisma.image.create).not.toHaveBeenCalled();

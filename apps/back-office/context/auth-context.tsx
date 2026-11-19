@@ -58,14 +58,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   // User from cookie created at login. It contains RBAC v2 permissions from JWT.
+  // useCookie reads document.cookie on the first client render but sees nothing on the server,
+  // so the user stays hidden until mount to keep that render equal to the server HTML.
   const user = useMemo<AdminUser | null>(() => {
-    if (!userCookie) return null;
+    if (isLoading || !userCookie) return null;
     try {
       return JSON.parse(userCookie);
     } catch {
       return null;
     }
-  }, [userCookie]);
+  }, [isLoading, userCookie]);
 
   // Mark initial loading as done (we don't block UI on API call)
   useEffect(() => {

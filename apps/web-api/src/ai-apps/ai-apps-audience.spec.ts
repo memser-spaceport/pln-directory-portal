@@ -1,4 +1,10 @@
-import { BadRequestException, ForbiddenException, NotFoundException, RequestMethod } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+  RequestMethod,
+} from '@nestjs/common';
 import { GUARDS_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 
 jest.mock('axios', () => ({ isAxiosError: jest.fn(() => false), post: jest.fn(), get: jest.fn() }));
@@ -11,7 +17,7 @@ jest.mock('../analytics/service/analytics.service', () => ({
 
 import 'reflect-metadata';
 import { AiAppsAccessService } from './ai-apps-access.service';
-import { AiAppsAudienceService } from './ai-apps-audience.service';
+import { AiAppsAudienceService, normalizePath } from './ai-apps-audience.service';
 import { AiAppAudienceController } from './ai-app-audience.controller';
 import { AiAppsController } from './ai-apps.controller';
 import { UpdateAiAppAudienceSchema } from './dto/ai-app-audience.dto';
@@ -23,8 +29,10 @@ import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
 const OWNER = 'owner-1';
 const INFRA = 'infra-1'; // holds ai_apps.read
 const FOUNDER = 'founder-1'; // approved, holds founder_plc_crypto, no AI Apps access
-const PENDING = 'pending-1'; // holds founder_plc_crypto but is not approved
+const PENDING = 'pending-1'; // holds founder_plc_crypto and plaa.member but is not approved
 const INVESTOR = 'investor-1'; // approved, holds investor_pl only
+const PLA = 'pla-1'; // approved, no policy in any audience, holds the plaa.member permission
+const PICKED = 'picked-1'; // approved, no policy or permission, added to an app by name
 
 type Row = Record<string, any>;
 
@@ -39,6 +47,11 @@ const PUBLISHED_APP = {
   previewAccess: 'PRIVATE',
   publicPaths: [] as string[],
   audiencePolicyCodes: ['founder_plc_crypto'],
+  audiencePermissionCodes: [] as string[],
+  showInMore: true,
+  path: null as string | null,
+  iconUrl: null as string | null,
+  hideTopNav: false,
   directLinkGateReady: true,
   lastDeployedAt: new Date(0),
   url: 'https://playbook.example.test',
@@ -52,39 +65,110 @@ const INTERNAL_APP = {
   audiencePolicyCodes: [] as string[],
   url: null as string | null,
 };
+const PLA_APP = {
+  ...PUBLISHED_APP,
+  uid: 'app-pla',
+  appId: 'pla-portal',
+  name: 'PLA portal',
+  audiencePolicyCodes: [] as string[],
+  audiencePermissionCodes: ['plaa.member'],
+  showInMore: false,
+  path: 'pla',
+  iconUrl: 'https://cdn.example.test/pla.png',
+  hideTopNav: true,
+  url: 'https://pla.example.test',
+};
 
-function buildPrisma(apps: Row[] = [PUBLISHED_APP, INTERNAL_APP]) {
-  const state = { apps: apps.map((app) => ({ ...app })) };
+const APPROVAL: Record<string, string> = {
+  [OWNER]: 'APPROVED',
+  [INFRA]: 'APPROVED',
+  [FOUNDER]: 'APPROVED',
+  [PENDING]: 'PENDING',
+  [INVESTOR]: 'APPROVED',
+  [PLA]: 'APPROVED',
+  [PICKED]: 'APPROVED',
+};
+const EFFECTIVE_PERMISSIONS: Record<string, string[]> = {
+  [PLA]: ['plaa.member'],
+  [PENDING]: ['plaa.member'],
+  [INFRA]: ['ai_apps.read'],
+};
+const MEMBERS: Row[] = [
+  { uid: PICKED, name: 'Picked Founder', email: 'picked@example.test' },
+  { uid: PLA, name: 'Pla Participant', email: null },
+  { uid: FOUNDER, name: 'Founder', email: 'founder@example.test' },
+];
+
+function buildPrisma(apps: Row[] = [PUBLISHED_APP, INTERNAL_APP], audienceMembers: Row[] = []) {
+  const state = { apps: apps.map((app) => ({ ...app })), audienceMembers: audienceMembers.map((row) => ({ ...row })) };
   const assignments = [
-    { uid: 'pa-1', memberUid: FOUNDER, code: 'founder_plc_crypto', state: 'APPROVED' },
-    { uid: 'pa-2', memberUid: PENDING, code: 'founder_plc_crypto', state: 'PENDING' },
-    { uid: 'pa-3', memberUid: INVESTOR, code: 'investor_pl', state: 'APPROVED' },
+    { uid: 'pa-1', memberUid: FOUNDER, code: 'founder_plc_crypto' },
+    { uid: 'pa-2', memberUid: PENDING, code: 'founder_plc_crypto' },
+    { uid: 'pa-3', memberUid: INVESTOR, code: 'investor_pl' },
   ];
   const held = (where: Row) =>
     assignments.filter(
-      (row) =>
-        row.memberUid === where.memberUid &&
-        (!where.policy?.code?.in || where.policy.code.in.includes(row.code)) &&
-        (!where.member?.memberApproval?.state || row.state === where.member.memberApproval.state)
+      (row) => row.memberUid === where.memberUid && (!where.policy?.code?.in || where.policy.code.in.includes(row.code))
     );
-  const matches = (app: Row, where: Row = {}) =>
+  const matchesOne = (app: Row, where: Row): boolean =>
     (where.appId === undefined || app.appId === where.appId) &&
+    (where.uid === undefined ||
+      ((typeof where.uid === 'string' ? app.uid === where.uid : true) &&
+        (where.uid.in === undefined || where.uid.in.includes(app.uid)) &&
+        (where.uid.not === undefined || app.uid !== where.uid.not))) &&
+    (where.path === undefined || app.path === where.path) &&
     (where.status?.not === undefined || app.status !== where.status.not) &&
     (where.status?.notIn === undefined || !where.status.notIn.includes(app.status)) &&
     (where.lastDeployedAt === undefined || app.lastDeployedAt !== null) &&
-    (where.audiencePolicyCodes?.isEmpty !== false || app.audiencePolicyCodes.length > 0) &&
     (where.audiencePolicyCodes?.hasSome === undefined ||
-      app.audiencePolicyCodes.some((code: string) => where.audiencePolicyCodes.hasSome.includes(code)));
+      app.audiencePolicyCodes.some((code: string) => where.audiencePolicyCodes.hasSome.includes(code))) &&
+    (where.audiencePermissionCodes?.hasSome === undefined ||
+      app.audiencePermissionCodes.some((code: string) => where.audiencePermissionCodes.hasSome.includes(code))) &&
+    (where.OR === undefined || where.OR.some((alt: Row) => matchesOne(app, alt)));
   const prisma: any = {
     state,
     aiApp: {
-      findFirst: jest.fn(async ({ where }) => state.apps.find((app) => matches(app, where)) ?? null),
-      findMany: jest.fn(async ({ where }) => state.apps.filter((app) => matches(app, where))),
+      findFirst: jest.fn(async ({ where }) => state.apps.find((app) => matchesOne(app, where)) ?? null),
+      findMany: jest.fn(async ({ where }) => state.apps.filter((app) => matchesOne(app, where))),
       update: jest.fn(async ({ where, data }) => {
         const app = state.apps.find((row) => row.uid === where.uid)!;
         Object.assign(app, data);
         return { ...app };
       }),
+    },
+    aiAppAudienceMember: {
+      findUnique: jest.fn(
+        async ({ where }) =>
+          state.audienceMembers.find(
+            (row) => row.appUid === where.appUid_memberUid.appUid && row.memberUid === where.appUid_memberUid.memberUid
+          ) ?? null
+      ),
+      findMany: jest.fn(async ({ where }) =>
+        state.audienceMembers.filter(
+          (row) =>
+            (where.appUid === undefined || row.appUid === where.appUid) &&
+            (where.memberUid === undefined || row.memberUid === where.memberUid)
+        )
+      ),
+      deleteMany: jest.fn(async ({ where }) => {
+        state.audienceMembers = state.audienceMembers.filter(
+          (row) => !(row.appUid === where.appUid && where.memberUid.in.includes(row.memberUid))
+        );
+        return { count: 0 };
+      }),
+      createMany: jest.fn(async ({ data }) => {
+        state.audienceMembers.push(...data);
+        return { count: data.length };
+      }),
+    },
+    $transaction: jest.fn(async (operations: Promise<unknown>[]) => Promise.all(operations)),
+    memberApproval: {
+      findUnique: jest.fn(async ({ where }) =>
+        APPROVAL[where.memberUid] ? { state: APPROVAL[where.memberUid] } : null
+      ),
+    },
+    member: {
+      findMany: jest.fn(async ({ where }) => MEMBERS.filter((member) => where.uid.in.includes(member.uid))),
     },
     aiAppAllowedMember: { findUnique: jest.fn(async () => null) },
     aiAppEvent: { create: jest.fn(async () => ({})) },
@@ -99,6 +183,13 @@ function buildPrisma(apps: Row[] = [PUBLISHED_APP, INTERNAL_APP]) {
           .map((code) => ({ code }))
       ),
     },
+    permission: {
+      findMany: jest.fn(async ({ where }) =>
+        ['plaa.member', 'plaa.guest', 'ai_apps.read']
+          .filter((code) => where.code.in.includes(code))
+          .map((code) => ({ code }))
+      ),
+    },
   };
   return prisma;
 }
@@ -108,15 +199,19 @@ function buildServices(prisma = buildPrisma()) {
     canViewApp: jest.fn(async (requesterUid: string, app: Row) => app.access === 'OPEN' || requesterUid === OWNER),
     canViewPreview: jest.fn(async (requesterUid: string) => requesterUid === OWNER),
   };
-  const audienceService = new AiAppsAudienceService(prisma);
-  const rbacService = { hasPermission: jest.fn(async () => false) };
   const accessControl = {
     hasPermission: jest.fn(async (memberUid: string, code: string) => ({
       memberUid,
       permissionCode: code,
       allowed: (memberUid === INFRA && code === 'ai_apps.read') || memberUid === OWNER,
     })),
+    getMemberAccess: jest.fn(async (memberUid: string) => ({
+      memberUid,
+      effectivePermissions: EFFECTIVE_PERMISSIONS[memberUid] ?? [],
+    })),
   };
+  const audienceService = new AiAppsAudienceService(prisma, accessControl as any);
+  const rbacService = { hasPermission: jest.fn(async () => false) };
   const accessService = new AiAppsAccessService(
     prisma,
     aiAppsService,
@@ -125,7 +220,7 @@ function buildServices(prisma = buildPrisma()) {
     undefined,
     audienceService
   );
-  return { prisma, audienceService, accessService };
+  return { prisma, audienceService, accessService, accessControl };
 }
 
 const reason = async (denied: Promise<unknown>) =>
@@ -135,12 +230,11 @@ const reason = async (denied: Promise<unknown>) =>
   );
 
 describe('isInAudience', () => {
-  it('an unpublished app has no audience, and no lookup is made', async () => {
-    const { audienceService, prisma } = buildServices();
+  it('an unpublished app, an unknown member or no app is never in an audience', async () => {
+    const { audienceService } = buildServices();
     await expect(audienceService.isInAudience(FOUNDER, INTERNAL_APP)).resolves.toBe(false);
     await expect(audienceService.isInAudience(undefined, PUBLISHED_APP)).resolves.toBe(false);
     await expect(audienceService.isInAudience(FOUNDER, null)).resolves.toBe(false);
-    expect(prisma.policyAssignment.findFirst).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -148,14 +242,44 @@ describe('isInAudience', () => {
     ['an approved member holding other policies', INVESTOR, false],
     ['a member holding the policy who is not approved', PENDING, false],
     ['a member with no policies', 'nobody', false],
-  ])('%s → %s', async (_label, memberUid, expected) => {
+  ])('by policy: %s → %s', async (_label, memberUid, expected) => {
     const { audienceService } = buildServices();
     await expect(audienceService.isInAudience(memberUid, PUBLISHED_APP)).resolves.toBe(expected);
   });
 
-  it('resolves the app by appId, skipping unpublished and unknown apps', async () => {
-    const { audienceService } = buildServices();
+  it.each([
+    ['an approved member with the permission', PLA, true],
+    ['a member with the permission who is not approved', PENDING, false],
+    ['an approved member without it', INVESTOR, false],
+  ])('by permission: %s → %s', async (_label, memberUid, expected) => {
+    const { audienceService } = buildServices(buildPrisma([PLA_APP]));
+    await expect(audienceService.isInAudience(memberUid, PLA_APP)).resolves.toBe(expected);
+  });
+
+  it('by member: only the members named on the app, and only once approved', async () => {
+    const prisma = buildPrisma(
+      [INTERNAL_APP],
+      [
+        { appUid: 'app-internal', memberUid: PICKED },
+        { appUid: 'app-internal', memberUid: PENDING },
+      ]
+    );
+    const { audienceService } = buildServices(prisma);
+    await expect(audienceService.isInAudience(PICKED, INTERNAL_APP)).resolves.toBe(true);
+    await expect(audienceService.isInAudience(PENDING, INTERNAL_APP)).resolves.toBe(false);
+    await expect(audienceService.isInAudience(FOUNDER, INTERNAL_APP)).resolves.toBe(false);
+  });
+
+  it('does not read permissions when the app has no permission audience', async () => {
+    const { audienceService, accessControl } = buildServices();
+    await audienceService.isInAudience(INVESTOR, PUBLISHED_APP);
+    expect(accessControl.getMemberAccess).not.toHaveBeenCalled();
+  });
+
+  it('resolves the app by appId, whatever kind of audience it has', async () => {
+    const { audienceService } = buildServices(buildPrisma([PUBLISHED_APP, INTERNAL_APP, PLA_APP]));
     await expect(audienceService.isInAudienceOfAppId(FOUNDER, 'playbook')).resolves.toBe(true);
+    await expect(audienceService.isInAudienceOfAppId(PLA, 'pla-portal')).resolves.toBe(true);
     await expect(audienceService.isInAudienceOfAppId(FOUNDER, 'internal-tool')).resolves.toBe(false);
     await expect(audienceService.isInAudienceOfAppId(FOUNDER, 'not-ours')).resolves.toBe(false);
     await expect(audienceService.isInAudienceOfAppId(FOUNDER, undefined)).resolves.toBe(false);
@@ -173,6 +297,15 @@ describe('sidecar access check for a published app', () => {
       allowed: true,
       reason: 'audience',
     });
+  });
+
+  it('lets a permission audience in, even when the app is hidden from More', async () => {
+    const { accessService } = buildServices(buildPrisma([PLA_APP]));
+    await expect(accessService.checkAccess(PLA, 'pla-portal', 'GET')).resolves.toEqual({
+      allowed: true,
+      reason: 'audience',
+    });
+    await expect(reason(accessService.checkAccess(INVESTOR, 'pla-portal', 'GET'))).resolves.toBe('permission');
   });
 
   it('gives an audience member no other app, no preview, and nothing untracked', async () => {
@@ -194,8 +327,19 @@ describe('sidecar access check for a published app', () => {
 
   it('clearing the audience blocks the next request', async () => {
     const { accessService, audienceService } = buildServices();
-    await audienceService.updateAudience('admin-1', 'playbook', []);
+    await audienceService.updateAudience('admin-1', 'playbook', { policyCodes: [] });
     await expect(reason(accessService.checkAccess(FOUNDER, 'playbook', 'GET'))).resolves.toBe('permission');
+  });
+
+  it('removing a member from the list blocks their next request', async () => {
+    const prisma = buildPrisma([INTERNAL_APP], [{ appUid: 'app-internal', memberUid: PICKED }]);
+    const { accessService, audienceService } = buildServices(prisma);
+    await expect(accessService.checkAccess(PICKED, 'internal-tool', 'GET')).resolves.toEqual({
+      allowed: true,
+      reason: 'audience',
+    });
+    await audienceService.updateAudience('admin-1', 'internal-tool', { policyCodes: [], memberUids: [] });
+    await expect(reason(accessService.checkAccess(PICKED, 'internal-tool', 'GET'))).resolves.toBe('permission');
   });
 
   it('leaves PL Infra members and untracked apps unchanged', async () => {
@@ -210,24 +354,50 @@ describe('sidecar access check for a published app', () => {
 });
 
 describe('published apps for a member', () => {
+  const PLAYBOOK_VIEW = {
+    uid: 'app-published',
+    appId: 'playbook',
+    name: 'Playbook',
+    description: 'Shared prompts',
+    url: 'https://playbook.example.test',
+    path: null,
+    iconUrl: null,
+    showInMore: true,
+    hideTopNav: false,
+  };
+
   it('lists only live apps published to a policy the member holds', async () => {
     const { accessService } = buildServices();
-    await expect(accessService.listPublishedApps(FOUNDER)).resolves.toEqual([
-      {
-        uid: 'app-published',
-        appId: 'playbook',
-        name: 'Playbook',
-        description: 'Shared prompts',
-        url: 'https://playbook.example.test',
-      },
-    ]);
+    await expect(accessService.listPublishedApps(FOUNDER)).resolves.toEqual([PLAYBOOK_VIEW]);
     await expect(accessService.listPublishedApps(INVESTOR)).resolves.toEqual([]);
     await expect(accessService.listPublishedApps(PENDING)).resolves.toEqual([]);
   });
 
-  it('skips the app query for a member without policies', async () => {
+  it('lists apps published by permission or by name, with their LabOS settings, hidden-from-More ones included', async () => {
+    const prisma = buildPrisma([PUBLISHED_APP, INTERNAL_APP, PLA_APP], [{ appUid: 'app-internal', memberUid: PICKED }]);
+    const { accessService } = buildServices(prisma);
+    await expect(accessService.listPublishedApps(PLA)).resolves.toEqual([
+      {
+        uid: 'app-pla',
+        appId: 'pla-portal',
+        name: 'PLA portal',
+        description: 'Shared prompts',
+        url: 'https://pla.example.test',
+        path: 'pla',
+        iconUrl: 'https://cdn.example.test/pla.png',
+        showInMore: false,
+        hideTopNav: true,
+      },
+    ]);
+    await expect(accessService.listPublishedApps(PICKED)).resolves.toEqual([
+      expect.objectContaining({ uid: 'app-internal', url: expect.stringContaining('internal-tool') }),
+    ]);
+  });
+
+  it('skips the app query for an approved member matching nothing, and for a member who is not approved', async () => {
     const { accessService, prisma } = buildServices();
-    await expect(accessService.listPublishedApps('nobody')).resolves.toEqual([]);
+    await expect(accessService.listPublishedApps(PICKED)).resolves.toEqual([]);
+    await expect(accessService.listPublishedApps(PENDING)).resolves.toEqual([]);
     expect(prisma.aiApp.findMany).not.toHaveBeenCalled();
   });
 
@@ -243,29 +413,49 @@ describe('published apps for a member', () => {
 });
 
 describe('managing the audience', () => {
-  it('returns the current audience and 404s an unknown app', async () => {
-    const { audienceService } = buildServices();
+  it('returns the current settings and 404s an unknown app', async () => {
+    const prisma = buildPrisma([PUBLISHED_APP, PLA_APP], [{ appUid: 'app-pla', memberUid: PICKED }]);
+    const { audienceService } = buildServices(prisma);
     await expect(audienceService.getAudience('playbook')).resolves.toEqual({
       appUid: 'app-published',
       appId: 'playbook',
       name: 'Playbook',
       policyCodes: ['founder_plc_crypto'],
+      permissionCodes: [],
+      members: [],
+      showInMore: true,
+      path: null,
+      iconUrl: null,
+      hideTopNav: false,
       directLinkGateReady: true,
+    });
+    await expect(audienceService.getAudience('pla-portal')).resolves.toMatchObject({
+      permissionCodes: ['plaa.member'],
+      members: [{ uid: PICKED, name: 'Picked Founder', email: 'picked@example.test' }],
+      showInMore: false,
+      path: 'pla',
+      iconUrl: 'https://cdn.example.test/pla.png',
+      hideTopNav: true,
     });
     await expect(audienceService.getAudience('not-ours')).rejects.toThrow(NotFoundException);
   });
 
-  it('saves a deduplicated, sorted list and audits the change', async () => {
+  it('saves deduplicated, sorted policy codes and audits the change (v0 body)', async () => {
     const { audienceService, prisma } = buildServices();
-    const saved = await audienceService.updateAudience('admin-1', 'internal-tool', [
-      'investor_pl',
-      'founder_plc_crypto',
-      'investor_pl',
-    ]);
+    const saved = await audienceService.updateAudience('admin-1', 'internal-tool', {
+      policyCodes: ['investor_pl', 'founder_plc_crypto', 'investor_pl'],
+    });
     expect(saved.policyCodes).toEqual(['founder_plc_crypto', 'investor_pl']);
     expect(prisma.aiApp.update).toHaveBeenCalledWith({
       where: { uid: 'app-internal' },
-      data: { audiencePolicyCodes: ['founder_plc_crypto', 'investor_pl'] },
+      data: {
+        audiencePolicyCodes: ['founder_plc_crypto', 'investor_pl'],
+        audiencePermissionCodes: [],
+        showInMore: true,
+        hideTopNav: false,
+        path: null,
+        iconUrl: null,
+      },
     });
     expect(prisma.aiAppEvent.create).toHaveBeenCalledWith({
       data: {
@@ -273,32 +463,116 @@ describe('managing the audience', () => {
         memberUid: 'admin-1',
         appUid: 'app-internal',
         appId: 'internal-tool',
-        message: 'Audience policies: ["founder_plc_crypto","investor_pl"]',
+        message:
+          'Audience settings: {"policyCodes":["founder_plc_crypto","investor_pl"],"permissionCodes":[],"memberUids":[],"showInMore":true,"path":null,"iconUrl":null,"hideTopNav":false}',
       },
     });
   });
 
-  it('rejects unknown policy codes and saves nothing', async () => {
+  it('saves permissions, members and the LabOS settings together', async () => {
     const { audienceService, prisma } = buildServices();
-    const rejected = audienceService.updateAudience('admin-1', 'playbook', ['investor_pl', 'no_such_policy']);
+    const saved = await audienceService.updateAudience('admin-1', 'internal-tool', {
+      policyCodes: [],
+      permissionCodes: ['plaa.member'],
+      memberUids: [PICKED, PLA, PICKED],
+      showInMore: false,
+      path: '  PLA ',
+      iconUrl: 'https://cdn.example.test/pla.png',
+      hideTopNav: true,
+    });
+    expect(saved).toMatchObject({
+      permissionCodes: ['plaa.member'],
+      members: [
+        { uid: PICKED, name: 'Picked Founder' },
+        { uid: PLA, name: 'Pla Participant' },
+      ],
+      showInMore: false,
+      path: 'pla',
+      iconUrl: 'https://cdn.example.test/pla.png',
+      hideTopNav: true,
+    });
+    expect(prisma.state.audienceMembers).toEqual([
+      { appUid: 'app-internal', memberUid: PICKED, addedByUid: 'admin-1' },
+      { appUid: 'app-internal', memberUid: PLA, addedByUid: 'admin-1' },
+    ]);
+  });
+
+  it('leaves fields an older Back Office does not send as they are', async () => {
+    const prisma = buildPrisma([PLA_APP], [{ appUid: 'app-pla', memberUid: PICKED }]);
+    const { audienceService } = buildServices(prisma);
+    const saved = await audienceService.updateAudience('admin-1', 'pla-portal', { policyCodes: ['investor_pl'] });
+    expect(saved).toMatchObject({
+      policyCodes: ['investor_pl'],
+      permissionCodes: ['plaa.member'],
+      members: [{ uid: PICKED }],
+      showInMore: false,
+      path: 'pla',
+      hideTopNav: true,
+    });
+  });
+
+  it.each([
+    ['policy codes', { policyCodes: ['investor_pl', 'no_such_policy'] }, { unknownPolicyCodes: ['no_such_policy'] }],
+    [
+      'permission codes',
+      { policyCodes: [], permissionCodes: ['plaa.member', 'no.such'] },
+      { unknownPermissionCodes: ['no.such'] },
+    ],
+    ['members', { policyCodes: [], memberUids: [PICKED, 'ghost'] }, { unknownMemberUids: ['ghost'] }],
+    ['an invalid path', { policyCodes: [], path: 'Not a path!' }, { code: 'invalid_path' }],
+    ['a uid-shaped path', { policyCodes: [], path: 'cmu73kls90763n94gzz6s9fmq' }, { code: 'invalid_path' }],
+    ['an http icon', { policyCodes: [], iconUrl: 'http://cdn.example.test/x.png' }, { code: 'invalid_icon_url' }],
+  ])('rejects unknown %s and saves nothing', async (_label, body, response) => {
+    const { audienceService, prisma } = buildServices();
+    const rejected = audienceService.updateAudience('admin-1', 'playbook', body as any);
     await expect(rejected).rejects.toThrow(BadRequestException);
-    await rejected.catch((error: BadRequestException) =>
-      expect(error.getResponse()).toMatchObject({ unknownPolicyCodes: ['no_such_policy'] })
-    );
+    await rejected.catch((error: BadRequestException) => expect(error.getResponse()).toMatchObject(response));
     expect(prisma.aiApp.update).not.toHaveBeenCalled();
   });
 
-  it('saving the stored list again is a no-op', async () => {
-    const { audienceService, prisma } = buildServices();
-    await audienceService.updateAudience('admin-1', 'playbook', ['founder_plc_crypto']);
+  it('refuses a path another app already uses', async () => {
+    const { audienceService, prisma } = buildServices(buildPrisma([PUBLISHED_APP, PLA_APP]));
+    const rejected = audienceService.updateAudience('admin-1', 'playbook', { policyCodes: [], path: 'pla' });
+    await expect(rejected).rejects.toThrow(ConflictException);
+    await rejected.catch((error: ConflictException) =>
+      expect(error.getResponse()).toMatchObject({ code: 'path_taken' })
+    );
+    expect(prisma.aiApp.update).not.toHaveBeenCalled();
+    // Saving an app's own path again is fine.
+    await expect(
+      audienceService.updateAudience('admin-1', 'pla-portal', { policyCodes: [], path: 'pla' })
+    ).resolves.toMatchObject({ path: 'pla' });
+  });
+
+  it('clears the path and the icon with null or blank', async () => {
+    const { audienceService } = buildServices(buildPrisma([PLA_APP]));
+    await expect(
+      audienceService.updateAudience('admin-1', 'pla-portal', { policyCodes: [], path: '', iconUrl: null })
+    ).resolves.toMatchObject({ path: null, iconUrl: null });
+  });
+
+  it('saving the stored values again is a no-op', async () => {
+    const prisma = buildPrisma([PLA_APP], [{ appUid: 'app-pla', memberUid: PICKED }]);
+    const { audienceService } = buildServices(prisma);
+    await audienceService.updateAudience('admin-1', 'pla-portal', {
+      policyCodes: [],
+      permissionCodes: ['plaa.member'],
+      memberUids: [PICKED],
+      showInMore: false,
+      path: 'pla',
+      iconUrl: 'https://cdn.example.test/pla.png',
+      hideTopNav: true,
+    });
     expect(prisma.aiApp.update).not.toHaveBeenCalled();
     expect(prisma.aiAppEvent.create).not.toHaveBeenCalled();
   });
 
-  it('an empty list takes the app back', async () => {
+  it('emptying every audience list takes the app back', async () => {
     const { audienceService, prisma } = buildServices();
-    await expect(audienceService.updateAudience('admin-1', 'playbook', [])).resolves.toMatchObject({
+    await expect(audienceService.updateAudience('admin-1', 'playbook', { policyCodes: [] })).resolves.toMatchObject({
       policyCodes: [],
+      permissionCodes: [],
+      members: [],
     });
     expect(prisma.aiAppEvent.create).toHaveBeenCalledTimes(1);
   });
@@ -306,8 +580,34 @@ describe('managing the audience', () => {
   it('validates the request body', () => {
     expect(UpdateAiAppAudienceSchema.safeParse({ policyCodes: ['investor_pl'] }).success).toBe(true);
     expect(UpdateAiAppAudienceSchema.safeParse({ policyCodes: [] }).success).toBe(true);
+    expect(
+      UpdateAiAppAudienceSchema.safeParse({
+        policyCodes: [],
+        permissionCodes: ['plaa.member'],
+        memberUids: [PICKED],
+        showInMore: false,
+        path: null,
+        iconUrl: null,
+        hideTopNav: true,
+      }).success
+    ).toBe(true);
     expect(UpdateAiAppAudienceSchema.safeParse({}).success).toBe(false);
     expect(UpdateAiAppAudienceSchema.safeParse({ policyCodes: [''] }).success).toBe(false);
+    expect(UpdateAiAppAudienceSchema.safeParse({ policyCodes: [], showInMore: 'yes' }).success).toBe(false);
+  });
+
+  it.each([
+    ['pla', 'pla'],
+    ['PLA-Portal', 'pla-portal'],
+    ['ab', 'ab'],
+    ['', null],
+    [null, null],
+  ])('normalizes the path %p to %p', (input, expected) => {
+    expect(normalizePath(input as string | null)).toBe(expected);
+  });
+
+  it.each(['a', '-pla', 'pla-', 'pl--a', 'pla/x', 'p'.repeat(61)])('rejects the path %p', (input) => {
+    expect(() => normalizePath(input)).toThrow(BadRequestException);
   });
 });
 
@@ -427,7 +727,8 @@ describe('audience routes', () => {
   it('records the admin as the actor of an audience change', async () => {
     const audienceService = { updateAudience: jest.fn(async () => ({})) };
     const controller = new AiAppAudienceController(audienceService as any);
-    await controller.update('playbook', { policyCodes: ['investor_pl'] } as any, { user: { memberUid: 'admin-1' } });
-    expect(audienceService.updateAudience).toHaveBeenCalledWith('admin-1', 'playbook', ['investor_pl']);
+    const body = { policyCodes: ['investor_pl'], permissionCodes: ['plaa.member'], showInMore: false };
+    await controller.update('playbook', body as any, { user: { memberUid: 'admin-1' } });
+    expect(audienceService.updateAudience).toHaveBeenCalledWith('admin-1', 'playbook', body);
   });
 });
