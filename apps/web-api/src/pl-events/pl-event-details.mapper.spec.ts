@@ -1,4 +1,8 @@
-import { emptyPLEventDetails, SyncPLEventsBodySchema } from 'libs/contracts/src/schema/pl-event-details';
+import {
+  emptyPLEventDetails,
+  PLEventDetailsSchema,
+  SyncPLEventsBodySchema,
+} from 'libs/contracts/src/schema/pl-event-details';
 import { mapEventDetails, readEventDetails, withEventDetails } from './pl-event-details.mapper';
 import { EVENTS_SERVICE_EVENT } from './fixtures/events-service-event.fixture';
 
@@ -21,6 +25,7 @@ describe('mapEventDetails (LAB-3214)', () => {
         title: 'Program',
         sessions: EVENTS_SERVICE_EVENT.agenda.sessions,
       },
+      locationUrl: 'https://maps.example.org/?q=Fixture+Venue',
     });
     expect(onInvalid).not.toHaveBeenCalled();
   });
@@ -85,6 +90,92 @@ describe('mapEventDetails (LAB-3214)', () => {
   });
 });
 
+describe('mapEventDetails: locationUrl (LAB-3332)', () => {
+  it('R1: keeps an https or http location_url', () => {
+    const onInvalid = jest.fn();
+
+    expect(mapEventDetails({ location_url: 'https://maps.example.org/a' }, onInvalid).locationUrl).toBe(
+      'https://maps.example.org/a'
+    );
+    expect(mapEventDetails({ location_url: ' http://maps.example.org/b ' }, onInvalid).locationUrl).toBe(
+      'http://maps.example.org/b'
+    );
+    expect(onInvalid).not.toHaveBeenCalled();
+  });
+
+  it('R4: gives null when location_url is missing, null or empty', () => {
+    const onInvalid = jest.fn();
+
+    expect(mapEventDetails({}, onInvalid).locationUrl).toBeNull();
+    expect(mapEventDetails({ location_url: null }, onInvalid).locationUrl).toBeNull();
+    expect(mapEventDetails({ location_url: '' }, onInvalid).locationUrl).toBeNull();
+    expect(mapEventDetails({ location_url: '   ' }, onInvalid).locationUrl).toBeNull();
+    expect(onInvalid).not.toHaveBeenCalled();
+  });
+
+  it('R2: stores a javascript:, relative or other non-http link as null and reports it', () => {
+    for (const location_url of [
+      'javascript:alert(1)',
+      'JavaScript:alert(1)',
+      'data:text/html,x',
+      'ftp://x.org',
+      '/maps/x',
+      'maps.example.org',
+    ]) {
+      const onInvalid = jest.fn();
+
+      expect(mapEventDetails({ location_url }, onInvalid).locationUrl).toBeNull();
+      expect(onInvalid).toHaveBeenCalledWith('locationUrl', 'expected an http or https URL');
+    }
+  });
+
+  it('R2: stores a non-string location_url as null and reports it', () => {
+    const onInvalid = jest.fn();
+
+    expect(mapEventDetails({ location_url: 42 }, onInvalid).locationUrl).toBeNull();
+    expect(mapEventDetails({ location_url: { href: 'https://x.org' } }, onInvalid).locationUrl).toBeNull();
+    expect(onInvalid).toHaveBeenCalledWith('locationUrl', 'expected a string, got number');
+    expect(onInvalid).toHaveBeenCalledWith('locationUrl', 'expected a string, got object');
+  });
+
+  it('reads location_url first and falls back to locationUrl', () => {
+    expect(mapEventDetails({ locationUrl: 'https://camel.example.org' }).locationUrl).toBe('https://camel.example.org');
+    expect(
+      mapEventDetails({ location_url: 'https://snake.example.org', locationUrl: 'https://camel.example.org' })
+        .locationUrl
+    ).toBe('https://snake.example.org');
+  });
+
+  it('R5: a bad link changes no other detail', () => {
+    const good = mapEventDetails(EVENTS_SERVICE_EVENT);
+    const bad = mapEventDetails({ ...EVENTS_SERVICE_EVENT, location_url: 'javascript:alert(1)' });
+
+    expect(bad).toEqual({ ...good, locationUrl: null });
+  });
+});
+
+describe('PLEventDetailsSchema: locationUrl (LAB-3332)', () => {
+  const base = emptyPLEventDetails();
+
+  it('R2: accepts an http or https URL, null, or no key (details stored before LAB-3332)', () => {
+    expect(PLEventDetailsSchema.safeParse({ ...base, locationUrl: 'https://x.org' }).success).toBe(true);
+    expect(PLEventDetailsSchema.safeParse({ ...base, locationUrl: 'http://x.org' }).success).toBe(true);
+    expect(PLEventDetailsSchema.safeParse({ ...base, locationUrl: null }).success).toBe(true);
+    const older: Record<string, unknown> = { ...base };
+    delete older.locationUrl;
+    expect(PLEventDetailsSchema.safeParse(older).success).toBe(true);
+  });
+
+  it('R2: rejects any other link', () => {
+    expect(PLEventDetailsSchema.safeParse({ ...base, locationUrl: 'javascript:alert(1)' }).success).toBe(false);
+    expect(PLEventDetailsSchema.safeParse({ ...base, locationUrl: 'not a url' }).success).toBe(false);
+  });
+
+  it('R4: empty details have locationUrl null', () => {
+    expect(emptyPLEventDetails().locationUrl).toBeNull();
+  });
+});
+
 describe('readEventDetails (LAB-3214)', () => {
   it('reads an event that was never synced with details as empty', () => {
     expect(readEventDetails(null)).toEqual(emptyPLEventDetails());
@@ -97,6 +188,19 @@ describe('readEventDetails (LAB-3214)', () => {
     const details = mapEventDetails(EVENTS_SERVICE_EVENT);
 
     expect(readEventDetails(withEventDetails({ irlLink: 'x' }, details))).toEqual(details);
+  });
+
+  it('R3: reads back the stored locationUrl (LAB-3332)', () => {
+    const details = mapEventDetails(EVENTS_SERVICE_EVENT);
+
+    expect(readEventDetails(withEventDetails({ irlLink: 'x' }, details)).locationUrl).toBe(
+      'https://maps.example.org/?q=Fixture+Venue'
+    );
+  });
+
+  it('R2: reads a stored link that is not http or https as null (LAB-3332)', () => {
+    expect(readEventDetails({ details: { locationUrl: 'javascript:alert(1)' } }).locationUrl).toBeNull();
+    expect(readEventDetails({ details: { locationUrl: 7 } }).locationUrl).toBeNull();
   });
 
   it('fills fields missing from an older stored shape with empty values', () => {

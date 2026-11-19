@@ -51,7 +51,7 @@ export type AiAppAccessCheckResult = { allowed: true; reason?: 'untracked' | 'pu
 /** The app row the sidecar decision needs, fetched once per `access-check` request. */
 export type AiAppAccessCheckApp = Pick<
   AiApp,
-  'uid' | 'memberUid' | 'access' | 'publicPaths' | 'previewAccess' | 'audiencePolicyCodes'
+  'uid' | 'memberUid' | 'access' | 'publicPaths' | 'previewAccess' | 'audiencePolicyCodes' | 'audiencePermissionCodes'
 >;
 
 /** Either permission grants AI Apps visibility — the same `anyOf` the dashboard routes use. */
@@ -227,6 +227,7 @@ export class AiAppsAccessService {
         publicPaths: true,
         previewAccess: true,
         audiencePolicyCodes: true,
+        audiencePermissionCodes: true,
       },
     });
   }
