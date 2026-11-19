@@ -25,6 +25,7 @@ import { RbacModule } from '../rbac/rbac.module';
 import { AccessControlV2Module } from '../access-control-v2/access-control-v2.module';
 import { ProfileEventsController } from './profile-events.controller';
 import { ProfileEventsService } from './profile-events.service';
+import { EnvSeedEventsService } from './env-seed-events.service';
 
 @Module({
   controllers: [
@@ -46,6 +47,7 @@ import { ProfileEventsService } from './profile-events.service';
     IrlGatheringPushNotificationsProcessor,
     PLEventAssociationService,
     ProfileEventsService,
+    EnvSeedEventsService, // FEATURE-ENV ONLY (lab-3247-env-seed)
   ],
   exports: [
     PLEventsService,
