@@ -229,7 +229,7 @@ export class LabosAgentService {
   /** The live member behind the email, inside the pilot gate (403 AGENT_NOT_ENABLED otherwise). */
   private async enabledMember(email: string): Promise<string> {
     const memberUid = await resolveLiveMemberUidByEmail(this.prisma, email);
-    if (!memberUid || !this.access.isEnabled(memberUid)) {
+    if (!memberUid || !(await this.access.isEnabled(memberUid))) {
       throw agentError(
         ForbiddenException,
         403,

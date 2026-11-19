@@ -146,7 +146,7 @@ function setup() {
   const husky = { createContextualToolsResponse: jest.fn().mockResolvedValue({}) };
   const service = new LabosAgentService(
     prisma as any,
-    new LabosAgentAccessService(),
+    new LabosAgentAccessService({ hasPermission: jest.fn().mockResolvedValue({ allowed: false }) } as any),
     husky as any,
     {} as any,
     catalog as any,

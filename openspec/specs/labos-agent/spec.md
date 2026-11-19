@@ -18,14 +18,25 @@ The LabOS in-app agent (LAB-3272). In S1 (LAB-3298) a signed-in member asks the 
 
 ### Requirement: One pilot gate
 
-The system SHALL decide access in one function, `LabosAgentAccessService.isEnabled`. Until decision D1 (who sees the agent), the agent SHALL be on for every live member when `ENVIRONMENT` is not `production`, and off on production. A token with no live member (unknown or deleted) SHALL never be enabled.
+The system SHALL decide access in one function, `LabosAgentAccessService.isEnabled`. Decision D1 option A (LAB-3344): staff and a pilot list see the agent, by RBAC. A token with no live member (unknown or deleted) SHALL never be enabled. When `ENVIRONMENT` is not `production`, the agent SHALL be on for every live member (the rule from before D1, kept for dev and previews). On production, the agent SHALL be on only for a member whose effective permissions (`AccessControlV2Service.hasPermission`, direct grants and policies) include `labos_agent.use`. There SHALL be no other staff rule: staff get the agent through the same permission. A failed permission lookup SHALL give "off".
 
-#### Scenario: Production
+Migration `20261119120000_add_labos_agent_use_permission` SHALL add the permission `labos_agent.use`. Migration `20261119120100_add_labos_agent_pilot_policy` SHALL add the policy `labos_agent_pilot`, which holds `labos_agent.use`. Both SHALL be idempotent and SHALL NOT change or delete rows. Admins SHALL grant access with the existing `POST /v1/admin/access-control-v2/assign-policy` (policy `labos_agent_pilot`) or `POST /v1/admin/access-control-v2/member-permissions` (permission `labos_agent.use`). A member without access SHALL get the same response as before D1 on production: `{ "enabled": false }` from the access check and HTTP 403 `AGENT_NOT_ENABLED` from the other routes.
+
+#### Scenario: Production without access
 
 - **GIVEN** `ENVIRONMENT` is `production`
-- **WHEN** a signed-in member calls `POST /v1/labos-agent/chat` with a valid body
+- **AND** the member does not have `labos_agent.use`
+- **WHEN** the member calls `POST /v1/labos-agent/chat` with a valid body
 - **THEN** the response is HTTP 403 with code `AGENT_NOT_ENABLED`
 - **AND** no stream starts
+
+#### Scenario: Production with the pilot policy
+
+- **GIVEN** `ENVIRONMENT` is `production`
+- **AND** an admin assigned the policy `labos_agent_pilot` to the member, or granted `labos_agent.use` directly
+- **WHEN** the member calls `GET /v1/labos-agent/access`
+- **THEN** the response is `{ "enabled": true }`
+- **AND** the chat routes run for the member
 
 ### Requirement: Access check
 
@@ -36,7 +47,8 @@ The system SHALL decide access in one function, `LabosAgentAccessService.isEnabl
 - **GIVEN** a signed-in live member
 - **WHEN** the member calls the access route on dev
 - **THEN** the response is `{ "enabled": true }`
-- **AND** on production the response is `{ "enabled": false }`
+- **AND** on production the response is `{ "enabled": false }` for a member without `labos_agent.use`
+- **AND** on production the response is `{ "enabled": true }` for a member with `labos_agent.use`
 
 ### Requirement: Validate the chat body
 
