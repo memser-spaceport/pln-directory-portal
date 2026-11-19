@@ -313,3 +313,35 @@ export function eventIssuesMessage(issues: Array<{ path: Array<string | number> 
     })
     .join('; ');
 }
+
+/**
+ * Parses a submit body and, when it is refused, names every problem in one answer. Zod stops at the fields that
+ * are missing or have a wrong type and does not reach the submission rules, so a body with no name would hide that
+ * it also has no tag and no host. The submission rules are run on the raw body too, and the two lists are joined.
+ */
+export function parseEventSubmitBody(
+  raw: unknown
+): { success: true; data: PLEventSubmitBody } | { success: false; message: string } {
+  const parsed = PLEventSubmitBodySchema.safeParse(raw ?? {});
+  if (parsed.success) return { success: true, data: parsed.data };
+
+  const issues: Array<{ path: Array<string | number> | string; message: string }> = [...parsed.error.issues];
+  const named = new Set(parsed.error.issues.map((issue) => String(issue.path[0] ?? '')));
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    const body = raw as Record<string, unknown>;
+    const extra = eventSubmissionIssues(
+      {
+        endDate: body.endDate,
+        timezone: body.timezone,
+        format: body.format,
+        tags: Array.isArray(body.tags) ? body.tags : null,
+        hostName: typeof body.hostName === 'string' ? body.hostName : null,
+      },
+      { draft: body.draft === true }
+    );
+    for (const issue of extra) {
+      if (!named.has(issue.path)) issues.push(issue);
+    }
+  }
+  return { success: false, message: eventIssuesMessage(issues) };
+}

@@ -17,8 +17,7 @@ import {
   eventIssuesMessage,
   PLEventPatchBody,
   PLEventPatchBodySchema,
-  PLEventSubmitBody,
-  PLEventSubmitBodySchema,
+  parseEventSubmitBody,
 } from 'libs/contracts/src/schema/pl-event-body';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
@@ -63,7 +62,11 @@ export class PLEventSubmissionsController {
   @NoCache()
   async submitPLEvent(@Body() rawBody: unknown, @Req() request: Request) {
     this.assertEnabled();
-    const { draft, ...body } = parseBody<PLEventSubmitBody>(PLEventSubmitBodySchema, rawBody);
+    const parsed = parseEventSubmitBody(rawBody);
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.message);
+    }
+    const { draft, ...body } = parsed.data;
     const member = await this.requireMember(request);
     const actor = await this.eventWriteService.memberActor(member);
     return await this.eventWriteService.createEvent(body, actor, { draft: draft === true });

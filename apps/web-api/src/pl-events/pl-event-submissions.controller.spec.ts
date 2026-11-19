@@ -196,6 +196,29 @@ describe('event submission routes', () => {
       expect(db.all('pLEvent')).toHaveLength(0);
     });
 
+    it('names every missing field in one answer, for an empty body too', async () => {
+      const empty = await http().post('/v1/irl/events').set(as('forum@pl.xyz')).send({});
+      expect(empty.status).toBe(400);
+      for (const field of ['name', 'startDate', 'endDate', 'timezone', 'format', 'tags', 'hostName']) {
+        expect(empty.body.message).toContain(`${field}: `);
+      }
+
+      const noName = await http()
+        .post('/v1/irl/events')
+        .set(as('forum@pl.xyz'))
+        .send({ ...VALID, name: undefined, tags: [], hostName: '' });
+      expect(noName.body.message).toBe(
+        'name: Required; tags: at least one tag is required; hostName: hostName is required'
+      );
+
+      // A draft asks only for what a draft needs.
+      const draft = await http().post('/v1/irl/events').set(as('forum@pl.xyz')).send({ draft: true });
+      expect(draft.body.message).toBe(
+        'name: Required; startDate: Required; endDate: endDate is required; timezone: timezone is required'
+      );
+      expect(db.all('pLEvent')).toHaveLength(0);
+    });
+
     it('an in-person event with no address is accepted with no gathering', async () => {
       const res = await submit('forum@pl.xyz', { address: undefined });
       expect(res.status).toBe(201);

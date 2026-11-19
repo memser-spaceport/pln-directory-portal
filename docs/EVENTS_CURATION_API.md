@@ -185,7 +185,7 @@ curl -X PUT "$API/v1/integrations/events/by-external-id/evt-1" \
 
 - The first call with an id creates the event. It is published (`APPROVED`) at once.
 - A later call with the same id updates that event: `"result": "updated"`, same `uid`. So a job that sends the same
-  events again makes no duplicates. A field you leave out keeps its value. Send `null` to clear a field.
+  events again makes no duplicates. Every `PUT` sends `name`, `startDate` and `format`. Another field that you leave out keeps its value. Send `null` to clear a field.
 - An update keeps the event's status. To hide your event, reject it or delete it.
 - If you deleted the event, sending its id again brings it back with the same `uid`.
 - Your ids are your own: another team's events with the same id are separate events.
@@ -220,6 +220,9 @@ An invalid event answers 422, and nothing is stored. `message` names each proble
 ```json
 { "statusCode": 422, "message": "endDate: endDate is before startDate" }
 ```
+
+A day with no time needs `allDay: true`. Without it the answer is
+`"startDate: a date with no time of day needs allDay: true"`.
 
 ## Publish events in a batch
 

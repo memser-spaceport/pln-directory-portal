@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { z } from 'zod';
-import { eventIssuesMessage, PLEventSubmitBodySchema } from 'libs/contracts/src/schema/pl-event-body';
+import { parseEventSubmitBody } from 'libs/contracts/src/schema/pl-event-body';
 import { ADMIN_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import type { EventsService } from '../events/events.service';
 import { isLocalEventSubmitEnabled } from '../pl-events/pl-event-submit.constants';
@@ -74,7 +74,7 @@ export function submitEventTool(deps: {
         return { submitted: true, event: result ?? { event_name } };
       }
 
-      const parsed = PLEventSubmitBodySchema.safeParse({
+      const parsed = parseEventSubmitBody({
         name: event_name,
         description: args.description,
         startDate: args.start_date,
@@ -89,7 +89,7 @@ export function submitEventTool(deps: {
         ...(args.city || args.country ? { address: { city: args.city, country: args.country } } : {}),
       });
       if (!parsed.success) {
-        throw new BadRequestException(eventIssuesMessage(parsed.error.issues));
+        throw new BadRequestException(parsed.message);
       }
       const { draft, ...body } = parsed.data;
       const actor = await deps.eventWrite.memberActor({
