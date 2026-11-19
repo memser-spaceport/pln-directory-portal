@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 /**
  * The details of one IRL event as the PL events service describes it: tags,
- * access, format, host, co-hosts, sponsors and agenda. Stored on
+ * access, format, host, co-hosts, sponsors, agenda and the location link. Stored on
  * `PLEvent.additionalInfo.details` by both event sync paths (LAB-3214).
  *
  * **A leaf module on purpose.** It imports only `zod`, so jest specs can import
@@ -29,6 +29,20 @@ export const PLEventDetailsAgendaSchema = z
   })
   .passthrough();
 
+/**
+ * True only for an absolute `http:` or `https:` URL. The events service checks
+ * `location_url` with a loose regex, so the sync checks it again: any other
+ * scheme (for example `javascript:`) must never reach a link on the page.
+ */
+export function isHttpUrl(value: string): boolean {
+  try {
+    const { protocol } = new URL(value);
+    return protocol === 'http:' || protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export const PLEventDetailsSchema = z.object({
   tags: z.array(PLEventDetailsTagSchema),
   accessType: z.string().nullable(),
@@ -38,6 +52,12 @@ export const PLEventDetailsSchema = z.object({
   coHosts: z.array(PLEventDetailsPartySchema),
   sponsors: z.array(PLEventDetailsPartySchema),
   agenda: PLEventDetailsAgendaSchema.nullable(),
+  /**
+   * LAB-3332: the venue's map link, the events service's `location_url`. An
+   * `http` or `https` URL, or null. Optional because details stored before
+   * LAB-3332 do not have it; reads always return it (null when absent).
+   */
+  locationUrl: z.string().refine(isHttpUrl, 'expected an http or https URL').nullable().optional(),
 });
 
 export type PLEventDetailsParty = z.infer<typeof PLEventDetailsPartySchema>;
@@ -56,6 +76,7 @@ export function emptyPLEventDetails(): PLEventDetails {
     coHosts: [],
     sponsors: [],
     agenda: null,
+    locationUrl: null,
   };
 }
 
