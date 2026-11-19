@@ -41,6 +41,7 @@ import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.const
 import { assignJobSearchStatusFromInput, omitJobSearchStatus } from './job-search-status';
 import { directoryListedMemberWhere } from './member-visibility';
 import { memberCrawlIndexWhere, toMemberCrawlIndex } from './member-crawl-index';
+import { searchRelevanceScore } from './member-search-relevance';
 
 /**
  * Interface for member search match result (used by entity association)
@@ -3464,7 +3465,8 @@ export class MembersService {
 
   /**
    * Calculates a relevance score for a member based on how well they match the search term.
-   * Used for ranking search results to prioritize better matches.
+   * Used for ranking search results to prioritize better matches. The tiers are in `searchRelevanceScore`
+   * (LAB-1277), which the LabOS agent mention picker also uses (LAB-3318).
    *
    * @param member - Member object with name and teamMemberRoles
    * @param searchTerm - The search term to score against
@@ -3474,28 +3476,11 @@ export class MembersService {
     member: { name?: string; teamMemberRoles?: Array<{ team?: { name?: string } }> },
     searchTerm: string
   ): number {
-    const search = searchTerm.toLowerCase();
-    const name = (member.name || '').toLowerCase();
-
-    // Exact match (case-insensitive)
-    if (name === search) return 100;
-
-    // Name starts with search term
-    if (name.startsWith(search)) return 80;
-
-    // Word boundary match (e.g., "John RG Smith" matches "RG")
-    const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const wordBoundaryRegex = new RegExp(`\\b${escapedSearch}`, 'i');
-    if (wordBoundaryRegex.test(member.name || '')) return 60;
-
-    // Contains anywhere in name
-    if (name.includes(search)) return 40;
-
-    // Team name match only
-    const teamNames = member.teamMemberRoles?.map((t) => t.team?.name?.toLowerCase() || '') || [];
-    if (teamNames.some((tn) => tn.includes(search))) return 20;
-
-    return 0;
+    return searchRelevanceScore(
+      member.name,
+      searchTerm,
+      member.teamMemberRoles?.map((t) => t.team?.name)
+    );
   }
 
   /**

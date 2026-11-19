@@ -19,6 +19,7 @@ import { LabosAgentAccessService } from './labos-agent-access.service';
 import { LabosAgentController } from './labos-agent.controller';
 import { LabosAgentService } from './labos-agent.service';
 import { mcpToolsAsAgentTools, newsLinkLines } from './labos-agent-news.tools';
+import { NO_PAGE_SENTENCE } from './labos-agent-page-context';
 
 if (!(globalThis as any).WritableStream) {
   // The jest node environment predates the web streams globals this Node runtime has.
@@ -195,7 +196,8 @@ describe('LabosAgentController', () => {
     await controller.chat(VALID, req, res as any);
     expect(query.getTeamNewsItemDto).not.toHaveBeenCalled();
     expect(husky.createContextualToolsResponse.mock.calls[0][3].promptContext).toContain('Home');
-    expect(husky.createContextualToolsResponse.mock.calls[1][3].promptContext).toBeUndefined();
+    // S6-C37 (LAB-3318, contract 10.6): no context and no mentions give the no-page sentence and no page data.
+    expect(husky.createContextualToolsResponse.mock.calls[1][3].promptContext).toBe(NO_PAGE_SENTENCE);
   });
 
   it('destroys the connection when the stream fails after the headers', async () => {

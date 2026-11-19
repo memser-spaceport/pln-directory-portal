@@ -26,13 +26,28 @@ import { LabosAgentController } from './labos-agent.controller';
 import { LabosAgentProposalStore } from './labos-agent-proposals';
 import { LabosAgentService } from './labos-agent.service';
 import {
+  HOME_MENTION_SENTENCE,
   JOB_BOARD_SENTENCE,
   JOB_PAGE_SENTENCE,
   MEMBER_PAGE_SENTENCE,
+  MENTIONS_SENTENCE,
+  NEWS_SOURCE_HINT,
+  NO_PAGE_SENTENCE,
+  PROFILE_HINT,
   PROFILE_PAGE_SENTENCE,
   TEAM_PAGE_SENTENCE,
 } from './labos-agent-page-context';
 
+const NEWS_ITEM = {
+  uid: 'news-1',
+  title: 'Acme raises a seed round',
+  summary: 'Acme raised money.',
+  eventType: 'FUNDING',
+  eventDate: '2026-11-10T00:00:00.000Z',
+  teamUid: 't-acme',
+  teamName: 'Acme Team',
+  sourceUrl: 'https://example.com/acme',
+};
 const PAST = new Date('2000-01-01T00:00:00.000Z');
 const FUTURE = new Date('2999-01-01T00:00:00.000Z');
 const TEXT = 'I lead fundraising at Acme. We raise a seed round and want your advice.';
@@ -155,6 +170,8 @@ function setup(viewer: Viewer = {}, env: string = APP_ENV.DEV) {
       ],
     }),
     person('m-gone', 'Gone', { deletedAt: PAST }),
+    // S6 (LAB-3318): a second member for the mention tests.
+    person('m-alan', 'Alan Turing'),
   ];
   const teams = new Map<string, Team>(
     [
@@ -307,13 +324,18 @@ function setup(viewer: Viewer = {}, env: string = APP_ENV.DEV) {
     none
   );
   const jobsService = new JobOpeningsQueryService(prisma as any);
-  const introRequests = new IntroRequestsService(prisma as any, { send: jest.fn() } as any);
+  const telegram = { send: jest.fn() };
+  const introRequests = new IntroRequestsService(prisma as any, telegram as any);
   const husky = { createContextualToolsResponse: jest.fn().mockResolvedValue({ pipeTo: jest.fn() }) };
+  // S6 (LAB-3318): the S1 news lookup for news mentions. Only `news-1` exists.
+  const newsQuery = {
+    getTeamNewsItemDto: jest.fn(async (uid: string) => (uid === NEWS_ITEM.uid ? NEWS_ITEM : null)),
+  };
   const service = new LabosAgentService(
     prisma as any,
     new LabosAgentAccessService(),
     husky as any,
-    { getTeamNewsItemDto: jest.fn() } as any,
+    newsQuery as any,
     { forApp: jest.fn(() => []) } as any,
     { getMemberAccess: jest.fn().mockResolvedValue({ effectivePermissions: [] }) } as any,
     new LabosAgentProposalStore({ get: jest.fn(), set: jest.fn(), del: jest.fn() } as any),
@@ -338,6 +360,23 @@ function setup(viewer: Viewer = {}, env: string = APP_ENV.DEV) {
       prompt: options.promptContext as string,
     };
   };
+  /** S6: one chat turn with any extra body fields (for example `mentions`). */
+  const turnBody = async (extra: Record<string, unknown>, ...calls: Array<Record<string, unknown>>) => {
+    await controller.chat({ ...VALID, ...extra }, req, res as any);
+    const options = husky.createContextualToolsResponse.mock.calls.at(-1)[3];
+    const texts: string[] = [];
+    for (const args of calls) texts.push(await options.extraTools.draft_intro.execute(args));
+    return {
+      texts,
+      drafts: options.extraResponseFields.drafts as Array<Record<string, any>>,
+      prompt: options.promptContext as string,
+    };
+  };
+  const chatErrorBody = (extra: Record<string, unknown>) =>
+    controller.chat({ ...VALID, ...extra }, req, res as any).then(
+      () => null,
+      (error) => error
+    );
   const chatError = (context: unknown) =>
     controller.chat({ ...VALID, context }, req, res as any).then(
       () => null,
@@ -347,7 +386,7 @@ function setup(viewer: Viewer = {}, env: string = APP_ENV.DEV) {
     assert: jest.spyOn(teamsService, 'assertTeamVisibleToViewer'),
     getJob: jest.spyOn(jobsService, 'getJobOpening'),
   };
-  return { prisma, husky, res, turn, chatError, spies, membersService };
+  return { prisma, husky, res, turn, chatError, turnBody, chatErrorBody, spies, membersService, newsQuery, telegram };
 }
 
 /** The JSON after the label in the prompt context. */
@@ -711,6 +750,440 @@ describe('LabOS agent page context (LAB-3302)', () => {
       expect(prompt).not.toContain('draft_intro');
       expect(drafts).toEqual([]);
       expect(texts[0]).toContain('not the intro target of this turn');
+    });
+  });
+});
+
+// S6 @mentions in C1 (LAB-3318, contract 10.3, 10.4 and 10.6). The same fake Prisma and real page rules as S5.
+describe('LabOS agent mentions in chat (LAB-3318)', () => {
+  const originalEnv = process.env.ENVIRONMENT;
+  afterEach(() => jest.restoreAllMocks());
+  afterAll(() => {
+    process.env.ENVIRONMENT = originalEnv;
+  });
+
+  const mentionPaths = (mentions: unknown) => {
+    const result = LabosAgentChatRequestSchema.safeParse({ ...VALID, mentions });
+    return result.success ? [] : result.error.issues.map((issue) => issue.path.join('.'));
+  };
+  const ok = (mentions: unknown) => LabosAgentChatRequestSchema.safeParse({ ...VALID, mentions }).success;
+
+  /** The mention 404: the S5 body plus `mentionIndex`, before the stream and the model. */
+  function expectMention404(error: any, code: string, mentionIndex: number, h: ReturnType<typeof setup>) {
+    expect(error).toBeInstanceOf(NotFoundException);
+    expect(error.getResponse()).toEqual({ statusCode: 404, code, message: expect.any(String), mentionIndex });
+    expect(h.husky.createContextualToolsResponse).not.toHaveBeenCalled();
+    expect(h.res.flushHeaders).not.toHaveBeenCalled();
+  }
+
+  /** The JSON row of mention line `n`. */
+  function itemRow(prompt: string, n: number, type: string) {
+    return promptRow(prompt, `Item ${n} (${type})`);
+  }
+
+  describe('schema', () => {
+    it.each([
+      ['member', [{ type: 'member', uid: 'm-grace' }]],
+      ['team', [{ type: 'team', uid: 't-acme' }]],
+      ['news', [{ type: 'news', uid: 'news-1' }]],
+      ['page home', [{ type: 'page', page: 'home' }]],
+      ['page job', [{ type: 'page', page: 'job' }]],
+      ['page profile', [{ type: 'page', page: 'profile' }]],
+      [
+        '5 items',
+        [
+          { type: 'member', uid: 'm-grace' },
+          { type: 'team', uid: 't-acme' },
+          { type: 'news', uid: 'news-1' },
+          { type: 'page', page: 'home' },
+          { type: 'page', page: 'job' },
+        ],
+      ],
+    ])('S6-C21: accepts mentions with %s', (_name, mentions) => {
+      const result = LabosAgentChatRequestSchema.safeParse({ ...VALID, mentions });
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.mentions).toEqual(mentions);
+    });
+
+    it('S6-C21: an empty mentions array and no mentions both parse', () => {
+      expect(ok([])).toBe(true);
+      expect(ok(undefined)).toBe(true);
+    });
+
+    it('S6-C21: the page value is job, not jobs', () => {
+      expect(ok([{ type: 'page', page: 'jobs' }])).toBe(false);
+    });
+
+    it('S6-C22: 6 mentions give 400 VALIDATION_ERROR with path mentions', async () => {
+      const six = ['a', 'b', 'c', 'd', 'e', 'f'].map((uid) => ({ type: 'team', uid: `t-${uid}` }));
+      expect(mentionPaths(six)).toEqual(['mentions']);
+      const h = setup();
+      const error = await h.chatErrorBody({ mentions: six });
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect(error.getResponse()).toEqual(
+        expect.objectContaining({
+          statusCode: 400,
+          code: 'VALIDATION_ERROR',
+          errors: [expect.objectContaining({ path: 'mentions' })],
+        })
+      );
+      expect(h.husky.createContextualToolsResponse).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [
+        'two team items with one uid',
+        [
+          { type: 'team', uid: 't-acme' },
+          { type: 'team', uid: 't-acme' },
+        ],
+      ],
+      [
+        'two page home items',
+        [
+          { type: 'page', page: 'home' },
+          { type: 'page', page: 'home' },
+        ],
+      ],
+    ])('S6-C23: %s give 400', (_name, mentions) => {
+      expect(mentionPaths(mentions)).toEqual(['mentions']);
+    });
+
+    it('S6-C23: one uid with two types is not a duplicate', () => {
+      expect(
+        ok([
+          { type: 'team', uid: 'x-1' },
+          { type: 'member', uid: 'x-1' },
+        ])
+      ).toBe(true);
+    });
+
+    it.each([
+      ['uid on a page item', { type: 'page', page: 'home', uid: 'x' }],
+      ['page on a member item', { type: 'member', uid: 'm-grace', page: 'home' }],
+      ['a label', { type: 'team', uid: 't-acme', label: 'Acme' }],
+      ['a page item with no page', { type: 'page' }],
+      ['a member item with no uid', { type: 'member' }],
+      ['an unknown type', { type: 'job', uid: 'j-open' }],
+    ])('S6-C24: %s gives 400', (_name, mention) => {
+      expect(ok([mention])).toBe(false);
+    });
+
+    it.each(['member', 'team', 'news'])('S6-C25: a %s uid of 0 or 65 characters gives 400, 64 passes', (type) => {
+      expect(ok([{ type, uid: '' }])).toBe(false);
+      expect(ok([{ type, uid: 'x'.repeat(65) }])).toBe(false);
+      expect(ok([{ type, uid: 'x'.repeat(64) }])).toBe(true);
+    });
+  });
+
+  describe('lookups before the stream', () => {
+    it.each([
+      ['an unknown member', 'm-missing'],
+      ['a deleted member', 'm-gone'],
+    ])('S6-C27: %s mention gives 404 MEMBER_NOT_FOUND with mentionIndex and no model call', async (_n, uid) => {
+      const h = setup();
+      const error = await h.chatErrorBody({
+        mentions: [
+          { type: 'team', uid: 't-acme' },
+          { type: 'member', uid },
+        ],
+      });
+      expectMention404(error, 'MEMBER_NOT_FOUND', 1, h);
+    });
+
+    it.each([
+      ['an unknown team', 't-missing', {}],
+      ['an INACTIVE team for a member who is not a directory admin', 't-deleted', {}],
+      ['an L0 team for a member who is not a lead', 't-l0', { leadingTeams: ['t-acme'] }],
+    ])('S6-C28: %s mention gives 404 TEAM_NOT_FOUND with mentionIndex', async (_n, uid, viewer) => {
+      const h = setup(viewer);
+      const error = await h.chatErrorBody({ mentions: [{ type: 'team', uid }] });
+      expect(error).not.toBeInstanceOf(ForbiddenException);
+      expectMention404(error, 'TEAM_NOT_FOUND', 0, h);
+    });
+
+    it('S6-C29: an unknown news mention gives 404 NEWS_NOT_FOUND with mentionIndex', async () => {
+      const h = setup();
+      const error = await h.chatErrorBody({
+        mentions: [
+          { type: 'page', page: 'home' },
+          { type: 'news', uid: 'news-1' },
+          { type: 'news', uid: 'news-missing' },
+        ],
+      });
+      expectMention404(error, 'NEWS_NOT_FOUND', 2, h);
+      expect(h.newsQuery.getTeamNewsItemDto).toHaveBeenCalledWith('news-missing', new Set(), 'm-ada');
+    });
+
+    it('S6-C30: a 404 for context has no mentionIndex key', async () => {
+      const h = setup();
+      const error = await h.chatErrorBody({ context: { page: 'team', teamUid: 't-missing' }, mentions: [] });
+      expect404(error, 'TEAM_NOT_FOUND', h);
+      expect('mentionIndex' in error.getResponse()).toBe(false);
+    });
+
+    it('S6-C31: with a bad context and a bad mention, the 404 is for the context', async () => {
+      const h = setup();
+      const error = await h.chatErrorBody({
+        context: { page: 'member', memberUid: 'm-missing' },
+        mentions: [{ type: 'team', uid: 't-missing' }],
+      });
+      expect404(error, 'MEMBER_NOT_FOUND', h);
+      expect(h.spies.assert).not.toHaveBeenCalled();
+    });
+
+    it('S6-C32: a member outside the gate gets 403, also with an unknown mention uid, and no lookup runs', async () => {
+      const h = setup({}, APP_ENV.PRODUCTION);
+      const error = await h.chatErrorBody({
+        mentions: [
+          { type: 'team', uid: 't-missing' },
+          { type: 'member', uid: 'm-missing' },
+          { type: 'news', uid: 'news-missing' },
+        ],
+      });
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect(error.getResponse()).toEqual(expect.objectContaining({ code: 'AGENT_NOT_ENABLED' }));
+      expect(h.spies.assert).not.toHaveBeenCalled();
+      expect(h.prisma.member.findFirst).not.toHaveBeenCalled();
+      expect(h.newsQuery.getTeamNewsItemDto).not.toHaveBeenCalled();
+      expect(h.husky.createContextualToolsResponse).not.toHaveBeenCalled();
+    });
+
+    it('S6-C33: a member mention with the session uid gives the profile item and no lookup', async () => {
+      const h = setup();
+      const { prompt } = await h.turnBody({ mentions: [{ type: 'member', uid: 'm-ada' }] });
+      expect(prompt).toBe(`${MENTIONS_SENTENCE}\nItem 1 (page): ${JSON.stringify({ uid: 'm-ada' })} ${PROFILE_HINT}`);
+      expect(h.prisma.member.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('S6-C33: the own uid and the profile page are one item', async () => {
+      const h = setup();
+      const { prompt } = await h.turnBody({
+        mentions: [
+          { type: 'page', page: 'profile' },
+          { type: 'member', uid: 'm-ada' },
+        ],
+      });
+      expect(prompt.match(/Item \d/g)).toEqual(['Item 1']);
+    });
+  });
+
+  describe('prompt context', () => {
+    it('S6-C34: a mention with the key of the context is used once', async () => {
+      const h = setup();
+      const page = await h.turn({ page: 'team', teamUid: 't-acme' });
+      const { prompt } = await h.turnBody({
+        context: { page: 'team', teamUid: 't-acme' },
+        mentions: [{ type: 'team', uid: 't-acme' }],
+      });
+      expect(prompt).toBe(page.prompt);
+      expect(prompt).not.toContain(MENTIONS_SENTENCE);
+      expect(prompt.match(/"uid":"t-acme"/g)).toHaveLength(1);
+    });
+
+    it.each([
+      ['the profile page and the profile mention', { page: 'profile' }, { type: 'page', page: 'profile' }],
+      [
+        'the own member page and the profile mention',
+        { page: 'member', memberUid: 'm-ada' },
+        { type: 'page', page: 'profile' },
+      ],
+      ['the job board and the job mention', { page: 'job' }, { type: 'page', page: 'job' }],
+      ['the Home page and the home mention', { page: 'home' }, { type: 'page', page: 'home' }],
+      ['a news page and the same story', { page: 'news-story', newsUid: 'news-1' }, { type: 'news', uid: 'news-1' }],
+      [
+        'a member page and the same member',
+        { page: 'member', memberUid: 'm-grace' },
+        { type: 'member', uid: 'm-grace' },
+      ],
+    ])('S6-C34: %s are one item', async (_n, context, mention) => {
+      const h = setup();
+      const { prompt } = await h.turnBody({ context, mentions: [mention] });
+      expect(prompt).not.toContain(MENTIONS_SENTENCE);
+    });
+
+    it('S6-C35: 3 mentions give 3 item lines in the order of mentions, after the page text', async () => {
+      const h = setup();
+      const { prompt } = await h.turnBody({
+        context: { page: 'job' },
+        mentions: [
+          { type: 'team', uid: 't-acme' },
+          { type: 'news', uid: 'news-1' },
+          { type: 'member', uid: 'm-grace' },
+        ],
+      });
+      const lines = prompt.split('\n');
+      expect(lines[0]).toBe(JOB_BOARD_SENTENCE);
+      expect(lines[1]).toBe(MENTIONS_SENTENCE);
+      expect(lines.slice(2).map((line) => line.slice(0, line.indexOf(':')))).toEqual([
+        'Item 1 (team)',
+        'Item 2 (news)',
+        'Item 3 (member)',
+      ]);
+      expect(itemRow(prompt, 1, 'team')).toEqual({
+        uid: 't-acme',
+        name: 'Acme Team',
+        shortDescription: 'We build rockets.',
+      });
+      expect(itemRow(prompt, 2, 'news')).toEqual({
+        uid: 'news-1',
+        title: 'Acme raises a seed round',
+        summary: 'Acme raised money.',
+        teamName: 'Acme Team',
+        eventDate: '2026-11-10T00:00:00.000Z',
+      });
+      expect(lines[3]).toContain(NEWS_SOURCE_HINT);
+      expect(itemRow(prompt, 3, 'member').uid).toBe('m-grace');
+    });
+
+    it('S6-C35: the page mentions give the page lines with no row', async () => {
+      const h = setup();
+      const { prompt } = await h.turnBody({
+        mentions: [
+          { type: 'page', page: 'home' },
+          { type: 'page', page: 'job' },
+        ],
+      });
+      expect(prompt).toBe(
+        [MENTIONS_SENTENCE, `Item 1 (page): ${HOME_MENTION_SENTENCE}`, `Item 2 (page): ${JOB_BOARD_SENTENCE}`].join(
+          '\n'
+        )
+      );
+      expect(h.spies.getJob).not.toHaveBeenCalled();
+    });
+
+    it('S6-C36: the mention rows have the S5 fields; no email, handle or Telegram value', async () => {
+      const h = setup();
+      const page = await h.turn({ page: 'member', memberUid: 'm-grace' });
+      const { prompt } = await h.turnBody({ mentions: [{ type: 'member', uid: 'm-grace' }] });
+      const row = itemRow(prompt, 1, 'member');
+      expect(Object.keys(row)).toEqual(['uid', 'name', 'bio', 'teams', 'skills']);
+      expect(row).toEqual(promptRow(page.prompt, 'Member'));
+      for (const secret of ['grace.private@example.com', 'grace_tg', 'grace_x', 'calendly.example.com']) {
+        expect(prompt).not.toContain(secret);
+      }
+    });
+
+    it('S6-C37: a turn with no context and no mentions has the no-page sentence and no page data', async () => {
+      const h = setup();
+      const none = await h.turnBody({});
+      expect(none.prompt).toBe(NO_PAGE_SENTENCE);
+      const empty = await h.turnBody({ mentions: [] });
+      expect(empty.prompt).toBe(NO_PAGE_SENTENCE);
+    });
+
+    it('S6-C37: a turn with mentions and no context has no no-page sentence', async () => {
+      const h = setup();
+      const { prompt } = await h.turnBody({ mentions: [{ type: 'page', page: 'home' }] });
+      expect(prompt).not.toContain(NO_PAGE_SENTENCE);
+    });
+
+    it('S6-C26: an S5 body with an empty mentions array gives the S5 text', async () => {
+      const h = setup();
+      const page = await h.turn({ page: 'member', memberUid: 'm-grace' });
+      const { prompt } = await h.turnBody({ context: { page: 'member', memberUid: 'm-grace' }, mentions: [] });
+      expect(prompt).toBe(page.prompt);
+    });
+  });
+
+  describe('intro drafts with mentions', () => {
+    it('S6-C38: an eligible member with a team mention on the Home page gets 1 draft for that team', async () => {
+      const h = setup();
+      const { prompt, drafts } = await h.turnBody(
+        { context: { page: 'home' }, mentions: [{ type: 'team', uid: 't-acme' }] },
+        { type: 'team', targetUid: 't-acme', text: TEXT }
+      );
+      expect(prompt).toContain('call draft_intro with type "team" and targetUid "t-acme"');
+      expect(drafts).toEqual([
+        expect.objectContaining({
+          kind: 'intro',
+          target: { type: 'team', uid: 't-acme', name: 'Acme Team' },
+          text: TEXT,
+        }),
+      ]);
+      expect(h.prisma.introRequest.create).not.toHaveBeenCalled();
+    });
+
+    it('S6-C38: a member mention on a team page makes both intro targets', async () => {
+      const h = setup();
+      const { drafts } = await h.turnBody(
+        { context: { page: 'team', teamUid: 't-acme' }, mentions: [{ type: 'member', uid: 'm-grace' }] },
+        { type: 'member', targetUid: 'm-grace', text: TEXT }
+      );
+      expect(drafts).toEqual([
+        expect.objectContaining({ target: { type: 'member', uid: 'm-grace', name: 'Grace Hopper' } }),
+      ]);
+    });
+
+    it.each([
+      ['another team', { type: 'team', targetUid: 't-future' }],
+      ['a member who is not mentioned', { type: 'member', targetUid: 'm-alan' }],
+      ['the mentioned uid with the other type', { type: 'member', targetUid: 't-acme' }],
+      ['the own member', { type: 'member', targetUid: 'm-ada' }],
+    ])('S6-C39: draft_intro with %s gives no draft', async (_n, args) => {
+      const h = setup();
+      const { texts, drafts } = await h.turnBody(
+        {
+          mentions: [
+            { type: 'team', uid: 't-acme' },
+            { type: 'member', uid: 'm-ada' },
+          ],
+        },
+        { ...args, text: TEXT }
+      );
+      expect(drafts).toEqual([]);
+      expect(texts[0]).toContain('not the intro target of this turn');
+    });
+
+    it('S6-C39: a deleted team that an admin mentions is no intro target', async () => {
+      const h = setup({ isDirectoryAdmin: true });
+      const { prompt, drafts } = await h.turnBody(
+        { mentions: [{ type: 'team', uid: 't-deleted' }] },
+        { type: 'team', targetUid: 't-deleted', text: TEXT }
+      );
+      expect(prompt).not.toContain('draft_intro');
+      expect(drafts).toEqual([]);
+    });
+
+    it('S6-C40: a turn with 2 member mentions has at most 1 draft', async () => {
+      const h = setup();
+      const { drafts } = await h.turnBody(
+        {
+          mentions: [
+            { type: 'member', uid: 'm-grace' },
+            { type: 'member', uid: 'm-alan' },
+          ],
+        },
+        { type: 'member', targetUid: 'm-grace', text: TEXT },
+        { type: 'member', targetUid: 'm-alan', text: TEXT }
+      );
+      expect(drafts).toEqual([
+        expect.objectContaining({ target: { type: 'member', uid: 'm-alan', name: 'Alan Turing' } }),
+      ]);
+    });
+
+    it('S6-C41: C1 with mentions calls no Telegram or write code', async () => {
+      const h = setup();
+      await h.turnBody(
+        {
+          mentions: [
+            { type: 'member', uid: 'm-grace' },
+            { type: 'team', uid: 't-acme' },
+            { type: 'news', uid: 'news-1' },
+          ],
+        },
+        { type: 'team', targetUid: 't-acme', text: TEXT }
+      );
+      expect(h.telegram.send).not.toHaveBeenCalled();
+      expect(h.prisma.introRequest.create).not.toHaveBeenCalled();
+      expect(h.prisma.introRequest.update).not.toHaveBeenCalled();
+      expect(h.prisma.introRequest.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('S6-C43: C1 with mentions calls createContextualToolsResponse once', async () => {
+      const h = setup();
+      await h.turnBody({ mentions: [{ type: 'team', uid: 't-acme' }] });
+      expect(h.husky.createContextualToolsResponse).toHaveBeenCalledTimes(1);
     });
   });
 });

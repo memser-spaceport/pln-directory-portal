@@ -34,7 +34,7 @@ const chatBody = { threadId: 't1', chatId: 'c1', message: 'Hello' };
  */
 describe('LabOS agent error bodies over HTTP (LAB-3300)', () => {
   let app: INestApplication;
-  const agent = { chat: jest.fn(), confirm: jest.fn(), isEnabled: jest.fn() };
+  const agent = { chat: jest.fn(), confirm: jest.fn(), isEnabled: jest.fn(), mentions: jest.fn() };
 
   beforeAll(async () => {
     // NestFactory, not @nestjs/testing: the installed @nestjs/testing (9.0) does not match @nestjs/core (9.4).
@@ -135,5 +135,42 @@ describe('LabOS agent error bodies over HTTP (LAB-3300)', () => {
       .send({ proposalId: 'ap_1', decision: 'confirm' })
       .expect(500);
     expect(res.body).toEqual({ statusCode: 500, message: 'Unexpected Error. Please try again.' });
+  });
+
+  it('S6-C27: C1 unknown member mention gives 404 MEMBER_NOT_FOUND and keeps mentionIndex', async () => {
+    const body = {
+      statusCode: 404,
+      code: LABOS_AGENT_ERROR_CODES.MEMBER_NOT_FOUND,
+      message: 'Member not found: m-x',
+      mentionIndex: 1,
+    };
+    agent.chat.mockRejectedValue(new NotFoundException(body));
+    const res = await request(app.getHttpServer())
+      .post('/v1/labos-agent/chat')
+      .send({
+        ...chatBody,
+        mentions: [
+          { type: 'page', page: 'home' },
+          { type: 'member', uid: 'm-x' },
+        ],
+      })
+      .expect(404);
+    expect(res.body).toEqual(body);
+  });
+
+  it('S6-C5: C4 limit=11 gives 400 VALIDATION_ERROR and the service is not called', async () => {
+    const res = await request(app.getHttpServer()).get('/v1/labos-agent/mentions?q=ada&limit=11').expect(400);
+    expect(res.body).toEqual(
+      expect.objectContaining({ statusCode: 400, code: LABOS_AGENT_ERROR_CODES.VALIDATION_ERROR })
+    );
+    expect(agent.mentions).not.toHaveBeenCalled();
+  });
+
+  it('S6-C6: C4 returns the four keys over HTTP', async () => {
+    const response = { q: 'ada', members: [], teams: [], news: [] };
+    agent.mentions.mockResolvedValue(response);
+    const res = await request(app.getHttpServer()).get('/v1/labos-agent/mentions?q=ada&types=news').expect(200);
+    expect(res.body).toEqual(response);
+    expect(agent.mentions).toHaveBeenCalledWith('member@example.com', { q: 'ada', types: ['news'], limit: 5 });
   });
 });

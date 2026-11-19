@@ -2,13 +2,13 @@
 
 ## Purpose
 
-The LabOS in-app agent (LAB-3272). In S1 (LAB-3298) a signed-in member asks the agent a question, or a follow-up about the news story they read. The agent answers through the AI search stream. In S2 (LAB-3299) the agent proposes profile, experience and team edits, and the member confirms each one. In S3 (LAB-3300) the agent writes an intro request draft. The member edits it and sends it with the existing intro API (C3). Contract: `contracts/lab-3272-labos-agent-api.md` (C1, C2, section 8).
+The LabOS in-app agent (LAB-3272). In S1 (LAB-3298) a signed-in member asks the agent a question, or a follow-up about the news story they read. The agent answers through the AI search stream. In S2 (LAB-3299) the agent proposes profile, experience and team edits, and the member confirms each one. In S3 (LAB-3300) the agent writes an intro request draft. The member edits it and sends it with the existing intro API (C3). In S5 (LAB-3302) the agent reads the member, team, job or profile page. In S6 (LAB-3318) the member @mentions members, teams, news and pages: C4 searches the picker items and C1 takes a `mentions` list. Contract: `contracts/lab-3272-labos-agent-api.md` (C1, C2, C4, sections 8 to 10).
 
 ## Requirements
 
 ### Requirement: Signed-in members only
 
-`POST /v1/labos-agent/chat`, `POST /v1/labos-agent/actions/confirm` and `GET /v1/labos-agent/access` SHALL use the `UserTokenValidation` guard. A request with no member token or a bad token SHALL get HTTP 401 from the guard.
+`POST /v1/labos-agent/chat`, `POST /v1/labos-agent/actions/confirm`, `GET /v1/labos-agent/access` and `GET /v1/labos-agent/mentions` SHALL use the `UserTokenValidation` guard. A request with no member token or a bad token SHALL get HTTP 401 from the guard.
 
 #### Scenario: No token
 
@@ -296,7 +296,7 @@ The page context SHALL hold one plain sentence and the JSON of the row, from the
 
 ### Requirement: Intro target on member and team pages
 
-On a `member` or `team` page, the page target SHALL also be the intro target of the turn, with the name from the agent target lookup (`IntroRequestsService.findAgentTargetName`). If the lookup gives no name (for example, a directory admin on an `INACTIVE` team), the turn SHALL have no intro target and no error. `draft_intro` SHALL keep all S3 steps. The `profile`, `job` and `home` pages SHALL have no intro target.
+On a `member` or `team` page, the page target SHALL also be the intro target of the turn, with the name from the agent target lookup (`IntroRequestsService.findAgentTargetName`). If the lookup gives no name (for example, a directory admin on an `INACTIVE` team), the turn SHALL have no intro target and no error. `draft_intro` SHALL keep all S3 steps. The `profile`, `job` and `home` pages SHALL have no intro target. Member and team mentions (S6) SHALL add more intro targets with the same lookup. `draft_intro` SHALL give a draft only for a target of the turn, and at most one draft for each turn.
 
 #### Scenario: Draft on a team page
 
@@ -304,3 +304,53 @@ On a `member` or `team` page, the page target SHALL also be the intro target of 
 - **WHEN** the model calls `draft_intro` for T
 - **THEN** the body has one draft with the target T
 - **AND** a call for another uid gives `drafts: []`
+
+### Requirement: C4 mention search
+
+`GET /v1/labos-agent/mentions` SHALL check the pilot gate first; outside the gate it SHALL give HTTP 403 `AGENT_NOT_ENABLED` and run no search. The query SHALL have `q` (trimmed, up to 64 characters, default empty), `types` (a comma list of `member`, `team`, `news`; absent means all; empty or an unknown type gives 400) and `limit` (an integer from 1 to 10, default 5). A bad query SHALL get HTTP 400 `VALIDATION_ERROR`. The response SHALL always have `q`, `members`, `teams` and `news`, and each array SHALL have at most `limit` items. `members` SHALL have only directory-listed members with no `deletedAt`, never the session member, and only for a member with `member.search.read`. A member item SHALL have only `type`, `uid`, `name`, `imageUrl`, `teamName` and `role`. `teams` SHALL have no `INACTIVE` team and no L0 team, and only for a member with `team.search.read`. `news` SHALL have no item of a team in `TEAM_NEWS_EXCLUDED_TEAM_NAMES` and needs no search permission. The rank SHALL use the LAB-1277 tiers (`searchRelevanceScore` in `apps/web-api/src/members/member-search-relevance.ts`, shared with `MembersService.searchMembers`): on the member name (and current team names), on the team name (a tie sorts A to Z) and on the news title (a tie sorts the newest `eventDate` first). An empty `q` SHALL give no members, the member's current teams and the newest news. C4 SHALL call no model.
+
+#### Scenario: Member without search permission
+
+- **GIVEN** a member without `member.search.read`
+- **WHEN** the member calls C4 with `q=ada`
+- **THEN** `members` is `[]`
+- **AND** `news` still has the matches
+
+#### Scenario: Limit out of range
+
+- **GIVEN** `limit=11`
+- **WHEN** the member calls C4
+- **THEN** the response is HTTP 400 with code `VALIDATION_ERROR`
+
+### Requirement: Mentions in the chat body
+
+The chat body SHALL take an optional top-level `mentions` list (next to `context`) of 1 to 5 items. An item SHALL be `{ type: 'member' | 'team' | 'news', uid }` (`uid` 1 to 64 characters) or `{ type: 'page', page: 'home' | 'job' | 'profile' }`, with no other key. Two items with the same key (`type` and `uid`, or `page`) SHALL give 400. More than 5 items SHALL give 400 `VALIDATION_ERROR` with the path `mentions`. A body with no `mentions` SHALL parse as before.
+
+#### Scenario: Six mentions
+
+- **GIVEN** a chat body with 6 mentions
+- **WHEN** the member posts it
+- **THEN** the response is HTTP 400 with code `VALIDATION_ERROR` and the path `mentions`
+
+### Requirement: Mention lookups before the stream
+
+After the pilot gate and the `context` lookup, the system SHALL look up each mention in order with the S5 page rules: a member gives 404 `MEMBER_NOT_FOUND`, a team the member cannot see gives 404 `TEAM_NOT_FOUND`, and an unknown story gives 404 `NEWS_NOT_FOUND`. A mention 404 body SHALL also have `mentionIndex` (the index in `mentions`); a `context` 404 SHALL have no `mentionIndex`. With a bad `context` and a bad mention, the 404 SHALL be for `context`. A member mention with the session member's uid SHALL be the `profile` item, with no lookup. A mention with the same key as `context` SHALL be used once. On any error, no model call SHALL run.
+
+#### Scenario: Unknown member mention
+
+- **GIVEN** a second mention with an unknown member uid
+- **WHEN** the member posts the turn
+- **THEN** the response is HTTP 404 with code `MEMBER_NOT_FOUND` and `mentionIndex` 1
+- **AND** no stream starts
+
+### Requirement: What the agent sees
+
+The prompt context SHALL have the S5 page text first, then one line `Item <n> (<type>): ...` for each mention in the order of `mentions`, with the same public fields as the S5 rows. A turn with no `context` and no `mentions` SHALL have only the no-page sentence (`NO_PAGE_SENTENCE`), so the model does not say that it read a page. The turn SHALL make one model call, as in S5. C1 and C4 SHALL call no notification, email, push or Telegram code.
+
+#### Scenario: Three mentions
+
+- **GIVEN** a turn with 3 mentions
+- **WHEN** the member asks a question
+- **THEN** the prompt has 3 item lines in the order of `mentions`
+- **AND** no line has an email, a social handle or a Telegram value
+

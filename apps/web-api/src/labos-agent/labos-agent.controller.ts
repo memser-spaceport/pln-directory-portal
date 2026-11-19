@@ -1,4 +1,15 @@
-import { BadRequestException, Body, Controller, Get, Post, Req, Res, UseFilters, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  Req,
+  Res,
+  UseFilters,
+  UseGuards,
+} from '@nestjs/common';
 import { Response } from 'express';
 import { ZodType, ZodTypeDef } from 'zod';
 import {
@@ -7,12 +18,15 @@ import {
   LabosAgentChatRequestSchema,
   LabosAgentConfirmRequestSchema,
   LabosAgentConfirmResponse,
+  LabosAgentMentionsQuerySchema,
+  LabosAgentMentionsResponse,
 } from 'libs/contracts/src/schema/labos-agent';
+import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { LabosAgentExceptionFilter } from './labos-agent-exception.filter';
 import { LabosAgentService } from './labos-agent.service';
 
-/** LabOS in-app agent, contracts C1 and C2 (LAB-3272; slices S1 LAB-3298, S2 LAB-3299). */
+/** LabOS in-app agent, contracts C1, C2 and C4 (LAB-3272; slices S1 LAB-3298, S2 LAB-3299, S6 LAB-3318). */
 @Controller('v1/labos-agent')
 // Error bodies keep their `code` (LAB-3300). The global LogException drops it.
 @UseFilters(LabosAgentExceptionFilter)
@@ -24,6 +38,17 @@ export class LabosAgentController {
   @UseGuards(UserTokenValidation)
   async access(@Req() req: { userEmail?: string }): Promise<LabosAgentAccessResponse> {
     return { enabled: await this.agent.isEnabled(req.userEmail) };
+  }
+
+  /**
+   * C4 (LAB-3318): the @mention picker search for members, teams and news. The result depends on the member, so it is
+   * never cached.
+   */
+  @Get('mentions')
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async mentions(@Query() query: unknown, @Req() req: { userEmail?: string }): Promise<LabosAgentMentionsResponse> {
+    return this.agent.mentions(req.userEmail ?? '', validBody(LabosAgentMentionsQuerySchema, query, 'Invalid query'));
   }
 
   /** Same chunked JSON stream, headers and error handling as `POST /v1/husky/chat/contextual-tools`. */
@@ -61,14 +86,14 @@ export class LabosAgentController {
   }
 }
 
-/** The parsed body, or 400 VALIDATION_ERROR. */
-function validBody<T>(schema: ZodType<T, ZodTypeDef, unknown>, body: unknown): T {
+/** The parsed body (or query), or 400 VALIDATION_ERROR. */
+function validBody<T>(schema: ZodType<T, ZodTypeDef, unknown>, body: unknown, message = 'Invalid request body'): T {
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
     throw new BadRequestException({
       statusCode: 400,
       code: LABOS_AGENT_ERROR_CODES.VALIDATION_ERROR,
-      message: 'Invalid request body',
+      message,
       errors: parsed.error.issues.map((issue) => ({ path: issue.path.join('.'), message: issue.message })),
     });
   }

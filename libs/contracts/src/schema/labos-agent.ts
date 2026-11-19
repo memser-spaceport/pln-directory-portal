@@ -42,6 +42,29 @@ export const LabosAgentContextSchema = z
     path: ['jobUid'],
   });
 
+/** S6 (LAB-3318, contract 10.3): at most 5 mentions in one C1 message. */
+export const LABOS_AGENT_MAX_MENTIONS = 5;
+
+/** The pages a member can mention (contract 10.3). `job` is the job board. */
+export const LABOS_AGENT_MENTION_PAGES = ['home', 'job', 'profile'] as const;
+
+/**
+ * One item the member picked with `@` or + (S6, contract 10.3). `.strict()` rejects an extra key, for example `uid` on
+ * a `page` item or a `label`.
+ */
+export const LabosAgentMentionSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('member'), uid: z.string().min(1).max(64) }).strict(),
+  z.object({ type: z.literal('team'), uid: z.string().min(1).max(64) }).strict(),
+  z.object({ type: z.literal('news'), uid: z.string().min(1).max(64) }).strict(),
+  z.object({ type: z.literal('page'), page: z.enum(LABOS_AGENT_MENTION_PAGES) }).strict(),
+]);
+export type LabosAgentMention = z.infer<typeof LabosAgentMentionSchema>;
+
+/** The key of a mention: `type:uid`, or `page:<page>`. Two mentions with one key give 400. */
+export function labosAgentMentionKey(mention: LabosAgentMention): string {
+  return mention.type === 'page' ? `page:${mention.page}` : `${mention.type}:${mention.uid}`;
+}
+
 /** Body of `POST /v1/labos-agent/chat`. */
 export const LabosAgentChatRequestSchema = z.object({
   threadId: z.string().min(1).max(64),
@@ -53,10 +76,104 @@ export const LabosAgentChatRequestSchema = z.object({
       message: 'message must be 1 to 2000 characters after trim',
     }),
   context: LabosAgentContextSchema.optional(),
+  mentions: z
+    .array(LabosAgentMentionSchema)
+    .max(LABOS_AGENT_MAX_MENTIONS)
+    .refine((items) => new Set(items.map(labosAgentMentionKey)).size === items.length, {
+      message: 'mentions must not have two items with the same type and uid, or the same page',
+    })
+    .optional(),
 });
 
 export type LabosAgentContext = z.infer<typeof LabosAgentContextSchema>;
 export type LabosAgentChatRequest = z.infer<typeof LabosAgentChatRequestSchema>;
+
+/** The item types of C4 (contract 10.2). Pages are a frontend list (10.5). */
+export const LABOS_AGENT_MENTION_TYPES = ['member', 'team', 'news'] as const;
+export type LabosAgentMentionType = typeof LABOS_AGENT_MENTION_TYPES[number];
+
+/** C4 query limits (contract 10.2). */
+export const LABOS_AGENT_MENTIONS_QUERY_LIMITS = {
+  maxQueryLength: 64,
+  minLimit: 1,
+  maxLimit: 10,
+  defaultLimit: 5,
+} as const;
+
+const { maxQueryLength, minLimit, maxLimit, defaultLimit } = LABOS_AGENT_MENTIONS_QUERY_LIMITS;
+
+/**
+ * Query of `GET /v1/labos-agent/mentions` (C4). Query values are strings. `q` is trimmed (absent is empty). `types` is a
+ * comma list; absent means all three types. `limit` is an integer for each type.
+ */
+export const LabosAgentMentionsQuerySchema = z.object({
+  q: z
+    .string()
+    .optional()
+    .transform((value) => (value ?? '').trim())
+    .refine((value) => value.length <= maxQueryLength, {
+      message: `q must be 0 to ${maxQueryLength} characters after trim`,
+    }),
+  types: z
+    .string()
+    .optional()
+    .transform((value) =>
+      value === undefined ? [...LABOS_AGENT_MENTION_TYPES] : value.split(',').map((item) => item.trim())
+    )
+    .refine(
+      (items) =>
+        items.length > 0 && items.every((item) => (LABOS_AGENT_MENTION_TYPES as readonly string[]).includes(item)),
+      { message: `types must be a comma list of ${LABOS_AGENT_MENTION_TYPES.join(', ')}` }
+    )
+    .transform((items) => [...new Set(items)] as LabosAgentMentionType[]),
+  limit: z
+    .string()
+    .optional()
+    .refine(
+      (value) =>
+        value === undefined || (/^\d{1,3}$/.test(value) && Number(value) >= minLimit && Number(value) <= maxLimit),
+      { message: `limit must be an integer from ${minLimit} to ${maxLimit}` }
+    )
+    .transform((value) => (value === undefined ? defaultLimit : Number(value))),
+});
+export type LabosAgentMentionsQuery = z.infer<typeof LabosAgentMentionsQuerySchema>;
+
+/** C4 member row. No email, phone, handles, Telegram, office hours or bio. */
+export type LabosAgentMentionMember = {
+  type: 'member';
+  uid: string;
+  name: string;
+  imageUrl: string | null;
+  teamName: string | null;
+  role: string | null;
+};
+
+/** C4 team row. `shortDescription` is cut to 140 characters. */
+export type LabosAgentMentionTeam = {
+  type: 'team';
+  uid: string;
+  name: string;
+  logoUrl: string | null;
+  shortDescription: string | null;
+};
+
+/** C4 news row. `eventDate` is ISO. */
+export type LabosAgentMentionNews = {
+  type: 'news';
+  uid: string;
+  title: string;
+  teamUid: string;
+  teamName: string;
+  eventDate: string;
+};
+
+/** Response 200 of C4. Each key is always present. */
+export type LabosAgentMentionsResponse = {
+  q: string;
+  members: LabosAgentMentionMember[];
+  teams: LabosAgentMentionTeam[];
+  news: LabosAgentMentionNews[];
+};
 
 /** Response of `GET /v1/labos-agent/access`. */
 export type LabosAgentAccessResponse = { enabled: boolean };

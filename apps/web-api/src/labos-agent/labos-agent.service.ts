@@ -16,13 +16,15 @@ import {
   LabosAgentConfirmRequest,
   LabosAgentConfirmResponse,
   LabosAgentDraft,
+  LabosAgentMention,
+  LabosAgentMentionsQuery,
+  LabosAgentMentionsResponse,
   LabosAgentProposal,
 } from 'libs/contracts/src/schema/labos-agent';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
 import { HuskyAiService } from '../husky/husky-ai.service';
 import { IntroRequestsService } from '../intro-requests/intro-requests.service';
 import { JobOpeningsQueryService } from '../job-openings/job-openings-query.service';
-import { newsRow } from '../mcp/mcp-news-tools';
 import { McpToolCatalog } from '../mcp/mcp-tool-catalog';
 import { McpAdminCaps, McpScopesService } from '../mcp/mcp-scopes.service';
 import { McpActorContext, McpToolDef } from '../mcp/mcp-tools';
@@ -32,13 +34,23 @@ import { TeamNewsQueryService } from '../team-news/team-news-query.service';
 import { TeamsService } from '../teams/teams.service';
 import { LabosAgentAccessService } from './labos-agent-access.service';
 import { draftIntroTool, IntroTurnTarget } from './labos-agent-drafts';
+import { searchMentions } from './labos-agent-mentions';
 import { mcpToolsAsAgentTools } from './labos-agent-news.tools';
 import {
+  HOME_MENTION_SENTENCE,
   JOB_BOARD_SENTENCE,
   jobPagePrompt,
   memberPagePrompt,
+  memberPageRow,
+  MENTIONS_SENTENCE,
+  NEWS_SOURCE_HINT,
+  newsStoryPrompt,
+  newsStoryRow,
+  NO_PAGE_SENTENCE,
+  PROFILE_HINT,
   profilePrompt,
   teamPagePrompt,
+  teamPageRow,
 } from './labos-agent-page-context';
 import { canChangeTeam, LabosAgentProposalStore, proposeTool, StoredProposal } from './labos-agent-proposals';
 
@@ -82,10 +94,24 @@ export class LabosAgentService {
     return this.access.isEnabled(await resolveLiveMemberUidByEmail(this.prisma, email));
   }
 
+  /**
+   * C4 (LAB-3318, contract 10.2): the mention picker search. The gate comes first (403), so a member outside the gate
+   * runs no search. A database search only: no model call, no write, no notification.
+   */
+  async mentions(email: string, query: LabosAgentMentionsQuery): Promise<LabosAgentMentionsResponse> {
+    const memberUid = await this.enabledMember(email);
+    const access = await this.accessControl.getMemberAccess(memberUid);
+    return searchMentions(this.prisma, memberUid, new Set(access.effectivePermissions ?? []), query);
+  }
+
   /** Runs the checks that come before the stream (403, 404), then returns the stream. */
   async chat(email: string, body: LabosAgentChatRequest): Promise<ReadableStream> {
     const memberUid = await this.enabledMember(email);
-    const { promptContext, introTarget } = await this.pageContext(body, memberUid, email);
+    const page = await this.pageContext(body, memberUid, email);
+    // S6 (contract 10.4): the mention lookups come after the context lookup, so a bad context gives its 404 first.
+    const mentioned = await this.mentionContext(body, memberUid, email);
+    const promptContext = joinPrompt(page.promptContext, mentioned.promptContext, !body.context);
+    const introTargets = uniqueTargets([...(page.introTarget ? [page.introTarget] : []), ...mentioned.introTargets]);
     const ctx = await this.actor(memberUid, email);
     // The member's real RBAC permissions and the admin MCP caps pick the tools, as on the MCP server (LAB-3299).
     const allowed = await this.tools(ctx);
@@ -102,7 +128,7 @@ export class LabosAgentService {
     );
     // S3 (LAB-3300): an agent-only tool, not in McpToolCatalog, so the admin MCP caps do not apply. It writes nothing.
     const drafts: LabosAgentDraft[] = [];
-    const draftIntro = draftIntroTool(ctx, { introRequests: this.introRequests, target: introTarget, drafts });
+    const draftIntro = draftIntroTool(ctx, { introRequests: this.introRequests, targets: introTargets, drafts });
 
     return this.huskyAiService.createContextualToolsResponse(
       { question: body.message, threadId: body.threadId, chatId: body.chatId },
@@ -251,28 +277,77 @@ export class LabosAgentService {
     if (context.page !== 'news-story' || !context.newsUid) {
       return { promptContext: 'The member is on the LabOS Home page.' };
     }
-    const item = await this.teamNewsQuery.getTeamNewsItemDto(context.newsUid, new Set(), memberUid);
-    if (!item) {
-      throw new NotFoundException({
-        statusCode: 404,
-        code: LABOS_AGENT_ERROR_CODES.NEWS_NOT_FOUND,
-        message: `News item not found: ${context.newsUid}`,
-      });
+    return { promptContext: newsStoryPrompt(await newsStoryRow(this.teamNewsQuery, context.newsUid, memberUid)) };
+  }
+
+  /**
+   * S6 (LAB-3318, contract 10.4 and 10.6): the mention items of the turn. The items come from `mentions`, never from the
+   * message text. One item list: `context` first, then `mentions`; a later item with the key of an earlier item is
+   * dropped before its lookup. The lookups run in array order with the S5 rules, and the first 404 stops the turn with
+   * `mentionIndex`. The resolvers only read: no write and no notification.
+   */
+  private async mentionContext(
+    body: LabosAgentChatRequest,
+    memberUid: string,
+    email: string
+  ): Promise<{ promptContext?: string; introTargets: IntroTurnTarget[] }> {
+    const seen = new Set<string>();
+    const contextKey = pageItemKey(body.context, memberUid);
+    if (contextKey) seen.add(contextKey);
+    const kept: Array<{ mention: LabosAgentMention; index: number }> = [];
+    (body.mentions ?? []).forEach((mention, index) => {
+      const key = mentionItemKey(mention, memberUid);
+      if (seen.has(key)) return;
+      seen.add(key);
+      kept.push({ mention, index });
+    });
+    if (!kept.length) return { introTargets: [] };
+
+    const lines: string[] = [];
+    const targets: Array<{ type: 'member' | 'team'; uid: string; line: number }> = [];
+    for (const { mention, index } of kept) {
+      const n = lines.length + 1;
+      try {
+        lines.push(await this.mentionLine(mention, n, memberUid, email));
+      } catch (error) {
+        throw withMentionIndex(error, index);
+      }
+      if ((mention.type === 'member' && mention.uid !== memberUid) || mention.type === 'team') {
+        targets.push({ type: mention.type, uid: mention.uid, line: lines.length - 1 });
+      }
     }
-    const row = newsRow(item);
-    const story = {
-      uid: row.uid,
-      title: row.title,
-      summary: row.summary,
-      teamName: row.teamName,
-      eventDate: row.eventDate,
-    };
-    const promptContext =
-      'The member is reading this LabOS news story. "This story" means this item. ' +
-      `Call get_news_item with uid ${row.uid} for its source before you answer about it. Story: ${JSON.stringify(
-        story
-      )}`;
-    return { promptContext };
+    // S5 9.5 rule for each member and team item: an intro target when the S3 agent lookup gives a name.
+    const introTargets: IntroTurnTarget[] = [];
+    for (const target of targets) {
+      const name = await this.introRequests.findAgentTargetName(
+        target.type === 'member' ? 'MEMBER' : 'TEAM',
+        target.uid
+      );
+      if (!name) continue;
+      introTargets.push({ type: target.type, uid: target.uid, name });
+      lines[target.line] +=
+        ` When the member asks for an intro request to this ${target.type}, ` +
+        `call draft_intro with type "${target.type}" and targetUid "${target.uid}". You never send the request.`;
+    }
+    return { promptContext: [MENTIONS_SENTENCE, ...lines].join('\n'), introTargets };
+  }
+
+  /** One line for a mention: `Item <n> (<type>): <row>`, with the S5 rows and the S1 story row (contract 10.6). */
+  private async mentionLine(mention: LabosAgentMention, n: number, memberUid: string, email: string): Promise<string> {
+    if (mention.type === 'page' || (mention.type === 'member' && mention.uid === memberUid)) {
+      const page = mention.type === 'page' ? mention.page : 'profile';
+      if (page === 'profile') return `Item ${n} (page): ${JSON.stringify({ uid: memberUid })} ${PROFILE_HINT}`;
+      if (page === 'job') return `Item ${n} (page): ${JOB_BOARD_SENTENCE}`;
+      return `Item ${n} (page): ${HOME_MENTION_SENTENCE}`;
+    }
+    if (mention.type === 'member') {
+      return `Item ${n} (member): ${JSON.stringify(await memberPageRow(this.prisma, mention.uid))}`;
+    }
+    if (mention.type === 'team') {
+      return `Item ${n} (team): ${JSON.stringify(await teamPageRow(this.teams, this.prisma, mention.uid, email))}`;
+    }
+    const story = await newsStoryRow(this.teamNewsQuery, mention.uid, memberUid);
+    return `Item ${n} (news): ${JSON.stringify(story)} ${NEWS_SOURCE_HINT}`;
   }
 
   /**
@@ -317,6 +392,53 @@ export class LabosAgentService {
       'You never send the request. The member edits the draft and presses Send.';
     return { promptContext, introTarget };
   }
+}
+
+/** The dedupe key of the `context` item (contract 10.4). The `intro` page and a job post have no mention key. */
+function pageItemKey(context: LabosAgentChatRequest['context'], memberUid: string): string | undefined {
+  if (!context) return undefined;
+  if (context.page === 'profile' || (context.page === 'member' && context.memberUid === memberUid)) return 'profile';
+  if (context.page === 'member') return `member:${context.memberUid}`;
+  if (context.page === 'team') return `team:${context.teamUid}`;
+  if (context.page === 'news-story') return `news:${context.newsUid}`;
+  if (context.page === 'job') return context.jobUid ? undefined : 'job';
+  if (context.page === 'home') return 'home';
+  return undefined;
+}
+
+/** The dedupe key of a mention. The own member uid is the `profile` item. */
+function mentionItemKey(mention: LabosAgentMention, memberUid: string): string {
+  if (mention.type === 'page') return mention.page;
+  if (mention.type === 'member' && mention.uid === memberUid) return 'profile';
+  return `${mention.type}:${mention.uid}`;
+}
+
+/** A 404 of a mention lookup gets `mentionIndex`: the 0-based index of the item in `mentions`. */
+function withMentionIndex(error: unknown, index: number): unknown {
+  if (!(error instanceof NotFoundException)) return error;
+  const body = error.getResponse();
+  if (typeof body !== 'object' || body === null) return error;
+  return new NotFoundException({ ...body, mentionIndex: index });
+}
+
+/**
+ * The prompt context of the turn (contract 10.6): the S5 page text first, then the mention lines. With no context and
+ * no mentions, the no-page sentence, so the model does not claim that it read a page.
+ */
+function joinPrompt(page: string | undefined, mentioned: string | undefined, noContext: boolean): string | undefined {
+  if (!page && !mentioned) return noContext ? NO_PAGE_SENTENCE : undefined;
+  return [page, mentioned].filter(Boolean).join('\n');
+}
+
+/** One target for each type and uid, in order. */
+function uniqueTargets(targets: IntroTurnTarget[]): IntroTurnTarget[] {
+  const seen = new Set<string>();
+  return targets.filter((target) => {
+    const key = `${target.type}:${target.uid}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function summary(stored: StoredProposal): string {
