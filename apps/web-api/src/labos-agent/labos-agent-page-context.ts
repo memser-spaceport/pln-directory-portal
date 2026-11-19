@@ -2,6 +2,7 @@ import { HttpException, NotFoundException } from '@nestjs/common';
 import { TeamStatus } from '@prisma/client';
 import { LABOS_AGENT_ERROR_CODES } from 'libs/contracts/src/schema/labos-agent';
 import { JobOpeningsQueryService } from '../job-openings/job-openings-query.service';
+import { directoryVisibleMemberWhere } from '../members/member-visibility';
 import { newsRow } from '../mcp/mcp-news-tools';
 import { PrismaService } from '../shared/prisma.service';
 import { stripHtmlToPlainText } from '../team-news/team-news-body-html.util';
@@ -64,14 +65,15 @@ export function profilePrompt(memberUid: string): string {
 }
 
 /**
- * `member` page: a live member (no `deletedAt`, the S3 member rule), or 404 MEMBER_NOT_FOUND. Only public fields:
+ * `member` page: a live member (no `deletedAt`) whose public profile is reachable (`directoryVisibleMemberWhere`, the
+ * rule of global search), or 404 MEMBER_NOT_FOUND (LAB-3318 review). Only public fields:
  * no email, handles, Telegram, office hours or viewer-gated fields. Teams are current roles on teams that are not
  * deleted (INACTIVE).
  */
 export async function memberPageRow(prisma: PrismaService, uid: string): Promise<MemberPageRow> {
   const now = new Date();
   const member = await prisma.member.findFirst({
-    where: { uid, deletedAt: null },
+    where: { uid, deletedAt: null, ...directoryVisibleMemberWhere() },
     select: {
       uid: true,
       name: true,

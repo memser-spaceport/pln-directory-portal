@@ -16,7 +16,9 @@ jest.mock('ai', () => ({ tool: (def: unknown) => def }));
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { MCP_SCOPE_KEYS } from 'libs/contracts/src/schema/mcp-scopes';
 import { LabosAgentChatRequestSchema } from 'libs/contracts/src/schema/labos-agent';
+import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { IntroRequestsService } from '../intro-requests/intro-requests.service';
+import { directoryVisibleMemberWhere } from '../members/member-visibility';
 import { JobOpeningsQueryService } from '../job-openings/job-openings-query.service';
 import { PL_INFRA_POLICY_CODE } from '../pl-infra-members/pl-infra-members.constants';
 import { TeamsService } from '../teams/teams.service';
@@ -73,6 +75,10 @@ type Person = {
   skills: string[];
   roles: Role[];
   policies: string[];
+  /** The `memberApproval.state` (LAB-3318 review). */
+  approval: 'APPROVED' | 'PENDING' | 'REJECTED' | null;
+  /** Holds `member.profile.visible`. */
+  profileVisible: boolean;
 };
 type Team = { uid: string; name: string; status: string; accessLevel: string | null; shortDescription: string | null };
 type Job = {
@@ -96,8 +102,15 @@ const person = (uid: string, name: string, extra: Partial<Person> = {}): Person 
   skills: [],
   roles: [],
   policies: [],
+  approval: 'APPROVED',
+  profileVisible: false,
   ...extra,
 });
+
+/** The rule of `directoryVisibleMemberWhere`: approved, or `member.profile.visible` and not REJECTED. */
+const directoryVisible = (row: Person) =>
+  row.approval === 'APPROVED' || (row.approval !== 'REJECTED' && row.profileVisible);
+const VISIBLE_OR = JSON.stringify(directoryVisibleMemberWhere().OR);
 
 const job = (uid: string, extra: Partial<Job> = {}): Job => ({
   uid,
@@ -149,7 +162,7 @@ function pick(row: Record<string, unknown>, select: Record<string, unknown> | un
   return Object.fromEntries(Object.keys(select).map((key) => [key, row[key]]));
 }
 
-type Viewer = { isDirectoryAdmin?: boolean; leadingTeams?: string[]; policies?: string[] };
+type Viewer = { isDirectoryAdmin?: boolean; leadingTeams?: string[]; policies?: string[]; permissions?: string[] };
 
 function setup(viewer: Viewer = {}, env: string = APP_ENV.DEV) {
   process.env.ENVIRONMENT = env;
@@ -172,6 +185,11 @@ function setup(viewer: Viewer = {}, env: string = APP_ENV.DEV) {
     person('m-gone', 'Gone', { deletedAt: PAST }),
     // S6 (LAB-3318): a second member for the mention tests.
     person('m-alan', 'Alan Turing'),
+    // LAB-3318 review: members who are not directory-visible, and one who is visible by permission only.
+    person('m-pending', 'Pending Person', { approval: 'PENDING' }),
+    person('m-rejected', 'Rejected Person', { approval: 'REJECTED', profileVisible: true }),
+    person('m-no-approval', 'No Approval', { approval: null }),
+    person('m-visible', 'Visible Person', { approval: 'PENDING', profileVisible: true }),
   ];
   const teams = new Map<string, Team>(
     [
@@ -230,11 +248,14 @@ function setup(viewer: Viewer = {}, env: string = APP_ENV.DEV) {
   const prisma = {
     member: {
       findFirst: jest.fn(async ({ where, select }: any) => {
-        known(where, ['uid', 'email', 'deletedAt']);
+        known(where, ['uid', 'email', 'deletedAt', 'OR']);
+        // The only `OR` the fake knows is the real `directoryVisibleMemberWhere()` rule.
+        if (where.OR && JSON.stringify(where.OR) !== VISIBLE_OR) throw new Error('fake Prisma: unsupported OR');
         const row = people.find(
           (item) =>
             (where.email ? item.email === where.email : item.uid === where.uid) &&
-            (!('deletedAt' in where) || item.deletedAt === where.deletedAt)
+            (!('deletedAt' in where) || item.deletedAt === where.deletedAt) &&
+            (!where.OR || directoryVisible(item))
         );
         if (!row) return null;
         if (where.email) return requester(row, select);
@@ -331,13 +352,19 @@ function setup(viewer: Viewer = {}, env: string = APP_ENV.DEV) {
   const newsQuery = {
     getTeamNewsItemDto: jest.fn(async (uid: string) => (uid === NEWS_ITEM.uid ? NEWS_ITEM : null)),
   };
+  // LAB-3318 review: the viewer has `member.search.read` unless the test says otherwise.
+  const accessControl = {
+    getMemberAccess: jest
+      .fn()
+      .mockResolvedValue({ effectivePermissions: viewer.permissions ?? [MEMBER_PERMISSIONS.SEARCH_READ] }),
+  };
   const service = new LabosAgentService(
     prisma as any,
     new LabosAgentAccessService(),
     husky as any,
     newsQuery as any,
     { forApp: jest.fn(() => []) } as any,
-    { getMemberAccess: jest.fn().mockResolvedValue({ effectivePermissions: [] }) } as any,
+    accessControl as any,
     new LabosAgentProposalStore({ get: jest.fn(), set: jest.fn(), del: jest.fn() } as any),
     { adminCaps: jest.fn(async () => Object.fromEntries(MCP_SCOPE_KEYS.map((key) => [key, 'write']))) } as any,
     introRequests,
@@ -386,7 +413,20 @@ function setup(viewer: Viewer = {}, env: string = APP_ENV.DEV) {
     assert: jest.spyOn(teamsService, 'assertTeamVisibleToViewer'),
     getJob: jest.spyOn(jobsService, 'getJobOpening'),
   };
-  return { prisma, husky, res, turn, chatError, turnBody, chatErrorBody, spies, membersService, newsQuery, telegram };
+  return {
+    prisma,
+    husky,
+    res,
+    turn,
+    chatError,
+    turnBody,
+    chatErrorBody,
+    spies,
+    membersService,
+    newsQuery,
+    telegram,
+    accessControl,
+  };
 }
 
 /** The JSON after the label in the prompt context. */
@@ -511,6 +551,32 @@ describe('LabOS agent page context (LAB-3302)', () => {
     ])('S5-C9: %s gives 404 MEMBER_NOT_FOUND and no model call', async (_name, memberUid) => {
       const h = setup();
       expect404(await h.chatError({ page: 'member', memberUid }), 'MEMBER_NOT_FOUND', h);
+    });
+
+    it.each([
+      ['a pending member', 'm-pending'],
+      ['a rejected member with member.profile.visible', 'm-rejected'],
+      ['a member with no approval', 'm-no-approval'],
+    ])('LAB-3318 review: %s (not directory-visible) gives 404 MEMBER_NOT_FOUND', async (_name, memberUid) => {
+      const h = setup();
+      expect404(await h.chatError({ page: 'member', memberUid }), 'MEMBER_NOT_FOUND', h);
+      expect(h.prisma.member.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { uid: memberUid, deletedAt: null, ...directoryVisibleMemberWhere() } })
+      );
+    });
+
+    it('LAB-3318 review: a pending member with member.profile.visible gives the member row', async () => {
+      const h = setup();
+      const { prompt } = await h.turn({ page: 'member', memberUid: 'm-visible' });
+      expect(promptRow(prompt, 'Member')).toEqual(
+        expect.objectContaining({ uid: 'm-visible', name: 'Visible Person' })
+      );
+    });
+
+    it('LAB-3318 review: the member page needs no member.search.read (the S5 rule stays)', async () => {
+      const h = setup({ permissions: [] });
+      const { prompt } = await h.turn({ page: 'member', memberUid: 'm-grace' });
+      expect(promptRow(prompt, 'Member').uid).toBe('m-grace');
     });
 
     it('S5-C10: an unknown teamUid gives 404 TEAM_NOT_FOUND', async () => {
@@ -947,6 +1013,59 @@ describe('LabOS agent mentions in chat (LAB-3318)', () => {
       expect(h.prisma.member.findFirst).not.toHaveBeenCalled();
       expect(h.newsQuery.getTeamNewsItemDto).not.toHaveBeenCalled();
       expect(h.husky.createContextualToolsResponse).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['a pending member', 'm-pending'],
+      ['a rejected member with member.profile.visible', 'm-rejected'],
+      ['a member with no approval', 'm-no-approval'],
+    ])('LAB-3318 review: %s mention (not directory-visible) gives 404 MEMBER_NOT_FOUND', async (_n, uid) => {
+      const h = setup();
+      const error = await h.chatErrorBody({
+        mentions: [
+          { type: 'team', uid: 't-acme' },
+          { type: 'member', uid },
+        ],
+      });
+      expectMention404(error, 'MEMBER_NOT_FOUND', 1, h);
+    });
+
+    it('LAB-3318 review: a visible member mention gives the member row', async () => {
+      const h = setup();
+      const { prompt } = await h.turnBody({ mentions: [{ type: 'member', uid: 'm-visible' }] });
+      expect(itemRow(prompt, 1, 'member')).toEqual(expect.objectContaining({ uid: 'm-visible' }));
+    });
+
+    it('LAB-3318 review: a member mention without member.search.read gives 404 MEMBER_NOT_FOUND and no lookup', async () => {
+      const h = setup({ permissions: ['team.search.read'] });
+      const error = await h.chatErrorBody({
+        mentions: [
+          { type: 'team', uid: 't-acme' },
+          { type: 'member', uid: 'm-grace' },
+        ],
+      });
+      expect(error).not.toBeInstanceOf(ForbiddenException);
+      expectMention404(error, 'MEMBER_NOT_FOUND', 1, h);
+      expect(h.accessControl.getMemberAccess).toHaveBeenCalledWith('m-ada');
+      expect(h.prisma.member.findFirst).not.toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ uid: 'm-grace' }) })
+      );
+    });
+
+    it('LAB-3318 review: team, news and own-member mentions need no member.search.read', async () => {
+      const h = setup({ permissions: [] });
+      const { prompt } = await h.turnBody({
+        mentions: [
+          { type: 'team', uid: 't-acme' },
+          { type: 'news', uid: 'news-1' },
+          { type: 'member', uid: 'm-ada' },
+        ],
+      });
+      expect(itemRow(prompt, 1, 'team').uid).toBe('t-acme');
+      expect(prompt).toContain('Item 2 (news)');
+      expect(prompt).toContain('Item 3 (page)');
+      // One read only: the MCP actor. The mention step reads no permissions when no other member is mentioned.
+      expect(h.accessControl.getMemberAccess).toHaveBeenCalledTimes(1);
     });
 
     it('S6-C33: a member mention with the session uid gives the profile item and no lookup', async () => {

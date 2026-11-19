@@ -21,6 +21,7 @@ import {
   LabosAgentMentionsResponse,
   LabosAgentProposal,
 } from 'libs/contracts/src/schema/labos-agent';
+import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
 import { HuskyAiService } from '../husky/husky-ai.service';
 import { IntroRequestsService } from '../intro-requests/intro-requests.service';
@@ -302,13 +303,17 @@ export class LabosAgentService {
       kept.push({ mention, index });
     });
     if (!kept.length) return { introTargets: [] };
+    // C4 rule (contract 10.2.2): a member item needs `member.search.read`. Read the permissions once, only when needed.
+    const permissions = kept.some(({ mention }) => mention.type === 'member' && mention.uid !== memberUid)
+      ? new Set((await this.accessControl.getMemberAccess(memberUid)).effectivePermissions ?? [])
+      : new Set<string>();
 
     const lines: string[] = [];
     const targets: Array<{ type: 'member' | 'team'; uid: string; line: number }> = [];
     for (const { mention, index } of kept) {
       const n = lines.length + 1;
       try {
-        lines.push(await this.mentionLine(mention, n, memberUid, email));
+        lines.push(await this.mentionLine(mention, n, memberUid, email, permissions));
       } catch (error) {
         throw withMentionIndex(error, index);
       }
@@ -333,7 +338,13 @@ export class LabosAgentService {
   }
 
   /** One line for a mention: `Item <n> (<type>): <row>`, with the S5 rows and the S1 story row (contract 10.6). */
-  private async mentionLine(mention: LabosAgentMention, n: number, memberUid: string, email: string): Promise<string> {
+  private async mentionLine(
+    mention: LabosAgentMention,
+    n: number,
+    memberUid: string,
+    email: string,
+    permissions: Set<string>
+  ): Promise<string> {
     if (mention.type === 'page' || (mention.type === 'member' && mention.uid === memberUid)) {
       const page = mention.type === 'page' ? mention.page : 'profile';
       if (page === 'profile') return `Item ${n} (page): ${JSON.stringify({ uid: memberUid })} ${PROFILE_HINT}`;
@@ -341,6 +352,15 @@ export class LabosAgentService {
       return `Item ${n} (page): ${HOME_MENTION_SENTENCE}`;
     }
     if (mention.type === 'member') {
+      // LAB-3318 review: without `member.search.read` the member is hidden, as in C4. 404 does not tell that it exists.
+      if (!permissions.has(MEMBER_PERMISSIONS.SEARCH_READ)) {
+        throw agentError(
+          NotFoundException,
+          404,
+          LABOS_AGENT_ERROR_CODES.MEMBER_NOT_FOUND,
+          `Member not found: ${mention.uid}`
+        );
+      }
       return `Item ${n} (member): ${JSON.stringify(await memberPageRow(this.prisma, mention.uid))}`;
     }
     if (mention.type === 'team') {
