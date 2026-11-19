@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import {
   emptyPLEventDetails,
+  isHttpUrl,
   PLEventDetails,
   PLEventDetailsAgenda,
   PLEventDetailsParty,
@@ -51,6 +52,20 @@ function readString(value: unknown, field: keyof PLEventDetails, onInvalid: OnIn
     return null;
   }
   return nonEmptyString(value);
+}
+
+/**
+ * LAB-3332: a link that is not an absolute `http` or `https` URL (for example
+ * `javascript:`) reads as null, so the page never renders it as a link.
+ */
+function readHttpUrl(value: unknown, field: keyof PLEventDetails, onInvalid: OnInvalidDetailsField): string | null {
+  const url = readString(value, field, onInvalid);
+  if (url === null) return null;
+  if (!isHttpUrl(url)) {
+    onInvalid(field, 'expected an http or https URL');
+    return null;
+  }
+  return url;
 }
 
 function readTag(item: unknown): PLEventDetailsTag | null {
@@ -135,6 +150,8 @@ export function mapEventDetails(raw: unknown, onInvalid: OnInvalidDetailsField =
     coHosts: readParties(raw.co_hosts, 'coHosts', onInvalid),
     sponsors: readParties(raw.sponsors, 'sponsors', onInvalid),
     agenda: readAgenda(raw.agenda, onInvalid),
+    // The events service names it `location_url`; `locationUrl` is a fallback for a camelCase source.
+    locationUrl: readHttpUrl(isAbsent(raw.location_url) ? raw.locationUrl : raw.location_url, 'locationUrl', onInvalid),
   };
 }
 
@@ -156,6 +173,7 @@ export function readEventDetails(additionalInfo: unknown): PLEventDetails {
     coHosts: readParties(stored.coHosts, 'coHosts', noop),
     sponsors: readParties(stored.sponsors, 'sponsors', noop),
     agenda: readAgenda(stored.agenda, noop),
+    locationUrl: readHttpUrl(stored.locationUrl, 'locationUrl', noop),
   };
 }
 
