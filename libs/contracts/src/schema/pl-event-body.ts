@@ -325,8 +325,11 @@ export function parseEventSubmitBody(
   const parsed = PLEventSubmitBodySchema.safeParse(raw ?? {});
   if (parsed.success) return { success: true, data: parsed.data };
 
-  const issues: Array<{ path: Array<string | number> | string; message: string }> = [...parsed.error.issues];
-  const named = new Set(parsed.error.issues.map((issue) => String(issue.path[0] ?? '')));
+  // The cast keeps this file compiling in the back-office build, which is not strict and so does not narrow the
+  // result of `safeParse` by `success`.
+  const zodIssues = (parsed as z.SafeParseError<unknown>).error.issues;
+  const issues: Array<{ path: Array<string | number> | string; message: string }> = [...zodIssues];
+  const named = new Set(zodIssues.map((issue) => String(issue.path[0] ?? '')));
   if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
     const body = raw as Record<string, unknown>;
     const extra = eventSubmissionIssues(
