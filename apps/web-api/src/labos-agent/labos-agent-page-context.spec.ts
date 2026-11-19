@@ -360,7 +360,7 @@ function setup(viewer: Viewer = {}, env: string = APP_ENV.DEV) {
   };
   const service = new LabosAgentService(
     prisma as any,
-    new LabosAgentAccessService(),
+    new LabosAgentAccessService({ hasPermission: jest.fn().mockResolvedValue({ allowed: false }) } as any),
     husky as any,
     newsQuery as any,
     { forApp: jest.fn(() => []) } as any,

@@ -41,7 +41,7 @@ const NEWS_ITEM = {
 
 const VALID = { threadId: 'thread-1', chatId: 'chat-1', message: '  What does this story mean?  ' };
 
-function setup(env = APP_ENV.DEV as string) {
+function setup(env = APP_ENV.DEV as string, pilot = false) {
   process.env.ENVIRONMENT = env;
   const prisma = { member: { findUnique: jest.fn().mockResolvedValue({ uid: 'member-1', deletedAt: null }) } };
   const stream = { pipeTo: jest.fn().mockResolvedValue(undefined) };
@@ -61,7 +61,7 @@ function setup(env = APP_ENV.DEV as string) {
   const accessControl = { getMemberAccess: jest.fn().mockResolvedValue({ effectivePermissions: ['forum.read'] }) };
   const service = new LabosAgentService(
     prisma as any,
-    new LabosAgentAccessService(),
+    new LabosAgentAccessService({ hasPermission: jest.fn().mockResolvedValue({ allowed: pilot }) } as any),
     husky as any,
     query as any,
     catalog as any,
@@ -133,7 +133,7 @@ describe('LabosAgentController', () => {
     expect(error.getResponse()).toEqual(expect.objectContaining({ statusCode: 400, code: 'VALIDATION_ERROR' }));
   });
 
-  it('returns 403 AGENT_NOT_ENABLED on production', async () => {
+  it('returns 403 AGENT_NOT_ENABLED on production for a member without labos_agent.use', async () => {
     const error = await chatError(VALID, APP_ENV.PRODUCTION);
     expect(error).toBeInstanceOf(ForbiddenException);
     expect(error.getResponse()).toEqual(expect.objectContaining({ statusCode: 403, code: 'AGENT_NOT_ENABLED' }));
@@ -217,16 +217,81 @@ describe('LabosAgentController', () => {
     const prod = setup(APP_ENV.PRODUCTION);
     await expect(prod.controller.access(prod.req)).resolves.toEqual({ enabled: false });
   });
+
+  it('on production, GET access and the chat are on for a member with labos_agent.use (LAB-3344)', async () => {
+    const prod = setup(APP_ENV.PRODUCTION, true);
+    await expect(prod.controller.access(prod.req)).resolves.toEqual({ enabled: true });
+    await prod.controller.chat(VALID, prod.req, prod.res as any);
+    expect(prod.husky.createContextualToolsResponse).toHaveBeenCalledTimes(1);
+  });
 });
 
-describe('LabosAgentAccessService.isEnabled', () => {
-  it('is on for a live member outside production, off on production and without a member', () => {
-    const access = new LabosAgentAccessService();
-    process.env.ENVIRONMENT = APP_ENV.DEV;
-    expect(access.isEnabled('member-1')).toBe(true);
-    expect(access.isEnabled(undefined)).toBe(false);
+describe('LabosAgentAccessService.isEnabled (LAB-3344, D1 option A)', () => {
+  const originalEnv = process.env.ENVIRONMENT;
+  afterEach(() => {
+    process.env.ENVIRONMENT = originalEnv;
+  });
+
+  /** A fake of AccessControlV2Service.hasPermission over direct and policy grants, like getMemberAccess. */
+  function accessFor(grants: { direct?: string[]; policies?: Record<string, string[]> }) {
+    const hasPermission = jest.fn(async (memberUid: string, code: string) => {
+      const effective = [...(grants.direct ?? []), ...Object.values(grants.policies ?? {}).flat()];
+      return { memberUid, permissionCode: code, allowed: effective.includes(code) };
+    });
+    return { access: new LabosAgentAccessService({ hasPermission } as any), hasPermission };
+  }
+
+  it('on production: enables a member with labos_agent.use granted directly', async () => {
     process.env.ENVIRONMENT = APP_ENV.PRODUCTION;
-    expect(access.isEnabled('member-1')).toBe(false);
+    const { access, hasPermission } = accessFor({ direct: ['labos_agent.use'] });
+    await expect(access.isEnabled('member-1')).resolves.toBe(true);
+    expect(hasPermission).toHaveBeenCalledWith('member-1', 'labos_agent.use');
+  });
+
+  it('on production: enables a member with labos_agent.use through the labos_agent_pilot policy', async () => {
+    process.env.ENVIRONMENT = APP_ENV.PRODUCTION;
+    const { access } = accessFor({ policies: { labos_agent_pilot: ['labos_agent.use'] } });
+    await expect(access.isEnabled('member-1')).resolves.toBe(true);
+  });
+
+  it('on production: enables staff only through the same permission (no other staff rule)', async () => {
+    process.env.ENVIRONMENT = APP_ENV.PRODUCTION;
+    const staff = accessFor({
+      policies: { labos_agent_pilot: ['labos_agent.use'], pl_infra: ['directory.admin.full'] },
+    });
+    await expect(staff.access.isEnabled('staff-1')).resolves.toBe(true);
+    const adminOnly = accessFor({ direct: ['directory.admin.full'] });
+    await expect(adminOnly.access.isEnabled('admin-1')).resolves.toBe(false);
+  });
+
+  it('on production: does not enable a member with no grant or with other permissions only', async () => {
+    process.env.ENVIRONMENT = APP_ENV.PRODUCTION;
+    await expect(accessFor({}).access.isEnabled('member-1')).resolves.toBe(false);
+    const other = accessFor({ direct: ['forum.read'], policies: { pl_ats_user: ['ats_user'] } });
+    await expect(other.access.isEnabled('member-1')).resolves.toBe(false);
+  });
+
+  it('on production: gives false when the permission lookup fails', async () => {
+    process.env.ENVIRONMENT = APP_ENV.PRODUCTION;
+    const hasPermission = jest.fn().mockRejectedValue(new Error('Member not found'));
+    const access = new LabosAgentAccessService({ hasPermission } as any);
+    await expect(access.isEnabled('member-1')).resolves.toBe(false);
+  });
+
+  it('keeps the earlier rule outside production: every live member is on, with no lookup', async () => {
+    process.env.ENVIRONMENT = APP_ENV.DEV;
+    const { access, hasPermission } = accessFor({});
+    await expect(access.isEnabled('member-1')).resolves.toBe(true);
+    expect(hasPermission).not.toHaveBeenCalled();
+  });
+
+  it('never enables a caller with no live member', async () => {
+    for (const env of [APP_ENV.DEV, APP_ENV.PRODUCTION]) {
+      process.env.ENVIRONMENT = env;
+      const { access, hasPermission } = accessFor({ direct: ['labos_agent.use'] });
+      await expect(access.isEnabled(undefined)).resolves.toBe(false);
+      expect(hasPermission).not.toHaveBeenCalled();
+    }
   });
 });
 

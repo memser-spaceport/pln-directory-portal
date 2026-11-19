@@ -67,6 +67,16 @@ export const ATS_PERMISSIONS = {
 /** Assign in Back Office to grant ATS entry. Holds {@link ATS_PERMISSIONS.USER}. */
 export const ATS_POLICY_CODE = 'pl_ats_user';
 
+// ── LabOS agent (LAB-3344, D1 option A) ───────────────────────────────────
+
+export const LABOS_AGENT_PERMISSIONS = {
+  /** See and use the LabOS agent on production; grant via the labos_agent_pilot policy in Back Office */
+  USE: 'labos_agent.use',
+} as const;
+
+/** Assign in Back Office to add a member to the LabOS agent pilot. Holds {@link LABOS_AGENT_PERMISSIONS.USE}. */
+export const LABOS_AGENT_POLICY_CODE = 'labos_agent_pilot';
+
 // ── Agent Sessions (PL Infra / code-fix-orchestrator) ────────────────────
 
 export const CODE_AGENT_SESSIONS_PERMISSIONS = {
@@ -271,6 +281,9 @@ export const ALL_PERMISSION_CODES = [
 
   // ATS
   ATS_PERMISSIONS.USER,
+
+  // LabOS agent
+  LABOS_AGENT_PERMISSIONS.USE,
 
   // Agent Sessions
   CODE_AGENT_SESSIONS_PERMISSIONS.VIEW,

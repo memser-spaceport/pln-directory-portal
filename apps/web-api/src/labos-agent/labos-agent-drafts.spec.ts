@@ -123,7 +123,7 @@ function setup(sender: Partial<Person> = { roles: [portfolio()] }) {
   const husky = { createContextualToolsResponse: jest.fn().mockResolvedValue({ pipeTo: jest.fn() }) };
   const service = new LabosAgentService(
     prisma as any,
-    new LabosAgentAccessService(),
+    new LabosAgentAccessService({ hasPermission: jest.fn().mockResolvedValue({ allowed: false }) } as any),
     husky as any,
     { getTeamNewsItemDto: jest.fn() } as any,
     { forApp: jest.fn(() => []) } as any,
