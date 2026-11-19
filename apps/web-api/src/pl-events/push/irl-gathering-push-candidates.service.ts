@@ -3,6 +3,7 @@ import { PrismaService } from '../../shared/prisma.service';
 import { IrlGatheringPushRuleKind, PushNotificationCategory } from '@prisma/client';
 import { IrlGatheringPushConfigService } from './irl-gathering-push-config.service';
 import { PLEventGuestsService } from '../pl-event-guests.service';
+import { VISIBLE_PL_EVENT_WHERE } from '../pl-event-visibility';
 
 type CandidateRow = {
   eventUid: string;
@@ -54,7 +55,7 @@ export class IrlGatheringPushCandidatesService {
     const windowEndReminder = new Date(now.getTime() + cfg.reminderDaysBefore * msInDay);
 
     const events = await this.prisma.pLEvent.findMany({
-      where: { uid: { in: uniqueEventUids }, isDeleted: false },
+      where: { uid: { in: uniqueEventUids }, ...VISIBLE_PL_EVENT_WHERE },
       select: { uid: true, startDate: true, endDate: true, locationUid: true },
     });
 
@@ -174,6 +175,8 @@ export class IrlGatheringPushCandidatesService {
     const uniqueEventUids = [...new Set((eventUids ?? []).filter(Boolean))];
     if (uniqueEventUids.length === 0) return;
 
+    // pl-event-visibility: only finds the gatherings whose sent notifications to refresh; an event that was just
+    // rejected or hidden still needs its gathering refreshed.
     const events = await this.prisma.pLEvent.findMany({
       where: { uid: { in: uniqueEventUids }, isDeleted: false },
       select: { locationUid: true },
@@ -394,7 +397,7 @@ export class IrlGatheringPushCandidatesService {
     });
 
     const displayEvents = await this.prisma.pLEvent.findMany({
-      where: { uid: { in: displayEventUids }, isDeleted: false },
+      where: { uid: { in: displayEventUids }, ...VISIBLE_PL_EVENT_WHERE },
       select: {
         uid: true,
         slugURL: true,
@@ -433,7 +436,7 @@ export class IrlGatheringPushCandidatesService {
     // Total events shown on IRL schedule UI (not candidate-limited): endDate >= now
     const scheduleTotalEvents = await this.prisma.pLEvent.count({
       where: {
-        isDeleted: false,
+        ...VISIBLE_PL_EVENT_WHERE,
         locationUid: gatheringUid,
         endDate: { gte: new Date() },
       },

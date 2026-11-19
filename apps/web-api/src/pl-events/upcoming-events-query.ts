@@ -1,5 +1,6 @@
 import { hidesAttendance } from './pl-event-detail';
 import { BadRequestException } from '@nestjs/common';
+import { VISIBLE_PL_EVENT_WHERE } from './pl-event-visibility';
 
 /**
  * Optional narrowing of `GET /v1/irl/events/upcoming` (LAB-3071, for Home's events rail). With none of these the
@@ -48,7 +49,7 @@ export function upcomingEventsFindArgs(options: UpcomingEventsOptions, now: Date
       gt: now,
       ...(options.days ? { lte: new Date(now.getTime() + options.days * 24 * 60 * 60 * 1000) } : {}),
     },
-    isDeleted: false,
+    ...VISIBLE_PL_EVENT_WHERE,
   };
   return {
     where,

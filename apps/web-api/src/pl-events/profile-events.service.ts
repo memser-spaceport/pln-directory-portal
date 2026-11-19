@@ -32,6 +32,7 @@ import {
   toDemoDayItems,
   toMemberEventCards,
 } from './profile-events';
+import { VISIBLE_PL_EVENT_WHERE } from './pl-event-visibility';
 
 /** The event fields an event card needs. */
 const EVENT_CARD_SELECT = {
@@ -120,7 +121,7 @@ export class ProfileEventsService {
         eventUid: { not: null },
         // Hidden rows are listed, and counted, only for their owner.
         ...(isOwner ? {} : { showOnProfile: true }),
-        event: { isDeleted: false, endDate: group === 'upcoming' ? { gt: now } : { lte: now } },
+        event: { ...VISIBLE_PL_EVENT_WHERE, endDate: group === 'upcoming' ? { gt: now } : { lte: now } },
       },
       orderBy: { event: { startDate: group === 'upcoming' ? 'asc' : 'desc' } },
       select: {
@@ -151,7 +152,7 @@ export class ProfileEventsService {
         eventUid: { not: null },
         showOnProfile: true,
         member: LISTED_GUEST_MEMBER_WHERE,
-        event: { isDeleted: false, endDate: { gt: now } },
+        event: { ...VISIBLE_PL_EVENT_WHERE, endDate: { gt: now } },
       },
       select: { eventUid: true, createdAt: true, ...GUEST_PERSON_SELECT, event: { select: EVENT_CARD_SELECT } },
     });
@@ -164,7 +165,7 @@ export class ProfileEventsService {
   }
 
   private async teamPast(uid: string, now: Date, query: ProfileEventsQuery, viewer: Viewer) {
-    const pastEvent = { isDeleted: false, endDate: { lte: now } };
+    const pastEvent = { ...VISIBLE_PL_EVENT_WHERE, endDate: { lte: now } };
     const [guestRows, associations, demoDays] = await Promise.all([
       this.prisma.pLEventGuest.findMany({
         where: {

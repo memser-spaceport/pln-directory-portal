@@ -321,6 +321,7 @@ export class LabosDigestPageService {
       now
     );
     const [rows, total] = await Promise.all([
+      // pl-event-visibility: `where` comes from upcomingEventsFindArgs, which applies VISIBLE_PL_EVENT_WHERE.
       this.prisma.pLEvent.findMany({
         where,
         orderBy,
@@ -337,6 +338,7 @@ export class LabosDigestPageService {
           location: { select: { location: true } },
         },
       }),
+      // pl-event-visibility: the same `where` as the list above.
       this.prisma.pLEvent.count({ where }),
     ]);
     const counted = rows.filter((row) => !hidesAttendance(row.type, false)).map((row) => row.uid);

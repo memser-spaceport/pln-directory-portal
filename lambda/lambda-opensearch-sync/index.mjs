@@ -5,6 +5,7 @@ import { Client } from '@opensearch-project/opensearch';
 import { AwsSigv4Signer } from '@opensearch-project/opensearch/aws';
 import { defaultProvider } from '@aws-sdk/credential-provider-node';
 import sanitizeHtml from 'sanitize-html';
+import { buildEventBulkBody } from './events-bulk.mjs';
 
 const ssm = new SSMClient({});
 const CHECKPOINT_PATH = process.env.CHECKPOINT_PATH;
@@ -543,7 +544,8 @@ async function indexProjects(lastCheckpoint) {
 }
 async function indexEvents(lastCheckpoint) {
   const r = await pgClient.query(`
-    SELECT e.uid, e.name, e.description, e."additionalInfo", e."shortDescription", e."slugURL", el.location, i.url
+    SELECT e.uid, e.name, e.description, e."additionalInfo", e."shortDescription", e."slugURL", e.status, e."isDeleted",
+           el.location, i.url
     FROM "PLEvent" e
            LEFT JOIN "PLEventLocation" el ON e."locationUid" = el.uid
            LEFT JOIN "Image" i ON e."logoUid" = i.uid
@@ -551,7 +553,8 @@ async function indexEvents(lastCheckpoint) {
   `, [lastCheckpoint]);
   if (!r.rows.length) return 0;
 
-  const body = r.rows.flatMap(row => {
+  // Only approved, non-deleted events are searchable; any other changed row is removed from the index.
+  const body = buildEventBulkBody(r.rows, row => {
     const cleanName = (row.name || '').trim();
 
     // NEW: canonical slug from name; fallback to DB slug or uid
@@ -560,9 +563,7 @@ async function indexEvents(lastCheckpoint) {
     // NEW: build URL from canonical slug (NOT from DB slug)
     const eventUrl = buildEventUrl(canonicalSlug, EVENTS_PUBLIC_BASE_URL);
 
-    return [
-      { index: { _index: 'event', _id: row.uid } },
-      {
+    return {
         uid: row.uid,
         name: cleanName,
         image: row.url,
@@ -577,13 +578,12 @@ async function indexEvents(lastCheckpoint) {
         name_suggest: { input: generateSuggestInput(cleanName) },
         shortDescription_suggest: { input: generateSuggestInput(row.shortDescription) },
         location_suggest: { input: generateSuggestInput(row.location) }
-      }
-    ];
+    };
   });
 
   const resp = await osClient.bulk({ body });
   if (resp.body?.errors) {
-    const failed = resp.body.items.filter(x => x.index && x.index.error);
+    const failed = resp.body.items.filter(x => (x.index && x.index.error) || (x.delete && x.delete.error));
     console.error('Event bulk errors:', JSON.stringify(failed.slice(0, 10), null, 2));
     return 0;
   }

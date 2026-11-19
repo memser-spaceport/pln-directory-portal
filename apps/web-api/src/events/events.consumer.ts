@@ -7,6 +7,7 @@ import { PLEventType, PLEventLocationStatus } from '@prisma/client';
 import { UPSERT, DELETE } from '../utils/constants';
 import { EventConsumerHelper } from './event-consumer.helper';
 import { EventGuestSyncHelper } from './event-guests-sync.helper';
+import { isLocalEventSubmitEnabled } from '../pl-events/pl-event-submit.constants';
 
 export type EventOperationType = 'UPSERT'| 'DELETE';
 
@@ -37,6 +38,14 @@ export class EventsConsumer {
    */
   @SqsMessageHandler('events')
   async processEventOperation(message: any): Promise<void> {
+    // After the cutover LabOS owns events: a message from the events service must not change them.
+    if (isLocalEventSubmitEnabled()) {
+      this.logger.info(
+        `Ignoring events-service message ${message?.MessageId}: EVENTS_LOCAL_SUBMIT_ENABLED is on`,
+        'EventsConsumer'
+      );
+      return;
+    }
     try {
       this.logger.info(`Processing event operation message with id: ${message.MessageId}`, 'EventsConsumer');
       const payload: EventCreationPayload = JSON.parse(message.Body)?.body;

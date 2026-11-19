@@ -16,6 +16,7 @@ import { isEmpty } from 'lodash';
 import { PLEventGuestsService } from './pl-event-guests.service';
 import { CacheService } from '../utils/cache/cache.service';
 import { isIRLNotificationsEnabled } from '../utils/constants';
+import { VISIBLE_PL_EVENT_WHERE, visiblePLEventSql, withoutPrivateEventFields } from './pl-event-visibility';
 
 @Injectable()
 export class PLEventLocationsService {
@@ -44,7 +45,7 @@ export class PLEventLocationsService {
         include: {
           events: {
             where: {
-              isDeleted: false
+              ...VISIBLE_PL_EVENT_WHERE,
             },
             select: {
               slugURL: true,
@@ -110,7 +111,7 @@ export class PLEventLocationsService {
             },
             events: {
               some: {
-                isDeleted: false
+                ...VISIBLE_PL_EVENT_WHERE,
               }
             }
           }
@@ -127,14 +128,14 @@ export class PLEventLocationsService {
           },
           events: {
             some: {
-              isDeleted: false
+              ...VISIBLE_PL_EVENT_WHERE,
             }
           }
         },
         include: {
           events: {
             where: {
-              isDeleted: false
+              ...VISIBLE_PL_EVENT_WHERE,
             },
             select: {
               slugURL: true,
@@ -481,6 +482,7 @@ export class PLEventLocationsService {
     FROM
       "PLEventLocation" el
       JOIN "PLEvent" e ON e."locationUid" = el.uid AND e."endDate" >= NOW()  -- Only include current or future events
+        AND ${visiblePLEventSql('e')}
       LEFT JOIN "PLEventGuest" pg ON pg."eventUid" = e.uid
       LEFT JOIN "Member" m ON m."uid" = pg."memberUid"
       LEFT JOIN (
@@ -495,6 +497,7 @@ export class PLEventLocationsService {
             '${fallbackDate}'::timestamp
           )
           AND e."endDate" >= NOW()  -- Only include current or future events
+          AND ${visiblePLEventSql('e')}
           )AS events ON events."locationUid" = el."uid"
     GROUP BY
       el."uid",
@@ -798,7 +801,7 @@ export class PLEventLocationsService {
    */
   async findAllPLEventLocations(queryOptions?: Prisma.PLEventLocationFindManyArgs) {
     try {
-      return await this.prisma.pLEventLocation.findMany({
+      const locations = await this.prisma.pLEventLocation.findMany({
         where: {
           ...queryOptions?.where,
           isDeleted: false,
@@ -808,12 +811,13 @@ export class PLEventLocationsService {
             where: { isDeleted: false },
             include: {
               PLEvent: {
-                where: { isDeleted: false }
+                where: { ...VISIBLE_PL_EVENT_WHERE }
               }
             }
           }
         }
       });
+      return withoutPrivateEventFields(locations);
     } catch (error) {
       this.logger.error(`Error fetching locations: ${error.message}`, error.stack, 'PLEventLocationsService');
       throw new InternalServerErrorException(`Failed to fetch locations: ${error.message}`);

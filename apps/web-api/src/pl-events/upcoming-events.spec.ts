@@ -40,14 +40,18 @@ describe('upcomingEventsFindArgs and toUpcomingEvent (LAB-3071)', () => {
 
   it('without options: every event not yet started, newest first, uncapped (the member page widget)', () => {
     expect(upcomingEventsFindArgs({}, NOW)).toEqual({
-      where: { startDate: { gt: NOW }, isDeleted: false },
+      where: { startDate: { gt: NOW }, status: 'APPROVED', isDeleted: false },
       orderBy: { startDate: 'desc' },
     });
   });
 
   it('days=30, limit=3, sort=soonest: within 30 days, soonest first, capped', () => {
     expect(upcomingEventsFindArgs({ days: 30, limit: 3, sort: 'soonest' }, NOW)).toEqual({
-      where: { startDate: { gt: NOW, lte: new Date('2026-12-04T10:00:00.000Z') }, isDeleted: false },
+      where: {
+        startDate: { gt: NOW, lte: new Date('2026-12-04T10:00:00.000Z') },
+        status: 'APPROVED',
+        isDeleted: false,
+      },
       orderBy: { startDate: 'asc' },
       take: 3,
     });

@@ -77,7 +77,7 @@ export const PLEventPersonSchema = z.object({
 
 export const PLEventRoleSchema = z.enum(['Host', 'Speaker', 'Sponsor']);
 
-/** `GET /v1/irl/events/:uid`. `details` comes from the events sync (LAB-3214); empty for an event never resynced. */
+/** `GET /v1/irl/events/:uid`. `details` joins the event's typed columns and its stored details; empty for an event with none. */
 export const ResponsePLEventDetailSchema = z.object({
   uid: z.string(),
   name: z.string(),
@@ -113,11 +113,53 @@ export const ResponsePLEventDetailSchema = z.object({
       ),
     })
     .nullable(),
+  /** IANA name. The event's own time zone, or its gathering's when the event has none. */
+  timezone: z.string().nullable(),
+  /** True when the dates carry no time of day. */
+  allDay: z.boolean(),
+  /** Null when the event has no venue address and no position. */
+  venue: z
+    .object({ address: z.string().nullable(), latitude: z.number().nullable(), longitude: z.number().nullable() })
+    .nullable(),
+  registrationUrl: z.string().nullable(),
+  meetingUrl: z.string().nullable(),
   details: PLEventDetailsSchema,
   hosts: z.array(PLEventPersonSchema),
   goingCount: z.number().int(),
   faces: z.array(PLEventPersonSchema),
   viewerGoing: z.boolean(),
+  /**
+   * The fields below are returned only to the member who submitted the event and to a directory admin: the status
+   * and what the edit form fills. Other viewers get none of them.
+   */
+  status: z.enum(['DRAFT', 'PENDING', 'APPROVED', 'REJECTED']).optional(),
+  reviewNote: z.string().nullable().optional(),
+  updatedAt: z.string().optional(),
+  logoUid: z.string().nullable().optional(),
+  bannerUid: z.string().nullable().optional(),
+  format: z.string().nullable().optional(),
+  accessOption: z.string().nullable().optional(),
+  tags: z.array(z.string()).optional(),
+  hostName: z.string().nullable().optional(),
+  hostEmail: z.string().nullable().optional(),
+  coHosts: z.array(z.object({ name: z.string(), email: z.string().nullable() })).optional(),
+  contactInfos: z.record(z.array(z.string())).nullable().optional(),
+  agenda: z.any().optional(),
+  address: z
+    .object({
+      address: z.string().nullable(),
+      city: z.string().nullable(),
+      state: z.string().nullable(),
+      country: z.string().nullable(),
+      latitude: z.number().nullable(),
+      longitude: z.number().nullable(),
+      locationUrl: z.string().nullable(),
+      locationInstructions: z.string().nullable(),
+    })
+    .optional(),
+  associations: z
+    .array(z.object({ role: z.string(), memberUid: z.string().nullable(), teamUid: z.string().nullable() }))
+    .optional(),
   /** The signed-in viewer's own attendance, or null when they are not going. */
   viewer: z
     .object({

@@ -27,6 +27,7 @@ import {
 } from './upcoming-events-query';
 import {
   GUEST_PERSON_SELECT,
+  eventReadAccess,
   facesFindArgs,
   hidesAttendance,
   listedGuestWhere,
@@ -34,6 +35,17 @@ import {
   toPLEventDetail,
 } from './pl-event-detail';
 import type { ResponsePLEventDetail } from 'libs/contracts/src/schema/pl-event-attendance';
+import { VISIBLE_PL_EVENT_WHERE, withoutPrivateEventFields } from './pl-event-visibility';
+import {
+  attendanceByEvent,
+  EVENT_LIST_SELECT,
+  eventListGuestsFindArgs,
+  eventListWhere,
+  EventListOptions,
+  listHidesAttendance,
+  toEventListItem,
+} from './pl-event-list';
+import { ResponsePLEventList } from 'libs/contracts/src/schema/pl-event-list';
 
 
 @Injectable()
@@ -77,11 +89,11 @@ export class PLEventsService {
    * @returns An array of event objects with additional details such as logo, banner, event guests, and location.
    */
   async getPLEvents(queryOptions: Prisma.PLEventFindManyArgs, tx?): Promise<PLEvent[]> {
-    return await (tx || this.prisma).pLEvent.findMany({
+    const events = await (tx || this.prisma).pLEvent.findMany({
       ...queryOptions,
       where: {
         ...queryOptions.where,
-        isDeleted: false
+        ...VISIBLE_PL_EVENT_WHERE,
       },
       include: {
         logo: true,
@@ -94,6 +106,7 @@ export class PLEventsService {
         location: true
       }
     });
+    return withoutPrivateEventFields(events);
   };
 
   /**
@@ -111,7 +124,7 @@ export class PLEventsService {
       const plEvent = await this.prisma.pLEvent.findFirst({
         where: {
           slugURL: slug,
-          isDeleted: false
+          ...VISIBLE_PL_EVENT_WHERE,
         },
         include: {
           logo: { select: { url: true } },
@@ -190,7 +203,7 @@ export class PLEventsService {
         plEvent.eventGuests = this.eventGuestsService.restrictTelegramBasedOnMemberPreference(plEvent?.eventGuests, query.isUserLoggedIn);
         // plEvent.eventGuests = this.eventGuestsService.restrictOfficeHours(plEvent?.eventGuests, isUserLoggedIn);
       }
-      return plEvent as PLEvent;
+      return withoutPrivateEventFields(plEvent) as PLEvent;
     } catch (err) {
       return this.handleErrors(err, query.slug);
     }
@@ -198,7 +211,7 @@ export class PLEventsService {
 
   async searchPLEvents(filters: { search?: string; limit?: number }): Promise<{ events: PLEvent[]; limit: number }> {
     const limit = Math.min(Math.max(filters.limit ?? 20, 1), 50);
-    const where: Prisma.PLEventWhereInput = { isDeleted: false };
+    const where: Prisma.PLEventWhereInput = { ...VISIBLE_PL_EVENT_WHERE };
     const term = filters.search?.trim();
     if (term) {
       where.OR = [
@@ -207,6 +220,7 @@ export class PLEventsService {
         { location: { location: { contains: term, mode: 'insensitive' } } },
       ];
     }
+    // pl-event-visibility: `where` starts from VISIBLE_PL_EVENT_WHERE above.
     const events = await this.prisma.pLEvent.findMany({
       where,
       take: limit,
@@ -227,7 +241,7 @@ export class PLEventsService {
   async getPLEventForViewer(uid: string, { isUserLoggedIn }: { isUserLoggedIn: boolean }): Promise<PLEvent> {
     try {
       const plEvent = await this.prisma.pLEvent.findFirst({
-        where: { uid, isDeleted: false },
+        where: { uid, ...VISIBLE_PL_EVENT_WHERE },
         include: {
           logo: { select: { url: true } },
           banner: { select: { url: true } },
@@ -283,7 +297,7 @@ export class PLEventsService {
         plEvent.eventGuests,
         isUserLoggedIn
       );
-      return plEvent as PLEvent;
+      return withoutPrivateEventFields(plEvent) as PLEvent;
     } catch (err) {
       return this.handleErrors(err, uid);
     }
@@ -298,10 +312,20 @@ export class PLEventsService {
    * an event is about the profile, not about going.
    */
   async getPLEventDetail(uid: string, viewer: Member | null): Promise<ResponsePLEventDetail> {
+    // pl-event-visibility: the submitter and a directory admin also read an event that is not approved;
+    // eventReadAccess below answers 404 to everyone else.
     const event = await this.prisma.pLEvent.findFirst({
       where: { uid, isDeleted: false },
       select: {
         uid: true,
+        status: true,
+        submitterUid: true,
+        reviewNote: true,
+        privateDetails: true,
+        updatedAt: true,
+        logoUid: true,
+        bannerUid: true,
+        eventAssociations: { select: { role: true, memberUid: true, teamUid: true } },
         name: true,
         slugURL: true,
         type: true,
@@ -313,6 +337,17 @@ export class PLEventsService {
         externalId: true,
         resources: true,
         additionalInfo: true,
+        timezone: true,
+        isAllDay: true,
+        format: true,
+        accessOption: true,
+        tags: true,
+        hostName: true,
+        venueAddress: true,
+        latitude: true,
+        longitude: true,
+        registrationUrl: true,
+        meetingUrl: true,
         logo: { select: { url: true } },
         banner: { select: { url: true } },
         location: {
@@ -323,7 +358,7 @@ export class PLEventsService {
             timezone: true,
             resources: true,
             events: {
-              where: { isDeleted: false },
+              where: { ...VISIBLE_PL_EVENT_WHERE },
               select: { uid: true, name: true, type: true, startDate: true, endDate: true },
               orderBy: { startDate: 'asc' },
             },
@@ -331,7 +366,8 @@ export class PLEventsService {
         },
       },
     });
-    if (!event) {
+    const access = event ? eventReadAccess(event, viewer) : { canRead: false, isEditor: false };
+    if (!event || !access.canRead) {
       throw new NotFoundException(`Event not found with uid: ${uid}.`);
     }
 
@@ -366,7 +402,47 @@ export class PLEventsService {
       faces: faceRows.map((row) => row.member),
       viewerRow,
       isUserLoggedIn,
+      isEditor: access.isEditor,
     });
+  }
+
+  /** The events a member submitted, whatever their status, newest first (`GET /v1/irl/events/mine`). */
+  async listMyPLEvents(memberUid: string) {
+    // pl-event-visibility: a member lists their own submissions in every status.
+    const events = await this.prisma.pLEvent.findMany({
+      where: { submitterUid: memberUid, isDeleted: false },
+      orderBy: [{ createdAt: 'desc' }, { uid: 'asc' }],
+      select: {
+        uid: true,
+        name: true,
+        slugURL: true,
+        startDate: true,
+        endDate: true,
+        isAllDay: true,
+        timezone: true,
+        status: true,
+        reviewNote: true,
+        createdAt: true,
+        updatedAt: true,
+        logo: { select: { url: true } },
+        location: { select: { location: true, timezone: true } },
+      },
+    });
+    return events.map((event) => ({
+      uid: event.uid,
+      name: event.name,
+      slugURL: event.slugURL,
+      startDate: event.startDate.toISOString(),
+      endDate: event.endDate.toISOString(),
+      allDay: event.isAllDay,
+      timezone: event.timezone ?? event.location?.timezone ?? null,
+      status: event.status,
+      reviewNote: event.reviewNote ?? null,
+      logo: event.logo?.url ?? null,
+      location: event.location?.location ?? null,
+      createdAt: event.createdAt.toISOString(),
+      updatedAt: event.updatedAt.toISOString(),
+    }));
   }
 
   /**
@@ -378,20 +454,64 @@ export class PLEventsService {
    */
   async getPLEventsByMemberAndLocation(member: Member, locationUid: string): Promise<PLEvent[]> {
     try {
-      return this.prisma.pLEvent.findMany({
+      const events = await this.prisma.pLEvent.findMany({
         where: {
           locationUid,
-          isDeleted: false,
+          ...VISIBLE_PL_EVENT_WHERE,
           eventGuests: {
             some: {
               memberUid: member?.uid
             }
           }
         }
-      })
+      });
+      return withoutPrivateEventFields(events);
     } catch (err) {
       return this.handleErrors(err);
     }
+  }
+
+  /**
+   * The events list (`GET /v1/irl/events`): approved events, earliest first, with search, filters and paging. Three
+   * queries for a page whatever its size: the events with their count, one guest query for every card's going count
+   * and faces, and (for a signed-in viewer) the events of the page they go to.
+   */
+  async listPLEvents(options: EventListOptions, viewer: { uid: string } | null): Promise<ResponsePLEventList> {
+    const where = eventListWhere(options, new Date(), viewer?.uid ?? null);
+    const [events, total] = await Promise.all([
+      // pl-event-visibility: `where` comes from eventListWhere, which starts from VISIBLE_PL_EVENT_WHERE.
+      this.prisma.pLEvent.findMany({
+        where,
+        select: EVENT_LIST_SELECT,
+        orderBy: [{ startDate: 'asc' }, { uid: 'asc' }],
+        skip: (options.page - 1) * options.limit,
+        take: options.limit,
+      }),
+      // pl-event-visibility: the same `where` as the list above.
+      this.prisma.pLEvent.count({ where }),
+    ]);
+
+    const eventUids = events.map((event) => event.uid);
+    const counted = events.filter((event) => !listHidesAttendance(event)).map((event) => event.uid);
+    const [guestRows, viewerRows] = await Promise.all([
+      counted.length ? this.prisma.pLEventGuest.findMany(eventListGuestsFindArgs(counted)) : Promise.resolve([]),
+      viewer && eventUids.length
+        ? this.prisma.pLEventGuest.findMany({
+            where: { memberUid: viewer.uid, eventUid: { in: eventUids } },
+            distinct: ['eventUid'],
+            select: { eventUid: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    const attendance = attendanceByEvent(guestRows);
+    const going = new Set(viewerRows.map((row) => row.eventUid));
+
+    return {
+      page: options.page,
+      limit: options.limit,
+      total,
+      items: events.map((event) => toEventListItem(event, attendance.get(event.uid), going.has(event.uid))),
+    };
   }
 
   async getUpcomingPLEvents(options: UpcomingEventsOptions = {}): Promise<ResponseUpcomingEvents[]> {
@@ -409,6 +529,7 @@ export class PLEventsService {
     try {
       const { where, orderBy, take } = upcomingEventsFindArgs(options, new Date());
       const [events, total] = await Promise.all([
+        // pl-event-visibility: `where` comes from upcomingEventsFindArgs, which applies VISIBLE_PL_EVENT_WHERE.
         this.prisma.pLEvent.findMany({
           where,
           select: {
@@ -436,6 +557,7 @@ export class PLEventsService {
           orderBy,
           ...(take ? { take } : {}),
         }),
+        // pl-event-visibility: the same `where` as the list above.
         take ? this.prisma.pLEvent.count({ where }) : Promise.resolve(undefined),
       ]);
 

@@ -58,6 +58,10 @@ export const PLEventDetailsSchema = z.object({
    * LAB-3332 do not have it; reads always return it (null when absent).
    */
   locationUrl: z.string().refine(isHttpUrl, 'expected an http or https URL').nullable().optional(),
+  /** Addresses by platform, for example `{ twitter: ['https://x.com/pl'] }`. Null when the event has none. */
+  contactInfos: z.record(z.array(z.string())).nullable().optional(),
+  /** How to find the venue. Null when the event has none. */
+  locationInstructions: z.string().nullable().optional(),
 });
 
 export type PLEventDetailsParty = z.infer<typeof PLEventDetailsPartySchema>;
@@ -77,6 +81,8 @@ export function emptyPLEventDetails(): PLEventDetails {
     sponsors: [],
     agenda: null,
     locationUrl: null,
+    contactInfos: null,
+    locationInstructions: null,
   };
 }
 

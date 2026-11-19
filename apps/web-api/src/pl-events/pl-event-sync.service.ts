@@ -8,6 +8,8 @@ import { EventsService } from '../events/events.service';
 import { PLEventType } from '@prisma/client';
 import {IrlGatheringPushCandidatesService} from "./push/irl-gathering-push-candidates.service";
 import { mapEventDetails, withEventDetails } from './pl-event-details.mapper';
+import { mapEventColumns } from './pl-event-columns.mapper';
+import { isLocalEventSubmitEnabled } from './pl-event-submit.constants';
 
 @Injectable()
 export class PLEventSyncService {
@@ -26,11 +28,17 @@ export class PLEventSyncService {
    * @returns Acknowledgment of the sync process.
    */
   async syncEvents(body) {
+    // After the cutover LabOS owns events: a pull from the events service must not change them.
+    if (isLocalEventSubmitEnabled()) {
+      this.logger.warn('Event sync skipped: EVENTS_LOCAL_SUBMIT_ENABLED is on.');
+      return { skipped: true, reason: 'EVENTS_LOCAL_SUBMIT_ENABLED is on: LabOS owns events' };
+    }
     try {
       const {selectedEventUids } = body;
       const events = await this.fetchEventsFromService(body);
       if (!events) return [];
 
+      // pl-event-visibility: the sync matches its own events by externalId, whatever their status.
       const existingEvents = await this.prisma.pLEvent.findMany({
         where: {
           AND:{
@@ -72,19 +80,24 @@ export class PLEventSyncService {
 
 
   /**
-   * Backfills `additionalInfo.details` on events we already have (LAB-3214, design D8).
+   * Backfills `additionalInfo.details` and the typed columns (`mapEventColumns`) on events we already have.
    * It fetches the same APPROVED events as the full sync, matches them by `externalId`
-   * and writes only the details. It never creates or deletes an event and never touches
+   * and writes only those. It never creates or deletes an event and never touches
    * `slugURL`, name, dates or type (the full sync rewrites `slugURL` and skips events
    * whose `updatedAt` did not change, so it cannot be used for a backfill).
    * @returns how many events were updated.
    */
-  async syncEventDetailsOnly(body): Promise<{ updated: number }> {
+  async syncEventDetailsOnly(body): Promise<{ updated: number; skipped?: boolean; reason?: string }> {
+    if (isLocalEventSubmitEnabled()) {
+      this.logger.warn('Event details backfill skipped: EVENTS_LOCAL_SUBMIT_ENABLED is on.');
+      return { updated: 0, skipped: true, reason: 'EVENTS_LOCAL_SUBMIT_ENABLED is on: LabOS owns events' };
+    }
     try {
       const { selectedEventUids } = body ?? {};
       const events = await this.fetchEventsFromService({ selectedEventUids });
       if (!events) return { updated: 0 };
 
+      // pl-event-visibility: the backfill matches its own events by externalId, whatever their status.
       const existingEvents = await this.prisma.pLEvent.findMany({
         where: {
           externalId: { in: events.map((event) => event.event_id).filter(Boolean) },
@@ -100,7 +113,10 @@ export class PLEventSyncService {
         if (!existingEvent) continue;
         await this.prisma.pLEvent.update({
           where: { uid: existingEvent.uid },
-          data: { additionalInfo: withEventDetails(existingEvent.additionalInfo, this.detailsOf(event)) },
+          data: {
+            additionalInfo: withEventDetails(existingEvent.additionalInfo, this.detailsOf(event)),
+            ...mapEventColumns(event),
+          },
         });
         updated += 1;
       }
@@ -273,6 +289,7 @@ export class PLEventSyncService {
       logoUid: logo?.uid,
       resources,
       additionalInfo: withEventDetails(existingAdditionalInfo, this.detailsOf(event)),
+      ...mapEventColumns(event),
       isDeleted: false,
     };
   }
