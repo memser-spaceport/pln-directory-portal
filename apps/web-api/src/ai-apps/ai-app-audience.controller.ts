@@ -8,8 +8,9 @@ import { UpdateAiAppAudienceDto } from './dto/ai-app-audience.dto';
 type AudienceAdminRequest = { user?: { memberUid?: string; uid?: string } };
 
 /**
- * Back Office: publish an AI App to members outside PL Infra, by policy (LAB-3200). Directory admins only.
- * A saved audience applies on the next request to the app; an empty one takes the app back.
+ * Back Office: publish an AI App to members outside PL Infra by policy (LAB-3200), permission or member, and set how
+ * LabOS shows it: under More, path, icon, top navigation (LAB-3236). Directory admins only. A saved audience applies
+ * on the next request to the app; an empty one takes the app back.
  */
 @Controller('v1/admin/ai-app-audience')
 @UseGuards(AdminAuthGuard)
@@ -26,6 +27,6 @@ export class AiAppAudienceController {
   @UsePipes(ZodValidationPipe)
   update(@Param('appId') appId: string, @Body() body: UpdateAiAppAudienceDto, @Req() req: AudienceAdminRequest) {
     const actorUid = req.user?.memberUid ?? req.user?.uid ?? 'unknown';
-    return this.audienceService.updateAudience(actorUid, appId, body.policyCodes);
+    return this.audienceService.updateAudience(actorUid, appId, body);
   }
 }
