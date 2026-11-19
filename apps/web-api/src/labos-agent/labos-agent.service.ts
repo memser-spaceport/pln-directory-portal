@@ -34,6 +34,7 @@ import { resolveLiveMemberUidByEmail } from '../shared/resolve-live-member-uid.u
 import { TeamNewsQueryService } from '../team-news/team-news-query.service';
 import { TeamsService } from '../teams/teams.service';
 import { LabosAgentAccessService } from './labos-agent-access.service';
+import { answerCounts } from './labos-agent-answer-counts';
 import { draftIntroTool, IntroTurnTarget } from './labos-agent-drafts';
 import { searchMentions } from './labos-agent-mentions';
 import { mcpToolsAsAgentTools } from './labos-agent-news.tools';
@@ -140,6 +141,8 @@ export class LabosAgentService {
         extraTools: { ...mcpToolsAsAgentTools(reads, ctx), ...proposeTools, draft_intro: draftIntro },
         // The stream reads these arrays when it ends, so they hold the proposals and drafts the tools made in this turn.
         extraResponseFields: { proposals, drafts },
+        // LAB-3297 (V0-R4): `toolCount`, `usedWebSearch` and `sourceCount` at the end of the body. Counts only.
+        turnFields: answerCounts,
         persistHistory: false,
       }
     );

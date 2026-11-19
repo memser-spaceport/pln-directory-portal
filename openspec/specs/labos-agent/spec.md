@@ -368,3 +368,20 @@ The prompt context SHALL have the S5 page text first, then one line `Item <n> (<
 - **WHEN** the member asks a question
 - **THEN** the prompt has 3 item lines in the order of `mentions`
 - **AND** no line has an email, a social handle or a Telegram value
+
+### Requirement: Answer counts in the C1 body
+
+The C1 stream body SHALL end with `toolCount`, `usedWebSearch` and `sourceCount` (LAB-3297, V0-R4). `toolCount` SHALL be the number of tool calls of the model in the turn, all tools, web search too. `usedWebSearch` SHALL be true when at least one `searchWeb` call ran. `sourceCount` SHALL be the number of distinct items in `sources` and `sourceRefs`: a page in both lists, or twice in one list, counts once. The fields SHALL hold counts and a boolean only, never text, names, emails or ids. The counts come from `HuskyAiService` option `turnFields`; AI search passes no `turnFields`, so its body does not change. `LabosAgentChatResponseSchema` in `libs/contracts` has the fields as optional, so a body without them still parses. The counts add no model call.
+
+#### Scenario: Web search with sources
+
+- **GIVEN** a turn where the model calls `list_news` and `searchWeb`
+- **AND** the body has 1 news source ref, 1 web source ref and the same web URL in `sources`
+- **WHEN** the stream ends
+- **THEN** the body has `toolCount` 2, `usedWebSearch` true and `sourceCount` 2
+
+#### Scenario: No tool call
+
+- **GIVEN** a turn where the model calls no tool and the body has no sources
+- **WHEN** the stream ends
+- **THEN** the body has `toolCount` 0, `usedWebSearch` false and `sourceCount` 0
