@@ -20,6 +20,7 @@ jest.mock('./tools/irl-events.tool', () => ({ IrlEventsTool: jest.fn() }));
 
 import { streamText, streamObject, generateText } from 'ai';
 import { HuskyResponseSchema } from 'libs/contracts/src/schema/husky-chat';
+import { answerCounts } from '../labos-agent/labos-agent-answer-counts';
 import {
   HuskyAiService,
   encodeJsonStringFragment,
@@ -548,6 +549,126 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
       });
       expect(streamTextMock).toHaveBeenCalledTimes(2);
       expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('cut off as well'));
+    });
+
+    describe('answer counts (LAB-3297)', () => {
+      const WEB_RESULT =
+        'Web search results (public web, not directory data).\n\nSummary: Example Team builds storage.\n\n' +
+        'Web page: Example Team [WebLink](https://example.com/team)';
+      const searchWebStep = {
+        finishReason: 'tool-calls',
+        toolCalls: [{ toolName: 'searchWeb' }],
+        toolResults: [{ toolName: 'searchWeb', result: WEB_RESULT }],
+        text: '',
+      };
+      const tail = async () =>
+        JSON.parse(
+          await readAll(
+            await service.createContextualToolsResponse(chatInfo, false, undefined, { turnFields: answerCounts })
+          )
+        );
+
+      it('adds the tool calls of the continuation to the calls before the cut', async () => {
+        streamTextMock
+          .mockImplementationOnce(({ onStepFinish }) => {
+            onStepFinish(searchWebStep);
+            return answerStream(['Half of the'], 'length');
+          })
+          .mockImplementationOnce(({ onStepFinish }) => {
+            onStepFinish({
+              toolCalls: [{ toolName: 'getMembers' }],
+              toolResults: [{ toolName: 'getMembers', result: '' }],
+            });
+            return answerStream([' answer.']);
+          });
+        streamObjectMock.mockReturnValue(structuredStream([JSON.stringify(STRUCTURED)]));
+
+        const body = await tail();
+
+        expect(streamTextMock.mock.calls[1][0].prompt).toContain('partialAnswer: Half of the');
+        expect(body.content).toBe('Half of the answer.');
+        expect(body).toEqual(expect.objectContaining({ toolCount: 2, usedWebSearch: true, sourceCount: 1 }));
+      });
+
+      it('counts the calls of a continuation with no tool call: the calls before the cut only', async () => {
+        streamTextMock
+          .mockImplementationOnce(({ onStepFinish }) => {
+            onStepFinish(searchWebStep);
+            return answerStream(['Half of the'], 'length');
+          })
+          .mockReturnValueOnce(answerStream([' answer.']));
+        streamObjectMock.mockReturnValue(structuredStream([JSON.stringify(STRUCTURED)]));
+
+        expect(await tail()).toEqual(expect.objectContaining({ toolCount: 1, usedWebSearch: true, sourceCount: 1 }));
+      });
+
+      it('counts the web search of a restart with tools after a stall before any text', async () => {
+        streamTextMock
+          .mockImplementationOnce(({ abortSignal }) => ({
+            textStream: stallingChunks([], abortSignal),
+            finishReason: new Promise(() => undefined),
+          }))
+          .mockImplementationOnce(({ onStepFinish }) => {
+            onStepFinish(searchWebStep);
+            return answerStream(['Fresh answer']);
+          });
+        streamObjectMock.mockReturnValue(structuredStream([JSON.stringify(STRUCTURED)]));
+
+        const body = await tail();
+
+        expect(streamTextMock.mock.calls[1][0].tools).toBeDefined();
+        expect(body).toEqual(expect.objectContaining({ toolCount: 1, usedWebSearch: true, sourceCount: 1 }));
+      });
+
+      it('sends the counts in the final chunk of a stalled answer', async () => {
+        streamTextMock
+          .mockImplementationOnce(({ abortSignal, onStepFinish }) => {
+            onStepFinish(searchWebStep);
+            onStepFinish({
+              toolCalls: [{ toolName: 'list_news' }],
+              toolResults: [{ toolName: 'list_news', result: '' }],
+            });
+            return { textStream: stallingChunks(['partial'], abortSignal), finishReason: new Promise(() => undefined) };
+          })
+          .mockImplementationOnce(({ abortSignal }) => ({
+            textStream: stallingChunks([' more'], abortSignal),
+            finishReason: new Promise(() => undefined),
+          }));
+        streamObjectMock.mockReturnValue(
+          structuredStream(
+            [],
+            Promise.resolve({ ...STRUCTURED, sources: [...STRUCTURED.sources, 'https://b.example'] })
+          )
+        );
+
+        const body = await tail();
+
+        expect(body.content).toBe(`partial more${HUSKY_SEARCH_STALLED_NOTICE}`);
+        expect(body).toEqual(expect.objectContaining({ toolCount: 2, usedWebSearch: true, sourceCount: 2 }));
+      });
+
+      it('sends the counts of a stalled answer when the structured tail stalls too', async () => {
+        streamTextMock
+          .mockImplementationOnce(({ abortSignal, onStepFinish }) => {
+            onStepFinish(searchWebStep);
+            return { textStream: stallingChunks(['partial'], abortSignal), finishReason: new Promise(() => undefined) };
+          })
+          .mockImplementationOnce(({ abortSignal }) => ({
+            textStream: stallingChunks([' more'], abortSignal),
+            finishReason: new Promise(() => undefined),
+          }));
+        streamObjectMock.mockImplementation(({ abortSignal }) => ({
+          textStream: stallingChunks([], abortSignal),
+          object: new Promise(() => undefined),
+        }));
+
+        const body = await tail();
+
+        // The tail is empty and the answer cites no page, so the turn has no source.
+        expect(body.sources).toEqual([]);
+        expect(body.sourceRefs).toBeUndefined();
+        expect(body).toEqual(expect.objectContaining({ toolCount: 1, usedWebSearch: true, sourceCount: 0 }));
+      });
     });
 
     it('closes the object with empty fields when the structured stream stalls before any JSON', async () => {
