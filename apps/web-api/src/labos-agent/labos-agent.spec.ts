@@ -16,6 +16,7 @@ import { BadRequestException, ForbiddenException, NotFoundException } from '@nes
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { APP_ENV } from '../utils/constants';
 import { LabosAgentAccessService } from './labos-agent-access.service';
+import { answerCounts } from './labos-agent-answer-counts';
 import { LabosAgentController } from './labos-agent.controller';
 import { LabosAgentService } from './labos-agent.service';
 import { mcpToolsAsAgentTools, newsLinkLines } from './labos-agent-news.tools';
@@ -183,6 +184,8 @@ describe('LabosAgentController', () => {
     // S3-R8: a turn without a draft has drafts [], next to the S1 and S2 fields.
     expect(options.extraResponseFields).toEqual({ proposals: [], drafts: [] });
     expect(options.persistHistory).toBe(false);
+    // LAB-3297 (V0-R4): the answer counts come from the finished turn.
+    expect(options.turnFields).toBe(answerCounts);
 
     expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'application/json');
     expect(res.setHeader).toHaveBeenCalledWith('Transfer-Encoding', 'chunked');

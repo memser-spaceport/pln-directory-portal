@@ -262,3 +262,34 @@ export type LabosAgentDraft = {
   maxLength: number;
   source: 'agent';
 };
+
+/**
+ * The answer counts at the end of the C1 stream body (LAB-3297, V0-R4). Counts and a boolean only: no text, names,
+ * emails or ids. Each field is optional, so an older backend body still parses. The frontend sends them on the
+ * `agent-answer-shown` event.
+ * - `toolCount`: the tool calls of the model in the turn, all tools, web search too.
+ * - `usedWebSearch`: true when at least one web search ran.
+ * - `sourceCount`: the distinct items of `sources` and `sourceRefs`, the list the frontend shows as sources.
+ */
+export const LabosAgentAnswerCountsSchema = z.object({
+  toolCount: z.number().int().min(0).optional(),
+  usedWebSearch: z.boolean().optional(),
+  sourceCount: z.number().int().min(0).optional(),
+});
+export type LabosAgentAnswerCounts = z.infer<typeof LabosAgentAnswerCountsSchema>;
+
+/**
+ * The C1 stream body after the stream ends (contract section 2). Only the fields that every turn has are required.
+ * Other keys (`actions`, `proposals`, `drafts`) pass through.
+ */
+export const LabosAgentChatResponseSchema = z
+  .object({
+    steps: z.array(z.string()),
+    content: z.string(),
+    sources: z.array(z.string()),
+    followUpQuestions: z.array(z.string()),
+    sourceRefs: z.array(z.object({ type: z.string(), title: z.string() }).passthrough()).optional(),
+  })
+  .merge(LabosAgentAnswerCountsSchema)
+  .passthrough();
+export type LabosAgentChatResponse = z.infer<typeof LabosAgentChatResponseSchema>;

@@ -74,6 +74,21 @@ export interface ContextualToolsOptions {
   extraResponseFields?: Record<string, unknown>;
   /** False: keep the thread summary in the cache only, and write nothing to MongoDB. Default true. */
   persistHistory?: boolean;
+  /**
+   * Extra fields for the end of the streamed JSON object that need the finished turn, for example the answer counts
+   * of the LabOS agent (LAB-3297). Called once, after `extraResponseFields`. AI search passes nothing.
+   */
+  turnFields?: (turn: ContextualTurnSummary) => Record<string, unknown>;
+}
+
+/** What the finished turn did, for `ContextualToolsOptions.turnFields`. */
+export interface ContextualTurnSummary {
+  /** The name of each tool call of the answer model in the turn, in order. One entry for each call. */
+  toolNames: string[];
+  /** The `sources` of the tail. */
+  sources: string[];
+  /** The `sourceRefs` of the tail. */
+  sourceRefs: HuskySourceRef[];
 }
 
 interface AnswerResult {
@@ -82,6 +97,8 @@ interface AnswerResult {
   /** True when the model ended the answer itself (finish reason `stop`). */
   complete: boolean;
   reason: string;
+  /** The name of each tool call in the finished steps of this generation. */
+  toolNames: string[];
 }
 
 type HuskyResponseContext = z.infer<typeof HuskyResponseContextSchema>;
@@ -208,6 +225,7 @@ export class HuskyAiService {
   ) {
     const { question, threadId, chatId, chatSummary } = chatInfo;
     const persistHistory = options.persistHistory !== false;
+    const { turnFields } = options;
     const pageContext = options.promptContext ? `  - pageContext: ${options.promptContext}` : '';
     const currentDate = new Date().toISOString().split('T')[0];
     const auth = await this.resolveAuthContext(isLoggedIn, userEmail);
@@ -273,6 +291,7 @@ export class HuskyAiService {
           );
           content = answer.text;
           let toolResults = answer.toolResults;
+          const toolNames = [...answer.toolNames];
 
           if (!answer.complete) {
             this.logger.error(
@@ -295,6 +314,7 @@ export class HuskyAiService {
             );
             content += continuation.text;
             toolResults += continuation.toolResults;
+            toolNames.push(...continuation.toolNames);
             if (!continuation.complete) {
               this.logger.error(
                 `Husky answer continuation for thread ${threadId}, chat ${chatId} was cut off as well (${continuation.reason})`
@@ -321,7 +341,8 @@ export class HuskyAiService {
               pageContext,
             },
             enqueue,
-            options.extraResponseFields
+            options.extraResponseFields,
+            turnFields ? (payload) => turnFields(turnSummary(toolNames, payload)) : undefined
           );
 
           controller.close();
@@ -368,6 +389,7 @@ export class HuskyAiService {
     const watchdog = new StallWatchdog(this.getStallTimeoutMs());
     let text = '';
     let toolResults = '';
+    const toolNames: string[] = [];
     const emit = (chunk: string) => {
       text += chunk;
       enqueue(encodeJsonStringFragment(chunk));
@@ -429,6 +451,9 @@ export class HuskyAiService {
       ...this.searchCallOptions(),
       abortSignal: watchdog.signal,
       onStepFinish: async (step) => {
+        // LAB-3297: one entry for each tool call of the step. A step without `toolCalls` counts its tool results.
+        const calls = (step.toolCalls ?? step.toolResults ?? []) as { toolName?: string }[];
+        toolNames.push(...calls.map((call) => call.toolName ?? ''));
         if (step.toolResults?.length > 0) {
           toolResults += step.toolResults.map((tool: { result: string }) => tool.result).join('\n\n');
           for (const tool of step.toolResults as { toolName?: string; result?: unknown }[]) {
@@ -477,13 +502,19 @@ export class HuskyAiService {
       release();
       watchdog.touch();
       const finishReason = await watchdog.race(result.finishReason);
-      return { text, toolResults, complete: finishReason === 'stop', reason: `finish reason "${finishReason}"` };
+      return {
+        text,
+        toolResults,
+        complete: finishReason === 'stop',
+        reason: `finish reason "${finishReason}"`,
+        toolNames,
+      };
     } catch (error) {
       if (!watchdog.stalled) {
         throw error;
       }
       release();
-      return { text, toolResults, complete: false, reason: `no chunk for ${watchdog.timeoutMs}ms` };
+      return { text, toolResults, complete: false, reason: `no chunk for ${watchdog.timeoutMs}ms`, toolNames };
     } finally {
       watchdog.stop();
     }
@@ -527,7 +558,8 @@ export class HuskyAiService {
       pageContext: string;
     },
     enqueue: (text: string) => void,
-    extraResponseFields?: Record<string, unknown>
+    extraResponseFields?: Record<string, unknown>,
+    turnFields?: (payload: HuskyStoredContext) => Record<string, unknown>
   ): Promise<HuskyStoredContext> {
     const watchdog = new StallWatchdog(this.getStallTimeoutMs());
     try {
@@ -562,7 +594,7 @@ export class HuskyAiService {
       watchdog.touch();
       const object = await watchdog.race(objectPromise);
       const payload = this.withSourceRefs(object, input);
-      enqueue(JSON.stringify({ ...payload, ...extraResponseFields }).substring(1));
+      enqueue(JSON.stringify({ ...payload, ...extraResponseFields, ...turnFields?.(payload) }).substring(1));
       return payload;
     } catch (error) {
       if (watchdog.stalled) {
@@ -571,7 +603,7 @@ export class HuskyAiService {
         this.logger.error('Husky structured response generation failed:', error);
       }
       const payload = this.withSourceRefs(EMPTY_RESPONSE_CONTEXT, input);
-      enqueue(JSON.stringify({ ...payload, ...extraResponseFields }).substring(1));
+      enqueue(JSON.stringify({ ...payload, ...extraResponseFields, ...turnFields?.(payload) }).substring(1));
       return payload;
     } finally {
       watchdog.stop();
@@ -893,4 +925,8 @@ export class HuskyAiService {
       ...(thread?.guestUserId && { guestUserId: thread?.guestUserId }),
     };
   }
+}
+
+function turnSummary(toolNames: string[], payload: HuskyStoredContext): ContextualTurnSummary {
+  return { toolNames, sources: payload.sources ?? [], sourceRefs: payload.sourceRefs ?? [] };
 }

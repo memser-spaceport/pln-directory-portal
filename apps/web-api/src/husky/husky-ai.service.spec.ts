@@ -288,6 +288,69 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
     expect(refs.filter((ref) => ref.type === 'web')).toHaveLength(1);
   });
 
+  describe('turnFields (LAB-3297)', () => {
+    function twoToolTurn() {
+      streamTextMock.mockImplementation(({ onStepFinish }) => ({
+        fullStream: (async function* () {
+          yield { type: 'tool-call', toolCallId: 'c1', toolName: 'searchWeb' };
+          yield { type: 'tool-call', toolCallId: 'c2', toolName: 'getMembers' };
+          await onStepFinish({
+            toolCalls: [{ toolName: 'searchWeb' }, { toolName: 'getMembers' }],
+            toolResults: [{ toolName: 'searchWeb', result: 'Web search not available' }],
+          });
+          yield { type: 'text-delta', textDelta: 'Answer' };
+        })(),
+        finishReason: Promise.resolve('stop'),
+      }));
+      streamObjectMock.mockReturnValue(structuredStream(['{}']));
+    }
+
+    it('gives the tool calls of the turn and the tail sources to turnFields, and adds its fields to the tail', async () => {
+      twoToolTurn();
+      const turnFields = jest.fn().mockReturnValue({ toolCount: 2 });
+
+      const raw = await readAll(
+        await service.createContextualToolsResponse(chatInfo, false, undefined, {
+          extraResponseFields: { proposals: [] },
+          turnFields,
+        })
+      );
+
+      expect(turnFields).toHaveBeenCalledTimes(1);
+      expect(turnFields).toHaveBeenCalledWith({
+        toolNames: ['searchWeb', 'getMembers'],
+        sources: STRUCTURED.sources,
+        sourceRefs: [UNCITED_SOURCE_REF],
+      });
+      const body = JSON.parse(raw);
+      expect(body.toolCount).toBe(2);
+      expect(body.proposals).toEqual([]);
+    });
+
+    it('adds the turn fields when the structured tail fails too', async () => {
+      twoToolTurn();
+      streamObjectMock.mockReturnValue(structuredStream([], Promise.reject(new Error('tail failed'))));
+
+      const raw = await readAll(
+        await service.createContextualToolsResponse(chatInfo, false, undefined, {
+          turnFields: (turn) => ({ toolCount: turn.toolNames.length }),
+        })
+      );
+
+      expect(JSON.parse(raw).toolCount).toBe(2);
+    });
+
+    it('keeps the AI search body unchanged when no turnFields is given', async () => {
+      twoToolTurn();
+
+      const body = JSON.parse(await readAll(await service.createContextualToolsResponse(chatInfo, false)));
+
+      expect(Object.keys(body).sort()).toEqual(
+        ['actions', 'content', 'followUpQuestions', 'sourceRefs', 'sources', 'steps'].sort()
+      );
+    });
+  });
+
   it('streams one valid JSON object even when the answer contains quotes, backslashes and newlines', async () => {
     prisma.member.findUnique.mockResolvedValue({ uid: 'member-1', deletedAt: null });
     const answer = 'Example Team builds "storage" tools.\nSee C:\\path for details.';
