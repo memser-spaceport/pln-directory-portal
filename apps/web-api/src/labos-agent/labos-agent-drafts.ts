@@ -22,8 +22,11 @@ const logger = new Logger('LabosAgentDrafts');
 
 export type DraftDeps = {
   introRequests: IntroRequestsService;
-  /** `context.introTarget` of this turn, or undefined when the page is not `intro`. */
-  target: IntroTurnTarget | undefined;
+  /**
+   * The intro targets of this turn: the `intro` page target, the `member` or `team` page target (S5), and each `member`
+   * or `team` mention (S6, LAB-3318). Empty when the turn has none.
+   */
+  targets: IntroTurnTarget[];
   /** The stream body `drafts`. The stream reads it when it ends. */
   drafts: LabosAgentDraft[];
 };
@@ -37,10 +40,10 @@ export type DraftDeps = {
 export function draftIntroTool(ctx: McpActorContext, deps: DraftDeps): CoreTool {
   return tool({
     description:
-      'Write a draft intro request from the member to the member or team in the page context. ' +
+      'Write a draft intro request from the member to a member or team in the page context or the items of the message. ' +
       `The text is from ${MIN} to ${MAX} characters, in the voice of the member: who they are, what they ask, and why. ` +
       'The tool only makes a draft card. The member edits it and presses Send. Nothing is sent. ' +
-      'Use it only for the intro target of this turn. When there is no target, ask the member to open ' +
+      'Use it only for an intro target of this turn. Make one draft for one target. When there is no target, ask the member to open ' +
       '"Ask the agent" from the member or team profile.',
     parameters: z.object({
       type: z.enum(['member', 'team']),
@@ -50,9 +53,9 @@ export function draftIntroTool(ctx: McpActorContext, deps: DraftDeps): CoreTool 
     execute: async (args: { type: 'member' | 'team'; targetUid: string; text: string }) => {
       // A refusal gives `drafts: []`, also after an earlier draft in this turn. Only a valid call adds a draft.
       deps.drafts.splice(0, deps.drafts.length);
-      const target = deps.target;
-      // 1. Only the target of this turn.
-      if (!target || target.type !== args.type || target.uid !== args.targetUid) {
+      // 1. Only a target of this turn. A turn still has at most 1 draft (S3-R8).
+      const target = deps.targets.find((item) => item.type === args.type && item.uid === args.targetUid);
+      if (!target) {
         return (
           'The draft was refused: the target is not the intro target of this turn. Make no draft. ' +
           'Ask the member to open "Ask the agent" from the profile of the member or team.'
