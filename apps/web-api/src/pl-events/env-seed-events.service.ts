@@ -34,6 +34,7 @@ type SeedEvent = {
   coHosts?: string[];
   website?: string;
   registration?: string;
+  mapQuery?: string; // the venue search behind details.locationUrl (LAB-3332); none = no map link
   agenda?: boolean;
   going: number; // members to mark as going
   description: string;
@@ -52,6 +53,7 @@ const TAG = {
 const EVENTS: SeedEvent[] = [
   {
     key: 'berlin-meetup',
+    mapQuery: 'Factory Berlin Mitte, Berlin',
     name: 'PL Berlin Builders Meetup',
     city: 'Berlin',
     type: 'IN_PERSON',
@@ -68,6 +70,7 @@ const EVENTS: SeedEvent[] = [
   },
   {
     key: 'berlin-workshop',
+    mapQuery: 'Betahaus Kreuzberg, Berlin',
     name: 'IPFS Hands-on Workshop',
     city: 'Berlin',
     type: 'IN_PERSON',
@@ -86,6 +89,7 @@ const EVENTS: SeedEvent[] = [
   },
   {
     key: 'berlin-research',
+    mapQuery: 'Silent Green Kulturquartier, Berlin',
     name: 'Filecoin Research Day',
     city: 'Berlin',
     type: 'INVITE_ONLY',
@@ -102,6 +106,7 @@ const EVENTS: SeedEvent[] = [
   },
   {
     key: 'singapore-dinner',
+    mapQuery: 'Marina Bay Sands, Singapore',
     name: 'Singapore Founders Dinner',
     city: 'Singapore',
     type: 'INVITE_ONLY',
@@ -117,6 +122,7 @@ const EVENTS: SeedEvent[] = [
   },
   {
     key: 'tokyo-summit',
+    mapQuery: 'Tokyo International Forum, Tokyo',
     name: 'Decentralized Tokyo Summit',
     city: 'Tokyo',
     type: 'IN_PERSON',
@@ -135,6 +141,7 @@ const EVENTS: SeedEvent[] = [
   },
   {
     key: 'sf-ai-night',
+    mapQuery: 'Shack15, Ferry Building, San Francisco',
     name: 'Decentralized AI Night',
     city: 'San Francisco',
     type: 'IN_PERSON',
@@ -166,6 +173,7 @@ const EVENTS: SeedEvent[] = [
   },
   {
     key: 'buenos-aires-week',
+    mapQuery: 'Centro Cultural Kirchner, Buenos Aires',
     name: 'Lab Week Buenos Aires',
     city: 'Buenos Aires',
     type: 'IN_PERSON',
@@ -183,6 +191,7 @@ const EVENTS: SeedEvent[] = [
   },
   {
     key: 'bangkok-depin',
+    mapQuery: 'True Digital Park, Bangkok',
     name: 'DePIN Day Bangkok',
     city: 'Bangkok',
     type: 'IN_PERSON',
@@ -299,6 +308,10 @@ export class EnvSeedEventsService implements OnApplicationBootstrap {
         coHosts: (e.coHosts ?? []).map((name) => ({ name, logo: null })),
         sponsors: [],
         agenda: e.agenda ? { sessions: this.agenda(start, e.hours) } : null,
+        // LAB-3332: the drawer links the address to this map; events without mapQuery keep it plain text.
+        locationUrl: e.mapQuery
+          ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(e.mapQuery)}`
+          : null,
       };
       const data = {
         name: e.name,
@@ -333,7 +346,11 @@ export class EnvSeedEventsService implements OnApplicationBootstrap {
       for (const [i, member] of goers.entries()) {
         const guestUid = keep[i];
         const guest = { memberUid: member.uid, locationUid, eventUid: uid, isHost: i === 0, showOnProfile: true };
-        await this.prisma.pLEventGuest.upsert({ where: { uid: guestUid }, create: { uid: guestUid, ...guest }, update: guest });
+        await this.prisma.pLEventGuest.upsert({
+          where: { uid: guestUid },
+          create: { uid: guestUid, ...guest },
+          update: guest,
+        });
       }
       written++;
     }
