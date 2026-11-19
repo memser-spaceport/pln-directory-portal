@@ -24,16 +24,17 @@ export function hasRichTextContent(html: string | null | undefined): boolean {
 
 export function stripHtmlToPlainText(html: string | null | undefined): string {
   if (!html) return '';
+  // Decode &amp; last, so "&amp;lt;" stays the literal text "&lt;" (no double decode).
   return html
     .replace(/<\/(p|div|li|h[1-6])>/gi, ' ')
     .replace(/<br\s*\/?>/gi, ' ')
     .replace(/<[^>]*>/g, '')
     .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
     .replace(/\s+/g, ' ')
     .trim();
 }

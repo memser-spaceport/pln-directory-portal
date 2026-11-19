@@ -7,6 +7,8 @@ jest.mock('../team-news/team-news-query.service', () => ({ TeamNewsQueryService:
 jest.mock('../team-news/team-news-suggestions.service', () => ({ TeamNewsSuggestionsService: jest.fn() }));
 jest.mock('../mcp/mcp-tool-catalog', () => ({ McpToolCatalog: jest.fn() }));
 jest.mock('../access-control-v2/services/access-control-v2.service', () => ({ AccessControlV2Service: jest.fn() }));
+// The service imports TeamsService as a value; its real module pulls cheerio and undici, which need ReadableStream.
+jest.mock('../teams/teams.service', () => ({ TeamsService: jest.fn() }));
 jest.mock('ai', () => ({ tool: (def: unknown) => def }));
 
 import { ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
@@ -128,7 +130,9 @@ function setup(sender: Partial<Person> = { roles: [portfolio()] }) {
     { getMemberAccess: jest.fn().mockResolvedValue({ effectivePermissions: [] }) } as any,
     new LabosAgentProposalStore(cache as any),
     { adminCaps: jest.fn(async () => Object.fromEntries(MCP_SCOPE_KEYS.map((key) => [key, 'write']))) } as any,
-    introRequests
+    introRequests,
+    {} as any,
+    {} as any
   );
   const controller = new LabosAgentController(service);
   const req = { userEmail: 'ada@example.com' };

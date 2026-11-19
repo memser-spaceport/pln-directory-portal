@@ -21,6 +21,7 @@ import {
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
 import { HuskyAiService } from '../husky/husky-ai.service';
 import { IntroRequestsService } from '../intro-requests/intro-requests.service';
+import { JobOpeningsQueryService } from '../job-openings/job-openings-query.service';
 import { newsRow } from '../mcp/mcp-news-tools';
 import { McpToolCatalog } from '../mcp/mcp-tool-catalog';
 import { McpAdminCaps, McpScopesService } from '../mcp/mcp-scopes.service';
@@ -28,9 +29,17 @@ import { McpActorContext, McpToolDef } from '../mcp/mcp-tools';
 import { PrismaService } from '../shared/prisma.service';
 import { resolveLiveMemberUidByEmail } from '../shared/resolve-live-member-uid.util';
 import { TeamNewsQueryService } from '../team-news/team-news-query.service';
+import { TeamsService } from '../teams/teams.service';
 import { LabosAgentAccessService } from './labos-agent-access.service';
 import { draftIntroTool, IntroTurnTarget } from './labos-agent-drafts';
 import { mcpToolsAsAgentTools } from './labos-agent-news.tools';
+import {
+  JOB_BOARD_SENTENCE,
+  jobPagePrompt,
+  memberPagePrompt,
+  profilePrompt,
+  teamPagePrompt,
+} from './labos-agent-page-context';
 import { canChangeTeam, LabosAgentProposalStore, proposeTool, StoredProposal } from './labos-agent-proposals';
 
 /** Read tools that run in chat, next to the AI search tools (contract section 3: S1 news, S2 profile). */
@@ -62,7 +71,9 @@ export class LabosAgentService {
     private accessControl: AccessControlV2Service,
     private proposalStore: LabosAgentProposalStore,
     private scopes: McpScopesService,
-    private introRequests: IntroRequestsService
+    private introRequests: IntroRequestsService,
+    private teams: TeamsService,
+    private jobs: JobOpeningsQueryService
   ) {}
 
   private readonly logger = new Logger(LabosAgentService.name);
@@ -74,7 +85,7 @@ export class LabosAgentService {
   /** Runs the checks that come before the stream (403, 404), then returns the stream. */
   async chat(email: string, body: LabosAgentChatRequest): Promise<ReadableStream> {
     const memberUid = await this.enabledMember(email);
-    const { promptContext, introTarget } = await this.pageContext(body, memberUid);
+    const { promptContext, introTarget } = await this.pageContext(body, memberUid, email);
     const ctx = await this.actor(memberUid, email);
     // The member's real RBAC permissions and the admin MCP caps pick the tools, as on the MCP server (LAB-3299).
     const allowed = await this.tools(ctx);
@@ -215,11 +226,28 @@ export class LabosAgentService {
 
   private async pageContext(
     body: LabosAgentChatRequest,
-    memberUid: string
+    memberUid: string,
+    email: string
   ): Promise<{ promptContext?: string; introTarget?: IntroTurnTarget }> {
     const context = body.context;
     if (!context) return {};
     if (context.page === 'intro' && context.introTarget) return this.introContext(context.introTarget);
+    // S5 (LAB-3302, contract 9.3 and 9.4). The own member comes from the session, never from the body.
+    if (context.page === 'profile' || (context.page === 'member' && context.memberUid === memberUid)) {
+      return { promptContext: profilePrompt(memberUid) };
+    }
+    if (context.page === 'member' && context.memberUid) {
+      const promptContext = await memberPagePrompt(this.prisma, context.memberUid);
+      return this.withPageIntroTarget(promptContext, 'member', context.memberUid);
+    }
+    if (context.page === 'team' && context.teamUid) {
+      const promptContext = await teamPagePrompt(this.teams, this.prisma, context.teamUid, email);
+      return this.withPageIntroTarget(promptContext, 'team', context.teamUid);
+    }
+    if (context.page === 'job') {
+      if (!context.jobUid) return { promptContext: JOB_BOARD_SENTENCE };
+      return { promptContext: await jobPagePrompt(this.jobs, context.jobUid, email) };
+    }
     if (context.page !== 'news-story' || !context.newsUid) {
       return { promptContext: 'The member is on the LabOS Home page.' };
     }
@@ -245,6 +273,26 @@ export class LabosAgentService {
         story
       )}`;
     return { promptContext };
+  }
+
+  /**
+   * Contract 9.5 (Q1 A): on a member or team page, the page target is also the intro target of the turn. The name
+   * comes from the S3 agent lookup (`findAgentTargetName`), so the S3 rules stay: a deleted team gives no intro
+   * target, also for an admin who can read the page. No name is not an error; `draft_intro` then refuses.
+   */
+  private async withPageIntroTarget(
+    promptContext: string,
+    type: 'member' | 'team',
+    uid: string
+  ): Promise<{ promptContext: string; introTarget?: IntroTurnTarget }> {
+    const name = await this.introRequests.findAgentTargetName(type === 'member' ? 'MEMBER' : 'TEAM', uid);
+    if (!name) return { promptContext };
+    return {
+      promptContext:
+        `${promptContext} When the member asks for an intro request to this ${type}, ` +
+        `call draft_intro with type "${type}" and targetUid "${uid}". You never send the request.`,
+      introTarget: { type, uid, name },
+    };
   }
 
   /** The intro page (LAB-3300): the target from the agent lookup (deleted teams are unknown), or 404 INTRO_TARGET_NOT_FOUND before the stream. */
