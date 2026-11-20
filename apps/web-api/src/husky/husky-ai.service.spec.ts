@@ -17,6 +17,9 @@ jest.mock('./tools/demo-day.tool', () => ({ DemoDayTool: jest.fn() }));
 jest.mock('../analytics/service/analytics.service', () => ({ AnalyticsService: jest.fn() }));
 // irl-events.tool imports PLEventGuestsService/MembersService -> axios, same ESM problem.
 jest.mock('./tools/irl-events.tool', () => ({ IrlEventsTool: jest.fn() }));
+// The real tools service pulls in undici through its tool modules, and undici needs the web streams globals at import.
+// This spec passes its own tools service mock to the constructor.
+jest.mock('./tools/husky-ai-tools.serivice', () => ({ HuskyAiToolsService: jest.fn() }));
 
 import { streamText, streamObject, generateText } from 'ai';
 import { HuskyResponseSchema } from 'libs/contracts/src/schema/husky-chat';
@@ -326,6 +329,19 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
       const body = JSON.parse(raw);
       expect(body.toolCount).toBe(2);
       expect(body.proposals).toEqual([]);
+    });
+
+    it('LAB-3362 D2: lets a turn field replace a tail field with the same key, also in the counts input', async () => {
+      twoToolTurn();
+      const turnFields = jest.fn((turn) => ({ sources: [], sourceCount: turn.sources.length }));
+
+      const body = JSON.parse(
+        await readAll(await service.createContextualToolsResponse(chatInfo, false, undefined, { turnFields }))
+      );
+
+      expect(body.sources).toEqual([]);
+      expect(body.sourceCount).toBe(STRUCTURED.sources.length);
+      expect(body.followUpQuestions).toEqual(STRUCTURED.followUpQuestions);
     });
 
     it('adds the turn fields when the structured tail fails too', async () => {

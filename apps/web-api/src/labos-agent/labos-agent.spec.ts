@@ -184,13 +184,34 @@ describe('LabosAgentController', () => {
     // S3-R8: a turn without a draft has drafts [], next to the S1 and S2 fields.
     expect(options.extraResponseFields).toEqual({ proposals: [], drafts: [] });
     expect(options.persistHistory).toBe(false);
-    // LAB-3297 (V0-R4): the answer counts come from the finished turn.
-    expect(options.turnFields).toBe(answerCounts);
+    // LAB-3297 (V0-R4): the answer counts come from the finished turn. LAB-3362 D2: with the web `sources` only.
+    const turn = { toolNames: ['searchWeb'], sources: ['https://example.com/a'], sourceRefs: [] };
+    expect(options.turnFields(turn)).toEqual({ sources: ['https://example.com/a'], ...answerCounts(turn) });
 
     expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'application/json');
     expect(res.setHeader).toHaveBeenCalledWith('Transfer-Encoding', 'chunked');
     expect(res.flushHeaders).toHaveBeenCalled();
     expect(stream.pipeTo).toHaveBeenCalled();
+  });
+
+  it('LAB-3362 D2: sends only web sources that are not LabOS and not in sourceRefs, and counts what it sends', async () => {
+    const { controller, husky, res, req } = setup();
+    await controller.chat(VALID, req, res as any);
+    const { turnFields } = husky.createContextualToolsResponse.mock.calls[0][3];
+    const sourceRefs = [
+      { index: 1, title: 'Story', type: 'news', directoryLink: '/?news=n-1' },
+      { index: 2, title: 'Textile', type: 'team', directoryLink: '/teams/t-1', externalUrl: 'https://textile.io' },
+    ];
+    const sources = [
+      'https://directory-portal-lab-3272.os.pl.xyz/?news=n-1',
+      'https://www.textile.io/',
+      'https://filecoin.io/blog/post',
+    ];
+
+    const fields = turnFields({ toolNames: ['getTeamNews', 'searchWeb'], sources, sourceRefs });
+
+    expect(fields.sources).toEqual(['https://filecoin.io/blog/post']);
+    expect(fields.sourceCount).toBe(3);
   });
 
   it('passes a Home context and no context through without a news lookup', async () => {

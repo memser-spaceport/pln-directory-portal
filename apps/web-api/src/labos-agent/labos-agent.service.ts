@@ -55,6 +55,7 @@ import {
   teamPageRow,
 } from './labos-agent-page-context';
 import { canChangeTeam, LabosAgentProposalStore, proposeTool, StoredProposal } from './labos-agent-proposals';
+import { webSources } from './labos-agent-sources';
 
 /** Read tools that run in chat, next to the AI search tools (contract section 3: S1 news, S2 profile). */
 const READ_TOOLS = ['list_news', 'get_news_item', 'get_my_profile', 'list_my_experiences'];
@@ -142,7 +143,12 @@ export class LabosAgentService {
         // The stream reads these arrays when it ends, so they hold the proposals and drafts the tools made in this turn.
         extraResponseFields: { proposals, drafts },
         // LAB-3297 (V0-R4): `toolCount`, `usedWebSearch` and `sourceCount` at the end of the body. Counts only.
-        turnFields: answerCounts,
+        // LAB-3362 D2: `sources` keeps only web pages outside LabOS that are not in `sourceRefs`. `turnFields` fields
+        // replace the tail fields, and `sourceCount` counts the `sources` that the body sends.
+        turnFields: (turn) => {
+          const sources = webSources(turn.sources, turn.sourceRefs);
+          return { sources, ...answerCounts({ ...turn, sources }) };
+        },
         persistHistory: false,
       }
     );

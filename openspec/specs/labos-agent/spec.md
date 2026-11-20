@@ -397,3 +397,15 @@ The C1 stream body SHALL end with `toolCount`, `usedWebSearch` and `sourceCount`
 - **GIVEN** a turn where the model calls no tool and the body has no sources
 - **WHEN** the stream ends
 - **THEN** the body has `toolCount` 0, `usedWebSearch` false and `sourceCount` 0
+
+### Requirement: Web sources in the C1 body
+
+The C1 `sources` SHALL hold only web pages outside LabOS that are not in `sourceRefs` (LAB-3362 D2). A source SHALL be dropped when it is the same page as the `externalUrl` or the `directoryLink` of a source ref. The same page means the same host (without `www.`), path (without a trailing slash) and query; the protocol and the fragment do not count, and a relative `directoryLink` resolves against the web app origin (`WEB_UI_BASE_URL`, else `APPLICATION_BASE_URL`). A source on a LabOS host SHALL be dropped: the web app origin, `os.pl.xyz`, `directory-portal*.os.pl.xyz`, `lab-*.os.pl.xyz` and `plnetwork.io` with its subdomains. A page SHALL be in `sources` once, and a value that is not an http(s) URL SHALL be dropped. The order SHALL stay. `sourceCount` SHALL count the `sources` that the body sends. `sourceRefs` SHALL NOT change. AI search keeps its own `sources`.
+
+#### Scenario: News and team refs
+
+- **GIVEN** a turn with a news ref `/?news=n-1` and a team ref with `externalUrl` `https://textile.io`
+- **AND** the model `sources` are the LabOS page of the story, `https://www.textile.io/` and `https://filecoin.io/blog/post`
+- **WHEN** the stream ends
+- **THEN** `sources` is only `https://filecoin.io/blog/post`
+- **AND** `sourceCount` is 3
