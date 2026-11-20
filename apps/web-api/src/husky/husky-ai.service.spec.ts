@@ -379,6 +379,19 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
       expect(body.proposals).toEqual([]);
     });
 
+    it('LAB-3362 D2: lets a turn field replace a tail field with the same key, also in the counts input', async () => {
+      twoToolTurn();
+      const turnFields = jest.fn((turn) => ({ sources: [], sourceCount: turn.sources.length }));
+
+      const body = JSON.parse(
+        await readAll(await service.createContextualToolsResponse(chatInfo, false, undefined, { turnFields }))
+      );
+
+      expect(body.sources).toEqual([]);
+      expect(body.sourceCount).toBe(STRUCTURED.sources.length);
+      expect(body.followUpQuestions).toEqual(STRUCTURED.followUpQuestions);
+    });
+
     it('adds the turn fields when the structured tail fails too', async () => {
       twoToolTurn();
       streamObjectMock.mockReturnValue(structuredStream([], Promise.reject(new Error('tail failed'))));

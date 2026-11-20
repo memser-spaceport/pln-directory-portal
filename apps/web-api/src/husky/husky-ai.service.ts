@@ -77,7 +77,8 @@ export interface ContextualToolsOptions {
   persistHistory?: boolean;
   /**
    * Extra fields for the end of the streamed JSON object that need the finished turn, for example the answer counts
-   * of the LabOS agent (LAB-3297). Called once, after `extraResponseFields`. AI search passes nothing.
+   * of the LabOS agent (LAB-3297). Called once, after `extraResponseFields`. A field with the key of a tail field
+   * replaces it in the body, for example the agent `sources` (LAB-3362 D2). AI search passes nothing.
    */
   turnFields?: (turn: ContextualTurnSummary) => Record<string, unknown>;
 }
