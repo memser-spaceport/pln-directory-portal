@@ -119,3 +119,13 @@ The `searchWeb` result SHALL tell the answer model that its summary comes from p
 - **WHEN** the tool builds its result
 - **THEN** the summary keeps "Its data sources: on-chain logs."
 - **AND** the URL list is not part of the summary
+
+### Requirement: Text parts around tool calls are separate paragraphs
+
+The answer stream SHALL join the text before a tool call and the text after it with a blank line (`\n\n`). It SHALL add only the line breaks that the text does not already have. It SHALL NOT add a break between the deltas of one text part, or before the first text of the answer (LAB-3362 D3).
+
+#### Scenario: Text after a tool call
+
+- **GIVEN** the model writes "Checking.", calls two tools, then writes "Done."
+- **WHEN** the answer finishes
+- **THEN** `content` is "Checking.\n\nDone."

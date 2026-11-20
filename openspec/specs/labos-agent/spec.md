@@ -107,6 +107,22 @@ The chat SHALL write nothing to the directory. Only C2 runs a write tool. The ch
 - **THEN** the body has one `update_my_profile` proposal
 - **AND** the profile is not changed
 
+### Requirement: Text parts around tool calls
+
+The answer stream SHALL join the text before a tool call and the text after it with a blank line (`\n\n`), so markdown shows two paragraphs. A single `\n` is a soft break in markdown and renders as a space, so it is not enough. When the text already ends or starts with line breaks, the stream SHALL add only the missing ones. The stream SHALL NOT add a break between the deltas of one text part, or before the first text of the answer. The `content` in the final body SHALL match the streamed text. AI search uses the same stream and gets the same rule (LAB-3362 D3).
+
+#### Scenario: Text after a tool call
+
+- **GIVEN** the model writes "I will check your changes.", calls `get_my_profile`, then writes "Got your profile."
+- **WHEN** the turn finishes
+- **THEN** `content` is "I will check your changes.\n\nGot your profile."
+
+#### Scenario: One text part in many deltas
+
+- **GIVEN** the model streams "One " and "part." with no tool call between them
+- **WHEN** the turn finishes
+- **THEN** `content` is "One part."
+
 ### Requirement: Real permissions and the shared tool list
 
 The agent SHALL get its MCP tools from `McpToolCatalog.forApp`, the same tool list as the MCP server. It SHALL use the member's effective RBAC permissions from `AccessControlV2Service.getMemberAccess`, the same as the MCP server. The admin MCP caps (`McpScopesService.adminCaps`) SHALL apply through `planTools`, the same step as the MCP server, in the chat (read and propose tools) and again in C2 confirm. Per-connection MCP scope levels SHALL NOT apply: the agent has no connection, so every scope starts at `write` and only the admin cap and the registry maximum limit it. When the admin caps cannot be read, the agent SHALL fail closed as the MCP server does: every scoped tool is hidden, so the chat has no LabOS tools and C2 confirm returns 403 `ACTION_NOT_ALLOWED`.
