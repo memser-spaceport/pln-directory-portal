@@ -13,6 +13,7 @@ import {
   WEB_SEARCH_NOT_AVAILABLE,
   WEB_SEARCH_TIMEOUT_MS,
   WebSearchTool,
+  webPageTitle,
 } from './web-search.tool';
 import { HUSKY_SEARCH_OPUS_ENABLED_ENV_VAR, HUSKY_SEARCH_PROVIDER_ENV_VAR } from '../husky-search.constants';
 
@@ -164,6 +165,45 @@ describe('WebSearchTool', () => {
     expect(result).toContain(`Web page: other.example [WebLink](${failing})`);
     expect(result).toContain('Summary: Saturn Grid builds storage.');
     expect(result).not.toContain('inline.example');
+  });
+
+  it('LAB-3362: gives the full page host when the grounding title is the bare site domain', async () => {
+    generateText.mockResolvedValue({
+      text: 'Textile builds data tools.',
+      experimental_providerMetadata: {
+        google: {
+          groundingMetadata: {
+            groundingChunks: [
+              { web: { uri: 'https://docs.textile.io/guide', title: 'textile.io' } },
+              { web: { uri: 'https://blog.textile.io/post', title: 'textile.io' } },
+              { web: { uri: 'https://www.textile.io/', title: 'textile.io' } },
+              { web: { uri: 'https://textile.io/about', title: 'Textile | About us' } },
+            ],
+          },
+        },
+      },
+    });
+
+    const result = await run('Textile');
+
+    expect(result).toContain('Web page: docs.textile.io [WebLink](https://docs.textile.io/guide)');
+    expect(result).toContain('Web page: blog.textile.io [WebLink](https://blog.textile.io/post)');
+    expect(result).toContain('Web page: textile.io [WebLink](https://www.textile.io/)');
+    expect(result).toContain('Web page: Textile | About us [WebLink](https://textile.io/about)');
+  });
+
+  it.each([
+    ['textile.io', 'https://docs.textile.io/guide', 'docs.textile.io'],
+    ['Textile.IO', 'https://Blog.Textile.io/post', 'blog.textile.io'],
+    ['docs.textile.io', 'https://docs.textile.io/guide', 'docs.textile.io'],
+    ['textile.io', 'https://www.textile.io/', 'textile.io'],
+    ['Saturn Grid raises seed', 'https://news.example/seed', 'Saturn Grid raises seed'],
+    ['v1.2 release notes', 'https://docs.textile.io/v1', 'v1.2 release notes'],
+    ['other.example', 'https://saturngrid.example/about', 'other.example'],
+    ['io', 'https://docs.textile.io/guide', 'io'],
+    ['textile.io', 'not a url', 'textile.io'],
+  ])('LAB-3362: webPageTitle(%j, %j) is %j', (title, url, expected) => {
+    expect(webPageTitle(title, url)).toBe(expected);
   });
 
   it('stops the web call when the answer stream is aborted', async () => {
