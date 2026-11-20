@@ -21,6 +21,7 @@ import { LabosAgentController } from './labos-agent.controller';
 import { LabosAgentService } from './labos-agent.service';
 import { mcpToolsAsAgentTools, newsLinkFields, newsLinkLines, withNewsStoryLinks } from './labos-agent-news.tools';
 import { NO_PAGE_SENTENCE } from './labos-agent-page-context';
+import { buildSourceRefs } from '../husky/source-refs';
 
 if (!(globalThis as any).WritableStream) {
   // The jest node environment predates the web streams globals this Node runtime has.
@@ -327,7 +328,7 @@ describe('mcpToolsAsAgentTools', () => {
     const tools = mcpToolsAsAgentTools([{ name: 'list_news', description: 'd', visibility: 'always', execute }], ctx);
     const result = await (tools.list_news as any).execute({ search: 'x' });
     expect(execute).toHaveBeenCalledWith(ctx, { search: 'x' });
-    expect(result).toContain('Title: Story [NewsLink](/?news=news-1)');
+    expect(result).toContain('Title: Story [NewsLink](/home?news=news-1)');
     expect(result).toContain('"uid":"news-1"');
   });
 
@@ -360,7 +361,28 @@ describe('mcpToolsAsAgentTools', () => {
   });
 
   it('builds one NewsLink line for a single story', () => {
-    expect(newsLinkLines({ uid: 'a b', title: 'T' })).toBe('Title: T [NewsLink](/?news=a%20b)');
+    // LAB-3362 D1 review: the marker keeps the Home path of the news tool JSON `url`.
+    expect(newsLinkLines({ uid: 'a b', title: 'T' })).toBe('Title: T [NewsLink](/home?news=a%20b)');
     expect(newsLinkLines({ feed: 'latest', items: [] })).toBe('');
+  });
+
+  it('LAB-3362 D1: folds a /home?news= URL in sources or in a citation into the one news ref', () => {
+    const row = { uid: 'news-1', title: 'Story', url: 'https://lab-3272.os.pl.xyz/home?news=news-1' };
+    const toolResults = `${newsLinkLines(row)}\n\n${JSON.stringify(row)}`;
+    const content = 'Team X shipped v2 [1](https://lab-3272.os.pl.xyz/home?news=news-1).';
+    const llmSources = [
+      'https://lab-3272.os.pl.xyz/home?news=news-1',
+      '/home?news=news-1',
+      'https://www.example.com/a',
+    ];
+
+    const { sourceRefs } = buildSourceRefs({ content, toolResults, llmSources });
+    const fields = newsLinkFields({ toolNames: ['list_news'], sources: llmSources, sourceRefs });
+
+    expect(fields.sourceRefs).toEqual([
+      { index: 1, title: 'Story', type: 'news', directoryLink: '/?news=news-1' },
+      { index: 2, title: 'https://www.example.com/a', type: 'external', externalUrl: 'https://www.example.com/a' },
+    ]);
+    expect(fields.sourceRefs?.filter((ref) => ref.externalUrl?.includes('news='))).toEqual([]);
   });
 });
