@@ -765,10 +765,11 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
         text('Hi Grace.'),
         call('c2'),
         { set: false },
-        text('The draft was refused.'),
+        // Starts with its own break, so the result is the same with and without the D3 text part break.
+        text('\n\nThe draft was refused.'),
       ]);
 
-      expect(await content(answerLine)).toBe(`${LINE}The draft was refused.`);
+      expect(await content(answerLine)).toBe(`${LINE}\n\nThe draft was refused.`);
     });
 
     it('does not continue a cut-off answer while the line is on', async () => {
