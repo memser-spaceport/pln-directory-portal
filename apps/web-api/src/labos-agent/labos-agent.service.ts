@@ -16,6 +16,7 @@ import {
   LabosAgentConfirmRequest,
   LabosAgentConfirmResponse,
   LabosAgentDraft,
+  LabosAgentIntroDraft,
   LabosAgentMention,
   LabosAgentMentionsQuery,
   LabosAgentMentionsResponse,
@@ -113,8 +114,17 @@ export class LabosAgentService {
     const page = await this.pageContext(body, memberUid, email);
     // S6 (contract 10.4): the mention lookups come after the context lookup, so a bad context gives its 404 first.
     const mentioned = await this.mentionContext(body, memberUid, email);
-    const promptContext = joinPrompt(page.promptContext, mentioned.promptContext, !body.context);
-    const introTargets = uniqueTargets([...(page.introTarget ? [page.introTarget] : []), ...mentioned.introTargets]);
+    // Contract change 4 (LAB-3362, section 11): the waiting intro card, for this turn only. Nothing stores it.
+    const card = body.introDraft ? await this.introDraftContext(body.introDraft) : undefined;
+    const promptContext =
+      [joinPrompt(page.promptContext, mentioned.promptContext, !body.context), card?.promptContext]
+        .filter(Boolean)
+        .join('\n') || undefined;
+    const introTargets = uniqueTargets([
+      ...(page.introTarget ? [page.introTarget] : []),
+      ...mentioned.introTargets,
+      ...(card ? [card.introTarget] : []),
+    ]);
     const ctx = await this.actor(memberUid, email);
     // The member's real RBAC permissions and the admin MCP caps pick the tools, as on the MCP server (LAB-3299).
     const allowed = await this.tools(ctx);
@@ -401,6 +411,34 @@ export class LabosAgentService {
         `call draft_intro with type "${type}" and targetUid "${uid}". You never send the request.`,
       introTarget: { type, uid, name },
     };
+  }
+
+  /**
+   * Contract change 4 (section 11.2, 11.3): the target of the waiting card from the agent lookup (8.1), or 404
+   * INTRO_TARGET_NOT_FOUND before the stream. The card text goes only into the prompt context of this turn: no cache
+   * key, no log line, no analytics event (11.4). `draft_intro` checks the sender and the target again.
+   */
+  private async introDraftContext(
+    draft: LabosAgentIntroDraft
+  ): Promise<{ promptContext: string; introTarget: IntroTurnTarget }> {
+    const { type, uid } = draft.target;
+    const name = await this.introRequests.findAgentTargetName(type === 'member' ? 'MEMBER' : 'TEAM', uid);
+    if (!name) {
+      throw agentError(
+        NotFoundException,
+        404,
+        LABOS_AGENT_ERROR_CODES.INTRO_TARGET_NOT_FOUND,
+        `Intro target not found: ${type} ${uid}`
+      );
+    }
+    const introTarget: IntroTurnTarget = { type: type as IntroTurnTarget['type'], uid, name };
+    const promptContext =
+      `An intro draft card waits in this chat, for this ${type}: ${JSON.stringify(introTarget)}. ` +
+      `Its current text, with the edits of the member: ${JSON.stringify(draft.text)}. ` +
+      'Use this text only when the member asks to change the draft. ' +
+      `Then call draft_intro with type "${type}" and targetUid "${uid}" and the new text. ` +
+      'Do not write the draft text in the answer.';
+    return { promptContext, introTarget };
   }
 
   /** The intro page (LAB-3300): the target from the agent lookup (deleted teams are unknown), or 404 INTRO_TARGET_NOT_FOUND before the stream. */

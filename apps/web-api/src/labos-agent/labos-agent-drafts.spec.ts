@@ -13,6 +13,7 @@ jest.mock('ai', () => ({ tool: (def: unknown) => def }));
 
 import { ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
 import { MCP_SCOPE_KEYS } from 'libs/contracts/src/schema/mcp-scopes';
+import { LabosAgentChatRequestSchema } from 'libs/contracts/src/schema/labos-agent';
 import { IntroRequestsService } from '../intro-requests/intro-requests.service';
 import { PL_INFRA_POLICY_CODE } from '../pl-infra-members/pl-infra-members.constants';
 import { PL_PORTFOLIO_COMMUNITY_AFFILIATION } from '../teams/team-affiliation.constants';
@@ -419,5 +420,146 @@ describe('LabOS agent intro draft answer (LAB-3362 D4)', () => {
 
     expect(texts[0]).toBe(INTRO_NOT_ELIGIBLE_TEXT);
     expect(options.answerLine()).toBeUndefined();
+  });
+});
+
+describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', () => {
+  const originalEnv = process.env.ENVIRONMENT;
+  afterEach(() => jest.restoreAllMocks());
+  afterAll(() => {
+    process.env.ENVIRONMENT = originalEnv;
+  });
+
+  /** The card text with the member's edits. It must reach the prompt and nothing else. */
+  const CARD_TEXT = 'Card-text-7f3a: I lead fundraising at Acme. We raise a seed round and want your advice soon.';
+  const SHORT = 'I lead fundraising at Acme and want your advice on our seed round.';
+  const GRACE = { type: 'member' as const, uid: 'm-grace' };
+  const SHORTER = { ...VALID, message: 'Make it shorter.' };
+
+  async function chat(h: ReturnType<typeof setup>, body: Record<string, unknown>) {
+    await h.controller.chat(body as any, h.req, h.res as any);
+    return h.husky.createContextualToolsResponse.mock.calls.at(-1)[3];
+  }
+
+  it('C4-R1: the schema accepts a valid introDraft and rejects an extra key, an empty text and 3501 characters', () => {
+    const parse = (introDraft: unknown) => LabosAgentChatRequestSchema.safeParse({ ...VALID, introDraft });
+
+    const ok = parse({ target: GRACE, text: `  ${CARD_TEXT}  ` });
+    expect(ok.success && ok.data.introDraft).toEqual({ target: GRACE, text: CARD_TEXT });
+    expect(parse({ target: { type: 'team', uid: 't-acme' }, text: 'x' }).success).toBe(true);
+    expect(parse({ target: GRACE, text: 'x'.repeat(3500) }).success).toBe(true);
+    expect(LabosAgentChatRequestSchema.safeParse(VALID).success).toBe(true);
+
+    expect(parse({ target: GRACE, text: CARD_TEXT, draftId: 'dr_1' }).success).toBe(false);
+    expect(parse({ target: { ...GRACE, name: 'Grace Hopper' }, text: CARD_TEXT }).success).toBe(false);
+    expect(parse({ target: GRACE, text: '   ' }).success).toBe(false);
+    expect(parse({ target: GRACE, text: 'x'.repeat(3501) }).success).toBe(false);
+    expect(parse({ target: { type: 'project', uid: 'p-1' }, text: CARD_TEXT }).success).toBe(false);
+    expect(parse({ text: CARD_TEXT }).success).toBe(false);
+  });
+
+  it.each([
+    ['an unknown member', { type: 'member', uid: 'm-missing' }],
+    ['a deleted member', { type: 'member', uid: 'm-gone' }],
+    ['a deleted (INACTIVE) team', { type: 'team', uid: 't-deleted' }],
+  ])(
+    'C4-R2: %s as the introDraft target returns 404 INTRO_TARGET_NOT_FOUND before the stream',
+    async (_name, target) => {
+      const h = setup();
+      const error = await h.controller
+        .chat({ ...SHORTER, introDraft: { target, text: CARD_TEXT } } as any, h.req, h.res as any)
+        .catch((e) => e);
+      expect(error).toBeInstanceOf(NotFoundException);
+      expect(error.getResponse()).toEqual(expect.objectContaining({ statusCode: 404, code: 'INTRO_TARGET_NOT_FOUND' }));
+      expect(h.husky.createContextualToolsResponse).not.toHaveBeenCalled();
+      expect(h.res.flushHeaders).not.toHaveBeenCalled();
+    }
+  );
+
+  it('C4-R3: "make it shorter" with introDraft and no context gives 1 new draft, and the model input has the card text', async () => {
+    const h = setup();
+    const options = await chat(h, { ...SHORTER, introDraft: { target: GRACE, text: CARD_TEXT } });
+
+    expect(options.promptContext).toContain(JSON.stringify(CARD_TEXT));
+    expect(options.promptContext).toContain('call draft_intro with type "member" and targetUid "m-grace"');
+    const result = await options.extraTools.draft_intro.execute({ type: 'member', targetUid: 'm-grace', text: SHORT });
+
+    expect(result).toContain(INTRO_DRAFT_LINE);
+    expect(options.extraResponseFields.drafts).toHaveLength(1);
+    expect(options.extraResponseFields.drafts[0]).toEqual(
+      expect.objectContaining({ target: { type: 'member', uid: 'm-grace', name: 'Grace Hopper' }, text: SHORT })
+    );
+    expect(options.answerLine()).toBe(INTRO_DRAFT_LINE);
+  });
+
+  it('C4-R3: introDraft works next to another page context, and the target is checked again', async () => {
+    const h = setup();
+    const options = await chat(h, {
+      ...SHORTER,
+      context: { page: 'home' },
+      introDraft: { target: GRACE, text: CARD_TEXT },
+    });
+
+    expect(options.promptContext).toContain('Home');
+    expect(options.promptContext).toContain(JSON.stringify(CARD_TEXT));
+    // Only the card target is a target of the turn, not another member.
+    expect(
+      await options.extraTools.draft_intro.execute({ type: 'member', targetUid: 'm-other', text: SHORT })
+    ).toContain('not the intro target of this turn');
+    expect(options.extraResponseFields.drafts).toEqual([]);
+  });
+
+  it('C4-R4: a turn with no introDraft has no draft text in the prompt context', async () => {
+    const h = setup();
+    const withCard = await chat(h, { ...SHORTER, introDraft: { target: GRACE, text: CARD_TEXT } });
+    const noContext = await chat(h, SHORTER);
+    const introPage = await chat(h, { ...SHORTER, context: MEMBER_CONTEXT });
+
+    expect(withCard.promptContext).toContain(CARD_TEXT);
+    for (const options of [noContext, introPage]) {
+      expect(options.promptContext).not.toContain(CARD_TEXT);
+      expect(options.promptContext).not.toContain('An intro draft card waits');
+    }
+  });
+
+  it('C4-R5: the backend writes no cache key and no log line with the draft text', async () => {
+    const h = setup();
+    const logs = ['log', 'error', 'warn', 'debug', 'verbose'].map((level) =>
+      jest.spyOn(Logger.prototype, level as 'log').mockImplementation(() => undefined)
+    );
+    const consoleSpies = ['log', 'error', 'warn', 'info', 'debug'].map((level) =>
+      jest.spyOn(console, level as 'log').mockImplementation(() => undefined)
+    );
+
+    const options = await chat(h, { ...SHORTER, introDraft: { target: GRACE, text: CARD_TEXT } });
+    await options.extraTools.draft_intro.execute({ type: 'member', targetUid: 'm-grace', text: SHORT });
+    jest.spyOn(h.introRequests, 'findEligibleRequester').mockRejectedValueOnce(new Error('db down'));
+    await options.extraTools.draft_intro.execute({ type: 'member', targetUid: 'm-grace', text: SHORT });
+
+    const written = JSON.stringify([
+      h.cache.set.mock.calls,
+      ...logs.map((spy) => spy.mock.calls.map((call) => call.map(String))),
+      ...consoleSpies.map((spy) => spy.mock.calls.map((call) => call.map(String))),
+    ]);
+    expect(written).not.toContain('Card-text-7f3a');
+    expect(Object.keys(h.husky)).toEqual(['createContextualToolsResponse']);
+  });
+
+  it('C4-R6: the intro line shows only when drafts has a card, and a refused draft gives no line', async () => {
+    const eligible = setup();
+    const ok = await chat(eligible, { ...SHORTER, introDraft: { target: GRACE, text: CARD_TEXT } });
+    expect(ok.answerLine()).toBeUndefined();
+    await ok.extraTools.draft_intro.execute({ type: 'member', targetUid: 'm-grace', text: SHORT });
+    expect(ok.answerLine()).toBe(INTRO_DRAFT_LINE);
+    await ok.extraTools.draft_intro.execute({ type: 'member', targetUid: 'm-grace', text: 'too short' });
+    expect(ok.answerLine()).toBeUndefined();
+
+    const notEligible = setup({});
+    const refused = await chat(notEligible, { ...SHORTER, introDraft: { target: GRACE, text: CARD_TEXT } });
+    expect(await refused.extraTools.draft_intro.execute({ type: 'member', targetUid: 'm-grace', text: SHORT })).toBe(
+      INTRO_NOT_ELIGIBLE_TEXT
+    );
+    expect(refused.extraResponseFields.drafts).toEqual([]);
+    expect(refused.answerLine()).toBeUndefined();
   });
 });

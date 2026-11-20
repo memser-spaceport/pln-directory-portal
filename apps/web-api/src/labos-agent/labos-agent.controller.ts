@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Logger,
   Post,
   Query,
   Req,
@@ -23,6 +24,7 @@ import {
 } from 'libs/contracts/src/schema/labos-agent';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
+import { logSafeError } from '../husky/log-safe-error.util';
 import { LabosAgentExceptionFilter } from './labos-agent-exception.filter';
 import { LabosAgentService } from './labos-agent.service';
 
@@ -31,6 +33,8 @@ import { LabosAgentService } from './labos-agent.service';
 // Error bodies keep their `code` (LAB-3300). The global LogException drops it.
 @UseFilters(LabosAgentExceptionFilter)
 export class LabosAgentController {
+  private readonly logger = new Logger(LabosAgentController.name);
+
   constructor(private readonly agent: LabosAgentService) {}
 
   /** The frontend shows the agent dock only when this is true. Never 403. */
@@ -73,8 +77,10 @@ export class LabosAgentController {
         })
       );
     } catch (error) {
-      // Headers are on the wire, so an error response is impossible; abort the connection.
-      res.destroy(error);
+      // Headers are on the wire, so an error response is impossible; abort the connection. LAB-3362: log the safe
+      // fields only and destroy with no error, because an AI SDK APICallError holds the whole prompt.
+      this.logger.error(`LabOS agent chat stream failed: ${logSafeError(error)}`);
+      res.destroy();
     }
   }
 

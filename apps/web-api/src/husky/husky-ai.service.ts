@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable, NotFoundException, BadRequestException 
 import { RedisCacheDbService } from './db/redis-cache-db.service';
 import { MongoPersistantDbService } from './db/mongo-persistant-db.service';
 import { LogService } from '../shared/log.service';
+import { logSafeError } from './log-safe-error.util';
 import { CoreTool, generateText, LanguageModel, streamObject, streamText } from 'ai';
 import { HuskyChatInterface, HuskyResponseContextSchema, HuskySourceRef } from 'libs/contracts/src/schema/husky-chat';
 import {
@@ -369,7 +370,9 @@ export class HuskyAiService {
 
           this.updateChatSummary(threadId, { user: question, system: content })
             .then((summary) => (persistHistory ? this.updateChatSummaryInMongo(threadId, summary) : undefined))
-            .catch((error) => this.logger.error(`Failed to update chat summary for thread ${threadId}:`, error));
+            .catch((error) =>
+              this.logger.error(`Failed to update chat summary for thread ${threadId}: ${logSafeError(error)}`)
+            );
           if (!persistHistory) return;
           this.persistContextualHistory(
             threadId,
@@ -380,9 +383,12 @@ export class HuskyAiService {
             responseContext.followUpQuestions,
             responseContext.actions,
             responseContext.sourceRefs
-          ).catch((error) => this.logger.error(`Failed to persist chat history for thread ${threadId}:`, error));
+          ).catch((error) =>
+            this.logger.error(`Failed to persist chat history for thread ${threadId}: ${logSafeError(error)}`)
+          );
         } catch (error) {
-          this.logger.error(`Husky search failed for thread ${threadId}, chat ${chatId}:`, error);
+          // LAB-3362: log the name, status and message only. The error can hold the whole prompt.
+          this.logger.error(`Husky search failed for thread ${threadId}, chat ${chatId}: ${logSafeError(error)}`);
           controller.error(error);
         }
       },
@@ -639,7 +645,8 @@ export class HuskyAiService {
       if (watchdog.stalled) {
         this.logger.error(`Husky structured response generation stalled: no chunk for ${watchdog.timeoutMs}ms`);
       } else {
-        this.logger.error('Husky structured response generation failed:', error);
+        // LAB-3362: an APICallError (rate limit, 529, 5xx) holds `requestBodyValues`, the whole prompt.
+        this.logger.error(`Husky structured response generation failed: ${logSafeError(error)}`);
       }
       const payload = this.withSourceRefs(EMPTY_RESPONSE_CONTEXT, input);
       enqueue(JSON.stringify({ ...payload, ...extraResponseFields, ...turnFields?.(payload) }).substring(1));
