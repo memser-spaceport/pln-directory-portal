@@ -119,7 +119,8 @@ Notes on an item:
 - `gathering` is null for an event with no gathering (a virtual event). `venue` is null when the event has no
   address and no position.
 - `goingCount` counts distinct members the attendee list shows, as on the event drawer. An invite-only event
-  (`type: "INVITE_ONLY"`) has `goingCount: null` and no `faces`.
+  (`type: "INVITE_ONLY"` or `accessOption: "INVITE"`) has `goingCount: null` and no `faces`. The drawer, upcoming
+  events, profile events and the digest page hide the attendance of such an event from signed-out viewers.
 - `isGoing` is true only for a signed-in viewer who goes to the event.
 - `externalId`, `websiteUrl`, `location`, `locationUid` and `flag` are the fields of `GET /v1/irl/events/upcoming`.
 

@@ -539,6 +539,7 @@ export class PLEventsService {
             locationUid: true,
             websiteURL: true,
             type: true,
+            accessOption: true,
             startDate: true,
             endDate: true,
             logo: {

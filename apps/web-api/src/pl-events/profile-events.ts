@@ -71,6 +71,7 @@ export type EventCardRow = {
   uid: string;
   name: string;
   type: string | null;
+  accessOption?: string | null;
   startDate: Date;
   endDate: Date;
   logo: { url: string } | null;
@@ -90,6 +91,7 @@ export function toEventFields(event: EventCardRow, roles: ProfileRole[], summary
     uid: event.uid,
     name: event.name,
     type: event.type ?? null,
+    accessOption: event.accessOption ?? null,
     startDate: new Date(event.startDate).toISOString(),
     endDate: new Date(event.endDate).toISOString(),
     logo: event.logo?.url ?? null,

@@ -32,7 +32,7 @@ import { nextDigestSendAt } from './labos-digest-schedule.util';
 import { digestTopics } from './labos-digest-topics.util';
 import { TeamNewsQueryService } from './team-news-query.service';
 import { excludedTeamsWhere } from './labos-digest.service';
-import { hidesAttendance, listedGuestsWhereIn } from '../pl-events/pl-event-detail';
+import { hidesEventAttendance, listedGuestsWhereIn } from '../pl-events/pl-event-detail';
 import { upcomingEventsFindArgs } from '../pl-events/upcoming-events-query';
 import { readChosenNewsTags } from './utils/news-tags';
 
@@ -334,6 +334,7 @@ export class LabosDigestPageService {
           locationUid: true,
           externalId: true,
           type: true,
+          accessOption: true,
           logo: { select: { url: true } },
           location: { select: { location: true } },
         },
@@ -341,7 +342,7 @@ export class LabosDigestPageService {
       // pl-event-visibility: the same `where` as the list above.
       this.prisma.pLEvent.count({ where }),
     ]);
-    const counted = rows.filter((row) => !hidesAttendance(row.type, false)).map((row) => row.uid);
+    const counted = rows.filter((row) => !hidesEventAttendance(row, false)).map((row) => row.uid);
     const going = counted.length
       ? await this.prisma.pLEventGuest.groupBy({ by: ['eventUid', 'memberUid'], where: listedGuestsWhereIn(counted) })
       : [];

@@ -128,6 +128,41 @@ describe('gatherings are resolved from the address (design D6)', () => {
     expect(db.all('pLEventLocation').filter((row) => row.location === 'Lisbon, Portugal')).toHaveLength(1);
   });
 
+  it('does not reuse a city-only gathering of another country', async () => {
+    const { service, event, db } = setup({
+      pLEventLocation: [
+        {
+          uid: 'loc-lisbon-us',
+          location: 'Lisbon',
+          country: 'United States',
+          timezone: 'America/New_York',
+          isDeleted: false,
+        },
+      ],
+      pLEventLocationAssociation: [],
+    });
+    const { uid } = await service.createEvent(body(), FORUM_MEMBER);
+
+    const created = db.all('pLEventLocation').find((row) => row.location === 'Lisbon, Portugal')!;
+    expect(created).toMatchObject({ country: 'Portugal', timezone: 'Europe/Lisbon' });
+    expect(event(uid).locationUid).toBe(created.uid);
+    expect(event(uid).locationUid).not.toBe('loc-lisbon-us');
+  });
+
+  it('reuses a city-only gathering with no country, or with the same country', async () => {
+    for (const country of [null, '', 'portugal']) {
+      const { service, event, db } = setup({
+        pLEventLocation: [
+          { uid: 'loc-lisbon', location: 'lisbon', country, timezone: 'Europe/Lisbon', isDeleted: false },
+        ],
+        pLEventLocationAssociation: [],
+      });
+      const { uid } = await service.createEvent(body(), FORUM_MEMBER);
+      expect(event(uid).locationUid).toBe('loc-lisbon');
+      expect(db.all('pLEventLocation')).toHaveLength(1);
+    }
+  });
+
   it('a virtual event has no gathering', async () => {
     const { service, event, db } = setup();
     const { uid } = await service.createEvent(body({ format: 'VIRTUAL' }), FORUM_MEMBER);

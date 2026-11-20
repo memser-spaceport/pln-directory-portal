@@ -51,19 +51,12 @@ export function isInviteOnlyEvent(event: InviteOnlyFields): boolean {
 }
 
 /**
- * Signed-out viewers of an invite-only event (see `isInviteOnlyEvent`) see no attendance: no count and no faces. The
- * events list and the drawer use this rule.
+ * Signed-out viewers of an invite-only event (see `isInviteOnlyEvent`) see no attendance: no count and no faces.
+ * Every attendance count uses this rule: the events list, the drawer, upcoming events, profile events and the
+ * digest page.
  */
 export function hidesEventAttendance(event: InviteOnlyFields, isUserLoggedIn: boolean): boolean {
   return !isUserLoggedIn && isInviteOnlyEvent(event);
-}
-
-/**
- * The type-only form of `hidesEventAttendance`, for callers that do not select `accessOption` (profile events and
- * the upcoming list).
- */
-export function hidesAttendance(eventType: string | null | undefined, isUserLoggedIn: boolean): boolean {
-  return hidesEventAttendance({ type: eventType }, isUserLoggedIn);
 }
 
 /** "Lisbon, Portugal" → "Lisbon". Null when there is nothing before the first comma. */

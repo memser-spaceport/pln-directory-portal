@@ -136,3 +136,16 @@ describe('going count on upcoming events (LAB-3271)', () => {
     expect(row.goingCount).toBe(12);
   });
 });
+
+describe('countableUpcomingEventUids and the invite-only rule (LAB-3281)', () => {
+  it('leaves out an event with type INVITE_ONLY or accessOption INVITE', () => {
+    expect(
+      countableUpcomingEventUids([
+        { uid: 'open', type: 'IN_PERSON', accessOption: 'OPEN' },
+        { uid: 'by-type', type: 'INVITE_ONLY', accessOption: null },
+        { uid: 'by-access', type: null, accessOption: 'INVITE' },
+        { uid: 'old', type: null },
+      ])
+    ).toEqual(['open', 'old']);
+  });
+});

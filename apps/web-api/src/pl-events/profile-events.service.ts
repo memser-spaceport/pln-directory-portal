@@ -11,7 +11,7 @@ import { TeamsService } from '../teams/teams.service';
 import {
   facesFindArgs,
   GUEST_PERSON_SELECT,
-  hidesAttendance,
+  hidesEventAttendance,
   LISTED_GUEST_MEMBER_WHERE,
   listedGuestsWhereIn,
 } from './pl-event-detail';
@@ -39,6 +39,7 @@ const EVENT_CARD_SELECT = {
   uid: true,
   name: true,
   type: true,
+  accessOption: true,
   startDate: true,
   endDate: true,
   locationUid: true,
@@ -252,7 +253,7 @@ export class ProfileEventsService {
       return summaries;
     }
     const eventUids = events.map((item) => item.uid);
-    const counted = events.filter((item) => !hidesAttendance(item.type, !!viewer)).map((item) => item.uid);
+    const counted = events.filter((item) => !hidesEventAttendance(item, !!viewer)).map((item) => item.uid);
     const [goingGroups, faceLists, viewerRows] = await Promise.all([
       counted.length
         ? this.prisma.pLEventGuest.groupBy({ by: ['eventUid', 'memberUid'], where: listedGuestsWhereIn(counted) })

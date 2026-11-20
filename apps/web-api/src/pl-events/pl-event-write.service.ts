@@ -357,14 +357,17 @@ export class PLEventWriteService {
     }
 
     const name = triple.country ? `${triple.city}, ${triple.country}` : triple.city;
+    // A gathering named only by its city ("Lisbon") is reused when its country is unknown or is the event's
+    // country, so an event in Lisbon, Portugal never lands in a "Lisbon" gathering of another country.
+    const cityOnly: Prisma.PLEventLocationWhereInput = triple.country
+      ? {
+          location: { equals: triple.city, mode: 'insensitive' },
+          OR: [{ country: null }, { country: '' }, { country: { equals: triple.country, mode: 'insensitive' } }],
+        }
+      : { location: { equals: triple.city, mode: 'insensitive' } };
     const existing = await tx.pLEventLocation.findFirst({
-      where: {
-        isDeleted: false,
-        OR: [
-          { location: { equals: name, mode: 'insensitive' } },
-          { location: { equals: triple.city, mode: 'insensitive' } },
-        ],
-      },
+      where: { isDeleted: false, OR: [{ location: { equals: name, mode: 'insensitive' } }, cityOnly] },
+      orderBy: { createdAt: 'asc' },
       select: { uid: true, timezone: true },
     });
     const location =
