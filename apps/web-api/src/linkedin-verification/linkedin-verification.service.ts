@@ -13,6 +13,7 @@ import path from 'path';
 import { AwsService } from '../utils/aws/aws.service';
 import { Member, MemberApprovalState } from '@prisma/client';
 import { MemberService } from '../admin/member.service';
+import { MemberSignUpNotificationsService } from '../member-sign-up-notifications/member-sign-up-notifications.service';
 
 @Injectable()
 export class LinkedInVerificationService implements OnModuleDestroy {
@@ -27,7 +28,8 @@ export class LinkedInVerificationService implements OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly logger: LogService,
     private readonly memberService: MemberService,
-    private awsService: AwsService
+    private awsService: AwsService,
+    private readonly memberSignUpNotifications: MemberSignUpNotificationsService
   ) {
     this.redis = new Redis(process.env.REDIS_CACHE_URL as string, {
       ...(process.env.REDIS_CACHE_TLS && {
@@ -194,6 +196,7 @@ export class LinkedInVerificationService implements OnModuleDestroy {
         if (result.updated) {
           const emailData = await this.prepareEmailTemplateData(member);
           await this.sendLinkedinVerifiedEmailToAdmin(emailData, `New Member LinkedIn Verified : ${member.name}`);
+          void this.memberSignUpNotifications.notifyLinkedInVerified(member.uid);
         }
       }
 
