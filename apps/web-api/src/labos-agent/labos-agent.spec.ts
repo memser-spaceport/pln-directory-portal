@@ -19,7 +19,7 @@ import { LabosAgentAccessService } from './labos-agent-access.service';
 import { answerCounts } from './labos-agent-answer-counts';
 import { LabosAgentController } from './labos-agent.controller';
 import { LabosAgentService } from './labos-agent.service';
-import { mcpToolsAsAgentTools, newsLinkLines } from './labos-agent-news.tools';
+import { mcpToolsAsAgentTools, newsLinkFields, newsLinkLines, withNewsStoryLinks } from './labos-agent-news.tools';
 import { NO_PAGE_SENTENCE } from './labos-agent-page-context';
 
 if (!(globalThis as any).WritableStream) {
@@ -184,13 +184,37 @@ describe('LabosAgentController', () => {
     // S3-R8: a turn without a draft has drafts [], next to the S1 and S2 fields.
     expect(options.extraResponseFields).toEqual({ proposals: [], drafts: [] });
     expect(options.persistHistory).toBe(false);
-    // LAB-3297 (V0-R4): the answer counts come from the finished turn.
-    expect(options.turnFields).toBe(answerCounts);
+    // LAB-3297 (V0-R4): the answer counts come from the finished turn. LAB-3362 D1: no source refs, no `sourceRefs`.
+    const turn = { toolNames: ['list_news'], sources: [], sourceRefs: [] };
+    expect(options.turnFields(turn)).toEqual(answerCounts(turn));
 
     expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'application/json');
     expect(res.setHeader).toHaveBeenCalledWith('Transfer-Encoding', 'chunked');
     expect(res.flushHeaders).toHaveBeenCalled();
     expect(stream.pipeTo).toHaveBeenCalled();
+  });
+
+  it('LAB-3362 D1: sends news sourceRefs as /?news=<uid> and counts the refs it sends', async () => {
+    const { controller, husky, res, req } = setup();
+    await controller.chat(VALID, req, res as any);
+    const { turnFields } = husky.createContextualToolsResponse.mock.calls[0][3];
+    const sourceRefs = [
+      // The AI search news tool writes the old Home path; the agent tool writes the new one. One story.
+      { index: 1, title: 'Story', type: 'news', directoryLink: '/home?news=news-1' },
+      { index: 2, title: 'Story', type: 'news', directoryLink: '/?news=news-1' },
+      { index: 3, title: 'Team X', type: 'team', directoryLink: '/teams/team-x' },
+    ];
+
+    const fields = turnFields({ toolNames: ['getTeamNews', 'list_news'], sources: [], sourceRefs });
+
+    expect(fields.sourceRefs.map((ref) => ref.directoryLink)).toEqual([
+      '/?news=news-1',
+      '/?news=news-1',
+      '/teams/team-x',
+    ]);
+    expect(fields.sourceRefs.map((ref) => ref.index)).toEqual([1, 2, 3]);
+    expect(fields.sourceCount).toBe(2);
+    expect(fields.toolCount).toBe(2);
   });
 
   it('passes a Home context and no context through without a news lookup', async () => {
@@ -303,7 +327,7 @@ describe('mcpToolsAsAgentTools', () => {
     const tools = mcpToolsAsAgentTools([{ name: 'list_news', description: 'd', visibility: 'always', execute }], ctx);
     const result = await (tools.list_news as any).execute({ search: 'x' });
     expect(execute).toHaveBeenCalledWith(ctx, { search: 'x' });
-    expect(result).toContain('Title: Story [NewsLink](/home?news=news-1)');
+    expect(result).toContain('Title: Story [NewsLink](/?news=news-1)');
     expect(result).toContain('"uid":"news-1"');
   });
 
@@ -316,8 +340,27 @@ describe('mcpToolsAsAgentTools', () => {
     await expect((tools.get_news_item as any).execute({ uid: 'x' })).resolves.toContain('News item not found: x');
   });
 
+  it('LAB-3362 D1: rewrites only the old Home news path of news refs', () => {
+    const refs = [
+      { index: 1, title: 'A', type: 'news' as const, directoryLink: '/home?news=a%20b' },
+      { index: 2, title: 'B', type: 'news' as const, directoryLink: '/home/?news=b' },
+      { index: 3, title: 'C', type: 'news' as const, directoryLink: '/?news=c' },
+      { index: 4, title: 'D', type: 'news' as const, externalUrl: 'https://example.com/d' },
+      { index: 5, title: 'E', type: 'forum' as const, directoryLink: '/home?news=e' },
+    ];
+    expect(withNewsStoryLinks(refs).map((ref) => ref.directoryLink)).toEqual([
+      '/?news=a%20b',
+      '/?news=b',
+      '/?news=c',
+      undefined,
+      '/home?news=e',
+    ]);
+    expect(withNewsStoryLinks(refs)[3]).toEqual(refs[3]);
+    expect(newsLinkFields({ toolNames: [], sources: [], sourceRefs: [] })).toEqual({});
+  });
+
   it('builds one NewsLink line for a single story', () => {
-    expect(newsLinkLines({ uid: 'a b', title: 'T' })).toBe('Title: T [NewsLink](/home?news=a%20b)');
+    expect(newsLinkLines({ uid: 'a b', title: 'T' })).toBe('Title: T [NewsLink](/?news=a%20b)');
     expect(newsLinkLines({ feed: 'latest', items: [] })).toBe('');
   });
 });

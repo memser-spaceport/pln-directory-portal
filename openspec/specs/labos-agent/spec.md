@@ -81,6 +81,15 @@ When `context.page` is `news-story`, the system SHALL load the story by `newsUid
 
 The chat SHALL return the AI search stream of `POST /v1/husky/chat/contextual-tools`: the same headers, chunked JSON body, model settings (`HUSKY_SEARCH_*`), stall watchdog, one continuation and stalled notice. The body SHALL have `steps`, `content`, `sources`, `sourceRefs` (when there are any), `followUpQuestions`, `actions`, `proposals` and `drafts`. `proposals` SHALL hold the action proposals of the turn, or `[]`. `drafts` SHALL hold the intro draft of the turn, or `[]`. A hard error after the headers SHALL destroy the connection. The agent SHALL act as the signed-in member, with the AI search tools (including the news and web search tools) and the MCP tools `list_news`, `get_news_item`, `get_my_profile` and `list_my_experiences`. Each `list_news` and `get_news_item` result SHALL carry a `[NewsLink]` line per story, so the answer gets `sourceRefs` for those stories.
 
+Each news item of `sourceRefs` SHALL have `directoryLink` `/?news=<uid>` (LAB-3362 D1), the Home page with the story open. This SHALL hold for the news of the agent tools and of the AI search news tool. AI search keeps its own links. The index, the title and the order of each ref SHALL NOT change, so the `[n]` citations still match.
+
+#### Scenario: News source link
+
+- **GIVEN** a turn where the AI search news tool returns a story with the link `/home?news=n-1`
+- **WHEN** the stream ends
+- **THEN** the news ref has `directoryLink` `/?news=n-1`
+- **AND** `sourceCount` counts the story once when `list_news` also returns it
+
 #### Scenario: Question about a story
 
 - **GIVEN** an enabled member on a news story
