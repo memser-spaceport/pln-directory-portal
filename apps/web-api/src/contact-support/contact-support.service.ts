@@ -7,9 +7,9 @@ import { isEmails } from '../utils/helper/helper';
 import { AwsService } from '../utils/aws/aws.service';
 import * as path from 'path';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
+import { escapeTelegramHtml } from '../utils/telegram/escape-telegram-html';
 import {
   clipTelegramText,
-  escapeTelegramHtml,
   stripInlineDataImages,
   supportPageLine,
   toSupportEmailHtml,

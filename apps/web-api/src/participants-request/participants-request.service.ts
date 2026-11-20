@@ -13,6 +13,7 @@ import { Prisma } from '@prisma/client';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
 import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
 import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
+import { MemberSignUpNotificationsService } from '../member-sign-up-notifications/member-sign-up-notifications.service';
 
 type ParticipantTypeString = 'MEMBER' | 'TEAM';
 
@@ -26,7 +27,8 @@ export class ParticipantsRequestService {
     @Inject(forwardRef(() => TeamEnrichmentService))
     private readonly teamEnrichmentService: TeamEnrichmentService,
     private readonly logger: LogService,
-    private readonly locationTransferService: LocationTransferService
+    private readonly locationTransferService: LocationTransferService,
+    private readonly memberSignUpNotifications: MemberSignUpNotificationsService
   ) {}
 
   /**
@@ -90,6 +92,7 @@ export class ParticipantsRequestService {
     const result = await this.membersService.createMemberAndAttach(newData, opts);
 
     this.logger.info('[ParticipantsRequestService.handleMemberRequest] Created/updated member uid=' + result.uid);
+    void this.memberSignUpNotifications.notifySignUp(result.uid);
 
     return result;
   }
@@ -179,6 +182,7 @@ export class ParticipantsRequestService {
       this.logger.info(
         `[ParticipantsRequestService.processImmediateRequest] Created member uid=${member.uid} from legacy request`
       );
+      void this.memberSignUpNotifications.notifySignUp(member.uid);
 
       return {
         type: 'MEMBER',
