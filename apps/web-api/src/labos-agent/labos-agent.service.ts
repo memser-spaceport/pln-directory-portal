@@ -35,7 +35,15 @@ import { TeamNewsQueryService } from '../team-news/team-news-query.service';
 import { TeamsService } from '../teams/teams.service';
 import { LabosAgentAccessService } from './labos-agent-access.service';
 import { answerCounts } from './labos-agent-answer-counts';
-import { draftIntroTool, introDraftLine, IntroTurnTarget } from './labos-agent-drafts';
+import {
+  draftIntroTool,
+  introDraftLine,
+  introDraftNote,
+  introDraftNoteKey,
+  introDraftNotePrompt,
+  IntroTurnTarget,
+  parseIntroDraftNote,
+} from './labos-agent-drafts';
 import { searchMentions } from './labos-agent-mentions';
 import { mcpToolsAsAgentTools } from './labos-agent-news.tools';
 import {
@@ -112,8 +120,22 @@ export class LabosAgentService {
     const page = await this.pageContext(body, memberUid, email);
     // S6 (contract 10.4): the mention lookups come after the context lookup, so a bad context gives its 404 first.
     const mentioned = await this.mentionContext(body, memberUid, email);
-    const promptContext = joinPrompt(page.promptContext, mentioned.promptContext, !body.context);
-    const introTargets = uniqueTargets([...(page.introTarget ? [page.introTarget] : []), ...mentioned.introTargets]);
+    // LAB-3362 D4: the last intro draft of this thread, from the server memory. A follow-up can change it.
+    const noteKey = introDraftNoteKey(memberUid, body.threadId);
+    const lastDraft = parseIntroDraftNote(await this.huskyAiService.getTurnNote(noteKey));
+    const promptContext =
+      [
+        joinPrompt(page.promptContext, mentioned.promptContext, !body.context && !lastDraft),
+        lastDraft ? introDraftNotePrompt(lastDraft) : undefined,
+      ]
+        .filter(Boolean)
+        .join('\n') || undefined;
+    // The target of the last draft stays a target, so the new draft needs no new context. draft_intro checks it again.
+    const introTargets = uniqueTargets([
+      ...(page.introTarget ? [page.introTarget] : []),
+      ...mentioned.introTargets,
+      ...(lastDraft ? [lastDraft.target] : []),
+    ]);
     const ctx = await this.actor(memberUid, email);
     // The member's real RBAC permissions and the admin MCP caps pick the tools, as on the MCP server (LAB-3299).
     const allowed = await this.tools(ctx);
@@ -139,6 +161,8 @@ export class LabosAgentService {
       {
         // LAB-3362 D4: with a draft, the answer is one short line. The draft text is only in the card.
         answerLine: () => introDraftLine(drafts),
+        // LAB-3362 D4: the draft text stays in the thread memory on the server, not in the answer.
+        turnNote: { key: noteKey, next: () => introDraftNote(drafts) },
         promptContext,
         extraTools: { ...mcpToolsAsAgentTools(reads, ctx), ...proposeTools, draft_intro: draftIntro },
         // The stream reads these arrays when it ends, so they hold the proposals and drafts the tools made in this turn.

@@ -218,7 +218,7 @@ function setup(
     },
     teamNewsItem: { findMany: jest.fn(async (args: any) => findMany(items, args)) },
   };
-  const husky = { createContextualToolsResponse: jest.fn() };
+  const husky = { getTurnNote: jest.fn(async () => undefined), createContextualToolsResponse: jest.fn() };
   const accessControl = {
     getMemberAccess: jest.fn().mockResolvedValue({ effectivePermissions: data.permissions ?? ALL }),
   };

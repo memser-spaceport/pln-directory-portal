@@ -78,6 +78,12 @@ export interface ContextualToolsOptions {
    * text. The LabOS agent uses it for an intro draft. AI search passes nothing.
    */
   answerLine?: () => string | undefined;
+  /**
+   * LAB-3362 D4: a note of the turn for the next turns of the thread, kept on the server (cache key `key`) and never
+   * streamed. `next` is read when the turn ends; when it gives a text, the stream stores it before the body ends, so a
+   * follow-up turn can read it with `getTurnNote`. No text keeps the earlier note. AI search passes nothing.
+   */
+  turnNote?: { key: string; next: () => string | undefined };
   /** False: keep the thread summary in the cache only, and write nothing to MongoDB. Default true. */
   persistHistory?: boolean;
   /**
@@ -361,6 +367,9 @@ export class HuskyAiService {
             options.extraResponseFields,
             turnFields ? (payload) => turnFields(turnSummary(toolNames, payload)) : undefined
           );
+
+          // LAB-3362 D4: stored before the body ends, so the next message of the member finds it.
+          await this.storeTurnNote(options.turnNote);
 
           controller.close();
 
@@ -798,6 +807,28 @@ export class HuskyAiService {
       'threadId',
       threadId
     );
+  }
+
+  /** LAB-3362 D4: the note that a turn stored with `ContextualToolsOptions.turnNote`, or undefined. */
+  async getTurnNote(key: string): Promise<string | undefined> {
+    try {
+      const note = await this.huskyCacheDbService.get(key);
+      return typeof note === 'string' && note ? note : undefined;
+    } catch (error) {
+      this.logger.error(`Failed to read the turn note ${key}:`, error);
+      return undefined;
+    }
+  }
+
+  /** A failed write is logged; the answer is already complete, so the turn does not fail. */
+  private async storeTurnNote(turnNote: ContextualToolsOptions['turnNote']): Promise<void> {
+    const note = turnNote?.next();
+    if (!turnNote || !note) return;
+    try {
+      await this.huskyCacheDbService.set(turnNote.key, note);
+    } catch (error) {
+      this.logger.error(`Failed to store the turn note ${turnNote.key}:`, error);
+    }
   }
 
   async updateChatSummary(chatId: string, rawChatHistory: any) {
