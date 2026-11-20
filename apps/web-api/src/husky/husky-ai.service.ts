@@ -21,6 +21,7 @@ import { AiProviderService } from '../shared/ai-provider.service';
 import { StallWatchdog } from './stall-watchdog';
 import { MAX_OVERLAP_CHARS, trimRepeatedPrefix } from './answer-continuation.util';
 import { buildSourceRefs } from './source-refs';
+import { textPartBreak } from './text-parts.util';
 import { z } from 'zod';
 
 import {
@@ -466,6 +467,19 @@ export class HuskyAiService {
       },
     });
 
+    // LAB-3362 D3: the text of the model before and after a tool call are two text parts. `written` is the text of
+    // this generation so far; after a tool call, the next text part starts with `textPartBreak`. The deltas of one
+    // text part get no break.
+    let written = '';
+    let toolSinceText = false;
+    const forwardText = (delta: string) => {
+      if (!delta) return;
+      const gap = toolSinceText ? textPartBreak(written, delta) : '';
+      toolSinceText = false;
+      written += gap + delta;
+      forward(gap + delta);
+    };
+
     const announcedTools = new Set<string>();
     const announceSearch = (toolCallId: string, toolName: string) => {
       if (announcedTools.has(toolCallId)) return;
@@ -487,8 +501,9 @@ export class HuskyAiService {
         watchdog.touch();
         if (part.type === 'tool-call-streaming-start' || part.type === 'tool-call') {
           announceSearch(part.toolCallId, part.toolName);
+          toolSinceText = true;
         } else if (part.type === 'text-delta') {
-          forward(part.textDelta);
+          forwardText(part.textDelta);
         } else if (part.type === 'error') {
           // The provider error (quota, auth, 5xx) ends the stream with finish reason
           // "unknown". Log its text, or the cut-off log line is the only trace.

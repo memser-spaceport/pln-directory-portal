@@ -292,6 +292,54 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
     expect(refs.filter((ref) => ref.type === 'web')).toHaveLength(1);
   });
 
+  describe('text parts around tool calls (LAB-3362 D3)', () => {
+    function partsTurn(parts: Array<{ type: string; [key: string]: unknown }>) {
+      streamTextMock.mockImplementation(() => ({
+        fullStream: (async function* () {
+          for (const part of parts) yield part;
+        })(),
+        finishReason: Promise.resolve('stop'),
+      }));
+      streamObjectMock.mockReturnValue(structuredStream(['{"followUpQuestions":[],"sources":[],"actions":[]}']));
+    }
+    const text = (textDelta: string) => ({ type: 'text-delta', textDelta });
+    const call = (toolCallId: string) => ({ type: 'tool-call', toolCallId, toolName: 'get_my_profile' });
+
+    it('joins the text before and after a tool call with a blank line', async () => {
+      partsTurn([text('I will check your '), text('changes.'), call('c1'), text('Got your '), text('profile.')]);
+
+      const raw = await readAll(await service.createContextualToolsResponse(chatInfo, false));
+
+      expect(HuskyResponseSchema.parse(JSON.parse(raw)).content).toBe(
+        'I will check your changes.\n\nGot your profile.'
+      );
+    });
+
+    it('adds no break inside one text part, before the first text, or for a part that has the break', async () => {
+      partsTurn([
+        call('c1'),
+        text('One '),
+        text('part.'),
+        call('c2'),
+        text('\n\nNext part.'),
+        call('c3'),
+        text('End.'),
+      ]);
+
+      const raw = await readAll(await service.createContextualToolsResponse(chatInfo, false));
+
+      expect(HuskyResponseSchema.parse(JSON.parse(raw)).content).toBe('One part.\n\nNext part.\n\nEnd.');
+    });
+
+    it('puts one break after several tool calls in a row', async () => {
+      partsTurn([text('Checking.'), call('c1'), call('c2'), text('Done.')]);
+
+      const raw = await readAll(await service.createContextualToolsResponse(chatInfo, false));
+
+      expect(HuskyResponseSchema.parse(JSON.parse(raw)).content).toBe('Checking.\n\nDone.');
+    });
+  });
+
   describe('turnFields (LAB-3297)', () => {
     function twoToolTurn() {
       streamTextMock.mockImplementation(({ onStepFinish }) => ({
