@@ -42,6 +42,30 @@ export const LabosAgentContextSchema = z
     path: ['jobUid'],
   });
 
+/** The text limits of the C1 `introDraft` (contract change 4, section 11.1). The minimum is 1, not 20 (11.6). */
+export const LABOS_AGENT_INTRO_DRAFT_INPUT_LIMITS = { minLength: 1, maxLength: 3500 } as const;
+
+/**
+ * The intro card that waits in this chat, with the member's edits (LAB-3362, contract section 11.1). The frontend sends
+ * the newest waiting card only. `.strict()` rejects an extra key. The backend uses it for this turn only and stores
+ * nothing.
+ */
+export const LabosAgentIntroDraftSchema = z
+  .object({
+    target: LabosAgentIntroTargetSchema,
+    text: z
+      .string()
+      .transform((value) => value.trim())
+      .refine(
+        (value) =>
+          value.length >= LABOS_AGENT_INTRO_DRAFT_INPUT_LIMITS.minLength &&
+          value.length <= LABOS_AGENT_INTRO_DRAFT_INPUT_LIMITS.maxLength,
+        { message: 'introDraft.text must be 1 to 3500 characters after trim' }
+      ),
+  })
+  .strict();
+export type LabosAgentIntroDraft = z.infer<typeof LabosAgentIntroDraftSchema>;
+
 /** S6 (LAB-3318, contract 10.3): at most 5 mentions in one C1 message. */
 export const LABOS_AGENT_MAX_MENTIONS = 5;
 
@@ -83,6 +107,8 @@ export const LabosAgentChatRequestSchema = z.object({
       message: 'mentions must not have two items with the same type and uid, or the same page',
     })
     .optional(),
+  /** Contract change 4 (section 11): allowed with any `context.page` and with no `context`. */
+  introDraft: LabosAgentIntroDraftSchema.optional(),
 });
 
 export type LabosAgentContext = z.infer<typeof LabosAgentContextSchema>;

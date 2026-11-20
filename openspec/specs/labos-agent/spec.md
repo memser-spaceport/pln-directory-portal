@@ -291,6 +291,33 @@ When the turn has a draft, the answer text SHALL be one short line: "Here is a d
 - **THEN** the body has `drafts: []`
 - **AND** the answer is the refusal text, with no "Here is a draft intro" line
 
+### Requirement: Current intro draft in C1
+
+The C1 body MAY have `introDraft: { target: { type, uid }, text }` (contract change 4, section 11; LAB-3362). The object SHALL be strict. `text` SHALL be 1 to 3500 characters after trim. A bad shape, an extra key, an empty text or a text over 3500 characters SHALL get the C1 400. `introDraft` is allowed with any `context.page` and with no `context`. An unknown or deleted target SHALL get 404 `INTRO_TARGET_NOT_FOUND` before the stream, with the lookup of the intro page (`findAgentTargetName`). The backend SHALL put the target and the text into the prompt context of this turn only. The agent SHALL use the text only when the member asks to change the draft. `draft_intro` SHALL accept the `introDraft` target as a target of the turn, and SHALL check the sender eligibility and the target again. The backend SHALL NOT store `introDraft`, write a cache key for it, or write its text to a log line, error message or analytics event. The Husky thread summary has no extra rule (11.7 A).
+
+#### Scenario: Make it shorter
+
+- **GIVEN** an eligible member with an intro card for Grace that waits in the chat
+- **WHEN** the member sends "Make it shorter." with `introDraft` and no `context`
+- **THEN** the prompt context has the card text
+- **AND** a `draft_intro` call for Grace gives one draft in `drafts`, with the short intro line
+
+#### Scenario: Unknown introDraft target
+
+- **WHEN** `introDraft.target` is an unknown member, a deleted member or an INACTIVE team
+- **THEN** C1 returns 404 `INTRO_TARGET_NOT_FOUND` and no stream starts
+
+#### Scenario: No introDraft
+
+- **WHEN** the body has no `introDraft`
+- **THEN** the prompt context has no draft text
+
+#### Scenario: Sender who cannot send intros
+
+- **GIVEN** a member who cannot send intros and sends `introDraft`
+- **WHEN** the model calls `draft_intro`
+- **THEN** the tool refuses, `drafts` is empty and the answer has no intro line
+
 ### Requirement: Page context for member, team, job and profile pages
 
 When `context.page` is `member`, `team` or `job` with a `jobUid`, the system SHALL look up the page before the stream starts, after the pilot gate. A member outside the gate SHALL get HTTP 403 `AGENT_NOT_ENABLED` and no lookup SHALL run. The `member` page SHALL use a member with no `deletedAt` who is directory-visible (`directoryVisibleMemberWhere()` in `apps/web-api/src/members/member-visibility.ts`: approved, or `member.profile.visible` and not REJECTED); else HTTP 404 `MEMBER_NOT_FOUND`. The `team` page SHALL use the rule of `GET /v1/teams/:uid` (`TeamsService.assertTeamVisibleToViewer`); every case that hides the page (unknown, `INACTIVE` for a member who is not a directory admin, L0 for a member who is not a lead or admin) SHALL get HTTP 404 `TEAM_NOT_FOUND`, also where the GET gives 403. The `job` page SHALL use the rule of `GET /v1/job-openings/:uid` (`JobOpeningsQueryService.getJobOpening`); an unknown job, a hidden status or a job with no team SHALL get HTTP 404 `JOB_NOT_FOUND`. A job of an `INACTIVE` team SHALL show, as on the GET. `job` with no `jobUid` (the job board) and `profile` SHALL make no lookup. A `member` page with the session member's own uid SHALL be the `profile` page. The 404 body SHALL be `{ statusCode, code, message }`, and no model call SHALL run.
