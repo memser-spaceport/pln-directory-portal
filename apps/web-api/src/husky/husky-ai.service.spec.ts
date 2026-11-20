@@ -22,6 +22,7 @@ jest.mock('./tools/irl-events.tool', () => ({ IrlEventsTool: jest.fn() }));
 jest.mock('./tools/husky-ai-tools.serivice', () => ({ HuskyAiToolsService: jest.fn() }));
 
 import { streamText, streamObject, generateText } from 'ai';
+import { APICallError } from '@ai-sdk/provider';
 import { HuskyResponseSchema } from 'libs/contracts/src/schema/husky-chat';
 import { answerCounts } from '../labos-agent/labos-agent-answer-counts';
 import {
@@ -442,6 +443,86 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
     expect(persistent.create).not.toHaveBeenCalled();
     expect(generateTextMock).not.toHaveBeenCalled();
     expect(logger.error).toHaveBeenCalled();
+  });
+
+  describe('error logs (LAB-3362, contract 11.4)', () => {
+    const CARD_TEXT = 'Card-text-91bd: I lead fundraising at Acme and want your advice.';
+    const promptContext = `Its current text, with the edits of the member: ${JSON.stringify(CARD_TEXT)}.`;
+    // As the AI SDK does: the error keeps the whole request body, with the prompt.
+    const apiError = (statusCode: number, prompt: unknown) =>
+      new APICallError({
+        message: statusCode === 529 ? 'Overloaded' : 'Rate limit',
+        url: 'https://api.example.com/v1/messages',
+        requestBodyValues: { prompt },
+        statusCode,
+        responseBody: '{"type":"error"}',
+      }) as unknown as Error;
+    const logged = () =>
+      JSON.stringify(logger.error.mock.calls, (_key, value) =>
+        value instanceof Error ? { ...value, message: value.message, stack: value.stack } : value
+      );
+
+    it('logs only name, statusCode and message when the structured tail and the summary fail with an APICallError', async () => {
+      streamTextMock.mockReturnValue(answerStream(['Here is a draft intro.']));
+      streamObjectMock.mockImplementation((args: { prompt: string }) => {
+        const error = apiError(529, args.prompt);
+        const object = Promise.reject(error);
+        object.catch(() => undefined);
+        return { textStream: failingChunks([], error), object };
+      });
+      generateTextMock.mockImplementation(async (args: unknown) => {
+        throw apiError(429, args);
+      });
+
+      const raw = await readAll(
+        await service.createContextualToolsResponse(chatInfo, false, undefined, {
+          promptContext,
+          persistHistory: false,
+        })
+      );
+      await flushBackgroundWork();
+
+      expect(streamObjectMock.mock.calls[0][0].prompt).toContain('Card-text-91bd');
+      expect(JSON.parse(raw).content).toBe('Here is a draft intro.');
+      expect(logger.error).toHaveBeenCalledWith(
+        'Husky structured response generation failed: {"name":"AI_APICallError","statusCode":529,"message":"Overloaded"}'
+      );
+      expect(logger.error).toHaveBeenCalledWith(
+        'Failed to update chat summary for thread thread-1: {"name":"AI_APICallError","statusCode":429,"message":"Rate limit"}'
+      );
+      expect(logged()).not.toContain('Card-text-91bd');
+      expect(logged()).not.toContain('requestBodyValues');
+    });
+
+    it('logs only name, statusCode and message when the answer stream fails with an APICallError', async () => {
+      streamTextMock.mockImplementation((args: { prompt?: string; messages?: unknown; system?: string }) => ({
+        textStream: failingChunks([], apiError(529, args)),
+      }));
+
+      await expect(
+        readAll(await service.createContextualToolsResponse(chatInfo, false, undefined, { promptContext }))
+      ).rejects.toThrow('Overloaded');
+      await flushBackgroundWork();
+
+      expect(logger.error).toHaveBeenCalledWith(
+        'Husky search failed for thread thread-1, chat chat-1: {"name":"AI_APICallError","statusCode":529,"message":"Overloaded"}'
+      );
+      expect(logged()).not.toContain('Card-text-91bd');
+    });
+
+    it('logs only name, statusCode and message when the history write fails', async () => {
+      streamTextMock.mockReturnValue(answerStream(['Just the answer']));
+      streamObjectMock.mockReturnValue(structuredStream(['{}']));
+      persistent.create.mockRejectedValue(Object.assign(new Error('write failed'), { args: { response: CARD_TEXT } }));
+
+      await readAll(await service.createContextualToolsResponse(chatInfo, false, undefined, { promptContext }));
+      await flushBackgroundWork();
+
+      expect(logger.error).toHaveBeenCalledWith(
+        'Failed to persist chat history for thread thread-1: {"name":"Error","message":"write failed"}'
+      );
+      expect(logged()).not.toContain('Card-text-91bd');
+    });
   });
 
   describe('when the answer is cut off', () => {

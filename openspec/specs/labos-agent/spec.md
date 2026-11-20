@@ -293,7 +293,7 @@ When the turn has a draft, the answer text SHALL be one short line: "Here is a d
 
 ### Requirement: Current intro draft in C1
 
-The C1 body MAY have `introDraft: { target: { type, uid }, text }` (contract change 4, section 11; LAB-3362). The object SHALL be strict. `text` SHALL be 1 to 3500 characters after trim. A bad shape, an extra key, an empty text or a text over 3500 characters SHALL get the C1 400. `introDraft` is allowed with any `context.page` and with no `context`. An unknown or deleted target SHALL get 404 `INTRO_TARGET_NOT_FOUND` before the stream, with the lookup of the intro page (`findAgentTargetName`). The backend SHALL put the target and the text into the prompt context of this turn only. The agent SHALL use the text only when the member asks to change the draft. `draft_intro` SHALL accept the `introDraft` target as a target of the turn, and SHALL check the sender eligibility and the target again. The backend SHALL NOT store `introDraft`, write a cache key for it, or write its text to a log line, error message or analytics event. The Husky thread summary has no extra rule (11.7 A).
+The C1 body MAY have `introDraft: { target: { type, uid }, text }` (contract change 4, section 11; LAB-3362). The object and its `target` SHALL be strict; `context.introTarget` does not change. `text` SHALL be 1 to 3500 characters after trim. A bad shape, an extra key, an empty text or a text over 3500 characters SHALL get the C1 400. `introDraft` is allowed with any `context.page` and with no `context`. An unknown or deleted target SHALL get 404 `INTRO_TARGET_NOT_FOUND` before the stream, with the lookup of the intro page (`findAgentTargetName`). The backend SHALL put the target and the text into the prompt context of this turn only. The agent SHALL use the text only when the member asks to change the draft. `draft_intro` SHALL accept the `introDraft` target as a target of the turn, and SHALL check the sender eligibility and the target again. The backend SHALL NOT store `introDraft`, write a cache key for it, or write its text to a log line, error message or analytics event. The Husky thread summary has no extra rule (11.7 A). A Husky catch SHALL log only `{ name, statusCode, message }` of an error, never the error object: an AI SDK `APICallError` holds `requestBodyValues`, the whole prompt.
 
 #### Scenario: Make it shorter
 
@@ -311,6 +311,13 @@ The C1 body MAY have `introDraft: { target: { type, uid }, text }` (contract cha
 
 - **WHEN** the body has no `introDraft`
 - **THEN** the prompt context has no draft text
+
+#### Scenario: A model call fails
+
+- **GIVEN** a turn with `introDraft`
+- **WHEN** the structured tail, the summary or the answer stream fails with an `APICallError` (429, 529 or 5xx)
+- **THEN** the log line has only the error name, status code and message
+- **AND** no log line has the card text
 
 #### Scenario: Sender who cannot send intros
 

@@ -451,6 +451,7 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
     expect(LabosAgentChatRequestSchema.safeParse(VALID).success).toBe(true);
 
     expect(parse({ target: GRACE, text: CARD_TEXT, draftId: 'dr_1' }).success).toBe(false);
+    expect(parse({ target: { ...GRACE, name: 'Grace Hopper' }, text: CARD_TEXT }).success).toBe(false);
     expect(parse({ target: GRACE, text: '   ' }).success).toBe(false);
     expect(parse({ target: GRACE, text: 'x'.repeat(3501) }).success).toBe(false);
     expect(parse({ target: { type: 'project', uid: 'p-1' }, text: CARD_TEXT }).success).toBe(false);

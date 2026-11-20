@@ -47,12 +47,13 @@ export const LABOS_AGENT_INTRO_DRAFT_INPUT_LIMITS = { minLength: 1, maxLength: 3
 
 /**
  * The intro card that waits in this chat, with the member's edits (LAB-3362, contract section 11.1). The frontend sends
- * the newest waiting card only. `.strict()` rejects an extra key. The backend uses it for this turn only and stores
+ * the newest waiting card only. `.strict()` on the object and on `target` rejects an extra key. The backend uses it for this turn only and stores
  * nothing.
  */
 export const LabosAgentIntroDraftSchema = z
   .object({
-    target: LabosAgentIntroTargetSchema,
+    // Strict here only: an extra key in the card target fails (Oleg's review). `context.introTarget` stays as it is.
+    target: LabosAgentIntroTargetSchema.strict(),
     text: z
       .string()
       .transform((value) => value.trim())
