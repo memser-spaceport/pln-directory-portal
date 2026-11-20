@@ -143,10 +143,7 @@ function setup() {
   };
   const accessControl = { getMemberAccess: jest.fn().mockResolvedValue({ effectivePermissions: [] }) };
   const cache = fakeCache();
-  const husky = {
-    getTurnNote: jest.fn(async () => undefined),
-    createContextualToolsResponse: jest.fn().mockResolvedValue({}),
-  };
+  const husky = { createContextualToolsResponse: jest.fn().mockResolvedValue({}) };
   const service = new LabosAgentService(
     prisma as any,
     new LabosAgentAccessService({ hasPermission: jest.fn().mockResolvedValue({ allowed: false }) } as any),

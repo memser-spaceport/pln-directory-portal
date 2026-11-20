@@ -271,22 +271,12 @@ The chat SHALL have the agent tool `draft_intro` with the arguments `type` (`mem
 
 When the turn has a draft, the answer text SHALL be one short line: "Here is a draft intro. Edit it in the card, then send." The draft text SHALL be only in the draft card (`drafts[0].text`). The `draft_intro` description SHALL tell the model to call the tool before it writes the answer and not to write the draft text in the answer. The success text SHALL tell the model to write only that line. The server SHALL also enforce it: while `drafts` has a draft, the stream SHALL show the line once and drop the model text (Husky `answerLine`). When the model writes no text after the call, the stream SHALL add the line at the end. With the line on, a cut-off answer SHALL NOT be continued. When a refused call clears `drafts`, the model text SHALL stream again, so a refusal reaches the member. The text before the tool call stays. The `content` in the final body and the thread summary SHALL match the streamed text. This adds no model call (LAB-3362 D4).
 
-The server SHALL keep the draft in the thread memory, not in the answer. When the turn ends with a draft, the stream SHALL store the draft target and text in the cache (Husky `turnNote`) before the body ends, under a key for the member and the thread. The note SHALL NOT be streamed. A turn with no draft SHALL keep the earlier note. The next turn of the same member in the thread SHALL put the note in the model input with the instruction to call `draft_intro` again for that target. The target of the note SHALL be an intro target of that turn, also with no page context, and `draft_intro` SHALL check the sender and the target again. A follow-up such as "make it shorter" SHALL so give a new draft card and the same short answer line. The note expires with the cache, as the thread summary does.
-
 #### Scenario: Draft with text after the call
 
 - **GIVEN** an eligible member on the intro page
 - **WHEN** the model calls `draft_intro` and then writes the draft text again
 - **THEN** the answer after the call is "Here is a draft intro. Edit it in the card, then send."
 - **AND** the draft text is only in `drafts`
-
-#### Scenario: Make it shorter
-
-- **GIVEN** a turn that made a draft for member M
-- **WHEN** the member sends "Make it shorter." in the same thread with no page context
-- **THEN** the model input has the draft text and the instruction to call `draft_intro` for M
-- **AND** a new `draft_intro` call for M gives a new draft card
-- **AND** the answer is the one short line
 
 #### Scenario: Refusal
 

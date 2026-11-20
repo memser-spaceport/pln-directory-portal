@@ -45,10 +45,7 @@ function setup(env = APP_ENV.DEV as string, pilot = false) {
   process.env.ENVIRONMENT = env;
   const prisma = { member: { findUnique: jest.fn().mockResolvedValue({ uid: 'member-1', deletedAt: null }) } };
   const stream = { pipeTo: jest.fn().mockResolvedValue(undefined) };
-  const husky = {
-    getTurnNote: jest.fn(async () => undefined),
-    createContextualToolsResponse: jest.fn().mockResolvedValue(stream),
-  };
+  const husky = { createContextualToolsResponse: jest.fn().mockResolvedValue(stream) };
   const query = { getTeamNewsItemDto: jest.fn().mockResolvedValue(NEWS_ITEM), listTeamNews: jest.fn() };
   const names = ['list_news', 'get_news_item', 'get_my_profile', 'list_my_experiences', 'delete_experience'];
   const names2 = ['update_my_profile', 'add_experience', 'update_experience', 'update_team'];

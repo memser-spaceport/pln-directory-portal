@@ -24,53 +24,6 @@ export function introDraftLine(drafts: LabosAgentDraft[]): string | undefined {
   return drafts.length ? INTRO_DRAFT_LINE : undefined;
 }
 
-/** LAB-3362 D4: the intro draft of a turn, kept on the server for the next turns of the thread. Never streamed. */
-export type IntroDraftNote = { target: IntroTurnTarget; text: string };
-
-/** The cache key of the draft note: one for each member and thread, so another member never reads it. */
-export function introDraftNoteKey(memberUid: string, threadId: string): string {
-  return `labos-agent:intro-draft:${memberUid}:${threadId}`;
-}
-
-/** The note to store when the turn ends: the draft of the turn, or undefined (the earlier note stays). */
-export function introDraftNote(drafts: LabosAgentDraft[]): string | undefined {
-  const draft = drafts[0];
-  if (!draft) return undefined;
-  const note: IntroDraftNote = { target: draft.target, text: draft.text };
-  return JSON.stringify(note);
-}
-
-/** The stored note, or undefined when there is none or it is not a valid note. */
-export function parseIntroDraftNote(note: string | undefined): IntroDraftNote | undefined {
-  if (!note) return undefined;
-  try {
-    const value = JSON.parse(note) as Partial<IntroDraftNote>;
-    const target = value?.target;
-    if (
-      typeof value?.text !== 'string' ||
-      !target ||
-      (target.type !== 'member' && target.type !== 'team') ||
-      typeof target.uid !== 'string' ||
-      typeof target.name !== 'string'
-    ) {
-      return undefined;
-    }
-    return { target: { type: target.type, uid: target.uid, name: target.name }, text: value.text };
-  } catch {
-    return undefined;
-  }
-}
-
-/** The prompt line with the last draft, so a follow-up such as "make it shorter" can change it. */
-export function introDraftNotePrompt(note: IntroDraftNote): string {
-  return (
-    `The last intro draft of this thread is in the card, not in the answer: ${JSON.stringify(note)}. ` +
-    'When the member asks to change the draft, for example to make it shorter, ' +
-    `call draft_intro with type "${note.target.type}" and targetUid "${note.target.uid}" and the new text. ` +
-    'Do not write the draft text in the answer.'
-  );
-}
-
 /** A fixed text for an unexpected error. The error itself goes to the server log, never to the model. */
 export const INTRO_DRAFT_FAILED_TEXT =
   'The draft failed because of a server error. Make no draft. Tell the member to try again later.';

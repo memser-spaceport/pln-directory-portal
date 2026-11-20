@@ -788,56 +788,6 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
     });
   });
 
-  describe('turnNote (LAB-3362 D4)', () => {
-    const NOTE = '{"target":{"type":"member","uid":"m-1","name":"Grace"},"text":"Hi Grace, I lead fundraising."}';
-
-    function noteTurn() {
-      streamTextMock.mockReturnValue(answerStream(['Here is a draft.']));
-      streamObjectMock.mockReturnValue(structuredStream(['{"followUpQuestions":[],"sources":[],"actions":[]}']));
-    }
-
-    it('stores the note on the server before the body ends, and does not stream it', async () => {
-      noteTurn();
-      const stream = await service.createContextualToolsResponse(chatInfo, false, undefined, {
-        turnNote: { key: 'note-key', next: () => NOTE },
-      });
-
-      const raw = await readAll(stream);
-
-      expect(cache.set).toHaveBeenCalledWith('note-key', NOTE);
-      expect(raw).not.toContain('fundraising');
-      expect(HuskyResponseSchema.parse(JSON.parse(raw)).content).toBe('Here is a draft.');
-    });
-
-    it('stores nothing when the turn has no note, and the answer ends when the write fails', async () => {
-      noteTurn();
-      await readAll(
-        await service.createContextualToolsResponse(chatInfo, false, undefined, {
-          turnNote: { key: 'note-key', next: () => undefined },
-        })
-      );
-      expect(cache.set).not.toHaveBeenCalledWith('note-key', expect.anything());
-
-      noteTurn();
-      cache.set.mockRejectedValueOnce(new Error('redis down'));
-      const raw = await readAll(
-        await service.createContextualToolsResponse(chatInfo, false, undefined, {
-          turnNote: { key: 'note-key', next: () => NOTE },
-        })
-      );
-      expect(HuskyResponseSchema.parse(JSON.parse(raw)).content).toBe('Here is a draft.');
-    });
-
-    it('reads a stored note, and gives undefined for no note or a failed read', async () => {
-      cache.get.mockResolvedValueOnce(NOTE).mockResolvedValueOnce(null).mockRejectedValueOnce(new Error('redis down'));
-
-      expect(await service.getTurnNote('note-key')).toBe(NOTE);
-      expect(await service.getTurnNote('note-key')).toBeUndefined();
-      expect(await service.getTurnNote('note-key')).toBeUndefined();
-      expect(cache.get).toHaveBeenCalledWith('note-key');
-    });
-  });
-
   it('records a handed-over first exchange under its own chat id before answering', async () => {
     streamTextMock.mockReturnValue(answerStream(['Follow-up answer']));
     streamObjectMock.mockReturnValue(structuredStream(['{"followUpQuestions":[],"sources":[],"actions":[]}']));

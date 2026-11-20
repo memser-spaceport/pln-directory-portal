@@ -122,12 +122,7 @@ function setup(sender: Partial<Person> = { roles: [portfolio()] }) {
   const introMembers = { findMemberByEmail: jest.fn(async () => null) };
   const introRequests = new IntroRequestsService(prisma as any, telegram as any, introMembers as any);
   const cache = { get: jest.fn(), set: jest.fn(), del: jest.fn() };
-  // LAB-3362 D4: the server memory of the turn notes, as HuskyAiService keeps it in the cache.
-  const notes = new Map<string, string>();
-  const husky = {
-    getTurnNote: jest.fn(async (key: string) => notes.get(key)),
-    createContextualToolsResponse: jest.fn().mockResolvedValue({ pipeTo: jest.fn() }),
-  };
+  const husky = { createContextualToolsResponse: jest.fn().mockResolvedValue({ pipeTo: jest.fn() }) };
   const service = new LabosAgentService(
     prisma as any,
     new LabosAgentAccessService({ hasPermission: jest.fn().mockResolvedValue({ allowed: false }) } as any),
@@ -151,12 +146,9 @@ function setup(sender: Partial<Person> = { roles: [portfolio()] }) {
     const options = husky.createContextualToolsResponse.mock.calls.at(-1)[3];
     const texts: string[] = [];
     for (const args of calls) texts.push(await options.extraTools.draft_intro.execute(args));
-    // The end of the turn: the stream stores the turn note, as HuskyAiService does.
-    const note = options.turnNote?.next();
-    if (note) notes.set(options.turnNote.key, note);
     return { texts, drafts: options.extraResponseFields.drafts as Array<Record<string, any>>, options };
   };
-  return { prisma, telegram, cache, husky, controller, req, res, introRequests, turn, teams, notes };
+  return { prisma, telegram, cache, husky, controller, req, res, introRequests, turn, teams };
 }
 
 describe('LabOS agent intro drafts (LAB-3300)', () => {
@@ -427,39 +419,5 @@ describe('LabOS agent intro draft answer (LAB-3362 D4)', () => {
 
     expect(texts[0]).toBe(INTRO_NOT_ELIGIBLE_TEXT);
     expect(options.answerLine()).toBeUndefined();
-  });
-
-  it('keeps the draft in the thread memory on the server, so "make it shorter" sees it and makes a new card', async () => {
-    const h = setup();
-    const first = await h.turn(MEMBER_CONTEXT, { type: 'member', targetUid: 'm-grace', text: TEXT });
-    expect(first.options.answerLine()).toBe(INTRO_DRAFT_LINE);
-    expect(first.options.turnNote.key).toBe('labos-agent:intro-draft:m-ada:thread-1');
-    expect(JSON.parse(h.notes.get(first.options.turnNote.key) ?? '')).toEqual({
-      target: { type: 'member', uid: 'm-grace', name: 'Grace Hopper' },
-      text: TEXT,
-    });
-
-    // The follow-up has no page context. The model input has the draft text and the target.
-    const SHORT = 'I lead fundraising at Acme and want your advice on our seed round.';
-    await h.controller.chat({ ...VALID, message: 'Make it shorter.' }, h.req, h.res as any);
-    const options = h.husky.createContextualToolsResponse.mock.calls.at(-1)[3];
-    expect(options.promptContext).toContain(TEXT);
-    expect(options.promptContext).toContain('call draft_intro with type "member" and targetUid "m-grace"');
-
-    expect(
-      await options.extraTools.draft_intro.execute({ type: 'member', targetUid: 'm-grace', text: SHORT })
-    ).toContain(INTRO_DRAFT_LINE);
-    expect(options.extraResponseFields.drafts).toEqual([
-      expect.objectContaining({ target: { type: 'member', uid: 'm-grace', name: 'Grace Hopper' }, text: SHORT }),
-    ]);
-    expect(options.answerLine()).toBe(INTRO_DRAFT_LINE);
-  });
-
-  it('stores no draft note for a turn with no draft', async () => {
-    const h = setup();
-    const { options } = await h.turn(MEMBER_CONTEXT);
-    expect(options.turnNote.next()).toBeUndefined();
-    expect(h.notes.size).toBe(0);
-    expect(options.promptContext).not.toContain('The last intro draft');
   });
 });
