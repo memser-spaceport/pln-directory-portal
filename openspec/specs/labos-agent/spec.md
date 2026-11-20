@@ -267,6 +267,23 @@ The chat SHALL have the agent tool `draft_intro` with the arguments `type` (`mem
 - **AND** the error goes to the server log
 - **AND** the body has `drafts: []`
 
+### Requirement: Short answer with an intro draft
+
+When the turn has a draft, the answer text SHALL be one short line: "Here is a draft intro. Edit it in the card, then send." The draft text SHALL be only in the draft card (`drafts[0].text`). The `draft_intro` description SHALL tell the model to call the tool before it writes the answer and not to write the draft text in the answer. The success text SHALL tell the model to write only that line. The server SHALL also enforce it: while `drafts` has a draft, the stream SHALL show the line once and drop the model text (Husky `answerLine`). When the model writes no text after the call, the stream SHALL add the line at the end. With the line on, a cut-off answer SHALL NOT be continued. When a refused call clears `drafts`, the model text SHALL stream again, so a refusal reaches the member. The text before the tool call stays. The `content` in the final body and the thread summary SHALL match the streamed text. This adds no model call (LAB-3362 D4).
+
+#### Scenario: Draft with text after the call
+
+- **GIVEN** an eligible member on the intro page
+- **WHEN** the model calls `draft_intro` and then writes the draft text again
+- **THEN** the answer after the call is "Here is a draft intro. Edit it in the card, then send."
+- **AND** the draft text is only in `drafts`
+
+#### Scenario: Refusal
+
+- **GIVEN** a member who cannot send intros
+- **WHEN** the model calls `draft_intro` and writes the refusal
+- **THEN** the answer shows the refusal text of the model
+
 ### Requirement: Page context for member, team, job and profile pages
 
 When `context.page` is `member`, `team` or `job` with a `jobUid`, the system SHALL look up the page before the stream starts, after the pilot gate. A member outside the gate SHALL get HTTP 403 `AGENT_NOT_ENABLED` and no lookup SHALL run. The `member` page SHALL use a member with no `deletedAt` who is directory-visible (`directoryVisibleMemberWhere()` in `apps/web-api/src/members/member-visibility.ts`: approved, or `member.profile.visible` and not REJECTED); else HTTP 404 `MEMBER_NOT_FOUND`. The `team` page SHALL use the rule of `GET /v1/teams/:uid` (`TeamsService.assertTeamVisibleToViewer`); every case that hides the page (unknown, `INACTIVE` for a member who is not a directory admin, L0 for a member who is not a lead or admin) SHALL get HTTP 404 `TEAM_NOT_FOUND`, also where the GET gives 403. The `job` page SHALL use the rule of `GET /v1/job-openings/:uid` (`JobOpeningsQueryService.getJobOpening`); an unknown job, a hidden status or a job with no team SHALL get HTTP 404 `JOB_NOT_FOUND`. A job of an `INACTIVE` team SHALL show, as on the GET. `job` with no `jobUid` (the job board) and `profile` SHALL make no lookup. A `member` page with the session member's own uid SHALL be the `profile` page. The 404 body SHALL be `{ statusCode, code, message }`, and no model call SHALL run.

@@ -17,6 +17,9 @@ jest.mock('./tools/demo-day.tool', () => ({ DemoDayTool: jest.fn() }));
 jest.mock('../analytics/service/analytics.service', () => ({ AnalyticsService: jest.fn() }));
 // irl-events.tool imports PLEventGuestsService/MembersService -> axios, same ESM problem.
 jest.mock('./tools/irl-events.tool', () => ({ IrlEventsTool: jest.fn() }));
+// The real tools service pulls in undici through its tool modules, and undici needs the web streams globals at import.
+// This spec passes its own tools service mock to the constructor.
+jest.mock('./tools/husky-ai-tools.serivice', () => ({ HuskyAiToolsService: jest.fn() }));
 
 import { streamText, streamObject, generateText } from 'ai';
 import { HuskyResponseSchema } from 'libs/contracts/src/schema/husky-chat';
@@ -705,6 +708,82 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
         sources: [],
         actions: [],
       });
+    });
+  });
+
+  describe('answerLine (LAB-3362 D4)', () => {
+    const LINE = 'Here is a draft. Edit it in the card.';
+    const text = (textDelta: string) => ({ type: 'text-delta', textDelta });
+    const call = (toolCallId: string) => ({ type: 'tool-call', toolCallId, toolName: 'draft_intro' });
+
+    /** One answer generation. A `set` item changes the answer line, as a tool call that adds or removes a draft. */
+    function lineTurn(
+      items: Array<{ type: string; [key: string]: unknown } | { set: boolean }>,
+      finishReason = 'stop'
+    ) {
+      let on = false;
+      streamTextMock.mockImplementation(() => ({
+        fullStream: (async function* () {
+          for (const item of items) {
+            if ('set' in item) on = item.set as boolean;
+            else yield item;
+          }
+        })(),
+        finishReason: Promise.resolve(finishReason),
+      }));
+      streamObjectMock.mockReturnValue(structuredStream(['{"followUpQuestions":[],"sources":[],"actions":[]}']));
+      return () => (on ? LINE : undefined);
+    }
+
+    async function content(answerLine: () => string | undefined) {
+      const raw = await readAll(
+        await service.createContextualToolsResponse(chatInfo, false, undefined, { answerLine })
+      );
+      return HuskyResponseSchema.parse(JSON.parse(raw)).content;
+    }
+
+    it('shows the line once in place of the model text after the tool call', async () => {
+      const answerLine = lineTurn([
+        text('I will write it.'),
+        call('c1'),
+        { set: true },
+        text('Hi Grace, I lead '),
+        text('fundraising at Acme.'),
+      ]);
+
+      expect(await content(answerLine)).toBe(`I will write it.\n\n${LINE}`);
+    });
+
+    it('adds the line at the end when the model writes no text after the tool call', async () => {
+      expect(await content(lineTurn([call('c1'), { set: true }]))).toBe(LINE);
+    });
+
+    it('streams the model text again when the line goes off', async () => {
+      const answerLine = lineTurn([
+        call('c1'),
+        { set: true },
+        text('Hi Grace.'),
+        call('c2'),
+        { set: false },
+        text('The draft was refused.'),
+      ]);
+
+      expect(await content(answerLine)).toBe(`${LINE}The draft was refused.`);
+    });
+
+    it('does not continue a cut-off answer while the line is on', async () => {
+      const answerLine = lineTurn([call('c1'), { set: true }, text('Hi Grace, I')], 'length');
+
+      expect(await content(answerLine)).toBe(LINE);
+      expect(streamTextMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the model text when the caller passes no line (AI search)', async () => {
+      lineTurn([text('One answer.')]);
+
+      const raw = await readAll(await service.createContextualToolsResponse(chatInfo, false));
+
+      expect(HuskyResponseSchema.parse(JSON.parse(raw)).content).toBe('One answer.');
     });
   });
 

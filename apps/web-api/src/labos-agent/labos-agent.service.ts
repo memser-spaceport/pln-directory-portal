@@ -35,7 +35,7 @@ import { TeamNewsQueryService } from '../team-news/team-news-query.service';
 import { TeamsService } from '../teams/teams.service';
 import { LabosAgentAccessService } from './labos-agent-access.service';
 import { answerCounts } from './labos-agent-answer-counts';
-import { draftIntroTool, IntroTurnTarget } from './labos-agent-drafts';
+import { draftIntroTool, introDraftLine, IntroTurnTarget } from './labos-agent-drafts';
 import { searchMentions } from './labos-agent-mentions';
 import { mcpToolsAsAgentTools } from './labos-agent-news.tools';
 import {
@@ -137,6 +137,8 @@ export class LabosAgentService {
       true,
       email,
       {
+        // LAB-3362 D4: with a draft, the answer is one short line. The draft text is only in the card.
+        answerLine: () => introDraftLine(drafts),
         promptContext,
         extraTools: { ...mcpToolsAsAgentTools(reads, ctx), ...proposeTools, draft_intro: draftIntro },
         // The stream reads these arrays when it ends, so they hold the proposals and drafts the tools made in this turn.
