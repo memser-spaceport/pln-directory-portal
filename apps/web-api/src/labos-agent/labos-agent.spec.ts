@@ -12,7 +12,8 @@ jest.mock('../teams/teams.service', () => ({ TeamsService: jest.fn() }));
 jest.mock('ai', () => ({ tool: (def: unknown) => def }));
 
 import { GUARDS_METADATA } from '@nestjs/common/constants';
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
+import { APICallError } from '@ai-sdk/provider';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { APP_ENV } from '../utils/constants';
 import { LabosAgentAccessService } from './labos-agent-access.service';
@@ -254,7 +255,37 @@ describe('LabosAgentController', () => {
     const failure = new Error('model failed');
     stream.pipeTo.mockRejectedValue(failure);
     await controller.chat(VALID, req, res as any);
-    expect(res.destroy).toHaveBeenCalledWith(failure);
+    expect(res.destroy).toHaveBeenCalledTimes(1);
+    expect(res.destroy).toHaveBeenCalledWith();
+  });
+
+  it('LAB-3362: a stream APICallError after the headers logs only name, statusCode and message, and destroys with no error', async () => {
+    const { controller, stream, res, req } = setup();
+    const errors = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    const consoleSpies = ['log', 'error', 'warn'].map((level) =>
+      jest.spyOn(console, level as 'log').mockImplementation(() => undefined)
+    );
+    const failure = new APICallError({
+      message: 'Overloaded',
+      url: 'https://api.example.com/v1/messages',
+      requestBodyValues: { prompt: 'Its current text: "Card-text-c0de: I lead fundraising at Acme."' },
+      statusCode: 529,
+    });
+    stream.pipeTo.mockRejectedValue(failure);
+
+    await controller.chat(VALID, req, res as any);
+
+    expect(res.destroy).toHaveBeenCalledTimes(1);
+    expect(res.destroy.mock.calls[0]).toEqual([]);
+    expect(errors).toHaveBeenCalledWith(
+      'LabOS agent chat stream failed: {"name":"AI_APICallError","statusCode":529,"message":"Overloaded"}'
+    );
+    const written = JSON.stringify([errors.mock.calls, ...consoleSpies.map((spy) => spy.mock.calls)], (_key, value) =>
+      value instanceof Error ? { ...value, message: value.message } : value
+    );
+    expect(written).not.toContain('Card-text-c0de');
+    errors.mockRestore();
+    consoleSpies.forEach((spy) => spy.mockRestore());
   });
 
   it('GET access returns enabled true outside production and false on production, never 403', async () => {
