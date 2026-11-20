@@ -118,7 +118,9 @@ function setup(sender: Partial<Person> = { roles: [portfolio()] }) {
     },
   };
   const telegram = { send: jest.fn(async () => '42') };
-  const introRequests = new IntroRequestsService(prisma as any, telegram as any);
+  // LAB-3323: C3 asks MembersService whether the sender is a directory admin. No sender here is an admin.
+  const introMembers = { findMemberByEmail: jest.fn(async () => null) };
+  const introRequests = new IntroRequestsService(prisma as any, telegram as any, introMembers as any);
   const cache = { get: jest.fn(), set: jest.fn(), del: jest.fn() };
   const husky = { createContextualToolsResponse: jest.fn().mockResolvedValue({ pipeTo: jest.fn() }) };
   const service = new LabosAgentService(
@@ -351,11 +353,15 @@ describe('LabOS agent intro drafts (LAB-3300)', () => {
     expect(h.telegram.send).not.toHaveBeenCalled();
   });
 
-  it('S3-R9: C3 keeps its target rule: a deleted (INACTIVE) team is still a valid C3 target', async () => {
+  it('S3-R9: C3 refuses a deleted (INACTIVE) team with 404 "Team not found" for a non-admin (LAB-3323)', async () => {
     const h = setup();
-    await expect(
-      h.introRequests.create('ada@example.com', { type: 'TEAM', targetId: 't-deleted', text: TEXT })
-    ).resolves.toEqual({ uid: 'req-1' });
+    const error = await h.introRequests
+      .create('ada@example.com', { type: 'TEAM', targetId: 't-deleted', text: TEXT })
+      .catch((e) => e);
+    expect(error).toBeInstanceOf(NotFoundException);
+    expect(error.message).toBe('Team not found');
+    expect(h.prisma.introRequest.create).not.toHaveBeenCalled();
+    expect(h.telegram.send).not.toHaveBeenCalled();
   });
 
   it('S3-R9: C3 still refuses a deleted member with 404', async () => {

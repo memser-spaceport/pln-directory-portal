@@ -346,7 +346,9 @@ function setup(viewer: Viewer = {}, env: string = APP_ENV.DEV) {
   );
   const jobsService = new JobOpeningsQueryService(prisma as any);
   const telegram = { send: jest.fn() };
-  const introRequests = new IntroRequestsService(prisma as any, telegram as any);
+  // LAB-3323: C3 asks MembersService whether the sender is a directory admin. No sender here is an admin.
+  const introMembers = { findMemberByEmail: jest.fn(async () => null) };
+  const introRequests = new IntroRequestsService(prisma as any, telegram as any, introMembers as any);
   const husky = { createContextualToolsResponse: jest.fn().mockResolvedValue({ pipeTo: jest.fn() }) };
   // S6 (LAB-3318): the S1 news lookup for news mentions. Only `news-1` exists.
   const newsQuery = {
