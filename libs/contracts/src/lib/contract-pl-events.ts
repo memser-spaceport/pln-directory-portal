@@ -12,6 +12,16 @@ import {
   ProfileEventsQuerySchema,
   ResponseMemberEventsSchema,
   ResponseTeamEventsSchema,
+  PLEventListQuerySchema,
+  ResponsePLEventListSchema,
+  PLEventSubmitBodySchema,
+  PLEventPatchBodySchema,
+  PLEventWriteResultSchema,
+  ResponseMyPLEventsSchema,
+  PLEventAgendaParseBodySchema,
+  ResponsePLEventAgendaParseSchema,
+  ResponsePLEventPlaceSuggestionsSchema,
+  ResponsePLEventPlaceSchema,
 } from '../schema';
 import { SyncPLEventsBodySchema } from '../schema';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
@@ -169,6 +179,77 @@ export const apiEvents = contract.router({
     responses: {
       200: ResponsePLEventLocationWithRelationsSchema.array(),
     },
+  },
+  getPLEvents: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/irl/events`,
+    query: PLEventListQuerySchema,
+    responses: {
+      200: ResponsePLEventListSchema,
+    },
+    summary: 'Approved events with search, filters and paging, earliest first',
+  },
+  submitPLEvent: {
+    method: 'POST',
+    path: `${getAPIVersionAsPath('1')}/irl/events`,
+    body: PLEventSubmitBodySchema,
+    responses: {
+      201: PLEventWriteResultSchema,
+    },
+    summary: 'Submit an event. Trusted members are published at once; every other submission waits for approval',
+  },
+  getMyPLEvents: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/irl/events/mine`,
+    responses: {
+      200: ResponseMyPLEventsSchema,
+    },
+    summary: 'The events the signed-in member submitted, whatever their status, newest first',
+  },
+  updatePLEvent: {
+    method: 'PATCH',
+    path: `${getAPIVersionAsPath('1')}/irl/events/:uid`,
+    body: PLEventPatchBodySchema,
+    responses: {
+      200: PLEventWriteResultSchema,
+    },
+    summary: 'Edit an event (its submitter or a directory admin); `submit: true` sends a draft for approval',
+  },
+  deletePLEvent: {
+    method: 'DELETE',
+    path: `${getAPIVersionAsPath('1')}/irl/events/:uid`,
+    body: contract.body<unknown>(),
+    responses: {
+      200: contract.response<{ uid: string; deleted: boolean }>(),
+    },
+    summary: 'Delete an event (its submitter, until it is approved, or a directory admin)',
+  },
+  searchPLEventPlaces: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/irl/events/places`,
+    query: contract.query,
+    responses: {
+      200: ResponsePLEventPlaceSuggestionsSchema,
+    },
+    summary: 'Up to 5 venue and address suggestions for the event submit form (`?query=`)',
+  },
+  resolvePLEventPlace: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/irl/events/places/resolve`,
+    query: contract.query,
+    responses: {
+      200: ResponsePLEventPlaceSchema,
+    },
+    summary: 'One place by `placeId` or `address`: address parts, position, map link and time zone',
+  },
+  parsePLEventAgenda: {
+    method: 'POST',
+    path: `${getAPIVersionAsPath('1')}/irl/events/agenda/parse`,
+    body: PLEventAgendaParseBodySchema,
+    responses: {
+      200: ResponsePLEventAgendaParseSchema,
+    },
+    summary: 'Agenda text to sessions, or a message that says what is missing',
   },
   getAllUpcomingEvents: {
     method: 'GET',

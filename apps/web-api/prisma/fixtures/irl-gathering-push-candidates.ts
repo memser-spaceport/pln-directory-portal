@@ -1,5 +1,6 @@
 import { IrlGatheringPushRuleKind, PLEvent, PLEventGuest, PLEventLocation } from '@prisma/client';
 import { prisma } from '../index';
+import { SEED_PL_EVENT_COLUMNS } from './pl-event-defaults';
 
 const daysFromNow = (d: number) => new Date(Date.now() + d * 24 * 60 * 60 * 1000);
 
@@ -87,6 +88,7 @@ export const irlGatheringPushEvents: Array<Omit<PLEvent, 'id'>> = IRL_FIXTURE_EV
     locationStatus: 'AUTO_MAPPED' as any,
     reviewerUid: null,
     pLEventLocationAssociationUid: null,
+    ...SEED_PL_EVENT_COLUMNS,
   }),
 );
 

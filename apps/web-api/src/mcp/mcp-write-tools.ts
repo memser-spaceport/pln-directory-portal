@@ -21,6 +21,7 @@ import { TeamsService } from '../teams/teams.service';
 import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
 import { newsRow } from './mcp-news-tools';
 import { McpActorContext, McpToolDef } from './mcp-tools';
+import { VISIBLE_PL_EVENT_WHERE } from '../pl-events/pl-event-visibility';
 
 /** Profile fields an agent may change (LAB-3020). Anything else is rejected, never passed to Prisma. */
 const PROFILE_TEXT_FIELDS = [
@@ -318,7 +319,7 @@ export function eventWriteTools(
   /** The event, its gathering, and whether the member is already a guest. Refuses events that have ended. */
   const upcomingEvent = async (ctx: McpActorContext, eventUid: string) => {
     const event = await prisma.pLEvent.findFirst({
-      where: { uid: eventUid, isDeleted: false },
+      where: { uid: eventUid, ...VISIBLE_PL_EVENT_WHERE },
       select: { uid: true, name: true, type: true, slugURL: true, startDate: true, endDate: true, locationUid: true },
     });
     if (!event) throw new NotFoundException(`Event not found: ${eventUid}`);

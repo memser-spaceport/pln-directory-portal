@@ -10,7 +10,8 @@ import {
 
 /**
  * Event details from the PL events service, kept on `PLEvent.additionalInfo.details`
- * (LAB-3214, OpenSpec change `lab-3211-per-event-attendance`, design D7).
+ * (LAB-3214, OpenSpec change `lab-3211-per-event-attendance`, design D7). Tags, format, access
+ * and the host name are also typed `PLEvent` columns (LAB-3281); `assembleEventDetails` joins the two for a read.
  *
  * Everything here is pure and tolerant: a field that does not have the expected
  * shape becomes empty (`null` or `[]`) and is reported through `onInvalid`, so one
@@ -131,6 +132,18 @@ function readAgenda(value: unknown, onInvalid: OnInvalidDetailsField): PLEventDe
   return { ...rest, sessions: Array.isArray(sessions) ? sessions : [] };
 }
 
+/** `{ twitter: ['https://x.com/pl'] }`: text lists by platform. Anything else reads as null. */
+function readContactInfos(value: unknown): Record<string, string[]> | null {
+  if (!isPlainObject(value)) return null;
+  const entries = Object.entries(value)
+    .map(([platform, list]): [string, string[]] => [
+      platform,
+      (Array.isArray(list) ? list : [list]).map(nonEmptyString).filter((item): item is string => item !== null),
+    ])
+    .filter(([, list]) => list.length > 0);
+  return entries.length ? Object.fromEntries(entries) : null;
+}
+
 /**
  * Builds the details from one events-service event (snake_case payload, as both
  * the REST sync and the `events` queue receive it).
@@ -152,6 +165,10 @@ export function mapEventDetails(raw: unknown, onInvalid: OnInvalidDetailsField =
     agenda: readAgenda(raw.agenda, onInvalid),
     // The events service names it `location_url`; `locationUrl` is a fallback for a camelCase source.
     locationUrl: readHttpUrl(isAbsent(raw.location_url) ? raw.locationUrl : raw.location_url, 'locationUrl', onInvalid),
+    contactInfos: readContactInfos(raw.contact_infos),
+    locationInstructions: nonEmptyString(
+      isPlainObject(raw.address_info) ? raw.address_info.location_instructions : null
+    ),
   };
 }
 
@@ -174,6 +191,36 @@ export function readEventDetails(additionalInfo: unknown): PLEventDetails {
     sponsors: readParties(stored.sponsors, 'sponsors', noop),
     agenda: readAgenda(stored.agenda, noop),
     locationUrl: readHttpUrl(stored.locationUrl, 'locationUrl', noop),
+    contactInfos: readContactInfos(stored.contactInfos),
+    locationInstructions: nonEmptyString(stored.locationInstructions),
+  };
+}
+
+/** The typed `PLEvent` columns that are part of the details on the wire. */
+export type PLEventDetailsColumns = {
+  format?: string | null;
+  accessOption?: string | null;
+  tags?: string[] | null;
+  hostName?: string | null;
+};
+
+/**
+ * The details of one event as the event read returns them: the typed columns (tags, format, access, host name)
+ * plus what stays in `additionalInfo.details` (tag colours, host logo, access type, co-hosts, sponsors, agenda, map
+ * link). A column the event does not have falls back to the stored JSON value, so an event the migration could
+ * not fill still reads as before.
+ */
+export function assembleEventDetails(additionalInfo: unknown, columns: PLEventDetailsColumns): PLEventDetails {
+  const stored = readEventDetails(additionalInfo);
+  const colors = new Map(stored.tags.map((tag) => [tag.name, tag.color]));
+  const hostName = nonEmptyString(columns.hostName);
+
+  return {
+    ...stored,
+    tags: columns.tags?.length ? columns.tags.map((name) => ({ name, color: colors.get(name) ?? null })) : stored.tags,
+    format: columns.format ?? stored.format,
+    accessOption: columns.accessOption ?? stored.accessOption,
+    host: hostName ? { name: hostName, logo: stored.host?.logo ?? null } : stored.host,
   };
 }
 

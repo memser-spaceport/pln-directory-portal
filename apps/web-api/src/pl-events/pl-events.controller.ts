@@ -43,6 +43,7 @@ import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { parseUpcomingEventsQuery } from './upcoming-events-query';
+import { parseEventListQuery } from './pl-event-list';
 import { MembersService } from '../members/members.service';
 import { PLEventLocationsService } from './pl-event-locations.service';
 import { PLEventGuestsService } from './pl-event-guests.service';
@@ -361,6 +362,22 @@ export class PLEventsController {
       throw new UnauthorizedException('User not logged in');
     }
     return await this.eventGuestService.sendEventGuestPresenceRequest(loggedInMember?.email, body);
+  }
+
+  /**
+   * The events list for the All Events page. A signed-in viewer also gets `isGoing` on each item and may filter with
+   * `going=true`; that filter needs a user token.
+   */
+  @Api(server.route.getPLEvents)
+  @UseGuards(OptionalUserTokenCheckGuard)
+  @NoCache()
+  async getPLEvents(@Query() query: Record<string, unknown>, @Req() request: Request) {
+    const options = parseEventListQuery(query);
+    const viewer = request['userEmail'] ? await this.memberService.findMemberByEmail(request['userEmail']) : null;
+    if (options.going && !viewer) {
+      throw new UnauthorizedException('Sign in to list the events you are going to');
+    }
+    return await this.eventService.listPLEvents(options, viewer ? { uid: viewer.uid } : null);
   }
 
   @Api(server.route.getAllUpcomingEvents)

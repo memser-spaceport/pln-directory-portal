@@ -5,6 +5,7 @@ import { Prisma, PrismaPromise, PushNotificationCategory } from '@prisma/client'
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { PLEventGuestsService } from '../pl-events/pl-event-guests.service';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
+import { VISIBLE_PL_EVENT_WHERE } from '../pl-events/pl-event-visibility';
 
 export interface CreatePushNotificationDto {
   category: PushNotificationCategory;
@@ -130,7 +131,7 @@ export class PushNotificationsService {
                 {
                   eventUid: { in: eventUids },
                   event: {
-                    isDeleted: false,
+                    ...VISIBLE_PL_EVENT_WHERE,
                     endDate: { gte: new Date() },
                   },
                 },

@@ -13,10 +13,12 @@ export type AssociationEntityType = z.infer<typeof AssociationEntityTypeEnum>;
  * Schema for entity details containing representing team information.
  * Used primarily for ATTENDEE role to specify which team the member represents.
  */
-export const EntityDetailsSchema = z.object({
-  representingTeamUid: z.string().optional(),
-  representingTeamName: z.string().optional(),
-}).passthrough();
+export const EntityDetailsSchema = z
+  .object({
+    representingTeamUid: z.string().optional(),
+    representingTeamName: z.string().optional(),
+  })
+  .passthrough();
 
 /**
  * Schema for validating incoming association data from events-service.
