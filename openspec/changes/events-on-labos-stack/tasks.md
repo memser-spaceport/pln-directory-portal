@@ -35,7 +35,7 @@ Groups 1 to 5 are code in this repo and map to the PRs in design.md "Migration P
 - [x] 2.13 Add `hostEmail`, `coHosts`, `websiteUrl`, `contactInfos`, `agenda`, `address.locationInstructions`, `latitude` and `longitude` to the shared body and to the event read; return host and co-host emails only to the submitter and a directory admin; verify with specs for the stored values, the private emails, a co-host with no name (400) and a wrong email (400)
 - [x] 2.14 Sanitize `description` with `sanitize-html` on every write (allowed tags and attributes from design D12); verify with a spec for a script tag, an event handler attribute, a `javascript:` link and a heading with a list
 - [x] 2.15 Refuse a delete of an approved event by a submitter who is not a directory admin; verify with a spec for 403 and for an admin delete
-- [ ] 2.16 Add the venue search and place resolve routes on `LocationTransferService` (design D13), with the time zone lookup; first verify on dev that the Google key has Places, Geocoding and Time Zone enabled; verify with specs with the Google client mocked (suggestions, resolved place, no match 404, time zone failure gives null)
+- [x] 2.16 Add the venue search and place resolve routes on `LocationTransferService` (design D13), with the time zone lookup; first verify on dev that the Google key has Places, Geocoding and Time Zone enabled; verify with specs with the Google client mocked (suggestions, resolved place, no match 404, time zone failure gives null)
 - [x] 2.17 Add `POST /v1/irl/events/agenda/parse` with the AI SDK and the old prompt rules; verify with specs with the model mocked (sessions, "times are missing" message, provider error 503)
 - [x] 2.18 Not built: import from Luma is out of scope (scope change of 2026-11-19, LAB-3282 and LAB-3343). No route and no `EVENT_HARVESTER_API_URL`
 - [x] 2.19 Require a signed-in member on the form lookups (scope change of 2026-11-19: the form needs sign-in, so there are no signed-out limits); verify with a route-metadata spec
@@ -53,9 +53,9 @@ Groups 1 to 5 are code in this repo and map to the PRs in design.md "Migration P
 
 ## 4. Integration check on a feature env
 
-- [ ] 4.1 Deploy the goal branch to a feature env with `EVENTS_LOCAL_SUBMIT_ENABLED=true` and the matching v2 branch; verify a forum member's submission shows in the events list and drawer at once
+- [x] 4.1 Deploy the goal branch to a feature env with `EVENTS_LOCAL_SUBMIT_ENABLED=true` and the matching v2 branch; verify a forum member's submission shows in the events list and drawer at once
 - [ ] 4.2 Verify on the env that a pending event (member without forum access) is absent from: events list, upcoming, gathering page, event read by another member, home, digest page, global search, AI search, MCP event tools, and the named host's profile events
-- [ ] 4.3 With a test integration key, run the documented curl flow: read pending, approve one, reject one, push one event twice, push a batch; verify the results in the LabOS UI with no delay
+- [x] 4.3 With a test integration key, run the documented curl flow: read pending, approve one, reject one, push one event twice, push a batch; verify the results in the LabOS UI with no delay
 - [ ] 4.4 Verify "I'm going" on an approved LabOS-submitted in-person event creates a guest row and shows the member in the drawer
 
 ## 5. Cutover support

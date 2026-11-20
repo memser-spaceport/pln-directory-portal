@@ -43,6 +43,18 @@ Rehearse every step on dev before prod. Run the SQL read-only (the `pln-pg` skil
    `PLEvent.submitterUid` by matching the member email, and authors keep editing their events under "My events".
    If not, events from the events service have no submitter in LabOS: a directory admin or the curator app edits them.
 
+## How an event finds its gathering
+
+A new event goes to the gathering that its city, state and country are mapped to in `PLEventLocationAssociation`.
+A mapping row wins over everything else, and many rows point a city to a gathering with another name on purpose
+(on prod, small cities go to the gathering "Others"). With no mapping row, the event reuses a gathering named
+"City, Country", or one named only "City" when that gathering has no country or the same country. Otherwise a new
+gathering "City, Country" is made, with a mapping row.
+
+So a wrong mapping row sends every new event of that city to the wrong gathering. Query 7 lists the rows whose
+country differs from their gathering's country. On prod on 2026-11-20 it returned one row: San Juan, Argentina,
+mapped to the gathering "san juan" of Puerto Rico, with no events. Fix or delete such a row before the cutover.
+
 ## On the day
 
 Record the counts of queries 1 and 2 before step 3 and after step 6.
@@ -138,6 +150,16 @@ FROM "PLEvent"
 WHERE NOT "isDeleted"
 GROUP BY status
 ORDER BY status;
+-- 7. City mappings that point to a gathering in another country (review each row before the cutover).
+SELECT a.city, a.state, a.country, l.location AS gathering, l.country AS gathering_country,
+       (SELECT count(*) FROM "PLEvent" e
+        WHERE e."pLEventLocationAssociationUid" = a.uid AND NOT e."isDeleted") AS events
+FROM "PLEventLocationAssociation" a
+JOIN "PLEventLocation" l ON l.uid = a."locationUid"
+WHERE NOT a."isDeleted" AND NOT l."isDeleted"
+  AND a.country IS NOT NULL AND a.country <> ''
+  AND l.country IS NOT NULL AND l.country <> ''
+  AND lower(a.country) <> lower(l.country);
 ```
 
 Queries 1, 3, 4 and 6 read columns the migrations add (`sourceTeamUid`, `status`, `submitterUid`). Before the
