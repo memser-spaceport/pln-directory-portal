@@ -37,7 +37,7 @@ import { LabosAgentAccessService } from './labos-agent-access.service';
 import { answerCounts } from './labos-agent-answer-counts';
 import { draftIntroTool, IntroTurnTarget } from './labos-agent-drafts';
 import { searchMentions } from './labos-agent-mentions';
-import { mcpToolsAsAgentTools } from './labos-agent-news.tools';
+import { mcpToolsAsAgentTools, newsLinkFields } from './labos-agent-news.tools';
 import {
   HOME_MENTION_SENTENCE,
   JOB_BOARD_SENTENCE,
@@ -142,7 +142,12 @@ export class LabosAgentService {
         // The stream reads these arrays when it ends, so they hold the proposals and drafts the tools made in this turn.
         extraResponseFields: { proposals, drafts },
         // LAB-3297 (V0-R4): `toolCount`, `usedWebSearch` and `sourceCount` at the end of the body. Counts only.
-        turnFields: answerCounts,
+        // LAB-3362 D1: news `sourceRefs` link to `/?news=<uid>`, also the refs of the AI search news tool. The counts
+        // use the same refs as the body.
+        turnFields: (turn) => {
+          const links = newsLinkFields(turn);
+          return { ...links, ...answerCounts({ ...turn, ...links }) };
+        },
         persistHistory: false,
       }
     );
