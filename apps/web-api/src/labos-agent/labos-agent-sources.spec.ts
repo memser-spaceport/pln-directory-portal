@@ -23,15 +23,14 @@ describe('webSources (LAB-3362 D2)', () => {
     expect(webSources(['https://www.labos.example/?news=n-1'], [NEWS], ORIGIN)).toEqual([]);
   });
 
-  it('drops the LabOS site: the configured origin and the LabOS hosts, also for pages that are not refs', () => {
+  it('drops the app itself: the configured origin and os.pl.xyz with its subdomains, also for pages that are not refs', () => {
     const sources = [
       'https://labos.example/teams/other',
       'https://directory-portal-lab-3272.os.pl.xyz/?news=n-9',
       'https://lab-3272.os.pl.xyz/members/m-1',
       'https://os.pl.xyz/',
       'https://www.os.pl.xyz/jobs',
-      'https://directory.plnetwork.io/teams/x',
-      'https://plnetwork.io/',
+      'https://preview-123.dev.os.pl.xyz/teams/t-1',
       '/teams/relative',
     ];
     expect(webSources(sources, [], ORIGIN)).toEqual([]);
@@ -53,8 +52,24 @@ describe('webSources (LAB-3362 D2)', () => {
     ]);
   });
 
-  it('keeps hosts that only look like LabOS hosts', () => {
-    const sources = ['https://os.pl.xyz.example.com/a', 'https://notplnetwork.io/a', 'https://pl.xyz/a'];
+  it('keeps other Protocol Labs sites, such as plnetwork.io, as web sources', () => {
+    const sources = [
+      'https://plnetwork.io/',
+      'https://directory.plnetwork.io/teams/x',
+      'https://www.plnetwork.io/blog/a',
+    ];
+    expect(webSources(sources, [], ORIGIN)).toEqual(sources);
+  });
+
+  it('drops a plnetwork.io page only when it repeats a source ref', () => {
+    const ref: HuskySourceRef = { index: 1, title: 'PL', type: 'web', externalUrl: 'https://plnetwork.io/blog/a' };
+    expect(webSources(['https://www.plnetwork.io/blog/a/', 'https://plnetwork.io/blog/b'], [ref], ORIGIN)).toEqual([
+      'https://plnetwork.io/blog/b',
+    ]);
+  });
+
+  it('keeps hosts that only look like app hosts', () => {
+    const sources = ['https://os.pl.xyz.example.com/a', 'https://notos.pl.xyz/a', 'https://pl.xyz/a'];
     expect(webSources(sources, [], ORIGIN)).toEqual(sources);
   });
 
@@ -62,7 +77,7 @@ describe('webSources (LAB-3362 D2)', () => {
     expect(webSources(['', '  ', 'mailto:a@b.c', 'javascript:alert(1)'], [], ORIGIN)).toEqual([]);
   });
 
-  it('reads the web app origin from WEB_UI_BASE_URL, then APPLICATION_BASE_URL', () => {
+  it('reads the web app origin from WEB_UI_BASE_URL, and APPLICATION_BASE_URL only when WEB_UI_BASE_URL is not set', () => {
     const before = { web: process.env.WEB_UI_BASE_URL, app: process.env.APPLICATION_BASE_URL };
     try {
       process.env.WEB_UI_BASE_URL = 'https://staging.example/';

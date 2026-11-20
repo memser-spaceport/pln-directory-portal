@@ -194,7 +194,7 @@ describe('LabosAgentController', () => {
     expect(stream.pipeTo).toHaveBeenCalled();
   });
 
-  it('LAB-3362 D2: sends only web sources that are not LabOS and not in sourceRefs, and counts what it sends', async () => {
+  it('LAB-3362 D2: sends only web sources that are not the app and not in sourceRefs, keeps plnetwork.io, and counts what it sends', async () => {
     const { controller, husky, res, req } = setup();
     await controller.chat(VALID, req, res as any);
     const { turnFields } = husky.createContextualToolsResponse.mock.calls[0][3];
@@ -206,12 +206,13 @@ describe('LabosAgentController', () => {
       'https://directory-portal-lab-3272.os.pl.xyz/?news=n-1',
       'https://www.textile.io/',
       'https://filecoin.io/blog/post',
+      'https://plnetwork.io/blog/post',
     ];
 
     const fields = turnFields({ toolNames: ['getTeamNews', 'searchWeb'], sources, sourceRefs });
 
-    expect(fields.sources).toEqual(['https://filecoin.io/blog/post']);
-    expect(fields.sourceCount).toBe(3);
+    expect(fields.sources).toEqual(['https://filecoin.io/blog/post', 'https://plnetwork.io/blog/post']);
+    expect(fields.sourceCount).toBe(4);
   });
 
   it('passes a Home context and no context through without a news lookup', async () => {

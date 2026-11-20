@@ -1,21 +1,20 @@
 import { HuskySourceRef } from 'libs/contracts/src/schema/husky-chat';
 
 /**
- * LabOS web hosts that are not in the env config: production (`os.pl.xyz`), the feature envs
- * (`directory-portal*.os.pl.xyz`, `lab-*.os.pl.xyz`) and the `plnetwork.io` hosts. The same hosts are in
- * `ALLOWED_CORS_ORIGINS` (`apps/web-api/src/utils/constants.ts`). A host here has no `www.`.
+ * The hosts of the app itself that are not in the env config: production `os.pl.xyz` and each `*.os.pl.xyz` host
+ * (the feature and preview envs). A host here has no `www.`. Other Protocol Labs sites, for example `plnetwork.io`,
+ * are real web pages and stay (LAB-3362 D2, Oleg).
  */
-const LABOS_HOST_PATTERNS: RegExp[] = [
-  /^os\.pl\.xyz$/,
-  /^directory-portal[a-z0-9-]*\.os\.pl\.xyz$/,
-  /^lab-[a-z0-9-]+\.os\.pl\.xyz$/,
-  /^(?:[a-z0-9-]+\.)*plnetwork\.io$/,
-];
+const APP_HOST_PATTERN = /^(?:[a-z0-9-]+\.)*os\.pl\.xyz$/;
 
 /** Resolves relative links when the env has no web app URL. It matches no real host. */
 const FALLBACK_ORIGIN = 'https://labos.invalid';
 
-/** The web app origin from the existing config (`WEB_UI_BASE_URL`, else `APPLICATION_BASE_URL`), or undefined. */
+/**
+ * The web app origin, or undefined. `WEB_UI_BASE_URL` is the web app URL. When it is set, `APPLICATION_BASE_URL` is
+ * not read, so its host is never dropped. Only an env without `WEB_UI_BASE_URL` reads `APPLICATION_BASE_URL`, as
+ * the job links do (`job-openings-url.ts`, `job-alerts-dispatch.service.ts`): there it is the web app origin.
+ */
 export function appOrigin(): string | undefined {
   for (const value of [process.env.WEB_UI_BASE_URL, process.env.APPLICATION_BASE_URL]) {
     const url = parseUrl(value?.trim() ?? '');
@@ -49,12 +48,12 @@ export function pageKey(link: string, origin: string = FALLBACK_ORIGIN): string 
   return `${hostOf(url)}${url.pathname.replace(/\/+$/, '')}${url.search}`;
 }
 
-/** True for the LabOS web app: the configured origin, and the LabOS host patterns. */
+/** True for a page of the app itself: the web app origin and `os.pl.xyz` with its subdomains. */
 export function isLabosHost(link: string, origin: string = FALLBACK_ORIGIN): boolean {
   const url = parseUrl(link.trim(), origin);
   if (!url) return false;
   const host = hostOf(url);
-  return host === hostOf(new URL(origin)) || LABOS_HOST_PATTERNS.some((pattern) => pattern.test(host));
+  return host === hostOf(new URL(origin)) || APP_HOST_PATTERN.test(host);
 }
 
 /**
