@@ -2,12 +2,14 @@
  * LAB-3362 D4: a fixed answer line that replaces the model text of a turn while a condition holds. The LabOS agent
  * uses it for an intro draft: the draft text is only in the draft card, and the answer is one short line.
  *
- * `line` is read for each text chunk. While it gives a line, the stream shows that line once and drops the model
- * text. When it gives nothing again (for example a refused second `draft_intro` call removed the draft), the model
- * text streams again.
+ * `line` is read for each text chunk. While it gives a line, the stream drops the model text. The line itself goes
+ * out only when the turn ends (`finish`) and `line` still gives it, so the answer has the line only when a draft card
+ * goes out. When `line` gives nothing again (for example a refused second `draft_intro` call removed the draft), the
+ * model text streams again, so the member sees the refusal and no line.
  */
 export class AnswerOverride {
-  private shown = false;
+  /** True after the override dropped text, until the next text that streams. */
+  private dropped = false;
 
   constructor(private readonly line?: () => string | undefined) {}
 
@@ -18,16 +20,21 @@ export class AnswerOverride {
 
   /** The text to stream for `chunk`. `written` is the answer text of the turn so far. */
   filter(chunk: string, written: string): string {
-    const line = this.line?.();
-    if (!line) return chunk;
-    if (this.shown) return '';
-    this.shown = true;
-    return breakBefore(written) + line;
+    if (this.isOn()) {
+      if (chunk) this.dropped = true;
+      return '';
+    }
+    if (!this.dropped) return chunk;
+    // The break before the text came with the dropped text. At the start of the answer the text needs none.
+    const next = written.trim() ? chunk : chunk.replace(/^\s+/, '');
+    if (next) this.dropped = false;
+    return next;
   }
 
-  /** The line to add when the turn ends and the line is not shown yet, or ''. */
+  /** The line to add when the turn ends with the override on, or ''. */
   finish(written: string): string {
-    return this.filter('', written);
+    const line = this.line?.();
+    return line ? breakBefore(written) + line : '';
   }
 }
 

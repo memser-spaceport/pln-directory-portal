@@ -742,7 +742,7 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
       return HuskyResponseSchema.parse(JSON.parse(raw)).content;
     }
 
-    it('shows the line once in place of the model text after the tool call', async () => {
+    it('shows the line once, at the end, in place of the model text after the tool call', async () => {
       const answerLine = lineTurn([
         text('I will write it.'),
         call('c1'),
@@ -758,7 +758,7 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
       expect(await content(lineTurn([call('c1'), { set: true }]))).toBe(LINE);
     });
 
-    it('streams the model text again when the line goes off', async () => {
+    it('shows no line when a later call removes the draft, and streams the model text again', async () => {
       const answerLine = lineTurn([
         call('c1'),
         { set: true },
@@ -769,7 +769,35 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
         text('\n\nThe draft was refused.'),
       ]);
 
-      expect(await content(answerLine)).toBe(`${LINE}\n\nThe draft was refused.`);
+      // No draft card goes out, so the answer has no "Here is a draft" line.
+      expect(await content(answerLine)).toBe('The draft was refused.');
+    });
+
+    it('keeps the earlier answer text and its break when a later call removes the draft', async () => {
+      const answerLine = lineTurn([
+        text('I will write it.'),
+        call('c1'),
+        { set: true },
+        text('Hi Grace.'),
+        call('c2'),
+        { set: false },
+        text('\n\nThe draft was refused.'),
+      ]);
+
+      expect(await content(answerLine)).toBe('I will write it.\n\nThe draft was refused.');
+    });
+
+    it('shows the line at the end when a refused call is followed by a valid draft', async () => {
+      const answerLine = lineTurn([
+        call('c1'),
+        { set: false },
+        text('That was refused. I try again.'),
+        call('c2'),
+        { set: true },
+        text('Hi Grace.'),
+      ]);
+
+      expect(await content(answerLine)).toBe(`That was refused. I try again.\n\n${LINE}`);
     });
 
     it('does not continue a cut-off answer while the line is on', async () => {

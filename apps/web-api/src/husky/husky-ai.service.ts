@@ -74,8 +74,9 @@ export interface ContextualToolsOptions {
   /** Extra fields added to the end of the streamed JSON object, for example `proposals`. */
   extraResponseFields?: Record<string, unknown>;
   /**
-   * LAB-3362 D4: while this gives a line, the answer text of the turn is that one line, and the stream drops the model
-   * text. The LabOS agent uses it for an intro draft. AI search passes nothing.
+   * LAB-3362 D4: while this gives a line, the stream drops the model text. When the turn ends and it still gives the
+   * line, the stream adds the line, so the line goes out only with a draft card. The LabOS agent uses it for an intro
+   * draft. AI search passes nothing.
    */
   answerLine?: () => string | undefined;
   /** False: keep the thread summary in the cache only, and write nothing to MongoDB. Default true. */
@@ -334,7 +335,7 @@ export class HuskyAiService {
             }
           }
 
-          // LAB-3362 D4: the model wrote no text after the tool call, or only before it. Add the answer line.
+          // LAB-3362 D4: the line goes out only now, when the turn still has the draft card.
           const lastLine = override.finish(content);
           if (lastLine) {
             content += lastLine;

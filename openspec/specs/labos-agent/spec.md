@@ -269,7 +269,7 @@ The chat SHALL have the agent tool `draft_intro` with the arguments `type` (`mem
 
 ### Requirement: Short answer with an intro draft
 
-When the turn has a draft, the answer text SHALL be one short line: "Here is a draft intro. Edit it in the card, then send." The draft text SHALL be only in the draft card (`drafts[0].text`). The `draft_intro` description SHALL tell the model to call the tool before it writes the answer and not to write the draft text in the answer. The success text SHALL tell the model to write only that line. The server SHALL also enforce it: while `drafts` has a draft, the stream SHALL show the line once and drop the model text (Husky `answerLine`). When the model writes no text after the call, the stream SHALL add the line at the end. With the line on, a cut-off answer SHALL NOT be continued. When a refused call clears `drafts`, the model text SHALL stream again, so a refusal reaches the member. The text before the tool call stays. The `content` in the final body and the thread summary SHALL match the streamed text. This adds no model call (LAB-3362 D4).
+When the turn has a draft, the answer text SHALL be one short line: "Here is a draft intro. Edit it in the card, then send." The draft text SHALL be only in the draft card (`drafts[0].text`). The `draft_intro` description SHALL tell the model to call the tool before it writes the answer and not to write the draft text in the answer. The success text SHALL tell the model to write only that line. The server SHALL also enforce it: while `drafts` has a draft, the stream SHALL drop the model text (Husky `answerLine`). The stream SHALL add the line once, when the turn ends, and only when `drafts` still has a draft, so the line goes out only with a draft card. With the line on, a cut-off answer SHALL NOT be continued. When a refused call clears `drafts`, the model text SHALL stream again, so a refusal reaches the member, and the answer SHALL NOT have the line. The text before the tool call stays. The `content` in the final body and the thread summary SHALL match the streamed text. This adds no model call (LAB-3362 D4).
 
 #### Scenario: Draft with text after the call
 
@@ -283,6 +283,13 @@ When the turn has a draft, the answer text SHALL be one short line: "Here is a d
 - **GIVEN** a member who cannot send intros
 - **WHEN** the model calls `draft_intro` and writes the refusal
 - **THEN** the answer shows the refusal text of the model
+
+#### Scenario: A refused second call
+
+- **GIVEN** a turn where a first `draft_intro` call made a draft
+- **WHEN** a second call is refused and the model writes the refusal
+- **THEN** the body has `drafts: []`
+- **AND** the answer is the refusal text, with no "Here is a draft intro" line
 
 ### Requirement: Page context for member, team, job and profile pages
 
