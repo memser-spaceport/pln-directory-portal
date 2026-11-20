@@ -56,7 +56,7 @@ Groups 1 to 5 are code in this repo and map to the PRs in design.md "Migration P
 - [x] 4.1 Deploy the goal branch to a feature env with `EVENTS_LOCAL_SUBMIT_ENABLED=true` and the matching v2 branch; verify a forum member's submission shows in the events list and drawer at once
 - [ ] 4.2 Verify on the env that a pending event (member without forum access) is absent from: events list, upcoming, gathering page, event read by another member, home, digest page, global search, AI search, MCP event tools, and the named host's profile events
 - [x] 4.3 With a test integration key, run the documented curl flow: read pending, approve one, reject one, push one event twice, push a batch; verify the results in the LabOS UI with no delay
-- [ ] 4.4 Verify "I'm going" on an approved LabOS-submitted in-person event creates a guest row and shows the member in the drawer
+- [x] 4.4 Verify "I'm going" on an approved LabOS-submitted in-person event creates a guest row and shows the member in the drawer
 
 ## 5. Cutover support
 
