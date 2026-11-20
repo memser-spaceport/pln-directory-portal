@@ -61,6 +61,10 @@ describe('AdminIntegrationKeysController', () => {
     expect(() => pipe.transform({ teamUid: 'team-1', name: 'x', scopes: ['jobs:write', 'jobs:write'] }, meta)).toThrow(
       UnprocessableEntityException
     );
+    // LAB-3326: the events curation scopes can be issued.
+    expect(
+      pipe.transform({ teamUid: 'team-1', name: 'PL Infra Events', scopes: ['events:read', 'events:write'] }, meta)
+    ).toEqual({ teamUid: 'team-1', name: 'PL Infra Events', scopes: ['events:read', 'events:write'] });
     expect(pipe.transform({ teamUid: 'team-1', name: 'x', scopes: ['jobs:write'] }, meta)).toEqual({
       teamUid: 'team-1',
       name: 'x',

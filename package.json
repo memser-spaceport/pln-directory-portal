@@ -28,6 +28,7 @@
     "api:backfill-investor-additional-emails": "ts-node apps/web-api/src/scripts/backfill-investor-additional-emails.ts",
     "api:backfill-team-news-source-duplicates": "ts-node --transpile-only apps/web-api/src/scripts/backfill-team-news-source-duplicates.ts",
     "api:backfill-team-news-images": "ts-node --transpile-only apps/web-api/src/scripts/backfill-team-news-images.ts",
+    "api:copy-event-service-logos": "ts-node --transpile-only apps/web-api/src/scripts/copy-event-service-logos.ts",
     "api:backfill-ai-app-views": "ts-node --transpile-only apps/web-api/src/scripts/backfill-ai-app-views.ts",
     "api:backfill-ai-app-feedback-pins": "ts-node --transpile-only apps/web-api/src/scripts/backfill-ai-app-feedback-pins.ts",
     "api:sanitize-member-html": "ts-node --transpile-only apps/web-api/src/scripts/sanitize-member-html.ts",

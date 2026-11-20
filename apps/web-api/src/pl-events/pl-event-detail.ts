@@ -1,5 +1,6 @@
 import type { ResponsePLEventDetail } from 'libs/contracts/src/schema/pl-event-attendance';
-import { readEventDetails } from './pl-event-details.mapper';
+import { assembleEventDetails } from './pl-event-details.mapper';
+import { readEventContacts } from './pl-event-write';
 
 /**
  * `GET /v1/irl/events/:uid` (LAB-3213): pure helpers that turn the rows `PLEventsService.getPLEventDetail` loads into
@@ -38,12 +39,24 @@ export function facesFindArgs(eventUid: string) {
   };
 }
 
+/** The fields that make an event invite-only. */
+export type InviteOnlyFields = { type?: string | null; accessOption?: string | null };
+
 /**
- * Signed-out viewers of an `INVITE_ONLY` event see no attendance: count 0 and no faces, as on the drawer and the
- * attendee list.
+ * An event is invite-only when its `type` is `INVITE_ONLY` or its `accessOption` is `INVITE` (LAB-3281, QA 3281-5).
+ * Synced events can have `accessOption: INVITE` and `type: null`, so the type alone is not enough.
  */
-export function hidesAttendance(eventType: string | null | undefined, isUserLoggedIn: boolean): boolean {
-  return !isUserLoggedIn && eventType === 'INVITE_ONLY';
+export function isInviteOnlyEvent(event: InviteOnlyFields): boolean {
+  return event.type === 'INVITE_ONLY' || event.accessOption === 'INVITE';
+}
+
+/**
+ * Signed-out viewers of an invite-only event (see `isInviteOnlyEvent`) see no attendance: no count and no faces.
+ * Every attendance count uses this rule: the events list, the drawer, upcoming events, profile events and the
+ * digest page.
+ */
+export function hidesEventAttendance(event: InviteOnlyFields, isUserLoggedIn: boolean): boolean {
+  return !isUserLoggedIn && isInviteOnlyEvent(event);
 }
 
 /** "Lisbon, Portugal" → "Lisbon". Null when there is nothing before the first comma. */
@@ -66,8 +79,29 @@ export type PLEventDetailRow = {
   websiteURL: string | null;
   externalId: string | null;
   resources: unknown[];
-  /** Holds `details` once the events sync has stored them (LAB-3214). */
+  /** Holds the part of `details` that is not a column (LAB-3214). */
   additionalInfo?: unknown;
+  // The typed columns (LAB-3281). Optional, so a row loaded without them reads as an event that has none.
+  timezone?: string | null;
+  isAllDay?: boolean | null;
+  format?: string | null;
+  accessOption?: string | null;
+  tags?: string[] | null;
+  hostName?: string | null;
+  venueAddress?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  registrationUrl?: string | null;
+  meetingUrl?: string | null;
+  // Approval and ownership (LAB-3325).
+  privateDetails?: unknown;
+  status?: string | null;
+  submitterUid?: string | null;
+  reviewNote?: string | null;
+  updatedAt?: Date | null;
+  logoUid?: string | null;
+  bannerUid?: string | null;
+  eventAssociations?: Array<{ role: string; memberUid: string | null; teamUid: string | null }>;
   logo: { url: string } | null;
   banner: { url: string } | null;
   location: {
@@ -88,6 +122,8 @@ export type PLEventDetailParts = {
   /** The viewer's own guest row for this event, if they are going. */
   viewerRow: { showOnProfile: boolean; isHost: boolean; isSpeaker: boolean; isSponsor: boolean } | null;
   isUserLoggedIn: boolean;
+  /** The viewer submitted the event or is a directory admin: they also get the status and the edit form's fields. */
+  isEditor?: boolean;
 };
 
 function toPerson(row: PersonRow) {
@@ -98,6 +134,18 @@ function toPerson(row: PersonRow) {
 export function visibleResources(resources: unknown[] | null | undefined, isUserLoggedIn: boolean): unknown[] {
   const list = Array.isArray(resources) ? resources : [];
   return isUserLoggedIn ? list : list.filter((resource: any) => !resource?.isPrivate);
+}
+
+/** The venue of an event, or null when it has no address and no position. */
+export function eventVenue(event: {
+  venueAddress?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}): { address: string | null; latitude: number | null; longitude: number | null } | null {
+  const address = event.venueAddress ?? null;
+  const latitude = event.latitude ?? null;
+  const longitude = event.longitude ?? null;
+  return address === null && latitude === null && longitude === null ? null : { address, latitude, longitude };
 }
 
 export function toPLEventDetail(event: PLEventDetailRow, parts: PLEventDetailParts): ResponsePLEventDetail {
@@ -137,12 +185,76 @@ export function toPLEventDetail(event: PLEventDetailRow, parts: PLEventDetailPar
           })),
         }
       : null,
-    // Empty details for an event the sync has not stored them on yet, never missing fields.
-    details: readEventDetails(event.additionalInfo),
+    timezone: event.timezone ?? event.location?.timezone ?? null,
+    allDay: event.isAllDay === true,
+    venue: eventVenue(event),
+    registrationUrl: event.registrationUrl ?? null,
+    meetingUrl: event.meetingUrl ?? null,
+    // Empty details for an event that has none, never missing fields.
+    details: assembleEventDetails(event.additionalInfo, event),
     hosts: parts.hosts.map(toPerson).filter((p): p is NonNullable<typeof p> => !!p),
     goingCount: parts.goingCount,
     faces: parts.faces.map(toPerson).filter((p): p is NonNullable<typeof p> => !!p),
     viewerGoing: !!parts.viewerRow,
     viewer: parts.viewerRow ? { showOnProfile: parts.viewerRow.showOnProfile, roles } : null,
+    ...(parts.isEditor ? eventEditorFields(event) : {}),
   };
+}
+
+/**
+ * What only the submitter and a directory admin read: the status, and every field the edit form fills, the private
+ * contact data (host and co-host emails) included.
+ */
+export function eventEditorFields(event: PLEventDetailRow) {
+  const details = assembleEventDetails(event.additionalInfo, event);
+  const contacts = readEventContacts(event.privateDetails);
+  const coHosts = contacts.coHosts.length
+    ? contacts.coHosts
+    : details.coHosts.map((coHost) => ({ name: coHost.name, email: null }));
+
+  return {
+    status: (event.status ?? 'APPROVED') as 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED',
+    reviewNote: event.reviewNote ?? null,
+    updatedAt: event.updatedAt ? new Date(event.updatedAt).toISOString() : undefined,
+    logoUid: event.logoUid ?? null,
+    bannerUid: event.bannerUid ?? null,
+    format: details.format,
+    accessOption: details.accessOption,
+    tags: details.tags.map((tag) => tag.name),
+    hostName: details.host?.name ?? null,
+    hostEmail: contacts.hostEmail,
+    coHosts,
+    contactInfos: details.contactInfos ?? null,
+    agenda: details.agenda,
+    address: {
+      address: event.venueAddress ?? null,
+      city: contacts.address.city,
+      state: contacts.address.state,
+      country: contacts.address.country,
+      latitude: event.latitude ?? null,
+      longitude: event.longitude ?? null,
+      locationUrl: details.locationUrl ?? null,
+      locationInstructions: details.locationInstructions ?? null,
+    },
+    associations: (event.eventAssociations ?? []).map((link) => ({
+      role: link.role,
+      memberUid: link.memberUid,
+      teamUid: link.teamUid,
+    })),
+  };
+}
+
+/**
+ * Who may read an event by uid: anyone when it is approved; otherwise its submitter, and a directory admin unless
+ * it is a draft (a draft is for its submitter only).
+ */
+export function eventReadAccess(
+  event: { status?: string | null; submitterUid?: string | null },
+  viewer: { uid: string; isDirectoryAdmin?: boolean | null } | null
+): { canRead: boolean; isEditor: boolean } {
+  const status = event.status ?? 'APPROVED';
+  const isSubmitter = !!viewer && !!event.submitterUid && event.submitterUid === viewer.uid;
+  const isAdmin = viewer?.isDirectoryAdmin === true;
+  const isEditor = isSubmitter || (isAdmin && status !== 'DRAFT');
+  return { canRead: status === 'APPROVED' || isEditor, isEditor };
 }

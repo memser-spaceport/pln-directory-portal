@@ -116,7 +116,7 @@ describe('loadProfileBatch (LAB-3122)', () => {
         entityType: 'TEAM',
         teamUid: { not: null },
         role: { in: ['HOST', 'CO_HOST', 'SPEAKER', 'SPONSOR'] },
-        event: { isDeleted: false },
+        event: { status: 'APPROVED', isDeleted: false },
       },
       select: { eventUid: true, teamUid: true },
     });

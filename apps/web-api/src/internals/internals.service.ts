@@ -184,6 +184,7 @@ export class InternalsService {
   async getIrlEventDetails(uid: string) {
     try {
       this.logger.info(`Fetching IRL Event details for uid ${uid}`);
+      // pl-event-visibility: internal read for the events submission portal, which manages events in every state.
       const irlEvent = await this.prisma.pLEvent.findUnique({
         where: { uid },
         include: {

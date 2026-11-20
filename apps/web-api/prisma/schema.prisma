@@ -81,6 +81,7 @@ model Team {
   maintainingProjects          Project[]                     @relation("maintainingTeam")
   contributingProjects         Project[]                     @relation("contributingTeams")
   eventGuests                  PLEventGuest[]
+  publishedEvents              PLEvent[]                     @relation("PLEventSourceTeam")
   teamFocusAreas               TeamFocusArea[]
   teamFocusAreasVersionHistory TeamFocusAreaVersionHistory[]
   relatedQuestions             DiscoveryQuestion[]           @relation("TeamRelatedDiscoveryQuestions")
@@ -252,6 +253,7 @@ model Member {
   demoDayExpressInterestStatistics   DemoDayExpressInterestStatistic[]
   demoDayFeedbacks                   DemoDayFeedback[]
   reviewedEvents                     PLEvent[]                         @relation("PLEventReviewer")
+  submittedEvents                    PLEvent[]                         @relation("PLEventSubmitter")
   demoDayAdminScopes                 MemberDemoDayAdminScope[]
   pushNotifications                  PushNotification[]                @relation("PushNotificationRecipient")
   pushNotificationReadStatuses       PushNotificationReadStatus[]      @relation("PushNotificationReadStatuses")
@@ -392,6 +394,26 @@ enum PLEventType {
   INVITE_ONLY
   VIRTUAL
   IN_PERSON
+}
+
+// Approval state of an event. Only APPROVED events are visible in reads. PENDING is shown as "Submitted".
+enum PLEventStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PLEventFormat {
+  IN_PERSON
+  VIRTUAL
+  HYBRID
+}
+
+enum PLEventAccess {
+  OPEN
+  INVITE
+  PAID
 }
 
 enum MemberFollowUpStatus {
@@ -743,6 +765,35 @@ model PLEvent {
   pLEventLocationAssociationUid String?
   pLEventLocationAssociation    PLEventLocationAssociation? @relation(fields: [pLEventLocationAssociationUid], references: [uid])
   eventAssociations             PLEventAssociation[]
+  status                        PLEventStatus               @default(APPROVED)
+  // The member who submitted the event. Null for a partner event and for an event from the events service.
+  submitterUid                  String?
+  submitter                     Member?                     @relation("PLEventSubmitter", fields: [submitterUid], references: [uid], onDelete: SetNull)
+  // The team whose integration key published the event; with externalId it identifies a partner event.
+  sourceTeamUid                 String?
+  sourceTeam                    Team?                       @relation("PLEventSourceTeam", fields: [sourceTeamUid], references: [uid], onDelete: SetNull)
+  // The last approve or reject decision.
+  reviewedAt                    DateTime?
+  reviewNote                    String?
+  // IANA time zone name.
+  timezone                      String?
+  format                        PLEventFormat?
+  accessOption                  PLEventAccess?
+  tags                          String[]                    @default([])
+  hostName                      String?
+  venueAddress                  String?
+  latitude                      Float?
+  longitude                     Float?
+  // True when the dates carry no time of day.
+  isAllDay                      Boolean                     @default(false)
+  registrationUrl               String?
+  meetingUrl                    String?
+  // Contact data returned only to the submitter and a directory admin: host and co-host emails, address parts.
+  privateDetails                Json?
+
+  @@unique([sourceTeamUid, externalId])
+  @@index([status, isDeleted, startDate])
+  @@index([tags], type: Gin)
 }
 
 model PLEventGuest {

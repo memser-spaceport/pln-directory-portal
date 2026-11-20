@@ -11,6 +11,7 @@ import { DealsService } from '../deals/deals.service';
 import { DemoDayEngagementService } from '../demo-days/demo-day-engagement.service';
 import { DemoDaysService } from '../demo-days/demo-days.service';
 import { EventsService } from '../events/events.service';
+import { PLEventWriteService } from '../pl-events/pl-event-write.service';
 import { JobOpeningsApplicationService } from '../job-openings/job-openings-application.service';
 import { JobOpeningsInterestService } from '../job-openings/job-openings-interest.service';
 import { JobOpeningsReferralService } from '../job-openings/job-openings-referral.service';
@@ -26,6 +27,7 @@ import { TeamNewsUpvotesService } from '../team-news/team-news-upvotes.service';
 import { TeamPitchEngagementService } from '../team-pitches/team-pitch-engagement.service';
 import { TeamPitchesService } from '../team-pitches/team-pitches.service';
 import { McpActorContext, McpToolDef } from './mcp-tools';
+import { submitEventTool } from './mcp-event-submit-tool';
 import { assertOwnEmail } from './mcp-profile-coverage-tools';
 import { refuseUnknown, requiredUid } from './mcp-write-tools';
 
@@ -45,6 +47,7 @@ function emailOf(ctx: McpActorContext): string {
 /** Events, jobs, asks, guides, office hours, demo day, deals, and other member actions. */
 export function actionCoverageTools(deps: {
   events: EventsService;
+  eventWrite: PLEventWriteService;
   guests: PLEventGuestsService;
   prisma: PrismaService;
   applications: JobOpeningsApplicationService;
@@ -70,46 +73,7 @@ export function actionCoverageTools(deps: {
 }): McpToolDef[] {
   const d = deps;
   return [
-    {
-      name: 'submit_event',
-      description: 'Submit a new event for review, the same as the event submit form.',
-      visibility: 'always',
-      keepUnknownArgs: true,
-      inputSchema: {
-        event_name: z.string(),
-        description: z.string().optional(),
-        start_date: z.string().optional(),
-        end_date: z.string().optional(),
-        website: z.string().optional(),
-        timezone: z.string().optional(),
-        city: z.string().optional(),
-        country: z.string().optional(),
-      },
-      execute: async (ctx, args = {}) => {
-        refuseUnknown(args, [
-          'event_name',
-          'description',
-          'start_date',
-          'end_date',
-          'website',
-          'timezone',
-          'city',
-          'country',
-        ]);
-        const event_name = requiredUid(args, 'event_name');
-        const event = {
-          event_name,
-          description: args.description,
-          start_date: args.start_date,
-          end_date: args.end_date,
-          website: args.website,
-          timezone: args.timezone,
-          address_info: { city: args.city, country: args.country },
-        };
-        const result = await d.events.submitPLEvent(event, emailOf(ctx));
-        return { submitted: true, event: result ?? { event_name } };
-      },
-    },
+    submitEventTool({ events: d.events, eventWrite: d.eventWrite }),
     {
       name: 'update_my_event_rsvp',
       description:

@@ -16,7 +16,7 @@ The crawler is not an integration. It keeps using the shared `INTERNAL_SERVICE_S
 | Stored | sha256 hex of the plaintext in `IntegrationKey.keyHash` (unique), plus the first 16 characters in `keyPrefix` for display |
 | Shown | once, in the create response. Never retrievable afterwards |
 | Bound to | one `Team` (`teamUid`) |
-| Scopes | any of `jobs:write`, `candidates:read` (`INTEGRATION_KEY_SCOPES` in `libs/contracts/src/schema/integration-key.ts`) |
+| Scopes | any of `jobs:write`, `candidates:read`, `members:sign-in`, `plaa:access:manage`, `events:read`, `events:write` (`INTEGRATION_KEY_SCOPES` in `libs/contracts/src/schema/integration-key.ts`) |
 | Audit | `createdByUid` (admin member uid from the JWT, nullable), `createdAt`, `lastUsedAt` (rewritten at most once a minute), `revokedAt` |
 
 Revocation is permanent and idempotent. The row is kept so the audit trail survives.
@@ -93,6 +93,12 @@ GET /v1/integrations/me
 ```
 
 200: `{ uid, keyPrefix, name, teamUid, teamName, scopes }`. Requires no scope. Use it to confirm a configured key is valid and bound to the expected team.
+
+### Events: curation for partner event apps
+
+`events:read` reads LabOS events in every status. `events:write` approves or rejects any event, corrects any event,
+and publishes and maintains the key's own events by the app's own ids. The routes are under
+`/v1/integrations/events`; see [EVENTS_CURATION_API.md](./EVENTS_CURATION_API.md).
 
 ### Member proofs: which member an agent acts for
 

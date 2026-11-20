@@ -12,6 +12,7 @@ import { getFilenameFromUrl, getFileTypeFromUrl } from '../utils/helper/helper';
 import { PLEvent, PLEventLocation, PLEventType, PLEventLocationAssociation } from '@prisma/client';
 import { CacheService } from '../utils/cache/cache.service';
 import { mapEventDetails, withEventDetails } from '../pl-events/pl-event-details.mapper';
+import { mapEventColumns } from '../pl-events/pl-event-columns.mapper';
 import { 
   PLEventAssociationInputSchema, 
   PLEventAssociationInput,
@@ -157,12 +158,11 @@ export class EventConsumerHelper {
    * @throws Error if event not found
    */
   async findEventByExternalId(externalId: string, tx?): Promise<PLEvent | null> {
-    const events = await this.plEventsService.getPLEvents({
-      where: {
-        externalId
-      }
-    }, tx);
-    return events.length ? events[0] : null;
+    // pl-event-visibility: the queue consumer matches the events service's own events (no source team) by
+    // externalId, whatever their status.
+    return await (tx || this.prisma).pLEvent.findFirst({
+      where: { externalId, sourceTeamUid: null, isDeleted: false },
+    });
   }
 
   /**
@@ -255,6 +255,7 @@ export class EventConsumerHelper {
       type: event.format === PLEventType.VIRTUAL ? PLEventType.VIRTUAL: PLEventType.IN_PERSON,
       isDeleted: false,
       associations: event.associations,
+      ...mapEventColumns(event),
       details: mapEventDetails(event, (field, reason) =>
         this.logger.info(
           `Event ${event?.event_id}: details field "${field}" ignored (${reason})`,

@@ -244,6 +244,7 @@ export class AppModule {
         { path: 'v1/images', method: RequestMethod.POST },
         { path: 'v1/admin/images', method: RequestMethod.POST },
         { path: 'v1/service/images', method: RequestMethod.POST },
+        { path: 'v1/integrations/events/images', method: RequestMethod.POST },
         { path: 'v1/uploads', method: RequestMethod.POST },
         { path: 'v1/ai-apps/deploy', method: RequestMethod.POST },
         { path: 'v1/ai-apps/draft', method: RequestMethod.POST },

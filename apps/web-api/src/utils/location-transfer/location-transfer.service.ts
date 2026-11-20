@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { IAirtableMember } from '@protocol-labs-network/airtable';
 import axios from 'axios';
 import { PrismaService } from '../../shared/prisma.service';
@@ -202,5 +202,83 @@ export class LocationTransferService {
       latitude: lat,
       longitude: lng,
     };
+  }
+
+  /**
+   * Place suggestions of any kind (venues and street addresses, not only regions), for the event submit form.
+   * Up to 5, each with its text and a Google place id.
+   */
+  async searchVenues(query: string): Promise<Array<{ text: string; placeId: string }>> {
+    const input = (query ?? '').trim();
+    if (!input) {
+      throw new BadRequestException('query is required');
+    }
+    const result = await axios.get('https://maps.googleapis.com/maps/api/place/autocomplete/json', {
+      params: { input, key: process.env.GOOGLE_PLACES_API_KEY },
+    });
+    const predictions = Array.isArray(result.data?.predictions) ? result.data.predictions : [];
+    return predictions
+      .filter((prediction) => prediction?.place_id && prediction?.description)
+      .slice(0, 5)
+      .map((prediction) => ({ text: prediction.description, placeId: prediction.place_id }));
+  }
+
+  /**
+   * One place by its Google place id, or by an address text: the formatted address, its parts, the position, a map
+   * link and the IANA time zone. A text that matches no place answers 404. A failed time zone lookup returns the
+   * place with `timezone: null`.
+   */
+  async resolvePlace(input: { placeId?: string | null; address?: string | null }) {
+    const placeId = (input.placeId ?? '').trim();
+    const address = (input.address ?? '').trim();
+    if (!placeId && !address) {
+      throw new BadRequestException('placeId or address is required');
+    }
+    const geocode = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
+      params: { ...(placeId ? { place_id: placeId } : { address }), key: process.env.GOOGLE_PLACES_API_KEY },
+    });
+    const place = geocode.data?.results?.[0];
+    if (!place?.geometry?.location) {
+      throw new NotFoundException('No place matches this address');
+    }
+
+    const components: Array<{ long_name: string; types: string[] }> = place.address_components ?? [];
+    const part = (...types: string[]) =>
+      components.find((component) => types.some((type) => component.types?.includes(type)))?.long_name ?? null;
+    const latitude: number = place.geometry.location.lat;
+    const longitude: number = place.geometry.location.lng;
+    const resolvedPlaceId: string | null = place.place_id ?? (placeId || null);
+
+    const mapQuery = new URLSearchParams({ api: '1', query: `${latitude},${longitude}` });
+    if (resolvedPlaceId) mapQuery.set('query_place_id', resolvedPlaceId);
+
+    return {
+      placeId: resolvedPlaceId,
+      address: (place.formatted_address as string | undefined) ?? null,
+      city: part('locality', 'postal_town', 'administrative_area_level_2'),
+      state: part('administrative_area_level_1'),
+      country: part('country'),
+      latitude,
+      longitude,
+      locationUrl: `https://www.google.com/maps/search/?${mapQuery.toString()}`,
+      timezone: await this.fetchTimezone(latitude, longitude),
+    };
+  }
+
+  /** The IANA time zone of a position (Google Time Zone API), or null when the lookup fails. */
+  async fetchTimezone(latitude: number, longitude: number): Promise<string | null> {
+    try {
+      const result = await axios.get('https://maps.googleapis.com/maps/api/timezone/json', {
+        params: {
+          location: `${latitude},${longitude}`,
+          timestamp: Math.floor(Date.now() / 1000),
+          key: process.env.GOOGLE_PLACES_API_KEY,
+        },
+      });
+      const timezone = result.data?.status === 'OK' ? result.data.timeZoneId : null;
+      return typeof timezone === 'string' && timezone ? timezone : null;
+    } catch {
+      return null;
+    }
   }
 }

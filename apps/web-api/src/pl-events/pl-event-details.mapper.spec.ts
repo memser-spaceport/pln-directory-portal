@@ -26,8 +26,20 @@ describe('mapEventDetails (LAB-3214)', () => {
         sessions: EVENTS_SERVICE_EVENT.agenda.sessions,
       },
       locationUrl: 'https://maps.example.org/?q=Fixture+Venue',
+      contactInfos: null,
+      locationInstructions: null,
     });
     expect(onInvalid).not.toHaveBeenCalled();
+  });
+
+  it('maps the social addresses and the venue instructions (LAB-3343)', () => {
+    const details = mapEventDetails({
+      ...EVENTS_SERVICE_EVENT,
+      contact_infos: { twitter: ['https://x.com/pl', ' '], email: 'events@pl.xyz', empty: [] },
+      address_info: { location_instructions: ' Door B ' },
+    });
+    expect(details.contactInfos).toEqual({ twitter: ['https://x.com/pl'], email: ['events@pl.xyz'] });
+    expect(details.locationInstructions).toBe('Door B');
   });
 
   it('gives empty values for an event that sends none of the fields', () => {

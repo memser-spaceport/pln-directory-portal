@@ -3,6 +3,7 @@ import { PLEvent, PLEventLocationStatus } from '@prisma/client';
 import { faker } from '@faker-js/faker';
 import sample from 'lodash/sample';
 import { prisma } from './../index';
+import { SEED_PL_EVENT_COLUMNS } from './pl-event-defaults';
 
 const getUidsFrom = async (model: string, where: Record<string, any> = {}) => {
   const rows = await (prisma as any)[model].findMany({
@@ -63,6 +64,7 @@ const eventFactory = Factory.define<Omit<PLEvent, 'id'>>(({ sequence, onCreate }
     locationStatus: 'AUTO_MAPPED' as PLEventLocationStatus,
     reviewerUid: null,
     pLEventLocationAssociationUid: null,
+    ...SEED_PL_EVENT_COLUMNS,
   };
 });
 
