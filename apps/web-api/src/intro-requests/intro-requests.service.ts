@@ -1,9 +1,19 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Inject,
+  Injectable,
+  Logger,
+  forwardRef,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { IntroRequestType, Prisma, TeamStatus } from '@prisma/client';
 import { CreateIntroRequestDto } from 'libs/contracts/src/schema';
+import { MembersService } from '../members/members.service';
 import { PL_INFRA_POLICY_CODE } from '../pl-infra-members/pl-infra-members.constants';
 import { PrismaService } from '../shared/prisma.service';
 import { PL_PORTFOLIO_COMMUNITY_AFFILIATION } from '../teams/team-affiliation.constants';
+import { enforceDeletedTeamHidden } from '../teams/team-public-visibility';
 import { introRequestTelegramText, requesterTeamLabel } from './intro-request-message';
 import { IntroRequestTelegram, redactAsksBotToken } from './intro-request-telegram';
 
@@ -22,7 +32,11 @@ export type RequesterRow = {
 export class IntroRequestsService {
   private readonly logger = new Logger(IntroRequestsService.name);
 
-  constructor(private readonly prisma: PrismaService, private readonly telegram: IntroRequestTelegram) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly telegram: IntroRequestTelegram,
+    @Inject(forwardRef(() => MembersService)) private readonly membersService: MembersService
+  ) {}
 
   async create(email: string | undefined, input: CreateIntroRequestDto): Promise<{ uid: string }> {
     if (!email?.trim()) {
@@ -30,7 +44,7 @@ export class IntroRequestsService {
     }
 
     const requester = await this.loadEligibleRequester(email);
-    await this.requireTarget(input.type, input.targetId);
+    await this.requireTarget(input.type, input.targetId, email);
     const row = await this.prisma.introRequest.create({
       data: {
         requesterUid: requester.uid,
@@ -112,17 +126,10 @@ export class IntroRequestsService {
   }
 
   /**
-   * The C3 intro target lookup: a member with no `deletedAt`, or any team. Returns the target name, or null when the
-   * target does not exist. The LabOS agent uses `findAgentTargetName`, which shares the member rule.
-   */
-  async findTargetName(type: IntroRequestType, targetId: string): Promise<string | null> {
-    return this.lookupTargetName(type, targetId);
-  }
-
-  /**
-   * The LabOS agent target lookup (LAB-3300 C1 and `draft_intro`): the same as `findTargetName`, but a deleted team
-   * (status INACTIVE, LAB-3192) is unknown. This mirrors `GET /v1/teams/:uid`, which gives a non-admin 404 for it
-   * (`enforceDeletedTeamHidden`). C3 keeps `findTargetName` and does not change.
+   * The LabOS agent target lookup (LAB-3300 C1 and `draft_intro`): a member with no `deletedAt`, or a team that is
+   * not deleted (status INACTIVE, LAB-3192). Returns the target name, or null. This mirrors `GET /v1/teams/:uid`, which
+   * gives a non-admin 404 for a deleted team (`enforceDeletedTeamHidden`). The agent has no admin exception. C3
+   * (`create`) checks a team target with `requireVisibleTeam` (LAB-3323).
    */
   async findAgentTargetName(type: IntroRequestType, targetId: string): Promise<string | null> {
     if (type === 'MEMBER') return this.lookupTargetName(type, targetId);
@@ -145,11 +152,43 @@ export class IntroRequestsService {
     return requester.teamMemberRoles.length > 0 || requester.policyAssignmentsV2.length > 0;
   }
 
-  private async requireTarget(type: IntroRequestType, targetId: string): Promise<void> {
-    const name = await this.findTargetName(type, targetId);
-    if (!name) {
-      throw new NotFoundException(type === 'MEMBER' ? 'Member not found' : 'Team not found');
+  private async requireTarget(type: IntroRequestType, targetId: string, email: string): Promise<void> {
+    if (type === 'TEAM') {
+      await this.requireVisibleTeam(targetId, email);
+      return;
     }
+    const name = await this.lookupTargetName(type, targetId);
+    if (!name) {
+      throw new NotFoundException('Member not found');
+    }
+  }
+
+  /**
+   * The rule of `GET /v1/teams/:uid` (enforceDeletedTeamHidden, LAB-3192): a deleted (INACTIVE) team is
+   * "Team not found" to everyone except a directory admin (LAB-3323).
+   */
+  private async requireVisibleTeam(teamUid: string, email: string): Promise<void> {
+    const team = await this.prisma.team.findUnique({
+      where: { uid: teamUid },
+      select: { uid: true, status: true },
+    });
+    if (!team) {
+      throw new NotFoundException('Team not found');
+    }
+    try {
+      await enforceDeletedTeamHidden(team, email, (userEmail) => this.isDirectoryAdminEmail(userEmail));
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw new NotFoundException('Team not found');
+      }
+      throw error;
+    }
+  }
+
+  /** The same admin check as `TeamsService.isDirectoryAdminEmail`. */
+  private async isDirectoryAdminEmail(email: string): Promise<boolean> {
+    const member = await this.membersService.findMemberByEmail(email);
+    return !!member?.isDirectoryAdmin;
   }
 
   private async messageFor(uid: string): Promise<string> {

@@ -1017,7 +1017,11 @@ export class AiAppsService {
    * only sees OPEN apps).
    */
   async getApp(uid: string, requesterUid?: string): Promise<ApiAiApp<AiApp> & { canManage?: boolean }> {
-    let app = await this.prisma.aiApp.findUnique({ where: { uid } });
+    // The admin-set readable path (LAB-3236) names the app as well as its uid, so a shared `/apps/<path>` link
+    // resolves for PL Infra members too.
+    let app =
+      (await this.prisma.aiApp.findUnique({ where: { uid } })) ??
+      (await this.prisma.aiApp.findUnique({ where: { path: uid.toLowerCase() } }));
     if (!app) {
       throw new NotFoundException(`AI App not found: ${uid}`);
     }

@@ -13,6 +13,7 @@
   border-radius: 50%;
   overflow: hidden;
   background: lightgray;
+  flex-shrink: 0;
 
   > img {
     width: 40px;
