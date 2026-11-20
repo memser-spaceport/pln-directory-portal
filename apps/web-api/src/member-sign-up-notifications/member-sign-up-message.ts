@@ -1,7 +1,7 @@
 import { directoryUrl } from '../utils/directory-url';
+import { normalizeExternalLinkedinUrl } from '../utils/linkedin-profile-url';
 import { telegramLink } from '../utils/telegram/telegram-link';
 import { escapeTelegramHtml } from '../utils/telegram/escape-telegram-html';
-import { normalizeExternalLinkedinUrl } from '../job-openings/job-openings-linkedin-url';
 import { JOB_ASPIRANT_TAG, SIGN_UP_EVENTS } from './member-sign-up-notifications.constants';
 import type { SignUpEvent, SignUpMember } from './member-sign-up-notifications.types';
 

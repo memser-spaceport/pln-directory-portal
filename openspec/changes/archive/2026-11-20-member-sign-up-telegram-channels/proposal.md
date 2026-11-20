@@ -8,7 +8,7 @@ Admins want to see new Directory members as they arrive: one Telegram channel fo
 - Callers: `ParticipantsRequestService` (`handleMemberRequest`, legacy `processImmediateRequest` for `MEMBER`), `JobOpeningsSignUpService.signUp`, `LinkedInVerificationService.handleLinkedInCallback`.
 - A Job Aspirant sign-up posts to both channels; its sign-up message carries the `💼 Job Aspirant` tag.
 - Bots and test accounts (`isExcludedMember`) are skipped. A failed post is logged and never fails the flow.
-- `escapeTelegramHtml` (copied in contact-support and intro-requests), `telegramLink` and `directoryUrl` move to `src/utils`.
+- `escapeTelegramHtml` (copied in contact-support and intro-requests), `telegramLink`, `directoryUrl` and `normalizeExternalLinkedinUrl` (now `utils/linkedin-profile-url.ts`) move to `src/utils`.
 - `ChannelType` gets `SIGN_UP_AND_VERIFIED` and `JOB_ASPIRANT_SIGN_UP`.
 
 ## Capabilities

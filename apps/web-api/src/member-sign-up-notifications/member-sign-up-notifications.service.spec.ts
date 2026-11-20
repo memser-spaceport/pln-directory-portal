@@ -1,6 +1,7 @@
 import type { LogService } from '../shared/log.service';
 import type { PrismaService } from '../shared/prisma.service';
 import type { NotificationServiceClient } from '../notifications/notification-service.client';
+import { SIGN_UP_MEMBER_SELECT } from './member-sign-up-notifications.constants';
 import { MemberSignUpNotificationsService } from './member-sign-up-notifications.service';
 
 const member = {
@@ -41,7 +42,7 @@ describe('MemberSignUpNotificationsService', () => {
   ] as const)('%s posts to the %s channel', async (method, event, channelType) => {
     await service[method]('member-1');
 
-    expect(findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { uid: 'member-1' } }));
+    expect(findUnique).toHaveBeenCalledWith({ where: { uid: 'member-1' }, select: SIGN_UP_MEMBER_SELECT });
     expect(sendTelegramOutboxMessage).toHaveBeenCalledWith({
       channelType,
       text: expect.stringContaining('Ada'),
@@ -73,5 +74,14 @@ describe('MemberSignUpNotificationsService', () => {
     expect(logError).toHaveBeenCalledWith(
       'Member sign-up Telegram post failed: event=SIGN_UP memberUid=member-1: Notification service error.'
     );
+  });
+});
+
+describe('SIGN_UP_MEMBER_SELECT', () => {
+  it('reads only the Job Aspirant policy assignment', () => {
+    expect(SIGN_UP_MEMBER_SELECT.policyAssignmentsV2).toEqual({
+      where: { policy: { code: 'job_aspirant' } },
+      select: { uid: true },
+    });
   });
 });

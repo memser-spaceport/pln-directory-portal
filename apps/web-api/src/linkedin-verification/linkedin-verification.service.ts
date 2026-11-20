@@ -194,9 +194,9 @@ export class LinkedInVerificationService implements OnModuleDestroy {
       if (member.memberApproval?.state === MemberApprovalState.PENDING) {
         const result = await this.memberService.updateMemberApprovalState(member.uid, MemberApprovalState.VERIFIED);
         if (result.updated) {
+          void this.memberSignUpNotifications.notifyLinkedInVerified(member.uid);
           const emailData = await this.prepareEmailTemplateData(member);
           await this.sendLinkedinVerifiedEmailToAdmin(emailData, `New Member LinkedIn Verified : ${member.name}`);
-          void this.memberSignUpNotifications.notifyLinkedInVerified(member.uid);
         }
       }
 

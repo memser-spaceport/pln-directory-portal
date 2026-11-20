@@ -8,7 +8,7 @@
 - [x] 2.1 `member-sign-up-notifications` module: member load, exclusion, message, outbox post
 - [x] 2.2 Post from both participants-request sign-up paths, the Job Board sign-up and the LinkedIn verification
 - [x] 2.3 Move the Telegram HTML helpers to `src/utils`
-- [x] 2.4 Tests: message, service, participants-request, Job Board sign-up
+- [x] 2.4 Tests: message, service, participants-request, Job Board sign-up, LinkedIn verification
 
 ## 3. Setup per environment
 
