@@ -772,6 +772,111 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
     });
   });
 
+  describe('answerLine (LAB-3362 D4)', () => {
+    const LINE = 'Here is a draft. Edit it in the card.';
+    const text = (textDelta: string) => ({ type: 'text-delta', textDelta });
+    const call = (toolCallId: string) => ({ type: 'tool-call', toolCallId, toolName: 'draft_intro' });
+
+    /** One answer generation. A `set` item changes the answer line, as a tool call that adds or removes a draft. */
+    function lineTurn(
+      items: Array<{ type: string; [key: string]: unknown } | { set: boolean }>,
+      finishReason = 'stop'
+    ) {
+      let on = false;
+      streamTextMock.mockImplementation(() => ({
+        fullStream: (async function* () {
+          for (const item of items) {
+            if ('set' in item) on = item.set as boolean;
+            else yield item;
+          }
+        })(),
+        finishReason: Promise.resolve(finishReason),
+      }));
+      streamObjectMock.mockReturnValue(structuredStream(['{"followUpQuestions":[],"sources":[],"actions":[]}']));
+      return () => (on ? LINE : undefined);
+    }
+
+    async function content(answerLine: () => string | undefined) {
+      const raw = await readAll(
+        await service.createContextualToolsResponse(chatInfo, false, undefined, { answerLine })
+      );
+      return HuskyResponseSchema.parse(JSON.parse(raw)).content;
+    }
+
+    it('shows the line once, at the end, in place of the model text after the tool call', async () => {
+      const answerLine = lineTurn([
+        text('I will write it.'),
+        call('c1'),
+        { set: true },
+        text('Hi Grace, I lead '),
+        text('fundraising at Acme.'),
+      ]);
+
+      expect(await content(answerLine)).toBe(`I will write it.\n\n${LINE}`);
+    });
+
+    it('adds the line at the end when the model writes no text after the tool call', async () => {
+      expect(await content(lineTurn([call('c1'), { set: true }]))).toBe(LINE);
+    });
+
+    it('shows no line when a later call removes the draft, and streams the model text again', async () => {
+      const answerLine = lineTurn([
+        call('c1'),
+        { set: true },
+        text('Hi Grace.'),
+        call('c2'),
+        { set: false },
+        // Starts with its own break, so the result is the same with and without the D3 text part break.
+        text('\n\nThe draft was refused.'),
+      ]);
+
+      // No draft card goes out, so the answer has no "Here is a draft" line.
+      expect(await content(answerLine)).toBe('The draft was refused.');
+    });
+
+    it('keeps the earlier answer text and its break when a later call removes the draft', async () => {
+      const answerLine = lineTurn([
+        text('I will write it.'),
+        call('c1'),
+        { set: true },
+        text('Hi Grace.'),
+        call('c2'),
+        { set: false },
+        text('\n\nThe draft was refused.'),
+      ]);
+
+      expect(await content(answerLine)).toBe('I will write it.\n\nThe draft was refused.');
+    });
+
+    it('shows the line at the end when a refused call is followed by a valid draft', async () => {
+      const answerLine = lineTurn([
+        call('c1'),
+        { set: false },
+        text('That was refused. I try again.'),
+        call('c2'),
+        { set: true },
+        text('Hi Grace.'),
+      ]);
+
+      expect(await content(answerLine)).toBe(`That was refused. I try again.\n\n${LINE}`);
+    });
+
+    it('does not continue a cut-off answer while the line is on', async () => {
+      const answerLine = lineTurn([call('c1'), { set: true }, text('Hi Grace, I')], 'length');
+
+      expect(await content(answerLine)).toBe(LINE);
+      expect(streamTextMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the model text when the caller passes no line (AI search)', async () => {
+      lineTurn([text('One answer.')]);
+
+      const raw = await readAll(await service.createContextualToolsResponse(chatInfo, false));
+
+      expect(HuskyResponseSchema.parse(JSON.parse(raw)).content).toBe('One answer.');
+    });
+  });
+
   it('records a handed-over first exchange under its own chat id before answering', async () => {
     streamTextMock.mockReturnValue(answerStream(['Follow-up answer']));
     streamObjectMock.mockReturnValue(structuredStream(['{"followUpQuestions":[],"sources":[],"actions":[]}']));

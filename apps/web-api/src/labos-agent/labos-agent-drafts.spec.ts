@@ -19,7 +19,7 @@ import { PL_PORTFOLIO_COMMUNITY_AFFILIATION } from '../teams/team-affiliation.co
 import { APP_ENV } from '../utils/constants';
 import { LabosAgentAccessService } from './labos-agent-access.service';
 import { LabosAgentController } from './labos-agent.controller';
-import { INTRO_DRAFT_FAILED_TEXT, INTRO_NOT_ELIGIBLE_TEXT } from './labos-agent-drafts';
+import { INTRO_DRAFT_FAILED_TEXT, INTRO_DRAFT_LINE, INTRO_NOT_ELIGIBLE_TEXT } from './labos-agent-drafts';
 import { LabosAgentProposalStore } from './labos-agent-proposals';
 import { LabosAgentService } from './labos-agent.service';
 
@@ -379,5 +379,45 @@ describe('LabOS agent intro drafts (LAB-3300)', () => {
       h.introRequests.create('ada@example.com', { type: 'TEAM', targetId: 't-acme', text: TEXT })
     ).resolves.toEqual({ uid: 'req-1' });
     expect(h.prisma.introRequest.create).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('LabOS agent intro draft answer (LAB-3362 D4)', () => {
+  const originalEnv = process.env.ENVIRONMENT;
+  afterEach(() => jest.restoreAllMocks());
+  afterAll(() => {
+    process.env.ENVIRONMENT = originalEnv;
+  });
+
+  it('gives the stream one short answer line while the turn has a draft', async () => {
+    const h = setup();
+    const { options } = await h.turn(MEMBER_CONTEXT);
+    expect(options.answerLine()).toBeUndefined();
+
+    await options.extraTools.draft_intro.execute({ type: 'member', targetUid: 'm-grace', text: TEXT });
+    expect(options.answerLine()).toBe(INTRO_DRAFT_LINE);
+    expect(INTRO_DRAFT_LINE).toBe('Here is a draft intro. Edit it in the card, then send.');
+
+    // A refused second call removes the draft, so the model text streams again.
+    await options.extraTools.draft_intro.execute({ type: 'member', targetUid: 'm-other', text: TEXT });
+    expect(options.answerLine()).toBeUndefined();
+  });
+
+  it('tells the model not to repeat the draft text in the answer', async () => {
+    const h = setup();
+    const { texts, options } = await h.turn(MEMBER_CONTEXT, { type: 'member', targetUid: 'm-grace', text: TEXT });
+
+    expect(options.extraTools.draft_intro.description).toContain('Do not write the draft text in the answer');
+    expect(texts[0]).toContain('Do not repeat the draft text.');
+    expect(texts[0]).toContain(`Write only this line as the answer: "${INTRO_DRAFT_LINE}"`);
+    expect(texts[0]).not.toContain(TEXT);
+  });
+
+  it('keeps the model text for a refusal', async () => {
+    const h = setup({});
+    const { texts, options } = await h.turn(MEMBER_CONTEXT, { type: 'member', targetUid: 'm-grace', text: TEXT });
+
+    expect(texts[0]).toBe(INTRO_NOT_ELIGIBLE_TEXT);
+    expect(options.answerLine()).toBeUndefined();
   });
 });

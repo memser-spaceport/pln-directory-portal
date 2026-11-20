@@ -13,6 +13,17 @@ export const INTRO_NOT_ELIGIBLE_TEXT =
   'The member cannot request intros. Only members of portfolio teams and PL Infra can. ' +
   'Make no draft. Tell the member this.';
 
+/**
+ * LAB-3362 D4: the whole answer text of a turn with an intro draft. The draft text is only in the draft card. The
+ * stream shows this line in place of the model text while the turn has a draft (`answerLine` of the Husky stream).
+ */
+export const INTRO_DRAFT_LINE = 'Here is a draft intro. Edit it in the card, then send.';
+
+/** The answer line while the turn has a draft, else undefined. For `ContextualToolsOptions.answerLine`. */
+export function introDraftLine(drafts: LabosAgentDraft[]): string | undefined {
+  return drafts.length ? INTRO_DRAFT_LINE : undefined;
+}
+
 /** A fixed text for an unexpected error. The error itself goes to the server log, never to the model. */
 export const INTRO_DRAFT_FAILED_TEXT =
   'The draft failed because of a server error. Make no draft. Tell the member to try again later.';
@@ -43,6 +54,7 @@ export function draftIntroTool(ctx: McpActorContext, deps: DraftDeps): CoreTool 
       'Write a draft intro request from the member to a member or team in the page context or the items of the message. ' +
       `The text is from ${MIN} to ${MAX} characters, in the voice of the member: who they are, what they ask, and why. ` +
       'The tool only makes a draft card. The member edits it and presses Send. Nothing is sent. ' +
+      'Call it before you write the answer. Do not write the draft text in the answer: the card shows it. ' +
       'Use it only for an intro target of this turn. Make one draft for one target. When there is no target, ask the member to open ' +
       '"Ask the agent" from the member or team profile.',
     parameters: z.object({
@@ -91,7 +103,8 @@ export function draftIntroTool(ctx: McpActorContext, deps: DraftDeps): CoreTool 
         deps.drafts.push(draft);
         return (
           `Draft ${draft.draftId} is ready for ${name}. Nothing is sent. ` +
-          'Tell the member to check the draft, edit it if needed, and press Send.'
+          'The card shows the draft. Do not repeat the draft text. ' +
+          `Write only this line as the answer: "${INTRO_DRAFT_LINE}"`
         );
       } catch (error) {
         logger.error(`draft_intro failed: ${error instanceof Error ? error.stack ?? error.message : String(error)}`);

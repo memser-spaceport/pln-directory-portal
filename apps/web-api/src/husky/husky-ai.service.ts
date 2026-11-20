@@ -19,6 +19,7 @@ import { HuskyAiToolsService } from './tools/husky-ai-tools.serivice';
 import { HuskyAuthContext } from './tools/husky-auth-context';
 import { AiProviderService } from '../shared/ai-provider.service';
 import { StallWatchdog } from './stall-watchdog';
+import { AnswerOverride } from './answer-override.util';
 import { MAX_OVERLAP_CHARS, trimRepeatedPrefix } from './answer-continuation.util';
 import { buildSourceRefs } from './source-refs';
 import { textPartBreak } from './text-parts.util';
@@ -73,6 +74,12 @@ export interface ContextualToolsOptions {
   extraTools?: Record<string, CoreTool>;
   /** Extra fields added to the end of the streamed JSON object, for example `proposals`. */
   extraResponseFields?: Record<string, unknown>;
+  /**
+   * LAB-3362 D4: while this gives a line, the stream drops the model text. When the turn ends and it still gives the
+   * line, the stream adds the line, so the line goes out only with a draft card. The LabOS agent uses it for an intro
+   * draft. AI search passes nothing.
+   */
+  answerLine?: () => string | undefined;
   /** False: keep the thread summary in the cache only, and write nothing to MongoDB. Default true. */
   persistHistory?: boolean;
   /**
@@ -228,6 +235,7 @@ export class HuskyAiService {
     const { question, threadId, chatId, chatSummary } = chatInfo;
     const persistHistory = options.persistHistory !== false;
     const { turnFields } = options;
+    const override = new AnswerOverride(options.answerLine);
     const pageContext = options.promptContext ? `  - pageContext: ${options.promptContext}` : '';
     const currentDate = new Date().toISOString().split('T')[0];
     const auth = await this.resolveAuthContext(isLoggedIn, userEmail);
@@ -289,13 +297,15 @@ export class HuskyAiService {
             { kind: 'initial' },
             emitText,
             pushStep,
-            options.extraTools
+            options.extraTools,
+            override
           );
           content = answer.text;
           let toolResults = answer.toolResults;
           const toolNames = [...answer.toolNames];
 
-          if (!answer.complete) {
+          // LAB-3362 D4: with the answer line on, more model text is dropped, so a cut-off answer is not continued.
+          if (!answer.complete && !override.isOn()) {
             this.logger.error(
               `Husky answer for thread ${threadId}, chat ${chatId} was cut off after ${content.length} chars (${answer.reason}); continuing once`
             );
@@ -312,7 +322,8 @@ export class HuskyAiService {
               mode,
               emitText,
               pushStep,
-              options.extraTools
+              options.extraTools,
+              override
             );
             content += continuation.text;
             toolResults += continuation.toolResults;
@@ -324,6 +335,13 @@ export class HuskyAiService {
               content += HUSKY_SEARCH_STALLED_NOTICE;
               emitText(encodeJsonStringFragment(HUSKY_SEARCH_STALLED_NOTICE));
             }
+          }
+
+          // LAB-3362 D4: the line goes out only now, when the turn still has the draft card.
+          const lastLine = override.finish(content);
+          if (lastLine) {
+            content += lastLine;
+            emitText(encodeJsonStringFragment(lastLine));
           }
 
           if (stepsOpen) {
@@ -386,15 +404,20 @@ export class HuskyAiService {
     mode: AnswerMode,
     enqueue: (text: string) => void,
     pushStep: (label: string) => void,
-    extraTools?: Record<string, CoreTool>
+    extraTools?: Record<string, CoreTool>,
+    override?: AnswerOverride
   ): Promise<AnswerResult> {
     const watchdog = new StallWatchdog(this.getStallTimeoutMs());
     let text = '';
     let toolResults = '';
     const toolNames: string[] = [];
     const emit = (chunk: string) => {
-      text += chunk;
-      enqueue(encodeJsonStringFragment(chunk));
+      const out = override
+        ? override.filter(chunk, (mode.kind === 'continuation' ? mode.partialAnswer : '') + text)
+        : chunk;
+      if (!out) return;
+      text += out;
+      enqueue(encodeJsonStringFragment(out));
     };
 
     // A continuation often restates the line it picks up from. Its opening is held
