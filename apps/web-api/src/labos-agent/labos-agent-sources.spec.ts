@@ -31,6 +31,7 @@ describe('webSources (LAB-3362 D2)', () => {
       'https://os.pl.xyz/',
       'https://www.os.pl.xyz/jobs',
       'https://preview-123.dev.os.pl.xyz/teams/t-1',
+      'https://directory-lab-3272.os.pl.xyz/members/m-2',
       '/teams/relative',
     ];
     expect(webSources(sources, [], ORIGIN)).toEqual([]);
@@ -50,6 +51,13 @@ describe('webSources (LAB-3362 D2)', () => {
       'https://news.example.com/item?id=2',
       'https://textile.io/docs',
     ]);
+  });
+
+  it('matches every subdomain of os.pl.xyz, as CORS does', () => {
+    for (const host of ['directory-lab-3272.os.pl.xyz', 'os.pl.xyz', 'www.os.pl.xyz', 'a.b-c.os.pl.xyz']) {
+      expect(isLabosHost(`https://${host}/x`, ORIGIN)).toBe(true);
+    }
+    expect(webSources(['https://directory-lab-3272.os.pl.xyz/?news=n-1'], [], ORIGIN)).toEqual([]);
   });
 
   it('keeps other Protocol Labs sites, such as plnetwork.io, as web sources', () => {
