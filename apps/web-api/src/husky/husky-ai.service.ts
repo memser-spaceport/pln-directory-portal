@@ -19,9 +19,9 @@ import { HuskyAiToolsService } from './tools/husky-ai-tools.serivice';
 import { HuskyAuthContext } from './tools/husky-auth-context';
 import { AiProviderService } from '../shared/ai-provider.service';
 import { StallWatchdog } from './stall-watchdog';
+import { AnswerOverride } from './answer-override.util';
 import { MAX_OVERLAP_CHARS, trimRepeatedPrefix } from './answer-continuation.util';
 import { buildSourceRefs } from './source-refs';
-import { AnswerOverride } from './answer-override.util';
 import { z } from 'zod';
 
 import {
