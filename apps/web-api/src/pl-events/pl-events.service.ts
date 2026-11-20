@@ -29,7 +29,7 @@ import {
   GUEST_PERSON_SELECT,
   eventReadAccess,
   facesFindArgs,
-  hidesAttendance,
+  hidesEventAttendance,
   listedGuestWhere,
   listedGuestsWhereIn,
   toPLEventDetail,
@@ -308,8 +308,8 @@ export class PLEventsService {
    * other visible events, hosts, a going count with three faces, and the viewer's own attendance. Lean on purpose:
    * `getPLEventForViewer` loads every guest with contact fields and stays as it is for MCP.
    *
-   * A signed-out viewer of an `INVITE_ONLY` event gets no count and no faces. `showOnProfile` affects neither: hiding
-   * an event is about the profile, not about going.
+   * A signed-out viewer of an invite-only event (`type` INVITE_ONLY or `accessOption` INVITE) gets no count and no
+   * faces. `showOnProfile` affects neither: hiding an event is about the profile, not about going.
    */
   async getPLEventDetail(uid: string, viewer: Member | null): Promise<ResponsePLEventDetail> {
     // pl-event-visibility: the submitter and a directory admin also read an event that is not approved;
@@ -372,7 +372,7 @@ export class PLEventsService {
     }
 
     const isUserLoggedIn = !!viewer;
-    const hideAttendance = hidesAttendance(event.type, isUserLoggedIn);
+    const hideAttendance = hidesEventAttendance(event, isUserLoggedIn);
 
     const [hostRows, goingGroups, faceRows, viewerRow, locationEvents] = await Promise.all([
       this.prisma.pLEventGuest.findMany({

@@ -14,7 +14,7 @@ import { NotFoundException } from '@nestjs/common';
 import { ResponsePLEventDetailSchema } from 'libs/contracts/src/schema/pl-event-attendance';
 import { emptyPLEventDetails } from 'libs/contracts/src/schema/pl-event-details';
 import { EVENTS_SERVICE_EVENT } from './fixtures/events-service-event.fixture';
-import { cityOf, visibleResources } from './pl-event-detail';
+import { cityOf, hidesEventAttendance, isInviteOnlyEvent, visibleResources } from './pl-event-detail';
 import { mapEventDetails, withEventDetails } from './pl-event-details.mapper';
 import { PLEventsService } from './pl-events.service';
 
@@ -160,6 +160,21 @@ describe('PLEventsService.getPLEventDetail (LAB-3213)', () => {
     expect(detail.goingCount).toBe(0);
     expect(detail.faces).toEqual([]);
     expect(prisma.pLEventGuest.groupBy).not.toHaveBeenCalled();
+  });
+
+  it('signed out on an accessOption INVITE event with no type: count 0 and no faces (QA 3281-5)', async () => {
+    const { service, prisma } = makeService(eventRow({ type: null, accessOption: 'INVITE' }));
+    const detail = await service.getPLEventDetail('ev-1', null);
+    expect(detail.goingCount).toBe(0);
+    expect(detail.faces).toEqual([]);
+    expect(prisma.pLEventGuest.groupBy).not.toHaveBeenCalled();
+  });
+
+  it('signed in on an accessOption INVITE event with no type: the count and faces are shown', async () => {
+    const { service } = makeService(eventRow({ type: null, accessOption: 'INVITE' }));
+    const detail = await service.getPLEventDetail('ev-1', VIEWER);
+    expect(detail.goingCount).toBe(4);
+    expect(detail.faces).toHaveLength(3);
   });
 
   it('signed in on an INVITE_ONLY event: the count and faces are shown', async () => {
@@ -409,5 +424,21 @@ describe('pl-event-detail helpers (LAB-3213)', () => {
     expect(visibleResources(list, true)).toEqual(list);
     expect(visibleResources(list, false)).toEqual([{ a: 1 }]);
     expect(visibleResources(null, false)).toEqual([]);
+  });
+});
+
+describe('isInviteOnlyEvent and hidesEventAttendance (LAB-3281, QA 3281-5)', () => {
+  it('treats type INVITE_ONLY or accessOption INVITE as invite-only', () => {
+    expect(isInviteOnlyEvent({ type: 'INVITE_ONLY', accessOption: null })).toBe(true);
+    expect(isInviteOnlyEvent({ type: null, accessOption: 'INVITE' })).toBe(true);
+    expect(isInviteOnlyEvent({ type: 'IN_PERSON', accessOption: 'INVITE' })).toBe(true);
+    expect(isInviteOnlyEvent({ type: 'IN_PERSON', accessOption: 'OPEN' })).toBe(false);
+    expect(isInviteOnlyEvent({ type: null, accessOption: null })).toBe(false);
+  });
+
+  it('hides attendance only from signed-out viewers', () => {
+    expect(hidesEventAttendance({ type: null, accessOption: 'INVITE' }, false)).toBe(true);
+    expect(hidesEventAttendance({ type: null, accessOption: 'INVITE' }, true)).toBe(false);
+    expect(hidesEventAttendance({ type: 'IN_PERSON', accessOption: 'PAID' }, false)).toBe(false);
   });
 });

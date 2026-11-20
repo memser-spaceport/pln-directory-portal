@@ -383,6 +383,22 @@ describe('PLEventsService.listPLEvents', () => {
     expect(result.items[0]).toMatchObject({ goingCount: null, faces: [], isGoing: true });
   });
 
+  it('gives an accessOption INVITE event with no type no going count and no faces (QA 3281-5)', async () => {
+    const result = await list(
+      {
+        member: [member('m1')],
+        pLEvent: [event('invite-no-type', { type: null, accessOption: 'INVITE' }), event('open')],
+        pLEventGuest: [guest('m1', 'invite-no-type'), guest('m1', 'open')],
+      },
+      {},
+      null
+    );
+    const byUid = new Map(result.items.map((item) => [item.uid, item]));
+    expect(byUid.get('invite-no-type')).toMatchObject({ goingCount: null, faces: [] });
+    expect(byUid.get('open')).toMatchObject({ goingCount: 1 });
+    expect(byUid.get('open')?.faces).toHaveLength(1);
+  });
+
   it('reads the going counts and faces of a page in one guest query', async () => {
     const prisma = new InMemoryPrisma({
       member: [member('m1')],

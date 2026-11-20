@@ -6,7 +6,7 @@ import {
   ResponsePLEventListItem,
 } from 'libs/contracts/src/schema/pl-event-list';
 import { isDateOnly, isDateTime } from 'libs/contracts/src/schema/pl-event-body';
-import { cityOf, eventVenue, GUEST_PERSON_SELECT, hidesAttendance, listedGuestsWhereIn } from './pl-event-detail';
+import { cityOf, eventVenue, GUEST_PERSON_SELECT, hidesEventAttendance, listedGuestsWhereIn } from './pl-event-detail';
 import { assembleEventDetails } from './pl-event-details.mapper';
 import { VISIBLE_PL_EVENT_WHERE } from './pl-event-visibility';
 
@@ -226,10 +226,10 @@ export type EventListRow = {
 
 /**
  * The list has cards for every viewer, so it follows the signed-out rule of the drawer and of the upcoming list: an
- * invite-only event shows no going count and no faces.
+ * invite-only event (`type` INVITE_ONLY or `accessOption` INVITE) shows no going count and no faces.
  */
-export function listHidesAttendance(event: { type: string | null }): boolean {
-  return hidesAttendance(event.type, false);
+export function listHidesAttendance(event: { type: string | null; accessOption: string | null }): boolean {
+  return hidesEventAttendance(event, false);
 }
 
 /**

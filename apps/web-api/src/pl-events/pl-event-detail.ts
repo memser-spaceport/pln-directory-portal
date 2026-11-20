@@ -39,12 +39,31 @@ export function facesFindArgs(eventUid: string) {
   };
 }
 
+/** The fields that make an event invite-only. */
+export type InviteOnlyFields = { type?: string | null; accessOption?: string | null };
+
 /**
- * Signed-out viewers of an `INVITE_ONLY` event see no attendance: count 0 and no faces, as on the drawer and the
- * attendee list.
+ * An event is invite-only when its `type` is `INVITE_ONLY` or its `accessOption` is `INVITE` (LAB-3281, QA 3281-5).
+ * Synced events can have `accessOption: INVITE` and `type: null`, so the type alone is not enough.
+ */
+export function isInviteOnlyEvent(event: InviteOnlyFields): boolean {
+  return event.type === 'INVITE_ONLY' || event.accessOption === 'INVITE';
+}
+
+/**
+ * Signed-out viewers of an invite-only event (see `isInviteOnlyEvent`) see no attendance: no count and no faces. The
+ * events list and the drawer use this rule.
+ */
+export function hidesEventAttendance(event: InviteOnlyFields, isUserLoggedIn: boolean): boolean {
+  return !isUserLoggedIn && isInviteOnlyEvent(event);
+}
+
+/**
+ * The type-only form of `hidesEventAttendance`, for callers that do not select `accessOption` (profile events and
+ * the upcoming list).
  */
 export function hidesAttendance(eventType: string | null | undefined, isUserLoggedIn: boolean): boolean {
-  return !isUserLoggedIn && eventType === 'INVITE_ONLY';
+  return hidesEventAttendance({ type: eventType }, isUserLoggedIn);
 }
 
 /** "Lisbon, Portugal" → "Lisbon". Null when there is nothing before the first comma. */

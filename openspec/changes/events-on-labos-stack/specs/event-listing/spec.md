@@ -30,7 +30,7 @@ The system SHALL serve `GET /v1/irl/events` with an optional user token. It SHAL
 
 ### Requirement: Each listed event carries what a card, a calendar and a map need
 
-Each item SHALL include `uid`, `name`, `startDate`, `endDate`, `allDay`, `timezone`, `format`, `accessOption`, `tags`, `isFeatured`, `logo`, `banner`, `host` (name and logo), its gathering (`uid`, `city`, `country`), its venue (`address`, `latitude`, `longitude`), `goingCount`, `faces` (up to 3 members going) and, for a signed-in viewer, `isGoing`. A missing value SHALL be null or an empty list. An invite-only event SHALL have `goingCount` null and no `faces`.
+Each item SHALL include `uid`, `name`, `startDate`, `endDate`, `allDay`, `timezone`, `format`, `accessOption`, `tags`, `isFeatured`, `logo`, `banner`, `host` (name and logo), its gathering (`uid`, `city`, `country`), its venue (`address`, `latitude`, `longitude`), `goingCount`, `faces` (up to 3 members going) and, for a signed-in viewer, `isGoing`. A missing value SHALL be null or an empty list. An invite-only event SHALL have `goingCount` null and no `faces`. An event is invite-only when its `type` is `INVITE_ONLY` or its `accessOption` is `INVITE`; the drawer uses the same rule for signed-out viewers.
 
 #### Scenario: An event with venue coordinates
 
@@ -43,6 +43,12 @@ Each item SHALL include `uid`, `name`, `startDate`, `endDate`, `allDay`, `timezo
 - **GIVEN** an approved virtual event
 - **WHEN** the list is read
 - **THEN** the item's venue and gathering are null and `format` is `VIRTUAL`
+
+#### Scenario: An INVITE access event with no type
+
+- **GIVEN** an approved event with `accessOption` `INVITE`, `type` null and going members
+- **WHEN** the list is read
+- **THEN** the item has `goingCount` null and no `faces`
 
 #### Scenario: A signed-out viewer
 
