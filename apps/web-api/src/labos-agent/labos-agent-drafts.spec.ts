@@ -460,6 +460,14 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
     expect(parse({ text: CARD_TEXT }).success).toBe(false);
   });
 
+  it('accepts and strips extra keys from context.introTarget', () => {
+    const result = LabosAgentChatRequestSchema.safeParse({
+      ...VALID,
+      context: { page: 'intro', introTarget: { ...GRACE, extra: true } },
+    });
+    expect(result.success && result.data.context?.introTarget).toEqual(GRACE);
+  });
+
   it.each([
     ['an unknown member', { type: 'member', uid: 'm-missing' }],
     ['a deleted member', { type: 'member', uid: 'm-gone' }],
