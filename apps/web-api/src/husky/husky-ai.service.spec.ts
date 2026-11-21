@@ -22,7 +22,7 @@ jest.mock('./tools/irl-events.tool', () => ({ IrlEventsTool: jest.fn() }));
 jest.mock('./tools/husky-ai-tools.serivice', () => ({ HuskyAiToolsService: jest.fn() }));
 
 import { streamText, streamObject, generateText } from 'ai';
-import { APICallError } from '@ai-sdk/provider';
+import { AISDKError, APICallError, TypeValidationError } from '@ai-sdk/provider';
 import { HuskyResponseSchema } from 'libs/contracts/src/schema/husky-chat';
 import { answerCounts } from '../labos-agent/labos-agent-answer-counts';
 import {
@@ -507,6 +507,66 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
   });
 
   describe('error logs (LAB-3362, contract 11.4)', () => {
+    // LAB-3362 (Oleg 1795251083.950879): bad draft_intro args put the model input into the error message.
+    const SECRET = 'Secret-draft-5e1f: I lead fundraising at Acme and want your advice soon.';
+    // As `InvalidToolArgumentsError` in ai 4.0.19 (dist/index.js): the cause message, with the args, is in `message`.
+    const invalidDraftArgs = (): Error => {
+      const args = { type: 'person', targetUid: 'm-grace', text: SECRET };
+      const cause = new TypeValidationError({ value: args, cause: new Error('Invalid enum value') });
+      return Object.assign(
+        new AISDKError({
+          name: 'AI_InvalidToolArgumentsError',
+          message: `Invalid arguments for tool draft_intro: ${cause.message}`,
+          cause,
+        }),
+        { toolName: 'draft_intro', toolArgs: JSON.stringify(args) }
+      ) as unknown as Error;
+    };
+    const draftTool = { draft_intro: { description: 'draft', parameters: {} } as any };
+
+    it('logs only name and toolName for an invalid tool args error part in the answer stream', async () => {
+      streamTextMock.mockImplementation(() => ({
+        fullStream: (async function* () {
+          yield { type: 'error', error: invalidDraftArgs() };
+          yield { type: 'text-delta', textDelta: 'I could not make the draft.' };
+        })(),
+        finishReason: Promise.resolve('stop'),
+      }));
+      streamObjectMock.mockReturnValue(structuredStream(['{}']));
+
+      await readAll(
+        await service.createContextualToolsResponse(chatInfo, false, undefined, {
+          persistHistory: false,
+          extraTools: draftTool,
+        })
+      );
+      await flushBackgroundWork();
+
+      expect(logger.error).toHaveBeenCalledWith(
+        'Husky answer stream provider error: {"name":"AI_InvalidToolArgumentsError","toolName":"draft_intro"}'
+      );
+      expect(JSON.stringify(logger.error.mock.calls)).not.toContain('Secret-draft-5e1f');
+    });
+
+    it('logs only name and toolName when the answer stream throws an invalid tool args error', async () => {
+      streamTextMock.mockReturnValue({ textStream: failingChunks([], invalidDraftArgs()) });
+
+      await expect(
+        readAll(
+          await service.createContextualToolsResponse(chatInfo, false, undefined, {
+            persistHistory: false,
+            extraTools: draftTool,
+          })
+        )
+      ).rejects.toThrow('Invalid arguments for tool draft_intro');
+      await flushBackgroundWork();
+
+      expect(logger.error).toHaveBeenCalledWith(
+        'Husky search failed for thread thread-1, chat chat-1: {"name":"AI_InvalidToolArgumentsError","toolName":"draft_intro"}'
+      );
+      expect(JSON.stringify(logger.error.mock.calls)).not.toContain('Secret-draft-5e1f');
+    });
+
     const CARD_TEXT = 'Card-text-91bd: I lead fundraising at Acme and want your advice.';
     const promptContext = `Its current text, with the edits of the member: ${JSON.stringify(CARD_TEXT)}.`;
     // As the AI SDK does: the error keeps the whole request body, with the prompt.

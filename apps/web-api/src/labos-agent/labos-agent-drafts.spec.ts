@@ -14,6 +14,8 @@ jest.mock('ai', () => ({ tool: (def: unknown) => def }));
 import { ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
 import { MCP_SCOPE_KEYS } from 'libs/contracts/src/schema/mcp-scopes';
 import { LabosAgentChatRequestSchema } from 'libs/contracts/src/schema/labos-agent';
+import { AISDKError, TypeValidationError } from '@ai-sdk/provider';
+import { logSafeError } from '../husky/log-safe-error.util';
 import { IntroRequestsService } from '../intro-requests/intro-requests.service';
 import { PL_INFRA_POLICY_CODE } from '../pl-infra-members/pl-infra-members.constants';
 import { PL_PORTFOLIO_COMMUNITY_AFFILIATION } from '../teams/team-affiliation.constants';
@@ -561,5 +563,58 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
     );
     expect(refused.extraResponseFields.drafts).toEqual([]);
     expect(refused.answerLine()).toBeUndefined();
+  });
+});
+
+/** As `InvalidToolArgumentsError` in ai 4.0.19 (dist/index.js): the cause message, with the args, is in `message`. */
+function invalidToolArgsError(toolName: string, toolArgs: string, cause: { message: string }) {
+  return Object.assign(
+    new AISDKError({
+      name: 'AI_InvalidToolArgumentsError',
+      message: `Invalid arguments for tool ${toolName}: ${cause.message}`,
+      cause,
+    }),
+    { toolName, toolArgs }
+  );
+}
+
+describe('draft_intro invalid arguments (LAB-3362, Oleg 1795251083.950879)', () => {
+  const SECRET = 'Secret-draft-5e1f: I lead fundraising at Acme and want your advice soon.';
+
+  async function draftTool() {
+    const h = setup();
+    await h.controller.chat({ ...VALID, context: MEMBER_CONTEXT } as any, h.req, h.res as any);
+    return h.husky.createContextualToolsResponse.mock.calls.at(-1)[3].extraTools.draft_intro;
+  }
+
+  it('an invalid type gives an AI SDK error with the text in its message, and the log form has no text', async () => {
+    const args = { type: 'person', targetUid: 'm-grace', text: SECRET };
+    const parsed = (await draftTool()).parameters.safeParse(args);
+    expect(parsed.success).toBe(false);
+
+    // As the AI SDK does when the model sends bad tool args.
+    const error = invalidToolArgsError(
+      'draft_intro',
+      JSON.stringify(args),
+      TypeValidationError.wrap({ value: args, cause: parsed.error })
+    );
+    expect(error.message).toContain(SECRET);
+
+    expect(logSafeError(error, ['draft_intro'])).toBe(
+      '{"name":"AI_InvalidToolArgumentsError","toolName":"draft_intro"}'
+    );
+    expect(logSafeError(error.cause)).toBe('{"name":"AI_TypeValidationError"}');
+  });
+
+  it('an extra field is dropped from the args and does not reach execute', async () => {
+    const parsed = (await draftTool()).parameters.safeParse({
+      type: 'member',
+      targetUid: 'm-grace',
+      text: 'I lead fundraising at Acme and want your advice.',
+      note: SECRET,
+    });
+    expect(parsed.success).toBe(true);
+    expect(parsed.data).not.toHaveProperty('note');
+    expect(JSON.stringify(parsed.data)).not.toContain('Secret-draft-5e1f');
   });
 });
