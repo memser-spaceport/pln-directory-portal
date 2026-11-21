@@ -77,6 +77,25 @@ function pagesFromText(text: string): WebPage[] {
   });
 }
 
+/**
+ * The page title for the "Web page:" line (LAB-3362). Gemini grounding sets the chunk `title` to the bare site
+ * domain (for example "textile.io" for docs.textile.io and blog.textile.io), so two pages show the same label. When
+ * the title is a bare domain of the page host, the title is the full page host without `www.`. A real page title
+ * stays.
+ */
+export function webPageTitle(title: string, url: string): string {
+  let host: string;
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    return title;
+  }
+  const domain = title.trim().toLowerCase();
+  const bareDomain = !/\s/.test(domain) && domain.includes('.');
+  if (!bareDomain || !(host === domain || host.endsWith(`.${domain}`))) return title;
+  return host.replace(/^www\./, '');
+}
+
 function uniquePages(pages: WebPage[]): WebPage[] {
   const seen = new Set<string>();
   const unique: WebPage[] = [];
@@ -199,7 +218,10 @@ export class WebSearchTool {
       const grounded = pagesFromGrounding(providerMetadata).slice(0, MAX_WEB_PAGES * 2);
       const found = grounded.length ? grounded : pagesFromText(text ?? '');
       const resolved = await Promise.all(
-        found.map(async (page) => ({ ...page, url: await this.resolvePageUrl(page.url, signal) }))
+        found.map(async (page) => {
+          const url = await this.resolvePageUrl(page.url, signal);
+          return { url, title: webPageTitle(page.title, url) };
+        })
       );
       const pages = uniquePages(resolved);
       const summary = summaryOf(text ?? '');

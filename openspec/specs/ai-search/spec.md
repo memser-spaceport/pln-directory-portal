@@ -35,11 +35,20 @@ AI Search (`POST /v1/husky/chat/contextual-tools`) SHALL give the answer model a
 
 Each web page that the answer cites SHALL become a source ref with `type: "web"` and an `externalUrl`, and with no `directoryLink`. The answer text SHALL put directory facts first and SHALL label web facts as web information. A cited URL that no tool returned SHALL keep the type `external`. While the web search runs, the stream SHALL show the step "Searching the web".
 
+The `Web page:` title SHALL be the real page title. When the grounding title is a bare domain of the page host (no space, has a dot, and equals the host or the host ends with "." and the title), the title SHALL be the full page host without `www.` (LAB-3362). So two pages on two subdomains get two labels.
+
 #### Scenario: An answer with both kinds of source
 
 - **WHEN** an answer cites a team page and a web page
 - **THEN** `sourceRefs` holds a `team` ref with a `directoryLink`
 - **AND** a `web` ref with the page URL as `externalUrl` and no `directoryLink`
+
+#### Scenario: Two subdomains of one site
+
+- **GIVEN** Gemini grounding gives the title "textile.io" for https://docs.textile.io/guide and https://blog.textile.io/post
+- **WHEN** the web search returns its page lines
+- **THEN** the titles are "docs.textile.io" and "blog.textile.io"
+- **AND** a page with a real title, such as "Textile | About us", keeps that title
 
 ### Requirement: Web search failure gives a directory-only answer
 
