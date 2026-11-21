@@ -192,7 +192,45 @@ describe('WebSearchTool', () => {
     expect(result).toContain('Web page: Textile | About us [WebLink](https://textile.io/about)');
   });
 
+  it('LAB-3362: takes the full host from the resolved page URL of a Gemini redirect', async () => {
+    const redirect = 'https://vertexaisearch.cloud.google.com/grounding-api-redirect/Docs';
+    global.fetch = jest.fn(async () => ({
+      headers: { get: () => 'https://docs.textile.io/guide' },
+    })) as any;
+    generateText.mockResolvedValue({
+      text: 'Textile builds data tools.',
+      experimental_providerMetadata: {
+        google: { groundingMetadata: { groundingChunks: [{ web: { uri: redirect, title: 'textile.io' } }] } },
+      },
+    });
+
+    const result = await run('Textile');
+
+    expect(result).toContain('Web page: docs.textile.io [WebLink](https://docs.textile.io/guide)');
+    expect(result).not.toContain('Web page: textile.io ');
+    expect(result).not.toContain('vertexaisearch');
+  });
+
+  it('LAB-3362: keeps the title "ile.io" for a page on docs.textile.io after a Gemini redirect', async () => {
+    const redirect = 'https://vertexaisearch.cloud.google.com/grounding-api-redirect/Partial';
+    global.fetch = jest.fn(async () => ({
+      headers: { get: () => 'https://docs.textile.io/guide' },
+    })) as any;
+    generateText.mockResolvedValue({
+      text: 'Textile builds data tools.',
+      experimental_providerMetadata: {
+        google: { groundingMetadata: { groundingChunks: [{ web: { uri: redirect, title: 'ile.io' } }] } },
+      },
+    });
+
+    const result = await run('Textile');
+
+    expect(result).toContain('Web page: ile.io [WebLink](https://docs.textile.io/guide)');
+    expect(result).not.toContain('Web page: docs.textile.io');
+  });
+
   it.each([
+    ['ile.io', 'https://docs.textile.io/guide', 'ile.io'],
     ['textile.io', 'https://docs.textile.io/guide', 'docs.textile.io'],
     ['Textile.IO', 'https://Blog.Textile.io/post', 'blog.textile.io'],
     ['docs.textile.io', 'https://docs.textile.io/guide', 'docs.textile.io'],
