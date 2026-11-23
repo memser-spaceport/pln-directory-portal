@@ -55,6 +55,8 @@ export class MemberController {
    * Directory admins may set any roles. Demo day admins may only grant DEMO_DAY_ADMIN;
    * their member's other roles are preserved. Anything else is rejected with 403.
    */
+  private async scopeRolesToRequester(req: any, uid: string, roles: string[]): Promise<string[]>;
+  private async scopeRolesToRequester(req: any, uid: string, roles?: string[]): Promise<string[] | undefined>;
   private async scopeRolesToRequester(req: any, uid: string, roles?: string[]): Promise<string[] | undefined> {
     const permissions: string[] = req.user?.effectivePermissionCodes ?? req.user?.permissions ?? [];
     if (roles === undefined || permissions.includes(ADMIN_PERMISSIONS.DIRECTORY_FULL)) return roles;

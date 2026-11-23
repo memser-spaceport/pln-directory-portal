@@ -1,3 +1,16 @@
+// The `ai` / `@ai-sdk/*` packages ship untranspiled ESM that this jest config can't parse;
+// stub the module boundary, same pattern as member-enrichment.service.spec.ts.
+jest.mock('ai', () => ({ generateText: jest.fn() }));
+jest.mock('@ai-sdk/openai', () => ({
+  openai: Object.assign(jest.fn(), { responses: jest.fn(), tools: { webSearchPreview: jest.fn() } }),
+}));
+jest.mock('@ai-sdk/google', () => ({ google: jest.fn() }));
+jest.mock('@ai-sdk/anthropic', () => ({ anthropic: jest.fn(), createAnthropic: jest.fn() }));
+// cheerio and open-graph-scraper load undici, which needs web globals the jest node environment lacks.
+jest.mock('cheerio', () => ({}));
+jest.mock('open-graph-scraper', () => jest.fn());
+jest.mock('p-limit', () => ({ __esModule: true, default: () => (fn: () => unknown) => fn() }));
+
 import { ForbiddenException } from '@nestjs/common';
 import { MemberController } from './member.controller';
 

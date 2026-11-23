@@ -466,7 +466,11 @@ export class TeamsService {
     requestorEmail: string
   ): Promise<Team> {
     const updatedTeam: any = teamParticipantRequest.newData;
-    if (updatedTeam?.teamMemberRoles?.some((role) => role?.teamUid !== teamUid)) {
+    // Only rows the loop below acts on matter; untouched rows (no status) are ignored there.
+    const actedStatuses = ['Add', 'Update', 'Delete'];
+    if (
+      updatedTeam?.teamMemberRoles?.some((role) => actedStatuses.includes(role?.status) && role?.teamUid !== teamUid)
+    ) {
       throw new ForbiddenException('teamMemberRoles must belong to the team being updated');
     }
     let result;
