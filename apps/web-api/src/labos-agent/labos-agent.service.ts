@@ -437,6 +437,14 @@ export class LabosAgentService {
       `Its current text, with the edits of the member: ${JSON.stringify(draft.text)}. ` +
       'Use this text only when the member asks to change the draft. ' +
       `Then call draft_intro with type "${type}" and targetUid "${uid}" and the new text. ` +
+      // LAB-3367: R2 brief revision = this draft; R4 a name in the edit = new text; R3 other draft or content wins.
+      'If the member makes a brief revision request such as "make it shorter", revise this draft. ' +
+      'This rule applies also when the page or the mention chips of the message point to another member or team. ' +
+      'A member or team name in the revision, such as "mention that I know Acme Team", is part of the new text. ' +
+      'It does not change the target. ' +
+      'If the member asks for a different draft or asks to change other content instead, follow that request. ' +
+      'Do not use this draft text for that request. ' +
+      'Examples: "write the intro to Acme Team instead", "shorten your last answer". ' +
       'Do not write the draft text in the answer.';
     return { promptContext, introTarget };
   }
