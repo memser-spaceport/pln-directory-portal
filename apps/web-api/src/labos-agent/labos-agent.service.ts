@@ -469,7 +469,7 @@ export class LabosAgentService {
       `If latestReply is the draft line "${INTRO_DRAFT_LINE}", revise this draft. ` +
       'If latestReply is a normal answer, change that answer and do not change this draft. ' +
       'If there is no latestReply, ask which reply to change and leave this draft unchanged. ' +
-      'A brief request that does not name your last answer revises this draft. ' +
+      'A brief revision request that does not name your last answer revises this draft. ' +
       'If the member asks for a different draft or asks to change other content instead, follow that request. ' +
       'Do not use this draft text for that request. ' +
       'Example: "write the intro to Acme Team instead" with Acme Team in the items added to the message. ' +

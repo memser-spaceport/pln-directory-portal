@@ -213,6 +213,8 @@ describe('LabOS agent error bodies over HTTP (LAB-3300)', () => {
         req.end(JSON.stringify(chatBody));
       });
       await open.cancelled;
+      // i7: let the pipeTo rejection reach the catch of the controller before the log check.
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       expect(open.cancel).toHaveBeenCalledTimes(1);
       // A client stop is not a stream failure.
@@ -248,6 +250,8 @@ describe('LabOS agent error bodies over HTTP (LAB-3300)', () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
       resolveChat(open.stream);
       await open.cancelled;
+      // i7: let the pipeTo rejection reach the catch of the controller before the log check.
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       expect(open.cancel).toHaveBeenCalledTimes(1);
       expect(logs).not.toHaveBeenCalled();

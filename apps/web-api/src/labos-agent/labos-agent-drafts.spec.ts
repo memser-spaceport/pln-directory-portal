@@ -548,7 +548,7 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
     `If latestReply is the draft line "${INTRO_DRAFT_LINE}", revise this draft.`;
   const LAST_ANSWER_IS_NORMAL = 'If latestReply is a normal answer, change that answer and do not change this draft.';
   const LAST_ANSWER_UNKNOWN = 'If there is no latestReply, ask which reply to change and leave this draft unchanged.';
-  const BRIEF_NOT_LAST_ANSWER = 'A brief request that does not name your last answer revises this draft.';
+  const BRIEF_NOT_LAST_ANSWER = 'A brief revision request that does not name your last answer revises this draft.';
   const DIFFERENT_ITEM =
     'If the member asks for a different draft or asks to change other content instead, follow that request. ' +
     'Do not use this draft text for that request. ' +
