@@ -387,8 +387,14 @@ export class HuskyAiService {
             this.logger.error(`Failed to persist chat history for thread ${threadId}: ${logSafeError(error)}`)
           );
         } catch (error) {
-          // LAB-3362: log the name, status and message only. The error can hold the whole prompt.
-          this.logger.error(`Husky search failed for thread ${threadId}, chat ${chatId}: ${logSafeError(error)}`);
+          // LAB-3362: log the name, status and message only. The error can hold the whole prompt. A tool name is
+          // logged only when it is one of the caller's extra tools (for example draft_intro).
+          this.logger.error(
+            `Husky search failed for thread ${threadId}, chat ${chatId}: ${logSafeError(
+              error,
+              Object.keys(options.extraTools ?? {})
+            )}`
+          );
           controller.error(error);
         }
       },
@@ -475,6 +481,8 @@ export class HuskyAiService {
           ${input.pageContext}
           `,
           };
+    // LAB-3362: the tools of this call. A tool argument error log names only one of these.
+    const callToolNames = Object.keys((generation as { tools?: Record<string, CoreTool> }).tools ?? {});
 
     const result = streamText({
       model,
@@ -535,13 +543,10 @@ export class HuskyAiService {
           forwardText(part.textDelta);
         } else if (part.type === 'error') {
           // The provider error (quota, auth, 5xx) ends the stream with finish reason
-          // "unknown". Log its text, or the cut-off log line is the only trace.
-          const error = part.error as { statusCode?: number; message?: string } | undefined;
-          this.logger.error(
-            `Husky answer stream provider error${error?.statusCode ? ` (${error.statusCode})` : ''}: ${
-              error?.message ?? String(part.error)
-            }`
-          );
+          // "unknown". Log it, or the cut-off log line is the only trace. LAB-3362: only the safe fields, because a
+          // tool argument error has the model input (for example a draft_intro text) in its message. A tool
+          // name is logged only when it is a tool of this call.
+          this.logger.error(`Husky answer stream provider error: ${logSafeError(part.error, callToolNames)}`);
         }
       }
       release();
