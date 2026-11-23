@@ -1,5 +1,6 @@
 import DOMPurify from 'isomorphic-dompurify';
 import { decodeHtmlEntities } from '../utils/html-entities';
+import { escapeTelegramHtml } from '../utils/telegram/escape-telegram-html';
 
 export const TELEGRAM_MESSAGE_MAX_LENGTH = 4096;
 
@@ -36,11 +37,6 @@ export function looksLikeHtml(value: string): boolean {
 
 function escapeHtml(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-/** Escape text for a message sent with Telegram's `parse_mode: 'HTML'`. */
-export function escapeTelegramHtml(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function replaceDataUriImages(html: string, replacement: string): string {
