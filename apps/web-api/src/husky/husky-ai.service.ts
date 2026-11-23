@@ -390,7 +390,8 @@ export class HuskyAiService {
 
           // LAB-3367 h3: write before close, so the next C1 turn can read the reply as soon as the client sees the end.
           // A draft turn stores only the answer line, never the draft text. A cut-off or cancelled turn stores nothing.
-          if (latestReplyKey && complete && !cancelled) {
+          if (latestReplyKey && cancelled) return;
+          if (latestReplyKey && complete) {
             await this.saveLatestReply(latestReplyKey, lastLine ? lastLine.trim() : content);
             // A cancel during the write: the client gets no end, so the reply is not latest. Clear it again and do not
             // close the cancelled stream. No await comes between this check and `controller.close()`.
@@ -421,6 +422,7 @@ export class HuskyAiService {
             this.logger.error(`Failed to persist chat history for thread ${threadId}: ${logSafeError(error)}`)
           );
         } catch (error) {
+          if (latestReplyKey && cancelled) return;
           // LAB-3362: log the name, status and message only. The error can hold the whole prompt. A tool name is
           // logged only when it is one of the caller's extra tools (for example draft_intro).
           this.logger.error(

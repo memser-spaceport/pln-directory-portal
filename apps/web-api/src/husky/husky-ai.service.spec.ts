@@ -1151,6 +1151,8 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
       await flushBackgroundWork();
 
       expect(store.get(KEY)).toBe('');
+      expect(logger.error).not.toHaveBeenCalled();
+      expect(generateTextMock).not.toHaveBeenCalled();
     });
 
     it('a cancel while the reply write is pending clears the key again and does not close the stream', async () => {
