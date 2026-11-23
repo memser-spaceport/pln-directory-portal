@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from "../shared/prisma.service";
 import { CurrentUserAccessDto } from './rbac.types';
@@ -430,6 +431,9 @@ export class RbacService {
   }
 
   async findMemberByEmail(email: string) {
+    if (typeof email !== 'string' || email.trim() === '') {
+      throw new UnauthorizedException('Invalid Session. Please login and try again');
+    }
     return this.prisma.member.findFirst({
       where: {
         email: {

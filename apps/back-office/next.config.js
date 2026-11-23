@@ -9,8 +9,6 @@ const AWS_S3_DOMAIN = process.env.AWS_S3_DOMAIN || '';
 const nextConfig = {
   env: {
     WEB_API_BASE_URL: process.env.WEB_API_BASE_URL,
-    ADMIN_LOGIN_USERNAME: process.env.ADMIN_LOGIN_USERNAME,
-    ADMIN_LOGIN_PASSWORD: process.env.ADMIN_LOGIN_PASSWORD,
     WEB_UI_BASE_URL: process.env.WEB_UI_BASE_URL,
   },
   /*

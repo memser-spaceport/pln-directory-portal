@@ -22,7 +22,7 @@ import { DemoDaysService } from './demo-days.service';
 import { DemoDayFundraisingProfilesService } from './demo-day-fundraising-profiles.service';
 import { DemoDayEngagementService } from './demo-day-engagement.service';
 import { DemoDayEngagementAnalyticsService } from './demo-day-engagement-analytics.service';
-import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { OptionalUserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { UploadsService } from '../uploads/uploads.service';
 import { UploadKind, UploadScopeType } from '@prisma/client';
@@ -55,14 +55,14 @@ export class DemoDaysController {
   ) {}
 
   @Get()
-  @UseGuards(UserTokenCheckGuard)
+  @UseGuards(OptionalUserTokenCheckGuard)
   @NoCache()
   async getAllDemoDays(@Req() req) {
     return this.demoDaysService.getAllDemoDaysPublic(req.userEmail || null);
   }
 
   @Get(':demoDayUidOrSlug')
-  @UseGuards(UserTokenCheckGuard)
+  @UseGuards(OptionalUserTokenCheckGuard)
   @NoCache()
   async getCurrentDemoDay(@Param('demoDayUidOrSlug') demoDayUidOrSlug: string, @Req() req) {
     return this.demoDaysService.getDemoDayAccess(req.userEmail || null, demoDayUidOrSlug);

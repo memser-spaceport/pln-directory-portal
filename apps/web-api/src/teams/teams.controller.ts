@@ -38,7 +38,7 @@ import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { AdminAuthGuard } from '../guards/admin-auth.guard';
 import { ParticipantsReqValidationPipe } from '../pipes/participant-request-validation.pipe';
 import { MembersService } from '../members/members.service';
-import { OptionalUserTokenCheckGuard, UserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { OptionalUserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { TeamMembershipSourceReadAuthGuard } from '../guards/admin-auth.guard';
 import { QueryCache } from '../decorators/query-cache.decorator';
 import { UpdateTeamAccessLevelDto } from './dto/teams.dto';
@@ -60,7 +60,7 @@ export class TeamsController {
   @ApiQueryFromZod(TeamQueryParams)
   @QueryCache()
   @NoCache()
-  @UseGuards(UserTokenCheckGuard)
+  @UseGuards(OptionalUserTokenCheckGuard)
   async getTeamFilters(@Req() request) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseTeamWithRelationsSchema);
     const builder = new PrismaQueryBuilder(queryableFields);
@@ -94,7 +94,7 @@ export class TeamsController {
   @ApiQueryFromZod(TeamQueryParams)
   @ApiOkResponseFromZod(ResponseTeamWithRelationsSchema.array())
   @NoCache()
-  @UseGuards(UserTokenCheckGuard)
+  @UseGuards(OptionalUserTokenCheckGuard)
   async findAll(@Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseTeamWithRelationsSchema);
     const builder = new PrismaQueryBuilder(queryableFields);
@@ -166,7 +166,7 @@ export class TeamsController {
 
     const result = await this.teamsService.findAll(builtQuery, statusFilter);
     // Stamp `isFollowed` per team for the authenticated caller (false for all
-    // when anonymous). Optional auth via UserTokenCheckGuard keeps this public.
+    // when anonymous). Optional auth via OptionalUserTokenCheckGuard keeps this public.
     await this.stampIsFollowed(result.teams, request['userEmail']);
     if (!request['userEmail']) {
       for (const team of result.teams as any[]) {
@@ -228,7 +228,7 @@ export class TeamsController {
   @ApiNotFoundResponse(NOT_FOUND_GLOBAL_RESPONSE_SCHEMA)
   @ApiQueryFromZod(TeamDetailQueryParams)
   @NoCache()
-  @UseGuards(UserTokenCheckGuard)
+  @UseGuards(OptionalUserTokenCheckGuard)
   async findOne(@Req() request, @ApiDecorator() { params: { uid } }: RouteShape['getTeam']) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseTeamWithRelationsSchema);
     const builder = new PrismaQueryBuilder(queryableFields, ENABLED_RETRIEVAL_PROFILE);
