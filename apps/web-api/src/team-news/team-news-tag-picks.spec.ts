@@ -167,15 +167,30 @@ describe('getDigestNewsPicks by news tags (LAB-2999)', () => {
       expect(await picksOf(service)).toEqual(['funding-other', 'own-story']);
     });
 
-    it('leaves picks unchanged when the member picked no category tags', async () => {
+    it('leaves picks unchanged when a member with saved tags picked no category tags', async () => {
       const { service } = buildService({
         rows: [row('own-story', 'team-own', [], 16, 'PARTNERSHIP'), row('funding-other', 'team-x', [], 18, 'FUNDING')],
         ownTeams: { m1: ['team-own'] },
-        tags: { m1: [] },
-        preferences: { m1: { newsCategoryTags: [] } },
+        tags: { m1: ['desci'] },
+        preferences: { m1: { newsTags: ['desci'], newsCategoryTags: [] } },
       });
 
       expect(await picksOf(service)).toEqual(['own-story']);
+    });
+
+    it('adds stories in the default categories for a member with no saved tags (LAB-3284)', async () => {
+      const { service } = buildService({
+        rows: [
+          row('funding-other', 'team-x', [], 18, 'FUNDING'),
+          row('partnership-other', 'team-y', [], 16, 'PARTNERSHIP'),
+          row('announcement-other', 'team-z', [], 14, 'ANNOUNCEMENT'),
+        ],
+        ownTeams: { m1: [] },
+        tags: { m1: [] },
+        preferences: { m1: { newsTags: [], newsCategoryTags: [] } },
+      });
+
+      expect(await picksOf(service)).toEqual(['funding-other', 'announcement-other']);
     });
 
     it('falls back to the newest network stories for a member with no match', async () => {
@@ -257,6 +272,32 @@ describe('listGroupedByFocusArea For You tag fields (LAB-2999)', () => {
     const result = await service.listGroupedByFocusArea(query, new Set(), 'm1');
 
     expect(result.forYouCategories).toEqual(['FUNDING', 'LAUNCH']);
+  });
+
+  it('returns the default categories for a viewer with no saved tags (LAB-3284)', async () => {
+    const { service } = buildService({
+      rows: [],
+      ownTeams: { m1: [] },
+      tags: { m1: ['ai'] },
+      preferences: { m1: null },
+    });
+
+    const result = await service.listGroupedByFocusArea(query, new Set(), 'm1');
+
+    expect(result.forYouCategories).toEqual(['FUNDING', 'LAUNCH', 'ANNOUNCEMENT']);
+  });
+
+  it('returns no categories for a viewer with saved tags and no category tags', async () => {
+    const { service } = buildService({
+      rows: [],
+      ownTeams: { m1: [] },
+      tags: { m1: ['ai'] },
+      preferences: { m1: { newsTags: ['ai'] } },
+    });
+
+    const result = await service.listGroupedByFocusArea(query, new Set(), 'm1');
+
+    expect(result.forYouCategories).toEqual([]);
   });
 
   it('returns empty tag fields for a signed-out viewer', async () => {
