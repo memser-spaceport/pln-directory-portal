@@ -66,6 +66,8 @@ export class MemberExperiencesController {
     @ApiDecorator() { params: { uid }, body }: RouteShape['updateMemberExperience'],
     @Req() req
   ) {
+    const experience = await this.memberExperiencesService.findOne(uid);
+    await this.memberExperiencesService.assertSelfOrAdmin(experience?.memberUid, req.userEmail);
     this.validateExperienceDates(body as UpdateMemberExperienceDto);
     return await this.memberExperiencesService.update(uid, body as UpdateMemberExperienceDto, req.userEmail);
   }

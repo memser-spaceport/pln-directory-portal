@@ -50,7 +50,7 @@ describe('member experiences — requester must be the member or a directory adm
   it('refuses a stranger on create, update and remove', async () => {
     const { service, controller, prisma } = setup(stranger);
     await expect(controller.create(dto, req)).rejects.toBeInstanceOf(ForbiddenException);
-    await expect(service.update('e1', { title: 'x' } as any, req.userEmail)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(controller.update({ params: { uid: 'e1' }, body: { title: 'x' } } as any, req)).rejects.toBeInstanceOf(ForbiddenException);
     await expect(controller.remove({ params: { uid: 'e1' } } as any, req)).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.memberExperience.create).not.toHaveBeenCalled();
     expect(prisma.$transaction).not.toHaveBeenCalled();
@@ -63,10 +63,16 @@ describe('member experiences — requester must be the member or a directory adm
   ])('allows %s', async (_label, requester) => {
     const { service, controller, prisma } = setup(requester);
     await controller.create(dto, req);
-    await service.update('e1', { title: 'x' } as any, req.userEmail);
+    await controller.update({ params: { uid: 'e1' }, body: { title: 'x' } } as any, req);
     await controller.remove({ params: { uid: 'e1' } } as any, req);
     expect(prisma.memberExperience.create).toHaveBeenCalledTimes(1);
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(prisma.memberExperience.delete).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the MCP update path working for a session without an email (ownership proven by own())', async () => {
+    const { service, prisma } = setup(null);
+    await service.update('e1', { title: 'x' } as any, '');
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 });

@@ -31,7 +31,7 @@ export class MemberExperiencesService {
 
   /**
    * Only the owning member or a directory admin may write a member's experiences.
-   * Routes call this before create/update/remove; the body's memberUid is never trusted for authorization.
+   * Routes call this before create/update/remove (on the stored owner for update/remove); the body's memberUid is never trusted for authorization.
    *
    * @throws ForbiddenException when the requester is neither the member nor an admin
    */
@@ -111,8 +111,8 @@ export class MemberExperiencesService {
    */
   async update(uid: string, updateMemberExperiencedto: UpdateMemberExperienceDto, requesterEmailId: string) {
     try {
-      // The owner comes from the stored record; the body's memberUid is ignored below.
-      await this.assertSelfOrAdmin((await this.findOne(uid))?.memberUid, requesterEmailId);
+      // Callers authorize first (the route via assertSelfOrAdmin on the stored owner, the MCP tool via
+      // its own() check); the body's memberUid is ignored below so it can never move the record.
       const { memberUid, ...experienceData } = updateMemberExperiencedto;
 
       // Trim title and company fields if they exist
