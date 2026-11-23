@@ -1515,6 +1515,17 @@ export class TeamsService {
   async addEditTeamAsk(teamUid, teamName, requesterEmailId, data) {
     let addEditResponse;
 
+    // Ownership fields are never taken from the client: the ask is bound to the authorized path team.
+    // Checked before the try block below, which swallows errors.
+    const { uid, isDeleted, ...rest } = data;
+    const fields = { ...rest, teamUid: undefined, projectUid: undefined };
+    if (uid) {
+      const ask = await this.prisma.ask.findFirst({ where: { uid, teamUid }, select: { uid: true } });
+      if (!ask) {
+        throw new ForbiddenException(`Ask ${uid} does not belong to team ${teamUid}`);
+      }
+    }
+
     try {
       //get existing asks related to teamuid
       const teamAsks = await this.prisma.ask.findMany({
@@ -1522,18 +1533,18 @@ export class TeamsService {
       });
 
       await this.prisma.$transaction(async (tx) => {
-        if (data.uid) {
-          if (data.isDeleted) {
+        if (uid) {
+          if (isDeleted) {
             //deleting asks
             addEditResponse = await this.prisma.ask.delete({
-              where: { uid: data.uid },
+              where: { uid },
             });
           } else {
             //updating asks
             addEditResponse = await this.prisma.ask.update({
-              where: { uid: data.uid },
+              where: { uid },
               data: {
-                ...data,
+                ...fields,
                 closedAt: data.status === AskStatus.CLOSED ? new Date() : null,
               },
             });
@@ -1542,7 +1553,7 @@ export class TeamsService {
           //inserting asks
           addEditResponse = await tx.ask.create({
             data: {
-              ...data,
+              ...fields,
               teamUid: teamUid,
             },
           });
