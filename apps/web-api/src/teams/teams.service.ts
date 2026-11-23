@@ -466,6 +466,9 @@ export class TeamsService {
     requestorEmail: string
   ): Promise<Team> {
     const updatedTeam: any = teamParticipantRequest.newData;
+    if (updatedTeam?.teamMemberRoles?.some((role) => role?.teamUid !== teamUid)) {
+      throw new ForbiddenException('teamMemberRoles must belong to the team being updated');
+    }
     let result;
     this.logger.info(`Going to update information about the '${teamUid}' team`);
     const requestor = await this.membersService.findMemberByEmail(requestorEmail);
