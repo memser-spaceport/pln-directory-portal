@@ -4,6 +4,7 @@ import type {
   LabosDigestChoiceResponse,
   LabosDigestChoiceValue,
   LabosDigestPage,
+  LabosDigestPageForumPost,
   LabosDigestNetworkNews,
   LabosDigestPageIssue,
   LabosDigestPageSource,
@@ -53,10 +54,51 @@ export const EVENTS_LIMIT = 5;
 /** How many issues Past issues lists (LAB-3294). */
 export const PAST_ISSUES_LIMIT = 8;
 
-/** One issue's content, as the link token carries it. */
-type DigestIssue = Pick<DigestLinkPayload, 'f' | 's' | 'n' | 'l' | 'p'>;
+/** One issue's content, as the link token carries it, with its recorded id when there is one (LAB-3356). */
+type DigestIssue = Pick<DigestLinkPayload, 'f' | 's' | 'n' | 'l' | 'p'> & { uid?: string };
+
+/**
+ * Who reads the page (LAB-3356). `null` is a signed-out reader: no member data at all. `canReadForum` gives them
+ * the forum posts' bodies and authors.
+ */
+export type DigestViewer = { uid: string; canReadForum: boolean } | null;
+
+/** A forum post for a reader who may not read the forum: what the row shows, nothing from the post itself. */
+export function lockForumPost(post: LabosDigestPageForumPost): LabosDigestPageForumPost {
+  return {
+    tid: post.tid,
+    title: post.title,
+    locked: true,
+    authorName: null,
+    authorRole: null,
+    authorTeam: null,
+    authorAvatarUrl: null,
+    contentHtml: null,
+    url: post.url,
+    replyCount: post.replyCount,
+  };
+}
 
 type Tx = Prisma.TransactionClient;
+
+/** A recorded issue row as the page reads it. */
+function issueFromRow(row: {
+  uid: string;
+  frequency: LabosDigestFrequency;
+  sentAt: Date;
+  newsItemUids: string[];
+  leadUid: string | null;
+  forumTids: number[];
+}): DigestIssue {
+  return {
+    uid: row.uid,
+    f: toFrequencyValue(row.frequency),
+    s: row.sentAt.toISOString(),
+    n: row.newsItemUids,
+    l: row.leadUid ?? undefined,
+    p: row.forumTids,
+  };
+}
 
 /** The story's main source, then its other sources, each once (compared after URL normalization). */
 export function storySources(sourceUrl: string, sourceUrls: string[] | null | undefined): LabosDigestPageSource[] {
@@ -72,9 +114,10 @@ export function storySources(sourceUrl: string, sourceUrls: string[] | null | un
 }
 
 /**
- * The public digest page (LAB-3263): reads one member's digest from a signed email link, and saves their
- * "More like this" / "Less like this" choices. Reading never changes anything, so email link scanners are safe.
- * A choice moves the member's interest profile topic weights; it never changes their saved news tags.
+ * The public digest page (LAB-3263). LAB-3356: a signed email link only opens an issue (`exchange`); the issue is
+ * then read by id with the signed-in reader's own data, or none signed out, and "More like this" / "Less like this"
+ * save for the signed-in member only. Reading never changes anything but the exchange's issue record, so email link
+ * scanners are safe. A choice moves the member's interest profile topic weights; it never changes their saved tags.
  */
 @Injectable()
 export class LabosDigestPageService {
@@ -87,12 +130,76 @@ export class LabosDigestPageService {
   ) {}
 
   /**
-   * The link's digest, or with `issueKey` (a send time) one of the same member's past issues (LAB-3294).
+   * DEPRECATED (LAB-3356): the link's digest, or with `issueKey` (a send time) one of the same member's past issues
+   * (LAB-3294), read as the link's member. Kept for one release so an open old page still loads; the page now uses
+   * `exchange` and `readIssueByUid`.
    * @throws DigestLinkError for a bad token; NotFoundException when the member or that issue doesn't exist.
    */
   async read(token: string, issueKey?: string): Promise<LabosDigestPage> {
     const link = verifyDigestLinkToken(token);
     const issue = await this.issueOf(link, issueKey);
+    const own: DigestIssue = { f: link.f, s: link.s, n: link.n, l: link.l, p: link.p };
+    return this.readIssue(issue, { uid: link.m, canReadForum: true }, this.listIssues(link.m, own, true));
+  }
+
+  /**
+   * LAB-3356: swaps a link for the id of its issue, recording the issue when the notification service didn't
+   * (best effort). With `issueKey` (a send time from an older Past issues link), the link member's recorded issue
+   * sent then. Changes no choice or setting.
+   * @throws DigestLinkError for a bad token; NotFoundException for an unknown member or past issue.
+   */
+  async exchange(token: string, issueKey?: string): Promise<{ issueUid: string }> {
+    const link = verifyDigestLinkToken(token);
+    if (issueKey && !sameInstant(issueKey, link.s)) {
+      const row = await this.prisma.labosDigestIssue.findFirst({
+        where: { memberUid: link.m, sentAt: new Date(issueKey) },
+        orderBy: { createdAt: 'desc' },
+        select: { uid: true },
+      });
+      if (!row) throw new NotFoundException('Issue not found');
+      return { issueUid: row.uid };
+    }
+    const member = await this.prisma.member.findUnique({ where: { uid: link.m }, select: { uid: true } });
+    if (!member) throw new NotFoundException('Digest not found');
+    const frequency = toFrequencyKind(link.f);
+    const sentAt = new Date(link.s);
+    // The row the send recorded, or a new one from the link's own fields. An existing row is never changed.
+    const row = await this.prisma.labosDigestIssue.upsert({
+      where: { memberUid_frequency_sentAt: { memberUid: link.m, frequency, sentAt } },
+      create: {
+        memberUid: link.m,
+        frequency,
+        sentAt,
+        newsItemUids: link.n,
+        leadUid: link.l && link.n.includes(link.l) ? link.l : null,
+        forumTids: link.p,
+      },
+      update: {},
+      select: { uid: true },
+    });
+    return { issueUid: row.uid };
+  }
+
+  /**
+   * LAB-3356: one issue by id, for anyone. `viewer` is the signed-in member reading it (any member, not only the
+   * one it was sent to), or null signed out: then no name, choices, follows, topics or Past issues. Forum bodies and
+   * authors only for a viewer who may read the forum.
+   * @throws NotFoundException for an unknown issue.
+   */
+  async readIssueByUid(issueUid: string, viewer: DigestViewer): Promise<LabosDigestPage> {
+    const row = await this.prisma.labosDigestIssue.findUnique({ where: { uid: issueUid } });
+    if (!row) throw new NotFoundException('Issue not found');
+    const issue = issueFromRow(row);
+    const pastIssues = viewer ? this.listIssues(viewer.uid, issue, row.memberUid === viewer.uid) : Promise.resolve([]);
+    return this.readIssue(issue, viewer, pastIssues);
+  }
+
+  /** One issue as `viewer` sees it. The token read and the issue read share it, so the two can't drift. */
+  private async readIssue(
+    issue: DigestIssue,
+    viewer: DigestViewer,
+    pastIssues: Promise<LabosDigestPageIssue[]>
+  ): Promise<LabosDigestPage> {
     const now = new Date();
     const [
       member,
@@ -109,7 +216,9 @@ export class LabosDigestPageService {
       networkNews,
       events,
     ] = await Promise.all([
-      this.prisma.member.findUnique({ where: { uid: link.m }, select: { name: true, preferences: true } }),
+      viewer
+        ? this.prisma.member.findUnique({ where: { uid: viewer.uid }, select: { name: true, preferences: true } })
+        : null,
       this.prisma.teamNewsItem.findMany({
         where: { uid: { in: issue.n } },
         select: {
@@ -127,37 +236,48 @@ export class LabosDigestPageService {
           ...TEAM_NEWS_IMAGE_SELECT,
         },
       }),
-      this.prisma.labosDigestChoice.findMany({
-        where: { memberUid: link.m, newsItemUid: { in: issue.n }, undoneAt: null },
-        select: { newsItemUid: true, choice: true },
-      }),
+      viewer
+        ? this.prisma.labosDigestChoice.findMany({
+            where: { memberUid: viewer.uid, newsItemUid: { in: issue.n }, undoneAt: null },
+            select: { newsItemUid: true, choice: true },
+          })
+        : ([] as { newsItemUid: string; choice: LabosDigestChoiceKind }[]),
       this.forum.read(issue.p),
-      this.prisma.follow.findMany({
-        where: { memberUid: link.m, entityType: 'TEAM' },
-        select: { entityUid: true },
-      }),
+      viewer
+        ? this.prisma.follow.findMany({
+            where: { memberUid: viewer.uid, entityType: 'TEAM' },
+            select: { entityUid: true },
+          })
+        : ([] as { entityUid: string }[]),
       this.prisma.feedComment.groupBy({
         by: ['newsItemUid'],
         where: { newsItemUid: { in: issue.n } },
         _count: { _all: true },
       }),
-      this.prisma.teamMemberRole.count({
-        where: { memberUid: link.m, OR: [{ endDate: null }, { endDate: { gte: now } }] },
-      }),
+      viewer
+        ? this.prisma.teamMemberRole.count({
+            where: { memberUid: viewer.uid, OR: [{ endDate: null }, { endDate: { gte: now } }] },
+          })
+        : 0,
       this.tagVocabulary.getVocabulary(),
       this.newsQuery.listNewsTags(now),
-      this.prisma.memberInterestProfileEntry.findMany({
-        where: { memberUid: link.m, kind: 'TOPIC' },
-        select: { key: true, score: true },
-      }),
-      this.listIssues(link),
+      viewer
+        ? this.prisma.memberInterestProfileEntry.findMany({
+            where: { memberUid: viewer.uid, kind: 'TOPIC' },
+            select: { key: true, score: true },
+          })
+        : ([] as { key: string; score: number }[]),
+      pastIssues,
       this.listNetworkNews(issue),
       this.listUpcomingEvents(now),
     ]);
-    if (!member) throw new NotFoundException('Digest not found');
+    if (viewer && !member) throw new NotFoundException('Digest not found');
     // Same tags News preferences shows as ticked: the saved list, else the starting tags. Reading stores nothing.
+    // Signed out there are none, so every offered tag is suggested, by title (no weights to order by).
     const followedSlugs =
-      readChosenNewsTags(member.preferences) ?? (await this.tagVocabulary.seedTagsForMember(link.m));
+      viewer && member
+        ? readChosenNewsTags(member.preferences) ?? (await this.tagVocabulary.seedTagsForMember(viewer.uid))
+        : [];
 
     const itemByUid = new Map(items.map((item) => [item.uid, item]));
     const choiceByUid = new Map<string, LabosDigestChoiceValue>(
@@ -196,9 +316,9 @@ export class LabosDigestPageService {
     return {
       frequency: issue.f,
       sentAt: issue.s,
-      firstName: member.name?.trim().split(/\s+/)[0] || null,
+      firstName: member?.name?.trim().split(/\s+/)[0] || null,
       stories,
-      forumPosts: forum.posts,
+      forumPosts: viewer?.canReadForum ? forum.posts : forum.posts.map(lockForumPost),
       forumUnavailable: forum.unavailable,
       isTeamMember: activeRoles > 0,
       nextSendAt: nextDigestSendAt(issue.f, now).toISOString(),
@@ -215,18 +335,22 @@ export class LabosDigestPageService {
   }
 
   /**
-   * Saves More or Less on one story of the link's digest, or undoes the active choice (`none`).
-   * @throws DigestLinkError for a bad token; BadRequestException for a story that is not in the link.
+   * LAB-3356: saves More or Less on one story of the issue for the signed-in member, or undoes their active choice
+   * (`none`). Any member may choose on any issue they can open; it only ever changes their own weights.
+   * @throws NotFoundException for an unknown issue or story; BadRequestException for a story not in the issue.
    */
-  async choose(
-    token: string,
+  async chooseByIssue(
+    issueUid: string,
+    memberUid: string,
     newsItemUid: string,
-    choice: LabosDigestChoiceValue | 'none',
-    issueKey?: string
+    choice: LabosDigestChoiceValue | 'none'
   ): Promise<LabosDigestChoiceResponse> {
-    const link = verifyDigestLinkToken(token);
-    const issue = await this.issueOf(link, issueKey);
-    if (!issue.n.includes(newsItemUid)) throw new BadRequestException('This story is not in the digest');
+    const row = await this.prisma.labosDigestIssue.findUnique({
+      where: { uid: issueUid },
+      select: { newsItemUids: true },
+    });
+    if (!row) throw new NotFoundException('Issue not found');
+    if (!row.newsItemUids.includes(newsItemUid)) throw new BadRequestException('This story is not in the digest');
 
     const [item, vocabulary] = await Promise.all([
       this.prisma.teamNewsItem.findUnique({ where: { uid: newsItemUid }, select: { tags: true } }),
@@ -235,7 +359,9 @@ export class LabosDigestPageService {
     if (!item) throw new NotFoundException('Story not found');
     const topics = storyFocusTags(item.tags, (slug) => vocabulary.has(slug));
 
-    const result = await this.prisma.$transaction((tx) => this.chooseLocked(tx, link, newsItemUid, choice, topics));
+    const result = await this.prisma.$transaction((tx) =>
+      this.chooseLocked(tx, memberUid, newsItemUid, choice, topics)
+    );
     if (result.changed) await this.cache.reset({ service: 'members' });
     return result;
   }
@@ -372,41 +498,44 @@ export class LabosDigestPageService {
       orderBy: { createdAt: 'desc' },
     });
     if (!row) throw new NotFoundException('Issue not found');
-    return {
-      f: toFrequencyValue(row.frequency),
-      s: row.sentAt.toISOString(),
-      n: row.newsItemUids,
-      l: row.leadUid ?? undefined,
-      p: row.forumTids,
-    };
+    return issueFromRow(row);
   }
 
   /**
-   * The member's latest issues, newest first, at most PAST_ISSUES_LIMIT. The link's own issue is always listed, even
-   * when it was sent before issues were recorded; each is titled by its top story, else its first story.
+   * The member's latest issues, newest first, at most PAST_ISSUES_LIMIT, with `isLinkIssue` on `current` (matched by
+   * id when it has one, else by send time). With `keepCurrent` it is always listed, even when it was sent before
+   * issues were recorded (then its `uid` is null). Each is titled by its top story, else its first story.
    */
-  private async listIssues(link: DigestLinkPayload): Promise<LabosDigestPageIssue[]> {
+  private async listIssues(
+    memberUid: string,
+    current: DigestIssue,
+    keepCurrent: boolean
+  ): Promise<LabosDigestPageIssue[]> {
     const rows = await this.prisma.labosDigestIssue.findMany({
-      where: { memberUid: link.m },
+      where: { memberUid },
       orderBy: { sentAt: 'desc' },
       take: PAST_ISSUES_LIMIT,
-      select: { frequency: true, sentAt: true, newsItemUids: true, leadUid: true },
+      select: { uid: true, frequency: true, sentAt: true, newsItemUids: true, leadUid: true },
     });
+    const isCurrent = (row: { uid: string; sentAt: Date }) =>
+      current.uid ? row.uid === current.uid : sameInstant(row.sentAt.toISOString(), current.s);
     const listed = rows.map((row) => ({
+      uid: row.uid as string | null,
       sentAt: row.sentAt.toISOString(),
       frequency: toFrequencyValue(row.frequency),
       titleUid: row.leadUid ?? row.newsItemUids[0] ?? null,
-      isLinkIssue: sameInstant(row.sentAt.toISOString(), link.s),
+      isLinkIssue: isCurrent(row),
     }));
-    if (!listed.some((issue) => issue.isLinkIssue)) {
+    if (keepCurrent && !listed.some((issue) => issue.isLinkIssue)) {
       listed.push({
-        sentAt: new Date(link.s).toISOString(),
-        frequency: link.f,
-        titleUid: link.l ?? link.n[0] ?? null,
+        uid: current.uid ?? null,
+        sentAt: new Date(current.s).toISOString(),
+        frequency: current.f,
+        titleUid: current.l ?? current.n[0] ?? null,
         isLinkIssue: true,
       });
       listed.sort((a, b) => Date.parse(b.sentAt) - Date.parse(a.sentAt));
-      // One too many now: drop the oldest that isn't the link's, so the link's issue stays listed.
+      // One too many now: drop the oldest that isn't the current one, so the current one stays listed.
       if (listed.length > PAST_ISSUES_LIMIT) {
         const oldest = listed.map((issue) => issue.isLinkIssue).lastIndexOf(false);
         listed.splice(oldest, 1);
@@ -426,17 +555,17 @@ export class LabosDigestPageService {
 
   private async chooseLocked(
     tx: Tx,
-    link: DigestLinkPayload,
+    memberUid: string,
     newsItemUid: string,
     choice: LabosDigestChoiceValue | 'none',
     topics: string[]
   ): Promise<LabosDigestChoiceResponse> {
     // One writer per member at a time, so two fast presses can't interleave their read-modify-write of the weights.
-    const locked = await tx.$queryRaw<{ uid: string }[]>`SELECT uid FROM "Member" WHERE uid = ${link.m} FOR UPDATE`;
+    const locked = await tx.$queryRaw<{ uid: string }[]>`SELECT uid FROM "Member" WHERE uid = ${memberUid} FOR UPDATE`;
     if (locked.length === 0) throw new NotFoundException('Digest not found');
 
     const active = await tx.labosDigestChoice.findFirst({
-      where: { memberUid: link.m, newsItemUid, undoneAt: null },
+      where: { memberUid, newsItemUid, undoneAt: null },
     });
     if (active && choice !== 'none' && toChoiceValue(active.choice) === choice) {
       return { newsItemUid, choice, changed: false };
@@ -446,7 +575,7 @@ export class LabosDigestPageService {
     const activeAfter = active ? jsonToWeights(active.afterWeights) : undefined;
 
     const slugs = [...new Set([...topics, ...Object.keys(activeBefore ?? {}), ...Object.keys(activeAfter ?? {})])];
-    const initial = await readTopicWeights(tx, link.m, slugs);
+    const initial = await readTopicWeights(tx, memberUid, slugs);
     let current = initial;
 
     if (active) {
@@ -457,7 +586,7 @@ export class LabosDigestPageService {
     }
 
     if (choice === 'none') {
-      await writeTopicWeights(tx, link.m, initial, current);
+      await writeTopicWeights(tx, memberUid, initial, current);
       return { newsItemUid, choice: null, changed: Boolean(active) };
     }
 
@@ -465,7 +594,7 @@ export class LabosDigestPageService {
     const before = Object.fromEntries(topics.map((slug) => [slug, current[slug] ?? 0]));
     await tx.labosDigestChoice.create({
       data: {
-        memberUid: link.m,
+        memberUid,
         newsItemUid,
         choice: toChoiceKind(choice),
         beforeWeights: before,
@@ -480,7 +609,7 @@ export class LabosDigestPageService {
       },
     });
     const final = { ...current, ...after };
-    await writeTopicWeights(tx, link.m, initial, final);
+    await writeTopicWeights(tx, memberUid, initial, final);
     return { newsItemUid, choice, changed: Boolean(active) || weightsDiffer(initial, final) };
   }
 }
