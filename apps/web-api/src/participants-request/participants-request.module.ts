@@ -11,6 +11,7 @@ import {MembersModule} from "../members/members.module";
 import {TeamEnrichmentModule} from "../team-enrichment/team-enrichment.module";
 import { RbacModule } from '../rbac/rbac.module';
 import { AccessControlV2Module } from '../access-control-v2/access-control-v2.module';
+import { MemberSignUpNotificationsModule } from '../member-sign-up-notifications/member-sign-up-notifications.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { AccessControlV2Module } from '../access-control-v2/access-control-v2.mo
     NotificationSettingsModule,
     RbacModule,
     AccessControlV2Module,
+    MemberSignUpNotificationsModule,
   ],
   controllers: [ParticipantsRequestController],
   providers: [

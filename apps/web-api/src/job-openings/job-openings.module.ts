@@ -16,6 +16,7 @@ import { MembersModule } from '../members/members.module';
 import { IntegrationKeysModule } from '../integration-keys/integration-keys.module';
 import { JobOpeningsIntegrationController } from './job-openings-integration.controller';
 import { JobOpeningsIntegrationService } from './job-openings-integration.service';
+import { MemberSignUpNotificationsModule } from '../member-sign-up-notifications/member-sign-up-notifications.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { JobOpeningsIntegrationService } from './job-openings-integration.servic
     NotificationsModule,
     forwardRef(() => MembersModule),
     IntegrationKeysModule,
+    MemberSignUpNotificationsModule,
   ],
   controllers: [JobOpeningsController, JobOpeningsServiceController, JobOpeningsIntegrationController],
   providers: [
