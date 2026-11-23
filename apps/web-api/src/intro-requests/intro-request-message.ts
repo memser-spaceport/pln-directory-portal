@@ -1,23 +1,12 @@
 import { IntroRequestType } from '@prisma/client';
+import { directoryUrl } from '../utils/directory-url';
+import { telegramLink } from '../utils/telegram/telegram-link';
+import { escapeTelegramHtml } from '../utils/telegram/escape-telegram-html';
 
 const TYPE_LABEL: Record<IntroRequestType, string> = {
   MEMBER: 'intro to member',
   TEAM: 'intro to team',
 };
-
-export function escapeTelegramHtml(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-function telegramLink(url: string, label: string): string {
-  const href = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-  return `<a href="${href}">${escapeTelegramHtml(label)}</a>`;
-}
-
-export function directoryUrl(path: string): string {
-  const base = (process.env.WEB_UI_BASE_URL ?? '').replace(/\/+$/, '');
-  return `${base}${path}`;
-}
 
 export function requesterTeamLabel(roles: { mainTeam: boolean; teamName: string }[], plInfra: boolean): string {
   const names = [...roles]
