@@ -749,6 +749,25 @@ export const LabosDigestPageRequestSchema = z.object({
 
 export const LabosDigestChoiceValueSchema = z.enum(['more', 'less']);
 
+/* LAB-3356: the page by issue id. The link token only opens an issue; sign-in names the reader. */
+
+/** `LabosDigestIssue.uid`: one member's sent issue. */
+const LabosDigestIssueUidSchema = z.string().min(1).max(64);
+
+/** Swaps a link (and an older Past issues send time) for the issue's id. Saves nothing. */
+export const LabosDigestExchangeRequestSchema = LabosDigestPageRequestSchema;
+export const LabosDigestExchangeResponseSchema = z.object({ issueUid: z.string() });
+
+/** The issue by id, with the signed-in reader's own data, or none signed out. */
+export const LabosDigestIssuePageRequestSchema = z.object({ issueUid: LabosDigestIssueUidSchema });
+
+/** More, Less or undo (`none`) on a story of the issue, for the signed-in member. */
+export const LabosDigestIssueChoiceRequestSchema = z.object({
+  issueUid: LabosDigestIssueUidSchema,
+  newsItemUid: z.string().min(1),
+  choice: z.enum(['more', 'less', 'none']),
+});
+
 export const LabosDigestPageSourceSchema = z.object({
   url: z.string(),
   /** The outlet's domain, without `www.`; null when the URL does not parse. */
@@ -784,11 +803,16 @@ export const LabosDigestPageStorySchema = z.object({
 export const LabosDigestPageForumPostSchema = z.object({
   tid: z.number().int(),
   title: z.string(),
-  authorName: z.string(),
+  /**
+   * LAB-3356: true when the reader may not read the forum (signed out, or no forum read permission). A locked post
+   * has its title, reply count and URL only: author fields and `contentHtml` are null.
+   */
+  locked: z.boolean(),
+  authorName: z.string().nullable(),
   authorRole: z.string().nullable(),
   authorTeam: z.string().nullable(),
   authorAvatarUrl: z.string().nullable(),
-  contentHtml: z.string(),
+  contentHtml: z.string().nullable(),
   url: z.string(),
   /** Replies to the thread now, for "From the forum" (LAB-3293): the forum's post count less the opening post. */
   replyCount: z.number().int(),
@@ -796,11 +820,13 @@ export const LabosDigestPageForumPostSchema = z.object({
 
 /** One issue in the page's Past issues list (LAB-3294), newest first. */
 export const LabosDigestPageIssueSchema = z.object({
+  /** LAB-3356: the issue's id for `?issue=`; null for a link issue that was never recorded. */
+  uid: z.string().nullable(),
   sentAt: z.string(),
   frequency: LabosDigestFrequencySchema,
   /** The issue's top story title (else its first story's), null when that story is gone. */
   title: z.string().nullable(),
-  /** The link's own issue: the page opens it without `issue`. */
+  /** The issue on the page: the link's own issue on the token read, the issue read on the issue read. */
   isLinkIssue: z.boolean(),
 });
 
@@ -929,3 +955,4 @@ export type RecordLabosDigestIssuesRequest = z.infer<typeof RecordLabosDigestIss
 export type LabosDigestChoiceValue = z.infer<typeof LabosDigestChoiceValueSchema>;
 export type LabosDigestChoiceRequest = z.infer<typeof LabosDigestChoiceRequestSchema>;
 export type LabosDigestChoiceResponse = z.infer<typeof LabosDigestChoiceResponseSchema>;
+export type LabosDigestIssueChoiceRequest = z.infer<typeof LabosDigestIssueChoiceRequestSchema>;
