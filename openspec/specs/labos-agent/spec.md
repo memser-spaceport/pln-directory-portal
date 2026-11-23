@@ -325,7 +325,7 @@ When the turn has a draft, the answer text SHALL be one short line: "Here is a d
 
 ### Requirement: Current intro draft in C1
 
-The C1 body MAY have `introDraft: { target: { type, uid }, text }` (contract change 4, section 11; LAB-3362). The object and its `target` SHALL be strict; `context.introTarget` does not change. `text` SHALL be 1 to 3500 characters after trim. A bad shape, an extra key, an empty text or a text over 3500 characters SHALL get the C1 400. `introDraft` is allowed with any `context.page` and with no `context`. An unknown or deleted target SHALL get 404 `INTRO_TARGET_NOT_FOUND` before the stream, with the lookup of the intro page (`findAgentTargetName`). The backend SHALL put the target and the text into the prompt context of this turn only. The agent SHALL use the text only when the member asks to change the draft. LAB-3367 R2: if the member makes a brief revision request such as "make it shorter", the agent SHALL revise this draft, also when the page or the mention chips of the message point to another member or team. R4: a member or team name in the revision, such as "mention that I know Acme Team", is part of the new text and SHALL NOT change the target. R3: if the member asks for a different draft or asks to change other content instead (for example "write the intro to Acme Team instead", "shorten your last answer" or a change to a news title), the agent SHALL follow that request and SHALL NOT use the draft text for it. These rules add no target and do not force a `draft_intro` call. `draft_intro` SHALL accept the `introDraft` target as a target of the turn, and SHALL check the sender eligibility and the target again. The backend SHALL NOT store `introDraft`, write a cache key for it, or write its text to a log line, error message or analytics event. The Husky thread summary has no extra rule (11.7 A). A Husky catch and the C1 controller catch SHALL log only `{ name, statusCode, message }` of an error, never the error object: an AI SDK `APICallError` holds `requestBodyValues`, the whole prompt. When the stream fails after the headers, the controller SHALL destroy the connection with no error argument. For `AI_InvalidToolArgumentsError`, `AI_TypeValidationError` and `AI_JSONParseError`, the message has the model input (for example the `draft_intro` text), so the log SHALL have only `name`, plus `toolName` when it is a tool of that call, and no `message`. The Husky answer stream `error` part SHALL use the same log form.
+The C1 body MAY have `introDraft: { target: { type, uid }, text }` (contract change 4, section 11; LAB-3362). The object and its `target` SHALL be strict; `context.introTarget` does not change. `text` SHALL be 1 to 3500 characters after trim. A bad shape, an extra key, an empty text or a text over 3500 characters SHALL get the C1 400. `introDraft` is allowed with any `context.page` and with no `context`. An unknown or deleted target SHALL get 404 `INTRO_TARGET_NOT_FOUND` before the stream, with the lookup of the intro page (`findAgentTargetName`). The backend SHALL put the target and the text into the prompt context of this turn only. The agent SHALL use the text only when the member asks to change the draft. LAB-3367 R2: if the member makes a brief revision request such as "make it shorter", the agent SHALL revise this draft, also when the page or the mention chips of the message point to another member or team. R4: a member or team name in the revision, such as "mention that I know Acme Team", is part of the new text and SHALL NOT change the target. Q1: in a revision, the agent SHALL use only facts the member gave. It SHALL NOT treat a fact as confirmed only because it is in the draft. It SHALL NOT add a role, shared work, experience or that someone can vouch for the member, when the member did not give it. F1: "your last answer" is the latest assistant reply in the chat history. If that reply is the intro draft line, the agent SHALL revise the draft. If it is a normal answer, the agent SHALL change that answer and SHALL NOT change the draft. If the history does not show the latest reply, the agent SHALL ask which reply to change and leave the draft unchanged. F1 is prompt guidance only: C1 sends no earlier reply, and the model sees only the Husky thread summary (500 characters at most, written after the stream closes), so the backend does not check this choice. R3: if the member asks for a different draft or asks to change other content instead (for example "write the intro to Acme Team instead" or a change to a news title), the agent SHALL follow that request and SHALL NOT use the draft text for it. F2: a draft for a different member or team needs a target of the turn (the page, a mention chip or the card). If the member gives only a name of a member or team that is not a target of the turn, the agent SHALL NOT call `draft_intro` for it, and SHALL ask the member to @mention it. These rules add no target and do not force a `draft_intro` call. `draft_intro` SHALL accept the `introDraft` target as a target of the turn, and SHALL check the sender eligibility and the target again. The backend SHALL NOT store `introDraft`, write a cache key for it, or write its text to a log line, error message or analytics event. The Husky thread summary has no extra rule (11.7 A). A Husky catch and the C1 controller catch SHALL log only `{ name, statusCode, message }` of an error, never the error object: an AI SDK `APICallError` holds `requestBodyValues`, the whole prompt. When the stream fails after the headers, the controller SHALL destroy the connection with no error argument. For `AI_InvalidToolArgumentsError`, `AI_TypeValidationError` and `AI_JSONParseError`, the message has the model input (for example the `draft_intro` text), so the log SHALL have only `name`, plus `toolName` when it is a tool of that call, and no `message`. The Husky answer stream `error` part SHALL use the same log form.
 
 #### Scenario: Make it shorter
 
@@ -350,10 +350,30 @@ The C1 body MAY have `introDraft: { target: { type, uid }, text }` (contract cha
 
 #### Scenario: A request for a different draft or other content instead (R3)
 
-- **GIVEN** an intro card for Grace that waits in the chat
-- **WHEN** the member sends "Write the intro to Acme Team instead." or "Shorten your last answer."
+- **GIVEN** an intro card for Grace that waits in the chat, and a target of the turn for Acme Team (the page or a mention chip)
+- **WHEN** the member sends "Write the intro to Acme Team instead."
 - **THEN** the prompt context tells the agent to follow that request and not to use the draft text
-- **AND** the targets of the turn do not change, and the turn has no draft without a `draft_intro` call
+- **AND** a `draft_intro` call for Acme Team gives one draft, and the targets of the turn do not change
+
+#### Scenario: Only the facts of the member (Q1)
+
+- **GIVEN** an intro card that waits in the chat
+- **WHEN** the member asks for a revision
+- **THEN** the prompt context tells the agent to use only facts the member gave, and not to treat a fact in the draft as confirmed
+
+#### Scenario: Your last answer (F1)
+
+- **GIVEN** an intro card that waits in the chat
+- **WHEN** the member sends "Shorten your last answer."
+- **THEN** the prompt context tells the agent: revise the draft when the latest reply is the draft line, change the answer and keep the draft when it is a normal answer, and ask which reply and leave the draft unchanged when the history does not show it
+- **AND** the turn has no draft without a `draft_intro` call
+
+#### Scenario: A switch by name only (F2)
+
+- **GIVEN** an intro card for Grace that waits in the chat, and no other target of the turn
+- **WHEN** the member sends "Write the intro to Linus instead."
+- **THEN** the prompt context tells the agent to ask for an @mention and not to call `draft_intro` for a name
+- **AND** a `draft_intro` call for another uid gives the "not the intro target of this turn" refusal and no draft
 
 #### Scenario: Unknown introDraft target
 

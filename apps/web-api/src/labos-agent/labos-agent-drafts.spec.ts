@@ -530,11 +530,36 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
   const NAME_IN_EDIT =
     'A member or team name in the revision, such as "mention that I know Acme Team", is part of the new text. ' +
     'It does not change the target.';
+  const FACTS_ONLY =
+    'In a revision, use only facts the member gave. ' +
+    'Do not treat a fact as confirmed only because it is in the draft. ' +
+    'Do not add a role, shared work, experience or that someone can vouch for the member, ' +
+    'when the member did not give it.';
+  const LAST_ANSWER_IS_DRAFT =
+    '"Your last answer" is your latest reply in the chat history. ' +
+    `If that reply is the draft line "${INTRO_DRAFT_LINE}", revise this draft.`;
+  const LAST_ANSWER_IS_NORMAL = 'If that reply is a normal answer, change that answer and do not change this draft.';
+  const LAST_ANSWER_UNKNOWN =
+    'If the chat history does not show your latest reply, ask which reply to change and leave this draft unchanged.';
   const DIFFERENT_ITEM =
     'If the member asks for a different draft or asks to change other content instead, follow that request. ' +
     'Do not use this draft text for that request. ' +
-    'Examples: "write the intro to Acme Team instead", "shorten your last answer".';
-  const RULES = [BRIEF_REVISION, PAGE_OR_CHIPS, NAME_IN_EDIT, DIFFERENT_ITEM];
+    'Example: "write the intro to Acme Team instead" with a mention chip for Acme Team.';
+  const NAME_ONLY =
+    'A draft for a different member or team needs a target of this turn: the page, a mention chip or this card. ' +
+    'If the member gives only a name, and that member or team is not a target of this turn, do not call ' +
+    'draft_intro for it. Ask the member to @mention that member or team in the message.';
+  const RULES = [
+    BRIEF_REVISION,
+    PAGE_OR_CHIPS,
+    NAME_IN_EDIT,
+    FACTS_ONLY,
+    LAST_ANSWER_IS_DRAFT,
+    LAST_ANSWER_IS_NORMAL,
+    LAST_ANSWER_UNKNOWN,
+    DIFFERENT_ITEM,
+    NAME_ONLY,
+  ];
   const ACME = { type: 'team' as const, uid: 't-acme' };
   const draftFor = (target: { type: string; uid: string; name: string }) =>
     expect.objectContaining({ target, text: SHORT });
@@ -606,7 +631,21 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
     expect(options.extraResponseFields.drafts).toEqual([draftFor({ ...ACME, name: 'Acme Team' })]);
   });
 
-  it('LAB-3367 R3: "Shorten your last answer." gets the different-item rule, and no draft is forced', async () => {
+  it('LAB-3367 Q1: a revision may use only facts the member gave', async () => {
+    const h = setup();
+    const options = await chat(h, {
+      ...VALID,
+      message: 'Make it warmer.',
+      introDraft: { target: GRACE, text: CARD_TEXT },
+    });
+    expect(options.promptContext).toContain(FACTS_ONLY);
+  });
+
+  it.each([
+    ['the latest reply is the draft line: revise this draft', LAST_ANSWER_IS_DRAFT],
+    ['the latest reply is a normal answer: change it and keep this draft', LAST_ANSWER_IS_NORMAL],
+    ['the history does not show the latest reply: ask, and keep this draft', LAST_ANSWER_UNKNOWN],
+  ])('LAB-3367 F1: "Shorten your last answer." gets the guidance when %s', async (_name, rule) => {
     const h = setup();
     const options = await chat(h, {
       ...VALID,
@@ -614,10 +653,56 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
       introDraft: { target: GRACE, text: CARD_TEXT },
     });
 
-    expect(options.promptContext).toContain(DIFFERENT_ITEM);
-    // With no tool call, the turn has no draft and the model text streams.
+    // Prompt guidance only: the model sees the chat history summary, so the backend cannot check the choice.
+    expect(options.promptContext).toContain(rule);
+    // No draft is forced: with no tool call, the turn has no draft and the model text streams.
     expect(options.extraResponseFields.drafts).toEqual([]);
     expect(options.answerLine()).toBeUndefined();
+  });
+
+  it('LAB-3367 F2: a new draft to a permitted mentioned member works', async () => {
+    const h = setup(undefined, [MEMBER_PERMISSIONS.SEARCH_READ]);
+    const options = await chat(h, {
+      ...VALID,
+      message: 'Write the intro to Grace instead.',
+      mentions: [{ type: 'member', uid: 'm-grace' }],
+      introDraft: { target: ACME, text: CARD_TEXT },
+    });
+
+    expect(options.promptContext).toContain(DIFFERENT_ITEM);
+    expect(options.promptContext).toContain('call draft_intro with type "member" and targetUid "m-grace"');
+    await options.extraTools.draft_intro.execute({ type: 'member', targetUid: 'm-grace', text: SHORT });
+    expect(options.extraResponseFields.drafts).toEqual([draftFor({ ...GRACE, name: 'Grace Hopper' })]);
+  });
+
+  it('LAB-3367 R4: an edit with a mention chip keeps the card target', async () => {
+    const h = setup(undefined, [MEMBER_PERMISSIONS.SEARCH_READ]);
+    const options = await chat(h, {
+      ...VALID,
+      message: 'Mention that I know Grace.',
+      mentions: [{ type: 'member', uid: 'm-grace' }],
+      introDraft: { target: ACME, text: CARD_TEXT },
+    });
+
+    expect(options.promptContext).toContain(NAME_IN_EDIT);
+    await options.extraTools.draft_intro.execute({ type: 'team', targetUid: 't-acme', text: SHORT });
+    expect(options.extraResponseFields.drafts).toEqual([draftFor({ ...ACME, name: 'Acme Team' })]);
+  });
+
+  it('LAB-3367 F2: a switch by name only gets the @mention rule, and adds no target', async () => {
+    const h = setup();
+    const options = await chat(h, {
+      ...VALID,
+      message: 'Write the intro to Linus instead.',
+      introDraft: { target: GRACE, text: CARD_TEXT },
+    });
+
+    expect(options.promptContext).toContain(NAME_ONLY);
+    // The only target of the turn is the card. A name gives no new target, so draft_intro refuses another uid.
+    expect(await options.extraTools.draft_intro.execute({ type: 'member', targetUid: 'm-ada', text: SHORT })).toContain(
+      'not the intro target of this turn'
+    );
+    expect(options.extraResponseFields.drafts).toEqual([]);
   });
 
   it.each([
@@ -625,6 +710,7 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
     ['the Home page', { context: { page: 'home' } }],
     ['a member page', { context: { page: 'member', memberUid: 'm-grace' } }],
     ['a member mention chip', { mentions: [{ type: 'member', uid: 'm-grace' }] }],
+    ['the intro page', { context: MEMBER_CONTEXT }],
   ])('LAB-3367: with no introDraft, %s gives no revision rule and no card text', async (_name, extra) => {
     const h = setup(undefined, [MEMBER_PERMISSIONS.SEARCH_READ]);
     const options = await chat(h, { ...SHORTER, ...extra });

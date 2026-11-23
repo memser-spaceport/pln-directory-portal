@@ -36,7 +36,7 @@ import { TeamNewsQueryService } from '../team-news/team-news-query.service';
 import { TeamsService } from '../teams/teams.service';
 import { LabosAgentAccessService } from './labos-agent-access.service';
 import { answerCounts } from './labos-agent-answer-counts';
-import { draftIntroTool, introDraftLine, IntroTurnTarget } from './labos-agent-drafts';
+import { draftIntroTool, INTRO_DRAFT_LINE, introDraftLine, IntroTurnTarget } from './labos-agent-drafts';
 import { searchMentions } from './labos-agent-mentions';
 import { mcpToolsAsAgentTools, newsLinkFields } from './labos-agent-news.tools';
 import {
@@ -442,9 +442,23 @@ export class LabosAgentService {
       'This rule applies also when the page or the mention chips of the message point to another member or team. ' +
       'A member or team name in the revision, such as "mention that I know Acme Team", is part of the new text. ' +
       'It does not change the target. ' +
+      // LAB-3367 Q1 (live QA): no facts that the member did not give.
+      'In a revision, use only facts the member gave. ' +
+      'Do not treat a fact as confirmed only because it is in the draft. ' +
+      'Do not add a role, shared work, experience or that someone can vouch for the member, ' +
+      'when the member did not give it. ' +
+      // LAB-3367 F1 (live QA): the model sees only the chat history summary, so this is guidance, not a rule in code.
+      '"Your last answer" is your latest reply in the chat history. ' +
+      `If that reply is the draft line "${INTRO_DRAFT_LINE}", revise this draft. ` +
+      'If that reply is a normal answer, change that answer and do not change this draft. ' +
+      'If the chat history does not show your latest reply, ask which reply to change and leave this draft unchanged. ' +
       'If the member asks for a different draft or asks to change other content instead, follow that request. ' +
       'Do not use this draft text for that request. ' +
-      'Examples: "write the intro to Acme Team instead", "shorten your last answer". ' +
+      'Example: "write the intro to Acme Team instead" with a mention chip for Acme Team. ' +
+      // LAB-3367 F2 (live QA): no new targets. A name alone is not a target.
+      'A draft for a different member or team needs a target of this turn: the page, a mention chip or this card. ' +
+      'If the member gives only a name, and that member or team is not a target of this turn, do not call ' +
+      'draft_intro for it. Ask the member to @mention that member or team in the message. ' +
       'Do not write the draft text in the answer.';
     return { promptContext, introTarget };
   }
