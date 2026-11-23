@@ -2,7 +2,13 @@ import { MemberSignalsService } from './member-signals.service';
 
 describe('MemberSignalsService.record (LAB-3121, LAB-3123)', () => {
   function build(
-    overrides: { member?: unknown; existingView?: unknown; teamUids?: string[]; createError?: Error } = {}
+    overrides: {
+      member?: unknown;
+      existingView?: unknown;
+      teamUids?: string[];
+      createError?: Error;
+      eventLinks?: { memberUid: string | null; teamUid: string | null }[];
+    } = {}
   ) {
     const prisma = {
       member: {
@@ -23,6 +29,7 @@ describe('MemberSignalsService.record (LAB-3121, LAB-3123)', () => {
       project: { findUnique: jest.fn(async () => ({ createdBy: 'someone', maintainingTeamUid: 'team-own' })) },
       teamNewsItem: { findUnique: jest.fn(async () => ({ teamUid: 'team-other', postedByMemberUid: 'm1' })) },
       jobOpening: { findUnique: jest.fn(async () => ({ teamUid: 'team-own' })) },
+      pLEventAssociation: { findMany: jest.fn(async () => overrides.eventLinks ?? []) },
     };
     const analytics = { trackEvent: jest.fn(async () => undefined) };
     const service = new MemberSignalsService(prisma as never, analytics as never);
@@ -81,6 +88,46 @@ describe('MemberSignalsService.record (LAB-3121, LAB-3123)', () => {
     await service.record({ memberUid: 'm1', action: 'view', entityType, entityUid });
 
     expect(prisma.memberSignal.create).toHaveBeenCalledWith({ data: expect.objectContaining({ own: expected }) });
+  });
+
+  it('writes an EVENT row, own when a team of the member hosts the event', async () => {
+    const { service, prisma } = build({
+      teamUids: ['team-own'],
+      eventLinks: [{ memberUid: null, teamUid: 'team-own' }],
+    });
+
+    await expect(
+      service.record({ memberUid: 'm1', action: 'search-result-click', entityType: 'EVENT', entityUid: 'e1' })
+    ).resolves.toBe(true);
+
+    expect(prisma.memberSignal.create).toHaveBeenCalledWith({
+      data: { memberUid: 'm1', action: 'search-result-click', entityType: 'EVENT', entityUid: 'e1', own: true },
+    });
+  });
+
+  it('keeps a news item open and its source click on the same day to one view row', async () => {
+    const { service, prisma } = build({ existingView: { id: 1 } });
+
+    await expect(
+      service.record({ memberUid: 'm1', action: 'view', entityType: 'NEWS_ITEM', entityUid: 'n1' })
+    ).resolves.toBe(false);
+
+    expect(prisma.memberSignal.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ memberUid: 'm1', action: 'view', entityType: 'NEWS_ITEM', entityUid: 'n1' }),
+      })
+    );
+    expect(prisma.memberSignal.create).not.toHaveBeenCalled();
+  });
+
+  it('writes every Apply click on the same job', async () => {
+    const { service, prisma } = build({ existingView: { id: 1 } });
+
+    await service.record({ memberUid: 'm1', action: 'job-apply-click', entityType: 'JOB_OPENING', entityUid: 'j1' });
+    await service.record({ memberUid: 'm1', action: 'job-apply-click', entityType: 'JOB_OPENING', entityUid: 'j1' });
+
+    expect(prisma.memberSignal.findFirst).not.toHaveBeenCalled();
+    expect(prisma.memberSignal.create).toHaveBeenCalledTimes(2);
   });
 
   it('adds one view per entity per UTC day', async () => {

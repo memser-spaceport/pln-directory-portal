@@ -180,6 +180,29 @@ describe('PLEventsService.getPLEventDetail (LAB-3213)', () => {
     expect(ResponsePLEventDetailSchema.safeParse(detail).success).toBe(true);
   });
 
+  it('R3: an event with a link returns details.locationUrl (LAB-3332)', async () => {
+    const stored = mapEventDetails(EVENTS_SERVICE_EVENT);
+    const { service } = makeService(
+      eventRow({ additionalInfo: withEventDetails({ irlLink: 'https://x.io' }, stored) })
+    );
+    const detail = await service.getPLEventDetail('ev-1', null);
+
+    expect(detail.details.locationUrl).toBe('https://maps.example.org/?q=Fixture+Venue');
+    expect(ResponsePLEventDetailSchema.safeParse(detail).success).toBe(true);
+  });
+
+  it('R4: an event with no link returns details.locationUrl null, not a missing key (LAB-3332)', async () => {
+    const noLink = mapEventDetails({ ...EVENTS_SERVICE_EVENT, location_url: undefined });
+    const olderShape = { tags: [{ name: 'AI', color: null }] };
+    for (const additionalInfo of [null, { details: noLink }, { details: olderShape }]) {
+      const { service } = makeService(eventRow({ additionalInfo }));
+      const detail = await service.getPLEventDetail('ev-1', VIEWER);
+
+      expect(detail.details).toHaveProperty('locationUrl', null);
+      expect(ResponsePLEventDetailSchema.safeParse(detail).success).toBe(true);
+    }
+  });
+
   it('an event never resynced returns empty details, never missing fields (LAB-3214)', async () => {
     for (const additionalInfo of [null, { irlLink: 'https://x.io' }]) {
       const { service } = makeService(eventRow({ additionalInfo }));

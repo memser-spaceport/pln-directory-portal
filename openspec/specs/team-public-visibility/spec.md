@@ -22,6 +22,44 @@ The system SHALL refuse `GET /v1/teams/:uid` with 403 `"Team is inactive"` when 
 - **WHEN** `GET /v1/teams/<uid>` is called without a user token
 - **THEN** the team is returned
 
+### Requirement: Deleting a team marks it INACTIVE
+
+The system SHALL set a team's access level to `L0` and its status to `INACTIVE` when a directory admin calls `DELETE /v1/teams/:uid`, and SHALL reset the teams cache (LAB-3192). An `L0` team with status `ACTIVE` is a team where no member has logged in yet, not a deleted team.
+
+#### Scenario: An admin deletes a team
+
+- **GIVEN** an active team
+- **WHEN** a directory admin calls `DELETE /v1/teams/<uid>`
+- **THEN** the team has access level `L0` and status `INACTIVE`
+
+### Requirement: Deleted teams are hidden
+
+The system SHALL answer `GET /v1/teams/:uid` (and the other team reads that share its rule) with 404 when the team's status is `INACTIVE`, unless the caller is a directory admin. The team lists, `GET /v1/search`, `GET /v1/search/autocomplete` and the Teams section of a member profile SHALL NOT contain an `INACTIVE` team.
+
+#### Scenario: A member opens a deleted team
+
+- **GIVEN** a team with status `INACTIVE`
+- **WHEN** a signed-in member who is not a directory admin calls `GET /v1/teams/<uid>`
+- **THEN** the response is 404
+
+#### Scenario: An admin opens a deleted team
+
+- **GIVEN** a team with status `INACTIVE`
+- **WHEN** a directory admin calls `GET /v1/teams/<uid>`
+- **THEN** the team is returned
+
+#### Scenario: Search leaves out a deleted team
+
+- **GIVEN** the search index still holds a team with status `INACTIVE`
+- **WHEN** any caller searches for its name
+- **THEN** the team is not in `teams` or `top`
+
+#### Scenario: A member profile leaves out a deleted team
+
+- **GIVEN** a member with a role in a team with status `INACTIVE`
+- **WHEN** `GET /v1/members/<uid>` is called
+- **THEN** `teamMemberRoles` does not contain that team
+
 ### Requirement: Crawl index lists only publicly visible teams
 
 The system SHALL serve `GET /v1/teams/crawl-index` without authentication and without caching. It SHALL return `{ teams: [{ uid, updatedAt }] }`, where `updatedAt` is an ISO 8601 string, ordered by `updatedAt` descending. The list SHALL contain every team whose status is not `INACTIVE` and whose access level is not `L0`, including teams whose access level is null. It SHALL NOT contain any team that a logged-out `GET /v1/teams/:uid` refuses.

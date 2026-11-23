@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { SearchResult, SearchResultItem } from 'libs/contracts/src/schema/global-search';
 import { OpenSearchService } from '../opensearch/opensearch.service';
 import { PrismaService } from '../shared/prisma.service';
+import { TeamStatus } from '@prisma/client';
 import { directoryVisibleMemberWhere } from '../members/member-visibility';
 import { truncate } from '../utils/formatters';
 import { SearchMetrics, classifyError } from '../metrics/search.metrics';
@@ -158,6 +159,37 @@ export class SearchService {
       teams: (result.teams ?? []).map(addFields),
       members: (result.members ?? []).map(addFields),
       top: (result.top ?? []).map(addFields),
+    };
+  }
+
+  /**
+   * Drops deleted teams (status INACTIVE in Postgres, LAB-3192) from team and top results.
+   * The search index can still hold a deleted team, so Postgres decides.
+   */
+  async removeDeletedTeams(result: SearchResult): Promise<SearchResult> {
+    const teamUids = [
+      ...new Set(
+        [...(result.teams ?? []), ...(result.top ?? []).filter((item) => item.index === 'teams')].map(
+          (item) => item.uid
+        )
+      ),
+    ];
+    if (teamUids.length === 0) {
+      return result;
+    }
+    const deleted = await this.prisma.team.findMany({
+      where: { uid: { in: teamUids }, status: TeamStatus.INACTIVE },
+      select: { uid: true },
+    });
+    if (!deleted?.length) {
+      return result;
+    }
+    const deletedUids = new Set<string>(deleted.map((team: { uid: string }) => team.uid));
+    const keep = (item: SearchResultItem) => !(item.index === 'teams' && deletedUids.has(item.uid));
+    return {
+      ...result,
+      teams: (result.teams ?? []).filter(keep),
+      top: (result.top ?? []).filter(keep),
     };
   }
 
@@ -571,7 +603,8 @@ export class SearchService {
       ];
 
       const withForum = options?.canReadForum ? result : this.removeForumResults(result);
-      return this.redactOfficeHoursForAnonymous(withForum, Boolean(options?.isAuthenticated));
+      const withoutDeleted = await this.removeDeletedTeams(withForum);
+      return this.redactOfficeHoursForAnonymous(withoutDeleted, Boolean(options?.isAuthenticated));
     } catch (e) {
       // Bubble up but record an overall error with a normalized type
       SearchMetrics.errors.inc({ source, section: 'all', strict, error_type: classifyError(e) });
@@ -742,7 +775,8 @@ export class SearchService {
       }
 
       const withForum = canReadForum ? results : this.removeForumResults(results);
-      return this.redactOfficeHoursForAnonymous(withForum, isAuthenticated);
+      const withoutDeleted = await this.removeDeletedTeams(withForum);
+      return this.redactOfficeHoursForAnonymous(withoutDeleted, isAuthenticated);
     } catch (e) {
       SearchMetrics.errors.inc({ source, section: 'all', strict, error_type: classifyError(e) });
       throw e;

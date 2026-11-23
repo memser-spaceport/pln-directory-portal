@@ -16,6 +16,11 @@ describe('MemberSignalBodySchema (LAB-3123)', () => {
     ['github-project-click', 'member'],
     ['team-contact-click', 'team'],
     ['project-link-click', 'project'],
+    ['view', 'news-item'],
+    ['view', 'job-opening'],
+    ['view', 'event'],
+    ['search-result-click', 'event'],
+    ['job-apply-click', 'job-opening'],
   ])('accepts %s on %s', (action, entityType) => {
     expect(ok(action, entityType)).toBe(true);
   });
@@ -28,6 +33,11 @@ describe('MemberSignalBodySchema (LAB-3123)', () => {
     ['project-link-click', 'team'],
     ['follow', 'team'],
     ['view', 'news'],
+    ['job-apply-click', 'news-item'],
+    ['job-apply-click', 'team'],
+    ['search-result-click', 'news-item'],
+    ['search-result-click', 'job-opening'],
+    ['view', 'demo-day'],
   ])('refuses %s on %s', (action, entityType) => {
     expect(ok(action, entityType)).toBe(false);
   });

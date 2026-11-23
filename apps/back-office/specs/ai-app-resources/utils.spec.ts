@@ -2,11 +2,13 @@ import {
   canManageAiAppAudience,
   canManageAiAppResources,
   getApiErrorMessage,
+  getAppPathError,
   getAudienceConfirmMessage,
   getAudienceStatusLabel,
   getHostUrl,
   hasEmptyResourceValue,
   isNotFoundError,
+  isSameAudienceSettings,
   isSamePolicyCodes,
   isSameResourceValues,
   resourcesToForm,
@@ -35,20 +37,62 @@ describe('ai-app-resources utils', () => {
       expect(canManageAiAppAudience((p) => p === 'ai_apps.resources.manage' || p === 'ai_apps.read')).toBe(false);
     });
 
+    const lists = (policyCodes: string[], permissionCodes: string[] = [], memberCount = 0) => ({
+      policyCodes,
+      permissionCodes,
+      members: Array.from({ length: memberCount }, (_, i) => ({ uid: `m${i}`, name: `M${i}`, email: null })),
+    });
+
     it('describes the current state', () => {
-      expect(getAudienceStatusLabel([])).toBe('PL Infra only');
-      expect(getAudienceStatusLabel(['a'])).toBe('Open to 1 policy');
-      expect(getAudienceStatusLabel(['a', 'b', 'c'])).toBe('Open to 3 policies');
+      expect(getAudienceStatusLabel(lists([]))).toBe('PL Infra only');
+      expect(getAudienceStatusLabel(lists(['a']))).toBe('Open to 1 policy');
+      expect(getAudienceStatusLabel(lists(['a', 'b', 'c']))).toBe('Open to 3 policies');
+      expect(getAudienceStatusLabel(lists([], ['plaa.member']))).toBe('Open to 1 permission');
+      expect(getAudienceStatusLabel(lists(['a', 'b'], ['p'], 3))).toBe(
+        'Open to 2 policies, 1 permission and 3 members'
+      );
+      expect(getAudienceStatusLabel({ policyCodes: ['a'] })).toBe('Open to 1 policy');
     });
 
     it('states plainly what saving does', () => {
-      expect(getAudienceConfirmMessage(0, 'PLaybook')).toBe('Nobody outside PL Infra will be able to open PLaybook.');
-      expect(getAudienceConfirmMessage(1, 'PLaybook')).toBe(
+      expect(getAudienceConfirmMessage(lists([]), 'PLaybook')).toBe(
+        'Nobody outside PL Infra will be able to open PLaybook.'
+      );
+      expect(getAudienceConfirmMessage(lists(['a']), 'PLaybook')).toBe(
         'Members holding this policy will be able to open PLaybook.'
       );
-      expect(getAudienceConfirmMessage(3, 'PLaybook')).toBe(
+      expect(getAudienceConfirmMessage(lists(['a', 'b', 'c']), 'PLaybook')).toBe(
         'Members holding any of these 3 policies will be able to open PLaybook.'
       );
+      expect(getAudienceConfirmMessage(lists([], ['p'], 5), 'PLaybook')).toBe(
+        'Approved members matching any of 1 permission and 5 members will be able to open PLaybook.'
+      );
+    });
+
+    it('checks the app path the same way the API does', () => {
+      expect(getAppPathError('')).toBeNull();
+      expect(getAppPathError('pla')).toBeNull();
+      expect(getAppPathError('pla-portal-2')).toBeNull();
+      ['a', '-pla', 'pla-', 'pl--a', 'PLA', 'pla/x'].forEach((path) => expect(getAppPathError(path)).toBeTruthy());
+      expect(getAppPathError('cmu73kls90763n94gzz6s9fmq')).toBe('This looks like an app ID. Pick a readable path.');
+    });
+
+    it('compares the edited settings with the saved ones', () => {
+      const base = {
+        ...lists(['a', 'b'], ['p'], 1),
+        showInMore: true,
+        path: null,
+        iconUrl: null,
+        hideTopNav: false,
+      };
+      expect(isSameAudienceSettings(base, { ...base, policyCodes: ['b', 'a'], path: '' as unknown as null })).toBe(
+        true
+      );
+      expect(isSameAudienceSettings(base, { ...base, showInMore: false })).toBe(false);
+      expect(isSameAudienceSettings(base, { ...base, path: 'pla' })).toBe(false);
+      expect(isSameAudienceSettings(base, { ...base, members: [] })).toBe(false);
+      expect(isSameAudienceSettings(base, { ...base, iconUrl: 'https://x/y.png' })).toBe(false);
+      expect(isSameAudienceSettings(base, { ...base, hideTopNav: true })).toBe(false);
     });
 
     it('compares policy codes regardless of order', () => {

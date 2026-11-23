@@ -33,6 +33,29 @@ A member who is not a current member of a portfolio team and is not assigned the
 - **THEN** the response is HTTP 403
 - **AND** no request is stored
 
+### Requirement: Refuse a deleted team target
+
+The system SHALL answer HTTP 404 "Team not found" when the type is `TEAM` and the target team does not exist. The system SHALL apply the rule of `GET /v1/teams/:uid` (`enforceDeletedTeamHidden`, LAB-3192) to the target team. A deleted (INACTIVE) team SHALL get HTTP 404 "Team not found" for a member who is not a directory admin. A directory admin keeps the same access as on `GET /v1/teams/:uid`. The system SHALL NOT store a refused request and SHALL NOT post it to Telegram (LAB-3323).
+
+#### Scenario: A member requests an intro to a deleted team
+
+- **GIVEN** an eligible member who is not a directory admin
+- **WHEN** the member posts type `TEAM` with the uid of an INACTIVE team
+- **THEN** the response is HTTP 404 "Team not found"
+- **AND** no request is stored and no Telegram message is sent
+
+#### Scenario: A directory admin requests an intro to a deleted team
+
+- **GIVEN** an eligible member who is a directory admin
+- **WHEN** the member posts type `TEAM` with the uid of an INACTIVE team
+- **THEN** the response is `{ uid }`
+
+#### Scenario: A stored request to a team that is deleted later
+
+- **GIVEN** a stored request to a team with no Telegram message id
+- **WHEN** the team becomes INACTIVE and the retry posts the request
+- **THEN** the message still shows the team name
+
 ### Requirement: Store each request
 
 The system SHALL store the requester, the type, the target, the text, the time, and the Telegram message id after a successful post. The message id stays empty until the post succeeds.

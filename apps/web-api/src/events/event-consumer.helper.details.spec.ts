@@ -50,6 +50,8 @@ describe('EventConsumerHelper keeps event details (LAB-3214)', () => {
     const mapped = await helper.mapEventData(EVENTS_SERVICE_EVENT);
 
     expect(mapped.details).toEqual(details);
+    // R1 (LAB-3332): the queue consumer keeps the events service's location_url.
+    expect(mapped.details.locationUrl).toBe(EVENTS_SERVICE_EVENT.location_url);
     expect(mapped.externalId).toBe(EVENTS_SERVICE_EVENT.event_id);
   });
 

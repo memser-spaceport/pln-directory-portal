@@ -87,6 +87,8 @@ export const API_ROUTE = {
   ADMIN_RBAC_PERMISSIONS: `${APP_CONSTANTS.V1}admin/rbac/permissions`,
   ADMIN_AI_APP_RESOURCES: `${APP_CONSTANTS.V1}admin/ai-app-resources`,
   ADMIN_AI_APP_AUDIENCE: `${APP_CONSTANTS.V1}admin/ai-app-audience`,
+  ADMIN_ACCESS_CONTROL_V2_PERMISSIONS: '/v2/admin/access-control-v2/permissions',
+  ADMIN_IMAGES: `${APP_CONSTANTS.V1}admin/images`,
   ADMIN_LABOS_DIGEST: `${APP_CONSTANTS.V1}admin/labos-digest`,
 };
 
@@ -139,6 +141,9 @@ export const ADMIN_PERMISSIONS = {
   DIRECTORY_FULL: 'directory.admin.full',
   TOOLS_ACCESS: 'admin.tools.access',
 } as const;
+
+/** Must match JOB_ASPIRANT_POLICY_CODE in apps/web-api/src/access-control-v2/access-control-v2.constants.ts */
+export const JOB_ASPIRANT_POLICY_CODE = 'job_aspirant';
 
 export const AI_APPS_PERMISSIONS = {
   RESOURCES_MANAGE: 'ai_apps.resources.manage',

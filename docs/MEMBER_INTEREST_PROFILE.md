@@ -24,7 +24,9 @@ instances.
 ## Sources
 
 - **Signal log rows** (follows, news upvotes/likes/comments, job interest, saved jobs, team interest, office hours
-  booking intents, views and clicks). Weights: `SIGNAL_WEIGHTS`.
+  booking intents, views and clicks, including news, job and event views and job Apply clicks). Weights:
+  `SIGNAL_WEIGHTS` by action; `SIGNAL_ENTITY_WEIGHTS` holds the weight of an action on one entity type and wins over
+  it (`view:NEWS_ITEM`, `view:JOB_OPENING`, `view:EVENT`, `search-result-click:EVENT`).
 - **Team roles**: the current team adds its focus areas at a fixed low weight and is never an entity; a past team
   (role `endDate` passed) is a weak interest, aging from the end date.
 - **Held office hours meetings**: `SCHEDULE_MEETING` interactions whose follow-ups carry feedback.
@@ -46,8 +48,11 @@ the sum of their weights for each story's tags before the limit (LAB-3263).
 - Weight × 0.5^(age / half-life). Half-life: `MEMBER_INTEREST_HALF_LIFE_DAYS`, default 90. No action is dropped.
 - The n-th repeat of the same action on the same item adds 0.5^n of the first; different items count in full.
 - A removal row (`unfollow`, `news-like-removed`, ...) cancels earlier rows of the action it removes on that item.
-- Rows marked `own` (own profile, own teams, own team's news, jobs and projects) add nothing to interests.
+- Rows marked `own` (own profile, own teams, own team's news, jobs, projects and events) add nothing to interests.
 - News: its focus-area tags as topics, and half its weight to the news team as an entity.
+- Job: the job's team as an entity, and that team's focus areas. A job with no team adds nothing.
+- Event: each team linked as host, co-host, speaker or sponsor as an entity, and half of that weight to the team's
+  focus areas. The member's current teams are skipped. An event with no such team, or a deleted event, adds nothing.
 - A member entity adds half its weight to the focus areas of that member's current teams.
 - Trending-seed bots and test accounts (`isExcludedMember`) get no profile and add nothing to others.
 

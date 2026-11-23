@@ -11,6 +11,10 @@
  * (`tags.tsx` renders tags as plain strings; `event-hosts.tsx` reads `{ name, logo }`).
  * The values are made up and name organisations only, no people.
  *
+ * `location_url` (LAB-3332) is named in the events service's own Mongoose schema
+ * (memser-spaceport/events-service, `src/schemas/event.schema.ts`) and is read as
+ * `event.location_url` by the PL events app (`service/events.service.ts`).
+ *
  * Replace it with a trimmed real payload once one is captured (LAB-3211 task 4.1 checks
  * the stored details on the feature env against PL Events).
  */
@@ -27,6 +31,7 @@ export const EVENTS_SERVICE_EVENT = {
   updatedAt: '2026-11-01T00:00:00.000Z',
   event_logo: null,
   format: 'IN_PERSON',
+  location_url: 'https://maps.example.org/?q=Fixture+Venue',
   access_type: 'Free',
   access_option: 'Free w/ RSVP',
   tags: ['DeSci', 'AI'],

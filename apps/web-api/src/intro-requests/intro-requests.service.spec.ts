@@ -2,8 +2,10 @@ jest.mock('axios', () => ({
   __esModule: true,
   default: { post: jest.fn(), isAxiosError: () => false },
 }));
+jest.mock('../members/members.service', () => ({ MembersService: class MembersService {} }));
 
 import { ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
+import { MembersService } from '../members/members.service';
 import { PrismaService } from '../shared/prisma.service';
 import { IntroRequestsService } from './intro-requests.service';
 import { IntroRequestTelegram } from './intro-request-telegram';
@@ -31,7 +33,9 @@ describe('IntroRequestsService', () => {
   const people = new Map<string, Person>();
   const emailToUid = new Map<string, string>();
   const targets = new Map<string, { name: string }>();
-  const teams = new Map<string, { name: string }>();
+  const teams = new Map<string, { uid?: string; name: string; status?: 'ACTIVE' | 'INACTIVE' }>();
+  const admins = new Set<string>();
+  const findMemberByEmail = jest.fn(async (email: string) => ({ isDirectoryAdmin: admins.has(email) }));
   const send = jest.fn();
   let service: IntroRequestsService;
   let errorLog: jest.SpyInstance;
@@ -103,6 +107,9 @@ describe('IntroRequestsService', () => {
     emailToUid.clear();
     targets.clear();
     teams.clear();
+    admins.clear();
+    findMemberByEmail.mockClear();
+    prisma.introRequest.create.mockClear();
     send.mockReset();
     send.mockResolvedValue('42');
     process.env.WEB_UI_BASE_URL = 'https://directory.example';
@@ -119,8 +126,12 @@ describe('IntroRequestsService', () => {
       policyAssignmentsV2: [],
     });
     targets.set('m-grace', { name: 'Grace Hopper' });
-    teams.set('t-acme', { name: 'Acme' });
-    service = new IntroRequestsService(prisma as unknown as PrismaService, { send } as unknown as IntroRequestTelegram);
+    teams.set('t-acme', { uid: 't-acme', name: 'Acme', status: 'ACTIVE' });
+    service = new IntroRequestsService(
+      prisma as unknown as PrismaService,
+      { send } as unknown as IntroRequestTelegram,
+      { findMemberByEmail } as unknown as MembersService
+    );
   });
 
   afterEach(() => {
@@ -210,6 +221,73 @@ describe('IntroRequestsService', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(rows).toHaveLength(0);
     expect(send).not.toHaveBeenCalled();
+  });
+
+  describe('a deleted (INACTIVE) team target (LAB-3323)', () => {
+    beforeEach(() => {
+      teams.set('t-gone', { uid: 't-gone', name: 'Gone Team', status: 'INACTIVE' });
+    });
+
+    it('R1: returns 404 "Team not found" to a non-admin', async () => {
+      const result = service.create('ada@example.com', { type: 'TEAM', targetId: 't-gone', text: 'Hello' });
+
+      await expect(result).rejects.toBeInstanceOf(NotFoundException);
+      await expect(
+        service.create('ada@example.com', { type: 'TEAM', targetId: 't-gone', text: 'Hello' })
+      ).rejects.toThrow(/^Team not found$/);
+    });
+
+    it('R2: stores no IntroRequest row and posts nothing to Telegram', async () => {
+      await expect(
+        service.create('ada@example.com', { type: 'TEAM', targetId: 't-gone', text: 'Hello' })
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(prisma.introRequest.create).not.toHaveBeenCalled();
+      expect(rows).toHaveLength(0);
+      expect(send).not.toHaveBeenCalled();
+    });
+
+    it('R3: uses the GET /v1/teams/:uid rule, so a directory admin can still send', async () => {
+      admins.add('ada@example.com');
+
+      const result = await service.create('ada@example.com', { type: 'TEAM', targetId: 't-gone', text: 'Hello' });
+
+      expect(result).toEqual({ uid: 'req-1' });
+      expect(findMemberByEmail).toHaveBeenCalledWith('ada@example.com');
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(send.mock.calls[0][0] as string).toContain(
+        '<a href="https://directory.example/teams/t-gone">Gone Team</a>'
+      );
+    });
+
+    it('R3: returns 404 for an unknown team uid, as before', async () => {
+      await expect(
+        service.create('ada@example.com', { type: 'TEAM', targetId: 't-missing', text: 'Hello' })
+      ).rejects.toThrow(/^Team not found$/);
+      expect(rows).toHaveLength(0);
+    });
+
+    it('R4: an active team target works as today and skips the admin check', async () => {
+      const result = await service.create('ada@example.com', { type: 'TEAM', targetId: 't-acme', text: 'Hello' });
+
+      expect(result).toEqual({ uid: 'req-1' });
+      expect(rows[0]).toEqual(expect.objectContaining({ type: 'TEAM', targetUid: 't-acme', telegramMessageId: '42' }));
+      expect(findMemberByEmail).not.toHaveBeenCalled();
+      expect(send).toHaveBeenCalledTimes(1);
+    });
+
+    it('R5: a stored request still shows the team name after the team becomes INACTIVE', async () => {
+      send.mockRejectedValueOnce(new Error('Telegram is down'));
+      await service.create('ada@example.com', { type: 'TEAM', targetId: 't-acme', text: 'Hello' });
+      expect(rows[0].telegramMessageId).toBeNull();
+
+      teams.set('t-acme', { uid: 't-acme', name: 'Acme', status: 'INACTIVE' });
+      await service.retryPending();
+
+      expect(send).toHaveBeenCalledTimes(2);
+      expect(send.mock.calls[1][0] as string).toContain('<a href="https://directory.example/teams/t-acme">Acme</a>');
+      expect(rows[0].telegramMessageId).toBe('42');
+    });
   });
 
   it('keeps a failed post, retries it once, and does not post it again', async () => {

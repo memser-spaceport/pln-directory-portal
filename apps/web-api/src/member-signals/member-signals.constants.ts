@@ -1,8 +1,8 @@
 /**
- * Member signal log vocabulary (LAB-3121, LAB-3123). Stored as text so a new
+ * Member signal log vocabulary (LAB-3121, LAB-3123, LAB-3267). Stored as text so a new
  * action needs no migration; every write is checked against these lists.
  */
-export const MEMBER_SIGNAL_ENTITY_TYPES = ['TEAM', 'MEMBER', 'PROJECT', 'NEWS_ITEM', 'JOB_OPENING'] as const;
+export const MEMBER_SIGNAL_ENTITY_TYPES = ['TEAM', 'MEMBER', 'PROJECT', 'NEWS_ITEM', 'JOB_OPENING', 'EVENT'] as const;
 export type MemberSignalEntityType = typeof MEMBER_SIGNAL_ENTITY_TYPES[number];
 
 export const MEMBER_SIGNAL_ACTIONS = [
@@ -28,8 +28,16 @@ export const MEMBER_SIGNAL_ACTIONS = [
   'project-link-click',
   'github-project-click',
   'search-result-click',
+  'job-apply-click',
 ] as const;
 export type MemberSignalAction = typeof MEMBER_SIGNAL_ACTIONS[number];
+
+/**
+ * Roles that link a team or a member to an event as more than a guest. An
+ * event is own for these links, and the profile scores an event through the
+ * teams that hold them.
+ */
+export const EVENT_LINK_ROLES = ['HOST', 'CO_HOST', 'SPEAKER', 'SPONSOR'] as const;
 
 /**
  * Removal action → the action it cancels. The profile build clears earlier

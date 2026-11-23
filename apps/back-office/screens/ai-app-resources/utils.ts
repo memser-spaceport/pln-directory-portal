@@ -1,6 +1,6 @@
 import { ADMIN_PERMISSIONS, AI_APPS_PERMISSIONS } from '../../utils/constants';
 import { DEFAULT_AI_APP_RESOURCES } from './constants';
-import { AiAppResourcesResponse, AiAppResourceValues } from './types';
+import { AiAppAudienceSettings, AiAppResourcesResponse, AiAppResourceValues } from './types';
 
 /** Mirrors AiAppsResourcesAdminAuthGuard: full Directory admins or the dedicated permission. */
 export function canManageAiAppResources(hasPermission: (permission: string) => boolean): boolean {
@@ -95,14 +95,67 @@ export function isSamePolicyCodes(a: string[], b: string[]): boolean {
   return a.length === b.length && [...a].sort().join('\n') === [...b].sort().join('\n');
 }
 
-export function getAudienceStatusLabel(policyCodes: string[]): string {
-  if (policyCodes.length === 0) return 'PL Infra only';
-  return `Open to ${policyCodes.length} ${policyCodes.length === 1 ? 'policy' : 'policies'}`;
+type AudienceLists = Pick<AiAppAudienceSettings, 'policyCodes'> &
+  Partial<Pick<AiAppAudienceSettings, 'permissionCodes' | 'members'>>;
+
+const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
+
+/** "1 policy, 2 permissions and 3 members" for the non-empty audience lists. */
+function describeAudience(audience: AudienceLists): string {
+  const parts = [
+    audience.policyCodes.length ? plural(audience.policyCodes.length, 'policy', 'policies') : null,
+    audience.permissionCodes?.length ? plural(audience.permissionCodes.length, 'permission', 'permissions') : null,
+    audience.members?.length ? plural(audience.members.length, 'member', 'members') : null,
+  ].filter((part): part is string => part !== null);
+  if (parts.length <= 1) return parts[0] ?? '';
+  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+}
+
+export function isAudienceEmpty(audience: AudienceLists): boolean {
+  return !audience.policyCodes.length && !audience.permissionCodes?.length && !audience.members?.length;
+}
+
+export function getAudienceStatusLabel(audience: AudienceLists): string {
+  if (isAudienceEmpty(audience)) return 'PL Infra only';
+  return `Open to ${describeAudience(audience)}`;
 }
 
 /** States plainly what saving this audience does; shown in the confirmation step. */
-export function getAudienceConfirmMessage(policyCount: number, appName: string): string {
-  if (policyCount === 0) return `Nobody outside PL Infra will be able to open ${appName}.`;
-  if (policyCount === 1) return `Members holding this policy will be able to open ${appName}.`;
-  return `Members holding any of these ${policyCount} policies will be able to open ${appName}.`;
+export function getAudienceConfirmMessage(audience: AudienceLists, appName: string): string {
+  if (isAudienceEmpty(audience)) return `Nobody outside PL Infra will be able to open ${appName}.`;
+  const onlyPolicies = !audience.permissionCodes?.length && !audience.members?.length;
+  if (onlyPolicies && audience.policyCodes.length === 1) {
+    return `Members holding this policy will be able to open ${appName}.`;
+  }
+  if (onlyPolicies) {
+    return `Members holding any of these ${audience.policyCodes.length} policies will be able to open ${appName}.`;
+  }
+  return `Approved members matching any of ${describeAudience(audience)} will be able to open ${appName}.`;
+}
+
+/** Same rule as the API: 2–60 lowercase letters, digits or single hyphens, no hyphen at either end. */
+export function getAppPathError(path: string): string | null {
+  const value = path.trim();
+  if (!value) return null;
+  if (!/^[a-z0-9](?:[a-z0-9-]{0,58}[a-z0-9])$/.test(value) || value.includes('--')) {
+    return 'Use 2–60 lowercase letters, digits or single hyphens, not starting or ending with a hyphen.';
+  }
+  if (/^c[a-z0-9]{24}$/.test(value)) return 'This looks like an app ID. Pick a readable path.';
+  return null;
+}
+
+/** Whether the edited settings differ from the saved ones. */
+export function isSameAudienceSettings(a: AiAppAudienceSettings, b: AiAppAudienceSettings): boolean {
+  return (
+    isSamePolicyCodes(a.policyCodes, b.policyCodes) &&
+    isSamePolicyCodes(a.permissionCodes, b.permissionCodes) &&
+    isSamePolicyCodes(
+      a.members.map((m) => m.uid),
+      b.members.map((m) => m.uid)
+    ) &&
+    a.showInMore === b.showInMore &&
+    (a.path ?? '') === (b.path ?? '') &&
+    (a.iconUrl ?? '') === (b.iconUrl ?? '') &&
+    a.hideTopNav === b.hideTopNav
+  );
 }

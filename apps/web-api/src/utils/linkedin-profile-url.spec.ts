@@ -1,4 +1,4 @@
-import { normalizeExternalLinkedinUrl } from './job-openings-linkedin-url';
+import { normalizeExternalLinkedinUrl } from './linkedin-profile-url';
 
 describe('normalizeExternalLinkedinUrl', () => {
   it('leaves a full https URL untouched', () => {

@@ -5,6 +5,7 @@ import { MemberForm } from '../MemberForm/MemberForm';
 import clsx from 'clsx';
 import { EditIcon } from '../icons';
 import { Member, TMemberForm } from '../../types/member';
+import { filterPoliciesForMemberState } from '../../utils/filterPoliciesForMemberState';
 import { saveRegistrationImage } from '../../../../utils/services/member';
 
 import s from './EditMember.module.scss';
@@ -148,7 +149,7 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
         // }
 
         const isApproved = formData.memberStateStatus?.value === 'Approved';
-        const selectedPolicies = isApproved ? formData.rbacPolicies ?? [] : [];
+        const selectedPolicies = filterPoliciesForMemberState(formData.rbacPolicies ?? [], formData.memberStateStatus?.value);
 
         const policyByCode = new Map(policiesData.map((p) => [p.code, p]));
         const roleNameToCode = new Map(rbacRolesData.map((r) => [r.name, r.code]));
