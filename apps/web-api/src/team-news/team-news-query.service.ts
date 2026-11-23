@@ -22,7 +22,7 @@ import { buildTeamNewsEventDateWhere } from './team-news-event-date.where';
 import { TEAM_NEWS_EXCLUDED_TEAM_NAMES } from './team-news-public-list.config';
 import { TeamNewsSuggestionsService } from './team-news-suggestions.service';
 import { orderByTopicWeights, selectForYouNewsItems, selectNewsItemsByTagsAndTeams } from './select-for-you-news-items';
-import { readNewsCategoryTags } from './utils/news-category-tags';
+import { resolveNewsCategoryTags } from './utils/news-category-tags';
 import { narrowsNews, readNewsCategories } from './utils/news-categories';
 import { groupUsedNewsTags, NewsTagVocabularyService } from './news-tag-vocabulary.service';
 import { isNewsTagPicksEnabled } from './utils/news-tags';
@@ -517,7 +517,7 @@ export class TeamNewsQueryService {
     };
   }
 
-  /** The viewer's effective news tags, own or followed teams, and picked categories. Empty signed out (LAB-2999, LAB-3140). */
+  /** The viewer's effective news tags, own or followed teams, and effective category tags. Empty signed out (LAB-2999, LAB-3140, LAB-3284). */
   private async loadForYouTagFields(viewerMemberUid?: string): Promise<{
     forYouTags: string[];
     forYouOwnTeamUids: string[];
@@ -689,7 +689,7 @@ export class TeamNewsQueryService {
   /**
    * Digest picks by news tags (LAB-2999, behind NEWS_TAG_PICKS_ENABLED): per
    * member, stories from their own or followed teams plus stories sharing any
-   * of their tags, plus stories in a category they picked, one per team (its
+   * of their tags, plus stories in one of their effective category tags, one per team (its
    * newest story). They are ordered by the member's topic weights in their
    * interest profile, highest first, newest first on a tie (LAB-3263: digest
    * page More / Less move those weights). A member with no match gets the newest
@@ -741,14 +741,17 @@ export class TeamNewsQueryService {
     return result;
   }
 
-  /** Saved `newsCategoryTags` per member. A missing key is an empty list (LAB-3140). */
+  /**
+   * Effective category tags per member (LAB-3140, LAB-3284): the saved ones, or
+   * every category tag for a member with no saved news tags and none saved here.
+   */
   private async loadNewsCategoryTags(memberUids: string[]): Promise<Map<string, NewsEventType[]>> {
     if (memberUids.length === 0) return new Map();
     const rows = await this.prisma.member.findMany({
       where: { uid: { in: memberUids } },
       select: { uid: true, preferences: true },
     });
-    return new Map(rows.map((row) => [row.uid, readNewsCategoryTags(row.preferences)]));
+    return new Map(rows.map((row) => [row.uid, resolveNewsCategoryTags(row.preferences)]));
   }
 
   /**
