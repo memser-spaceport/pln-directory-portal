@@ -1,5 +1,19 @@
+import * as webStreams from 'stream/web';
 import { AISDKError, APICallError, JSONParseError, TypeValidationError } from '@ai-sdk/provider';
 import { logSafeError } from './log-safe-error.util';
+
+// LAB-3367 R1: this spec loads the installed `ai` package, not a mock. Jest 27 picks the ES module build of
+// `eventsource-parser/stream`, so this line maps it to the CommonJS build of the same package. The Jest node
+// environment has no web streams, so the spec adds them before `ai` loads.
+jest.mock('eventsource-parser/stream', () =>
+  jest.requireActual(
+    jest.requireActual<typeof import('path')>('path').join(require.resolve('eventsource-parser'), '..', 'stream.cjs')
+  )
+);
+for (const [key, value] of Object.entries(webStreams)) {
+  if (!(key in globalThis)) (globalThis as Record<string, unknown>)[key] = value;
+}
+const { InvalidToolArgumentsError } = jest.requireActual('ai') as typeof import('ai');
 
 const SECRET = 'Secret-draft-5e1f: I lead fundraising at Acme.';
 
@@ -52,5 +66,15 @@ describe('logSafeError (LAB-3362)', () => {
   it('logs a plain error and a non-error value', () => {
     expect(logSafeError(new Error('write failed'))).toBe('{"name":"Error","message":"write failed"}');
     expect(logSafeError('boom')).toBe('{"name":"string","message":"boom"}');
+  });
+
+  it('LAB-3367 R1: logs only name and toolName of the installed ai InvalidToolArgumentsError', () => {
+    const toolArgs = JSON.stringify({ type: 'person', targetUid: 'm-test', text: SECRET });
+    const error = new InvalidToolArgumentsError({ toolName: 'draft_intro', toolArgs, cause: new Error(toolArgs) });
+
+    expect(error.message).toContain(SECRET);
+    expect(logSafeError(error, ['searchWeb', 'draft_intro'])).toBe(
+      JSON.stringify({ name: 'AI_InvalidToolArgumentsError', toolName: 'draft_intro' })
+    );
   });
 });

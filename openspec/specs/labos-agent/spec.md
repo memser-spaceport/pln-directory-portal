@@ -325,7 +325,7 @@ When the turn has a draft, the answer text SHALL be one short line: "Here is a d
 
 ### Requirement: Current intro draft in C1
 
-The C1 body MAY have `introDraft: { target: { type, uid }, text }` (contract change 4, section 11; LAB-3362). The object and its `target` SHALL be strict; `context.introTarget` does not change. `text` SHALL be 1 to 3500 characters after trim. A bad shape, an extra key, an empty text or a text over 3500 characters SHALL get the C1 400. `introDraft` is allowed with any `context.page` and with no `context`. An unknown or deleted target SHALL get 404 `INTRO_TARGET_NOT_FOUND` before the stream, with the lookup of the intro page (`findAgentTargetName`). The backend SHALL put the target and the text into the prompt context of this turn only. The agent SHALL use the text only when the member asks to change the draft. `draft_intro` SHALL accept the `introDraft` target as a target of the turn, and SHALL check the sender eligibility and the target again. The backend SHALL NOT store `introDraft`, write a cache key for it, or write its text to a log line, error message or analytics event. The Husky thread summary has no extra rule (11.7 A). A Husky catch and the C1 controller catch SHALL log only `{ name, statusCode, message }` of an error, never the error object: an AI SDK `APICallError` holds `requestBodyValues`, the whole prompt. When the stream fails after the headers, the controller SHALL destroy the connection with no error argument. For `AI_InvalidToolArgumentsError`, `AI_TypeValidationError` and `AI_JSONParseError`, the message has the model input (for example the `draft_intro` text), so the log SHALL have only `name`, plus `toolName` when it is a tool of that call, and no `message`. The Husky answer stream `error` part SHALL use the same log form.
+The C1 body MAY have `introDraft: { target: { type, uid }, text }` (contract change 4, section 11; LAB-3362). The object and its `target` SHALL be strict; `context.introTarget` does not change. `text` SHALL be 1 to 3500 characters after trim. A bad shape, an extra key, an empty text or a text over 3500 characters SHALL get the C1 400. `introDraft` is allowed with any `context.page` and with no `context`. An unknown or deleted target SHALL get 404 `INTRO_TARGET_NOT_FOUND` before the stream, with the lookup of the intro page (`findAgentTargetName`). The backend SHALL put the target and the text into the prompt context of this turn only. The agent SHALL use the text only when the member asks to change the draft. If the member makes a brief revision request such as "make it shorter" and does not refer to another item, the agent SHALL revise this draft, also when the page or the items give another target. If the member refers to a different item, the agent SHALL follow that reference and SHALL NOT use the draft text for that request. This rule adds no target and does not force a `draft_intro` call (LAB-3367). `draft_intro` SHALL accept the `introDraft` target as a target of the turn, and SHALL check the sender eligibility and the target again. The backend SHALL NOT store `introDraft`, write a cache key for it, or write its text to a log line, error message or analytics event. The Husky thread summary has no extra rule (11.7 A). A Husky catch and the C1 controller catch SHALL log only `{ name, statusCode, message }` of an error, never the error object: an AI SDK `APICallError` holds `requestBodyValues`, the whole prompt. When the stream fails after the headers, the controller SHALL destroy the connection with no error argument. For `AI_InvalidToolArgumentsError`, `AI_TypeValidationError` and `AI_JSONParseError`, the message has the model input (for example the `draft_intro` text), so the log SHALL have only `name`, plus `toolName` when it is a tool of that call, and no `message`. The Husky answer stream `error` part SHALL use the same log form.
 
 #### Scenario: Make it shorter
 
@@ -333,6 +333,20 @@ The C1 body MAY have `introDraft: { target: { type, uid }, text }` (contract cha
 - **WHEN** the member sends "Make it shorter." with `introDraft` and no `context`
 - **THEN** the prompt context has the card text
 - **AND** a `draft_intro` call for Grace gives one draft in `drafts`, with the short intro line
+
+#### Scenario: Brief revision next to another page target
+
+- **GIVEN** an intro card for Grace that waits in the chat, on the intro page of Acme Team
+- **WHEN** the member sends "Make it shorter." with `introDraft`
+- **THEN** the prompt context tells the agent to revise this draft
+- **AND** a `draft_intro` call for Grace gives one draft in `drafts`
+
+#### Scenario: A reference to another item
+
+- **GIVEN** an intro card for Grace that waits in the chat
+- **WHEN** the member refers to a different item, for example "Write the intro to Acme Team instead." or "Shorten your last answer."
+- **THEN** the prompt context tells the agent to follow that reference and not to use the draft text
+- **AND** the targets of the turn do not change, and the turn has no draft without a `draft_intro` call
 
 #### Scenario: Unknown introDraft target
 

@@ -437,6 +437,10 @@ export class LabosAgentService {
       `Its current text, with the edits of the member: ${JSON.stringify(draft.text)}. ` +
       'Use this text only when the member asks to change the draft. ' +
       `Then call draft_intro with type "${type}" and targetUid "${uid}" and the new text. ` +
+      // LAB-3367 R2, R3: a brief revision with no other reference is for this draft. A reference to another item wins.
+      'If the member makes a brief revision request such as "make it shorter" and does not refer to another item, ' +
+      'revise this draft. ' +
+      'If the member refers to a different item, follow that reference. Do not use this draft text for that request. ' +
       'Do not write the draft text in the answer.';
     return { promptContext, introTarget };
   }

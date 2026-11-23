@@ -519,6 +519,70 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
     expect(options.extraResponseFields.drafts).toEqual([]);
   });
 
+  const BRIEF_REVISION =
+    'If the member makes a brief revision request such as "make it shorter" and does not refer to another item, ' +
+    'revise this draft.';
+  const OTHER_REFERENCE =
+    'If the member refers to a different item, follow that reference. Do not use this draft text for that request.';
+
+  it('LAB-3367 R2: a brief revision with no other reference revises the draft, also next to another page target', async () => {
+    const h = setup();
+    const options = await chat(h, {
+      ...SHORTER,
+      context: TEAM_CONTEXT,
+      introDraft: { target: GRACE, text: CARD_TEXT },
+    });
+
+    expect(options.promptContext).toContain(BRIEF_REVISION);
+    expect(options.promptContext).toContain('call draft_intro with type "member" and targetUid "m-grace"');
+    const result = await options.extraTools.draft_intro.execute({ type: 'member', targetUid: 'm-grace', text: SHORT });
+
+    expect(result).toContain(INTRO_DRAFT_LINE);
+    expect(options.extraResponseFields.drafts).toEqual([
+      expect.objectContaining({ target: { type: 'member', uid: 'm-grace', name: 'Grace Hopper' }, text: SHORT }),
+    ]);
+  });
+
+  it('LAB-3367 R3: a reference to another item wins, and the page target stays a permitted target', async () => {
+    const h = setup();
+    const options = await chat(h, {
+      ...VALID,
+      message: 'Write the intro to Acme Team instead.',
+      context: TEAM_CONTEXT,
+      introDraft: { target: GRACE, text: CARD_TEXT },
+    });
+
+    expect(options.promptContext).toContain(OTHER_REFERENCE);
+    expect(options.promptContext).toContain('call draft_intro with type "team" and targetUid "t-acme"');
+    const result = await options.extraTools.draft_intro.execute({ type: 'team', targetUid: 't-acme', text: SHORT });
+
+    expect(result).toContain(INTRO_DRAFT_LINE);
+    expect(options.extraResponseFields.drafts).toEqual([
+      expect.objectContaining({ target: { type: 'team', uid: 't-acme', name: 'Acme Team' }, text: SHORT }),
+    ]);
+  });
+
+  it('LAB-3367 R3: "shorten your last answer" gets the reference rule, and the turn has no draft until a tool call', async () => {
+    const h = setup();
+    const options = await chat(h, {
+      ...VALID,
+      message: 'Shorten your last answer.',
+      introDraft: { target: GRACE, text: CARD_TEXT },
+    });
+
+    expect(options.promptContext).toContain(OTHER_REFERENCE);
+    // The prompt does not force draft_intro: with no tool call, the turn has no draft and the model text streams.
+    expect(options.extraResponseFields.drafts).toEqual([]);
+    expect(options.answerLine()).toBeUndefined();
+  });
+
+  it('LAB-3367: a turn with no introDraft has no revision rule', async () => {
+    const h = setup();
+    const options = await chat(h, { ...SHORTER, context: TEAM_CONTEXT });
+    expect(options.promptContext).not.toContain(BRIEF_REVISION);
+    expect(options.promptContext).not.toContain(OTHER_REFERENCE);
+  });
+
   it('C4-R4: a turn with no introDraft has no draft text in the prompt context', async () => {
     const h = setup();
     const withCard = await chat(h, { ...SHORTER, introDraft: { target: GRACE, text: CARD_TEXT } });
