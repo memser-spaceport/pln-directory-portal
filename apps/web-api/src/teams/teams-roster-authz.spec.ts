@@ -27,14 +27,21 @@ describe('TeamsService — teamMemberRoles must belong to the path team', () => 
     return { service: service as TeamsService, prisma };
   }
 
-  const request = (teamUid: string) =>
-    ({ newData: { name: 'Acme', teamMemberRoles: [{ status: 'Add', memberUid: 'm1', teamUid }] } } as any);
+  const request = (status: string, teamUid: string) =>
+    ({ newData: { name: 'Acme', teamMemberRoles: [{ status, memberUid: 'm1', teamUid }] } } as any);
 
-  it.each(['team-y', undefined])('refuses a role for teamUid=%s when updating team-x', async (teamUid) => {
+  // A Delete row without teamUid used to reach deleteMany with an undefined team filter.
+  it.each([
+    ['Add', 'team-y'],
+    ['Add', undefined],
+    ['Update', 'team-y'],
+    ['Delete', 'team-y'],
+    ['Delete', undefined],
+  ])('refuses a %s row for teamUid=%s when updating team-x', async (status, teamUid) => {
     const { service, prisma } = setup();
 
     await expect(
-      service.updateTeamFromParticipantsRequest('team-x', request(teamUid as string), 'lead@example.com')
+      service.updateTeamFromParticipantsRequest('team-x', request(status, teamUid as string), 'lead@example.com')
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });

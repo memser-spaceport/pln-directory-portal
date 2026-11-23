@@ -281,7 +281,14 @@ export class MemberController {
     if (referenceUid && referenceUid !== uid) {
       throw new BadRequestException('referenceUid must match the member uid in the path');
     }
-    if (participantsRequest.newData.isVerified !== undefined && !this.membersService.checkIfAdminUser(requestor)) {
+    // Non-admins can only edit themselves (checked above), so compare against the requestor's own flag:
+    // profile forms resend it unchanged, and only a change needs admin rights.
+    const { isVerified } = participantsRequest.newData;
+    if (
+      isVerified !== undefined &&
+      Boolean(isVerified) !== Boolean(requestor.isVerified) &&
+      !this.membersService.checkIfAdminUser(requestor)
+    ) {
       throw new ForbiddenException(`Member isn't authorized to verify a member`);
     }
     return await this.membersService.updateMemberFromParticipantsRequest(

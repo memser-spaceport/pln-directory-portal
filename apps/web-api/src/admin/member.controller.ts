@@ -52,8 +52,9 @@ export class MemberController {
   ) {}
 
   /**
-   * Directory admins may set any roles. Demo day admins may only grant DEMO_DAY_ADMIN;
-   * their member's other roles are preserved. Anything else is rejected with 403.
+   * Directory admins may set any roles. Demo day admins may only grant or revoke DEMO_DAY_ADMIN:
+   * the member's other roles are always preserved, and resending a role the member already holds
+   * (whole-roster UIs do) is allowed. Granting any other role is rejected with 403.
    */
   private async scopeRolesToRequester(req: any, uid: string, roles: string[]): Promise<string[]>;
   private async scopeRolesToRequester(req: any, uid: string, roles?: string[]): Promise<string[] | undefined>;
@@ -61,12 +62,13 @@ export class MemberController {
     const permissions: string[] = req.user?.effectivePermissionCodes ?? req.user?.permissions ?? [];
     if (roles === undefined || permissions.includes(ADMIN_PERMISSIONS.DIRECTORY_FULL)) return roles;
     const requested = roles.map((r) => r.trim().toUpperCase()).filter((r) => r.length > 0);
-    if (requested.some((r) => r !== 'DEMO_DAY_ADMIN')) {
+    const member = await this.memberService.findMemberByUid(uid);
+    const held = member.memberRoles.map((r) => r.name);
+    if (requested.some((r) => r !== 'DEMO_DAY_ADMIN' && !held.includes(r))) {
       throw new ForbiddenException('Only directory admins can grant roles other than DEMO_DAY_ADMIN');
     }
-    const member = await this.memberService.findMemberByUid(uid);
-    const kept = member.memberRoles.map((r) => r.name).filter((n) => n !== 'DEMO_DAY_ADMIN');
-    return [...kept, ...requested];
+    const kept = held.filter((n) => n !== 'DEMO_DAY_ADMIN');
+    return requested.includes('DEMO_DAY_ADMIN') ? [...kept, 'DEMO_DAY_ADMIN'] : kept;
   }
 
   @Get()

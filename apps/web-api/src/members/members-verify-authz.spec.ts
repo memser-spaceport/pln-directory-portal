@@ -12,12 +12,12 @@ jest.mock('../guards/user-token-check.guard', () => ({ OptionalUserTokenCheckGua
 jest.mock('../guards/service-auth.guard', () => ({ ServiceAuthGuard: class {} }));
 jest.mock('../interceptors/verified-member.interceptor', () => ({ IsVerifiedMemberInterceptor: class {} }));
 
-/** `isVerified` is admin-only, including boolean values (lodash `isEmpty(true)` is true). */
+/** Changing `isVerified` is admin-only, including boolean values (lodash `isEmpty(true)` is true). */
 describe('MemberController — isVerified authorization', () => {
   const req = { userEmail: 'member@example.com' };
 
-  function setup(isDirectoryAdmin: boolean) {
-    const requestor = { uid: 'member-1', email: 'member@example.com', isDirectoryAdmin };
+  function setup(isDirectoryAdmin: boolean, isVerified = false) {
+    const requestor = { uid: 'member-1', email: 'member@example.com', isDirectoryAdmin, isVerified };
     const membersService = {
       findMemberByEmail: jest.fn().mockResolvedValue(requestor),
       checkIfAdminUser: jest.fn().mockReturnValue(isDirectoryAdmin),
@@ -35,11 +35,22 @@ describe('MemberController — isVerified authorization', () => {
     newData: { email: 'x@example.com', isVerified },
   });
 
-  it.each([true, false])('refuses a non-admin sending isVerified=%s', async (value) => {
-    const { controller, membersService } = setup(false);
+  it.each([
+    [false, true],
+    [true, false],
+  ])('refuses a non-admin changing isVerified from %s to %s', async (current, value) => {
+    const { controller, membersService } = setup(false, current);
 
     await expect(controller.updateMember('member-1', body(value), req)).rejects.toBeInstanceOf(ForbiddenException);
     expect(membersService.updateMemberFromParticipantsRequest).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])('lets a non-admin resend an unchanged isVerified=%s', async (value) => {
+    const { controller, membersService } = setup(false, value);
+
+    await controller.updateMember('member-1', body(value), req);
+
+    expect(membersService.updateMemberFromParticipantsRequest).toHaveBeenCalled();
   });
 
   it('lets an admin send isVerified', async () => {
