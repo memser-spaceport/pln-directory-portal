@@ -81,6 +81,8 @@ function setup(env = APP_ENV.DEV as string, pilot = false) {
     write: jest.fn(),
     end: jest.fn(),
     destroy: jest.fn(),
+    on: jest.fn(),
+    off: jest.fn(),
   };
   const req = { userEmail: 'ada@example.com' };
   return { prisma, husky, query, stream, controller, res, req, catalog, caps };

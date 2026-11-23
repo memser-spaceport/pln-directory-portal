@@ -46,6 +46,13 @@ export const DEFAULT_HUSKY_SEARCH_OPUS_MODEL = 'claude-opus-5-5';
 export const HUSKY_SEARCH_STALL_TIMEOUT_ENV_VAR = 'HUSKY_SEARCH_STALL_TIMEOUT_MS';
 export const DEFAULT_HUSKY_SEARCH_STALL_TIMEOUT_MS = 30_000;
 
+/**
+ * LAB-3367 i1: the longest wait for one latest reply cache step (the read and the clear together, the write, or the
+ * clear after a cancel). After it the turn goes on as if the step failed. The wait ends, but the Redis command is not
+ * cancelled and can still run later.
+ */
+export const LATEST_REPLY_CACHE_TIMEOUT_MS = 1_000;
+
 /** Appended to an answer that stayed incomplete after the one continuation attempt. */
 export const HUSKY_SEARCH_STALLED_NOTICE =
   '\n\n_The answer was cut short because the AI provider stopped responding. Please try again._';
@@ -57,6 +64,7 @@ export const HUSKY_SEARCH_STALLED_NOTICE =
 type AnswerMode = { kind: 'initial' } | { kind: 'continuation'; partialAnswer: string; toolResults: string };
 
 interface AnswerInput {
+  /** The chat history line, plus the `latestReply` line when `ContextualToolsOptions.latestReplyKey` is set. */
   historyPrompt: string;
   question: string;
   currentDate: string;
@@ -83,6 +91,14 @@ export interface ContextualToolsOptions {
   answerLine?: () => string | undefined;
   /** False: keep the thread summary in the cache only, and write nothing to MongoDB. Default true. */
   persistHistory?: boolean;
+  /**
+   * LAB-3367 h3: the cache key of the latest reply, for the LabOS agent only. The caller scopes the key (member and
+   * thread). With a key, the stream reads the value into the answer prompt as `latestReply`, then writes `''` before
+   * the stream starts. Before the stream closes, it writes the reply of this turn: only the answer line for a turn
+   * with that line, else the answer text. A failed, cancelled or still cut-off turn writes nothing, so the key stays
+   * `''`. A cache error does not stop the turn. AI search passes nothing.
+   */
+  latestReplyKey?: string;
   /**
    * Extra fields for the end of the streamed JSON object that need the finished turn, for example the answer counts
    * of the LabOS agent (LAB-3297). Called once, after `extraResponseFields`. A field with the key of a tail field
@@ -258,14 +274,26 @@ export class HuskyAiService {
 
     const chatSummaryFromDb = await this.huskyCacheDbService.get(`${threadId}:summary`);
     const historyPrompt = chatSummaryFromDb ? ` - chatHistory: ${chatSummaryFromDb}` : '';
+    const { latestReplyKey } = options;
+    const latestReply = latestReplyKey ? await this.takeLatestReply(latestReplyKey) : '';
+    const answerHistoryPrompt = latestReply
+      ? `${historyPrompt}\n  - latestReply: ${JSON.stringify(latestReply)}`
+      : historyPrompt;
     const model = this.getSearchModel();
 
     const encoder = new TextEncoder();
+    // LAB-3367 h3: true after the reader cancels the stream, for example when the C1 client disconnects.
+    let cancelled = false;
     const stream = new ReadableStream({
+      cancel: () => {
+        cancelled = true;
+      },
       start: async (controller) => {
         const enqueue = (text: string) => controller.enqueue(encoder.encode(text));
 
         let content = '';
+        // LAB-3367 h3: false when the answer stayed cut off after the continuation. Then no latest reply is written.
+        let complete = true;
         try {
           // Status lines stream as a JSON array ahead of `content`, so the client
           // can show the latest one during the tool phase. Closed on the first
@@ -290,7 +318,7 @@ export class HuskyAiService {
           enqueue('{ "steps": [');
           pushStep(UNDERSTANDING_STEP);
 
-          const input: AnswerInput = { historyPrompt, question, currentDate, pageContext };
+          const input: AnswerInput = { historyPrompt: answerHistoryPrompt, question, currentDate, pageContext };
           const answer = await this.streamAnswer(
             model,
             auth,
@@ -333,6 +361,7 @@ export class HuskyAiService {
               this.logger.error(
                 `Husky answer continuation for thread ${threadId}, chat ${chatId} was cut off as well (${continuation.reason})`
               );
+              complete = false;
               content += HUSKY_SEARCH_STALLED_NOTICE;
               emitText(encodeJsonStringFragment(HUSKY_SEARCH_STALLED_NOTICE));
             }
@@ -363,8 +392,23 @@ export class HuskyAiService {
             },
             enqueue,
             options.extraResponseFields,
-            turnFields ? (payload) => turnFields(turnSummary(toolNames, payload)) : undefined
+            turnFields ? (payload) => turnFields(turnSummary(toolNames, payload)) : undefined,
+            // LAB-3367 i5: a client stop during the tail is not a tail failure, so it gets no log line.
+            () => Boolean(latestReplyKey) && cancelled
           );
+
+          // LAB-3367 h3: write before close, so the next C1 turn can read the reply as soon as the client sees the end.
+          // A draft turn stores only the answer line, never the draft text. A cut-off or cancelled turn stores nothing.
+          if (latestReplyKey && cancelled) return;
+          if (latestReplyKey && complete) {
+            await this.saveLatestReply(latestReplyKey, lastLine ? lastLine.trim() : content);
+            // A cancel during the write: the client gets no end, so the reply is not latest. Clear it again and do not
+            // close the cancelled stream. No await comes between this check and `controller.close()`.
+            if (cancelled) {
+              await this.saveLatestReply(latestReplyKey, '', 'clear');
+              return;
+            }
+          }
 
           controller.close();
 
@@ -387,6 +431,7 @@ export class HuskyAiService {
             this.logger.error(`Failed to persist chat history for thread ${threadId}: ${logSafeError(error)}`)
           );
         } catch (error) {
+          if (latestReplyKey && cancelled) return;
           // LAB-3362: log the name, status and message only. The error can hold the whole prompt. A tool name is
           // logged only when it is one of the caller's extra tools (for example draft_intro).
           this.logger.error(
@@ -609,7 +654,8 @@ export class HuskyAiService {
     },
     enqueue: (text: string) => void,
     extraResponseFields?: Record<string, unknown>,
-    turnFields?: (payload: HuskyStoredContext) => Record<string, unknown>
+    turnFields?: (payload: HuskyStoredContext) => Record<string, unknown>,
+    stopped?: () => boolean
   ): Promise<HuskyStoredContext> {
     const watchdog = new StallWatchdog(this.getStallTimeoutMs());
     try {
@@ -647,6 +693,7 @@ export class HuskyAiService {
       enqueue(JSON.stringify({ ...payload, ...extraResponseFields, ...turnFields?.(payload) }).substring(1));
       return payload;
     } catch (error) {
+      if (stopped?.()) throw error;
       if (watchdog.stalled) {
         this.logger.error(`Husky structured response generation stalled: no chunk for ${watchdog.timeoutMs}ms`);
       } else {
@@ -827,6 +874,73 @@ export class HuskyAiService {
       'threadId',
       threadId
     );
+  }
+
+  /**
+   * LAB-3367 h3, i1: the latest reply under `key`, or '' when there is none, the read fails or the step times out. The
+   * read and the clear ('') go to the cache client one after the other, with no wait between them. So the clear
+   * follows the read in the order of the one Redis connection, and a late read cannot start a clear after a newer
+   * turn. The two together wait at most `latestReplyTimeoutMs`. On a timeout the value is not used, because it can be
+   * old. The log lines are fixed texts: a Redis error can hold the command arguments, that is, the reply text.
+   */
+  private async takeLatestReply(key: string): Promise<string> {
+    const read = this.latestReplyCall(() => this.huskyCacheDbService.get(key));
+    const clear = this.latestReplyCall(() => this.huskyCacheDbService.set(key, ''));
+    const settled = await this.withinLatestReplyTimeout(Promise.all([read, clear]));
+    if (!settled) {
+      this.logger.error('Timed out reading and clearing the latest reply of the LabOS agent thread');
+      return '';
+    }
+    const [value, cleared] = settled;
+    if (cleared.failed) this.logger.error('Failed to clear the latest reply of the LabOS agent thread');
+    if (value.failed) {
+      this.logger.error('Failed to read the latest reply of the LabOS agent thread');
+      return '';
+    }
+    return typeof value.value === 'string' ? value.value : '';
+  }
+
+  /**
+   * LAB-3367 h3, i1: writes `reply` ('write') or '' after a cancel ('clear'). It waits at most `latestReplyTimeoutMs`.
+   * A failure or a timeout is logged with a fixed text and does not stop the turn.
+   */
+  private async saveLatestReply(key: string, reply: string, step: 'write' | 'clear' = 'write'): Promise<void> {
+    const saved = await this.withinLatestReplyTimeout(
+      this.latestReplyCall(() => this.huskyCacheDbService.set(key, reply))
+    );
+    if (!saved) this.logger.error(`Timed out on the ${step} of the latest reply of the LabOS agent thread`);
+    else if (saved.failed) this.logger.error(`Failed to ${step} the latest reply of the LabOS agent thread`);
+  }
+
+  /** LAB-3367 i1: the wait of one latest reply cache step. A field, so a test can make it short. */
+  private latestReplyTimeoutMs = LATEST_REPLY_CACHE_TIMEOUT_MS;
+
+  /** Starts one cache call now. The result never rejects, so a late failure after a timeout is not unhandled. */
+  private latestReplyCall<T>(call: () => Promise<T>): Promise<{ failed: false; value: T } | { failed: true }> {
+    let started: Promise<T>;
+    try {
+      started = call();
+    } catch {
+      return Promise.resolve({ failed: true });
+    }
+    return Promise.resolve(started).then(
+      (value) => ({ failed: false as const, value }),
+      () => ({ failed: true as const })
+    );
+  }
+
+  /** The result of `work`, or undefined after `latestReplyTimeoutMs`. The timer does not keep the process alive. */
+  private async withinLatestReplyTimeout<T>(work: Promise<T>): Promise<T | undefined> {
+    let timer: NodeJS.Timeout | undefined;
+    const timeout = new Promise<undefined>((resolve) => {
+      timer = setTimeout(() => resolve(undefined), this.latestReplyTimeoutMs);
+      timer.unref?.();
+    });
+    try {
+      return await Promise.race([work, timeout]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 
   async updateChatSummary(chatId: string, rawChatHistory: any) {

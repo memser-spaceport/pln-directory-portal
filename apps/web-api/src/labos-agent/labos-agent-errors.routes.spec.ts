@@ -16,15 +16,24 @@ import {
   ForbiddenException,
   HttpException,
   INestApplication,
+  Logger,
   Module,
   NotFoundException,
 } from '@nestjs/common';
 import { APP_FILTER, NestFactory } from '@nestjs/core';
+import http from 'http';
+import { AddressInfo } from 'net';
 import request from 'supertest';
 import { LABOS_AGENT_ERROR_CODES } from 'libs/contracts/src/schema/labos-agent';
 import { LogException } from '../filters/log-exception.filter';
 import { LabosAgentController } from './labos-agent.controller';
 import { LabosAgentService } from './labos-agent.service';
+
+// The jest node environment predates the web streams globals that the controller and this Node runtime use.
+for (const name of ['ReadableStream', 'WritableStream'] as const) {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  if (!(globalThis as any)[name]) (globalThis as any)[name] = require('stream/web')[name];
+}
 
 const chatBody = { threadId: 't1', chatId: 'c1', message: 'Hello' };
 
@@ -156,6 +165,115 @@ describe('LabOS agent error bodies over HTTP (LAB-3300)', () => {
       })
       .expect(404);
     expect(res.body).toEqual(body);
+  });
+
+  describe('C1 stop (LAB-3367 h3)', () => {
+    /** A stream that sends one chunk, then waits. `cancelled` resolves when the controller cancels it. */
+    function openStream() {
+      let onCancel: () => void = () => undefined;
+      const cancelled = new Promise<void>((resolve) => (onCancel = resolve));
+      const cancel = jest.fn(() => onCancel());
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('{ "steps": ['));
+        },
+        cancel,
+      });
+      return { stream, cancel, cancelled };
+    }
+
+    async function port(): Promise<number> {
+      const server = app.getHttpServer() as http.Server;
+      if (!server.listening) await new Promise<void>((resolve) => server.listen(0, resolve));
+      return (server.address() as AddressInfo).port;
+    }
+
+    it('cancels the stream when the client disconnects before the end', async () => {
+      const open = openStream();
+      agent.chat.mockResolvedValue(open.stream);
+      const logs = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      const target = await port();
+
+      await new Promise<void>((resolve, reject) => {
+        const req = http.request(
+          {
+            port: target,
+            path: '/v1/labos-agent/chat',
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          },
+          (res) => {
+            res.once('data', () => {
+              req.destroy();
+              resolve();
+            });
+          }
+        );
+        req.on('error', (error: NodeJS.ErrnoException) => (error.code === 'ECONNRESET' ? undefined : reject(error)));
+        req.end(JSON.stringify(chatBody));
+      });
+      await open.cancelled;
+      // i7: let the pipeTo rejection reach the catch of the controller before the log check.
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(open.cancel).toHaveBeenCalledTimes(1);
+      // A client stop is not a stream failure.
+      expect(logs).not.toHaveBeenCalled();
+    });
+
+    it('cancels the stream when the client disconnects before the headers, while agent.chat runs', async () => {
+      const open = openStream();
+      let resolveChat: (stream: ReadableStream) => void = () => undefined;
+      let called: () => void = () => undefined;
+      const chatCalled = new Promise<void>((resolve) => (called = resolve));
+      agent.chat.mockImplementation(
+        () =>
+          new Promise<ReadableStream>((resolve) => {
+            resolveChat = resolve;
+            called();
+          })
+      );
+      const logs = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      const target = await port();
+
+      const req = http.request({
+        port: target,
+        path: '/v1/labos-agent/chat',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      req.on('error', () => undefined);
+      req.end(JSON.stringify(chatBody));
+      await chatCalled;
+      req.destroy();
+      // Wait until the server sees the closed socket, then let agent.chat return.
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      resolveChat(open.stream);
+      await open.cancelled;
+      // i7: let the pipeTo rejection reach the catch of the controller before the log check.
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(open.cancel).toHaveBeenCalledTimes(1);
+      expect(logs).not.toHaveBeenCalled();
+    });
+
+    it('does not cancel a stream that ends', async () => {
+      const cancel = jest.fn();
+      agent.chat.mockResolvedValue(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('{ "content": "Hi" }'));
+            controller.close();
+          },
+          cancel,
+        })
+      );
+
+      const res = await request(app.getHttpServer()).post('/v1/labos-agent/chat').send(chatBody).expect(201);
+
+      expect(res.text).toBe('{ "content": "Hi" }');
+      expect(cancel).not.toHaveBeenCalled();
+    });
   });
 
   it('S6-C5: C4 limit=11 gives 400 VALIDATION_ERROR and the service is not called', async () => {

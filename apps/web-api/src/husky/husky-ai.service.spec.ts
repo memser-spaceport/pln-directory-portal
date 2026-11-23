@@ -1018,6 +1018,380 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
     });
   });
 
+  describe('latestReplyKey (LAB-3367 h3)', () => {
+    const KEY = 'labos-agent:latest-reply:["m-1","thread-1"]';
+    const LINE = 'Here is a draft intro. Edit it in the card, then send.';
+    const TAIL = '{"followUpQuestions":[],"sources":[],"actions":[]}';
+    let store: Map<string, unknown>;
+
+    beforeEach(() => {
+      store = new Map();
+      cache.get.mockImplementation(async (key: string) => (store.has(key) ? store.get(key) : null));
+      cache.set.mockImplementation(async (key: string, value: unknown) => {
+        store.set(key, value);
+      });
+      streamObjectMock.mockImplementation(() => structuredStream([TAIL]));
+    });
+
+    const turn = Object.assign(
+      (options: Record<string, unknown> = {}) =>
+        service
+          .createContextualToolsResponse(chatInfo, false, undefined, { latestReplyKey: KEY, ...options })
+          .then(readAll),
+      {
+        /** The open stream of one turn, for a test that reads or cancels it itself. */
+        stream: (options: Record<string, unknown> = {}) =>
+          service.createContextualToolsResponse(chatInfo, false, undefined, { latestReplyKey: KEY, ...options }),
+      }
+    );
+    const answerPrompt = (call: number) => streamTextMock.mock.calls[call][0].prompt as string;
+
+    it('AI search passes no key: no read, no write and no latestReply line', async () => {
+      streamTextMock.mockReturnValue(answerStream(['One answer.']));
+      await readAll(await service.createContextualToolsResponse(chatInfo, false));
+      await flushBackgroundWork();
+
+      const keys = [...cache.get.mock.calls, ...cache.set.mock.calls].map((call) => call[0]);
+      expect(keys.every((key) => key === 'thread-1:summary')).toBe(true);
+      expect(answerPrompt(0)).not.toContain('latestReply');
+    });
+
+    it('writes the reply before the stream closes, so an immediate follow-up reads it before the summary', async () => {
+      // The summary model never answers, so the summary key is never written.
+      generateTextMock.mockReturnValue(new Promise(() => undefined));
+      streamTextMock.mockReturnValueOnce(answerStream(['First "answer".'])).mockReturnValueOnce(answerStream(['Ok.']));
+
+      await turn();
+      // readAll returns when the client sees the end of the stream. The value is already there.
+      expect(store.get(KEY)).toBe('First "answer".');
+      await turn();
+
+      expect(store.has('thread-1:summary')).toBe(false);
+      expect(answerPrompt(1)).toContain(`latestReply: ${JSON.stringify('First "answer".')}`);
+      expect(answerPrompt(1)).not.toContain('chatHistory');
+    });
+
+    it('a follow-up after the summary gets the chat history and latestReply', async () => {
+      streamTextMock.mockReturnValueOnce(answerStream(['First answer.'])).mockReturnValueOnce(answerStream(['Ok.']));
+
+      await turn();
+      await flushBackgroundWork();
+      await turn();
+
+      expect(answerPrompt(1)).toContain('chatHistory: summary text');
+      expect(answerPrompt(1)).toContain('latestReply: "First answer."');
+      // The structured tail call does not get latestReply.
+      expect(streamObjectMock.mock.calls[1][0].prompt).not.toContain('latestReply');
+    });
+
+    it('a draft turn stores only the answer line, and the next normal turn replaces it', async () => {
+      let on = false;
+      streamTextMock
+        .mockImplementationOnce(() => ({
+          fullStream: (async function* () {
+            yield { type: 'text-delta', textDelta: 'I will write it.' };
+            yield { type: 'tool-call', toolCallId: 'c1', toolName: 'draft_intro' };
+            on = true;
+            yield { type: 'text-delta', textDelta: 'Hi Grace, Draft-text-91c2.' };
+          })(),
+          finishReason: Promise.resolve('stop'),
+        }))
+        .mockReturnValueOnce(answerStream(['A normal answer.']))
+        .mockReturnValueOnce(answerStream(['Ok.']));
+      const answerLine = () => (on ? LINE : undefined);
+
+      await turn({ answerLine });
+      expect(store.get(KEY)).toBe(LINE);
+      on = false;
+      await turn({ answerLine });
+      expect(answerPrompt(1)).toContain(`latestReply: ${JSON.stringify(LINE)}`);
+      expect(store.get(KEY)).toBe('A normal answer.');
+      await turn({ answerLine });
+
+      expect(answerPrompt(2)).toContain('latestReply: "A normal answer."');
+      expect(JSON.stringify(cache.set.mock.calls)).not.toContain('Draft-text-91c2');
+    });
+
+    it('clears the key before the stream starts, so the old reply is not latest during the turn', async () => {
+      store.set(KEY, 'Old reply.');
+      let during: unknown;
+      streamTextMock.mockImplementationOnce(() => {
+        during = store.get(KEY);
+        return answerStream(['New reply.']);
+      });
+
+      await turn();
+
+      expect(answerPrompt(0)).toContain('latestReply: "Old reply."');
+      expect(during).toBe('');
+      expect(store.get(KEY)).toBe('New reply.');
+    });
+
+    it('a failed turn writes no reply, so the key stays empty', async () => {
+      store.set(KEY, 'Old reply.');
+      streamTextMock.mockReturnValue({ textStream: failingChunks(['partial'], new Error('tool exploded')) });
+
+      await expect(turn()).rejects.toThrow('tool exploded');
+      await flushBackgroundWork();
+
+      expect(store.get(KEY)).toBe('');
+    });
+
+    it('a cancelled stream writes no reply, so the key stays empty', async () => {
+      store.set(KEY, 'Old reply.');
+      let release: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      streamTextMock.mockImplementationOnce(() => ({
+        textStream: (async function* () {
+          yield 'Part one.';
+          await gate;
+          yield ' Part two.';
+        })(),
+        finishReason: Promise.resolve('stop'),
+      }));
+
+      const stream = await service.createContextualToolsResponse(chatInfo, false, undefined, { latestReplyKey: KEY });
+      const reader = stream.getReader();
+      await reader.read();
+      await reader.cancel();
+      release();
+      await flushBackgroundWork();
+
+      expect(store.get(KEY)).toBe('');
+      expect(logger.error).not.toHaveBeenCalled();
+      expect(generateTextMock).not.toHaveBeenCalled();
+    });
+
+    it('a cancel while the reply write is pending clears the key again and does not close the stream', async () => {
+      store.set(KEY, 'Old reply.');
+      let release: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      let pending: () => void = () => undefined;
+      const writing = new Promise<void>((resolve) => (pending = resolve));
+      cache.set.mockImplementation(async (key: string, value: unknown) => {
+        store.set(key, value);
+        if (key === KEY && value === 'New reply.') {
+          pending();
+          await gate;
+        }
+      });
+      streamTextMock.mockReturnValueOnce(answerStream(['New reply.']));
+
+      const stream = await service.createContextualToolsResponse(chatInfo, false, undefined, { latestReplyKey: KEY });
+      const reader = stream.getReader();
+      const reading = (async () => {
+        for (;;) if ((await reader.read()).done) return;
+      })().catch(() => undefined);
+      await writing;
+      expect(store.get(KEY)).toBe('New reply.');
+      await reader.cancel();
+      release();
+      await reading;
+      await flushBackgroundWork();
+
+      expect(store.get(KEY)).toBe('');
+      // No close on the cancelled stream, so no "search failed" log, and no summary for a reply the client did not get.
+      expect(logger.error).not.toHaveBeenCalled();
+      expect(generateTextMock).not.toHaveBeenCalled();
+    });
+
+    /** Reads the whole stream in the background. `done` turns true when the client sees the end of the stream. */
+    function readInBackground(stream: ReadableStream<Uint8Array>) {
+      const reader = stream.getReader();
+      const state = { done: false, reader };
+      const reading = (async () => {
+        for (;;) if ((await reader.read()).done) break;
+        state.done = true;
+      })().catch(() => undefined);
+      return { state, reading };
+    }
+    const KEY_LOG = 'latest reply of the LabOS agent thread';
+
+    it('i3: the client sees no end of the stream while the reply write is pending', async () => {
+      let release: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      let pending: () => void = () => undefined;
+      const writing = new Promise<void>((resolve) => (pending = resolve));
+      cache.set.mockImplementation(async (key: string, value: unknown) => {
+        if (key === KEY && value === 'The reply.') {
+          pending();
+          await gate;
+        }
+        store.set(key, value);
+      });
+      streamTextMock.mockReturnValueOnce(answerStream(['The reply.']));
+
+      const { state, reading } = readInBackground(await turn.stream());
+      await writing;
+      // Far less than the write timeout: the stream must still wait for the write.
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(state.done).toBe(false);
+      expect(store.get(KEY)).toBe('');
+      release();
+      await reading;
+
+      expect(state.done).toBe(true);
+      expect(store.get(KEY)).toBe('The reply.');
+    });
+
+    describe('cache timeouts (i1)', () => {
+      beforeEach(() => {
+        (service as any).latestReplyTimeoutMs = 20;
+      });
+
+      it('sends the read and then the clear with no wait between them, and a late read starts nothing', async () => {
+        let lateRead: (value: unknown) => void = () => undefined;
+        cache.get.mockImplementation((key: string) =>
+          key === KEY ? new Promise((resolve) => (lateRead = resolve)) : Promise.resolve(null)
+        );
+        streamTextMock.mockReturnValueOnce(answerStream(['New reply.']));
+
+        const body = JSON.parse(await turn());
+
+        expect(body.content).toBe('New reply.');
+        const keyCalls = (mock: jest.Mock) =>
+          mock.mock.calls
+            .map((call, index) => [call, mock.mock.invocationCallOrder[index]] as const)
+            .filter(([call]) => call[0] === KEY);
+        const [[, readOrder]] = keyCalls(cache.get);
+        const [[clearCall, clearOrder]] = keyCalls(cache.set);
+        expect(clearCall).toEqual([KEY, '']);
+        expect(clearOrder).toBeGreaterThan(readOrder);
+        // The clear went out before the read timed out, as the next cache call of this turn.
+        expect(clearOrder).toBe(readOrder + 1);
+        // A timed-out read is not used, because it can be old.
+        expect(answerPrompt(0)).not.toContain('latestReply');
+        expect(logger.error).toHaveBeenCalledWith(`Timed out reading and clearing the ${KEY_LOG}`);
+        expect(store.get(KEY)).toBe('New reply.');
+
+        const setsBefore = cache.set.mock.calls.length;
+        lateRead('Old reply.');
+        await flushBackgroundWork();
+        expect(cache.set.mock.calls.length).toBe(setsBefore);
+        expect(store.get(KEY)).toBe('New reply.');
+      });
+
+      it('a write that times out does not stop the turn: the stream ends, with a fixed log line', async () => {
+        cache.set.mockImplementation(async (key: string, value: unknown) => {
+          if (key === KEY && value === 'The reply.') return new Promise<void>(() => undefined);
+          store.set(key, value);
+        });
+        streamTextMock.mockReturnValueOnce(answerStream(['The reply.']));
+
+        const body = JSON.parse(await turn());
+
+        expect(body.content).toBe('The reply.');
+        expect(logger.error).toHaveBeenCalledWith(`Timed out on the write of the ${KEY_LOG}`);
+        expect(JSON.stringify(logger.error.mock.calls)).not.toContain('The reply.');
+      });
+
+      it('the clear after a cancel during the write also has the timeout, with a fixed log line', async () => {
+        let writeStarted: () => void = () => undefined;
+        const writing = new Promise<void>((resolve) => (writeStarted = resolve));
+        let started = false;
+        cache.set.mockImplementation(async (key: string, value: unknown) => {
+          if (key === KEY && value === 'The reply.') {
+            started = true;
+            writeStarted();
+            return new Promise<void>(() => undefined);
+          }
+          // After the write starts, the clear of the cancel cleanup never answers.
+          if (key === KEY && started) return new Promise<void>(() => undefined);
+          store.set(key, value);
+        });
+        streamTextMock.mockReturnValueOnce(answerStream(['The reply.']));
+
+        const { state } = readInBackground(await turn.stream());
+        await writing;
+        await state.reader.cancel();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        expect(cache.set).toHaveBeenLastCalledWith(KEY, '');
+        expect(logger.error.mock.calls.map((call) => call[0])).toEqual([
+          `Timed out on the write of the ${KEY_LOG}`,
+          `Timed out on the clear of the ${KEY_LOG}`,
+        ]);
+      });
+    });
+
+    it('i5: a client stop during the structured tail gets no log line', async () => {
+      let release: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      streamTextMock.mockReturnValueOnce(answerStream(['The reply.']));
+      streamObjectMock.mockImplementationOnce(() => ({
+        textStream: (async function* () {
+          await gate;
+          yield TAIL;
+        })(),
+        object: gate.then(() => JSON.parse(TAIL)),
+      }));
+
+      const stream = await turn.stream();
+      const reader = stream.getReader();
+      // Read until the answer text is out, so the tail call runs.
+      let seen = '';
+      while (!seen.includes('The reply.')) seen += new TextDecoder().decode((await reader.read()).value);
+      await reader.cancel();
+      release();
+      await flushBackgroundWork();
+
+      expect(logger.error).not.toHaveBeenCalled();
+      expect(store.get(KEY)).toBe('');
+    });
+
+    describe('when the answer is cut off', () => {
+      it('stores the reply when the continuation completes it', async () => {
+        streamTextMock
+          .mockReturnValueOnce(answerStream(['Half'], 'length'))
+          .mockReturnValueOnce(answerStream([' and the rest.']));
+
+        await turn();
+
+        expect(store.get(KEY)).toBe('Half and the rest.');
+      });
+
+      it('stores no reply when the continuation is cut off as well, and the key stays empty', async () => {
+        store.set(KEY, 'Old reply.');
+        streamTextMock
+          .mockReturnValueOnce(answerStream(['Half'], 'length'))
+          .mockReturnValueOnce(answerStream([' more'], 'length'));
+
+        const body = JSON.parse(await turn());
+
+        expect(body.content).toContain(HUSKY_SEARCH_STALLED_NOTICE.trim());
+        expect(answerPrompt(1)).toContain('latestReply: "Old reply."');
+        expect(store.get(KEY)).toBe('');
+      });
+    });
+
+    it('a cache failure does not stop the turn, and the logs have fixed texts only', async () => {
+      cache.get.mockImplementation(async (key: string) => {
+        if (key === KEY) throw new Error(`GET ${KEY} Secret-reply-3d7e`);
+        return null;
+      });
+      cache.set.mockImplementation(async (key: string) => {
+        if (key === KEY) throw new Error(`SET ${KEY} Secret-reply-3d7e`);
+      });
+      streamTextMock.mockReturnValue(answerStream(['Secret-reply-3d7e']));
+
+      const body = JSON.parse(await turn());
+      await flushBackgroundWork();
+
+      expect(body.content).toBe('Secret-reply-3d7e');
+      expect(answerPrompt(0)).not.toContain('latestReply');
+      const lines = logger.error.mock.calls.map((call) => call.join(' '));
+      expect(lines).toEqual(
+        expect.arrayContaining([
+          'Failed to read the latest reply of the LabOS agent thread',
+          'Failed to clear the latest reply of the LabOS agent thread',
+          'Failed to write the latest reply of the LabOS agent thread',
+        ])
+      );
+      expect(JSON.stringify(logger.error.mock.calls)).not.toContain('Secret-reply-3d7e');
+      expect(JSON.stringify(logger.error.mock.calls)).not.toContain('m-1');
+    });
+  });
+
   it('records a handed-over first exchange under its own chat id before answering', async () => {
     streamTextMock.mockReturnValue(answerStream(['Follow-up answer']));
     streamObjectMock.mockReturnValue(structuredStream(['{"followUpQuestions":[],"sources":[],"actions":[]}']));

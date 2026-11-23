@@ -107,7 +107,7 @@ Each news item of `sourceRefs` SHALL have `directoryLink` `/?news=<uid>` (LAB-33
 
 ### Requirement: No writes in chat
 
-The chat SHALL write nothing to the directory. Only C2 runs a write tool. The chat SHALL keep the thread summary in the AI search cache only and SHALL NOT write thread history or summaries to MongoDB.
+The chat SHALL write nothing to the directory. Only C2 runs a write tool. The chat SHALL keep the thread summary and the latest reply (LAB-3367 h3) in the AI search cache only and SHALL NOT write thread history or summaries to MongoDB.
 
 #### Scenario: A finished turn
 
@@ -323,9 +323,55 @@ When the turn has a draft, the answer text SHALL be one short line: "Here is a d
 - **THEN** the body has `drafts: []`
 - **AND** the answer is the refusal text, with no "Here is a draft intro" line
 
+### Requirement: Latest reply in C1
+
+LAB-3367 h3 (contract 11.7 A). For each C1 turn, the agent SHALL keep the latest reply of the signed-in member in the thread under one cache key: `<ENVIRONMENT>:labos-agent:latest-reply:` (the env prefix of the proposal keys, `local` when unset) plus `JSON.stringify([memberUid, threadId])`. `memberUid` comes from the session, never from the body. The key SHALL NOT be the raw `threadId`, so another member with the same `threadId` gets another key. The key SHALL use the same cache and TTL as the Husky thread summary (`REDIS_CACHE_EXPIRY_IN_SECONDS`, default 24 hours). AI search SHALL NOT read or write this key, and its prompt SHALL NOT change.
+
+1. Before the stream starts, the Husky stream SHALL read the key and give a value to the answer model (the first call and the continuation) as `latestReply`. The structured tail call does not get it.
+2. Then, before the stream starts, it SHALL write `''` to the key. So no older reply looks latest while the turn runs, or after the turn fails. It SHALL send the clear right after the read, with no wait between them. So the read and the clear go out in that order on the one Redis connection, and a late read result cannot start a clear after a newer turn.
+3. After the structured tail, the stream SHALL try to write the reply before it closes. If the write succeeds within the limit in rule 8, an immediate follow-up can read it before the summary changes. When the reader cancels the stream while this write runs, the stream SHALL write `''` again and SHALL NOT close the stream (best effort).
+4. When the draft card goes out with the fixed draft line, the reply SHALL be only that line. The draft text and any earlier answer text of the turn are not stored. Otherwise the reply SHALL be the answer text. An answer that a continuation completed counts as complete.
+5. The stream SHALL write no reply when the turn fails (a throw in the answer or the tail), when the reader cancels the stream, or when the answer is still cut off after the continuation. The key then stays `''`, and the next turn has no `latestReply`.
+6. When the C1 client stops the turn or disconnects before the end of the response, the controller SHALL cancel the stream (an `AbortController` signal on `pipeTo`). This includes a disconnect while `agent.chat` runs, before the headers (`res.destroyed`). A client stop gets no error log line. A stopped turn SHALL NOT write a thread summary.
+7. A cache read or write error SHALL NOT stop the turn. Its log line SHALL be a fixed text, with no error object, error message, key or reply text: a Redis error can hold the command arguments.
+8. Each cache step SHALL wait at most 1 second (`LATEST_REPLY_CACHE_TIMEOUT_MS`, LAB-3367 i1): the read and the clear together, the write of the reply, and the clear after a cancel. A timeout SHALL NOT stop the turn. It gets a fixed log line. After a read timeout, the turn SHALL NOT use the value that arrives late, and has no `latestReply`. The timeout stops only the wait. It does not cancel the Redis command, so that command can still run later.
+
+Limits (best effort, no lock across requests):
+
+- A normal answer can repeat text of the draft, and then the stored reply has that text (accepted risk).
+- Two parallel turns of one member in one thread can race. The last write wins, and one turn can read a reply that is not the latest.
+- A cache outage: if the `''` write at the start fails and the turn then fails or stops, or its own write also fails, the older reply can stay. If the second `''` write after a cancel fails, the reply of the cancelled turn can stay.
+- A disconnect after `controller.close()`, while the last bytes are on the wire, keeps the stored reply.
+- The stored reply has no length limit.
+- A timed-out write can still land later. Commands of one app instance go in order on its one Redis connection, so a later turn of that instance sends its clear after it. Several app instances or connections have no order guarantee, so a late write from one instance can land after the clear of a newer turn on another instance.
+- After a timeout on the write, the stream closes, so an immediate next turn can read `''` or the reply, by the time of the write.
+
+#### Scenario: Immediate follow-up
+
+- **GIVEN** a finished agent turn with the answer A, and a thread summary that is not yet written
+- **WHEN** the member sends the next C1 turn in the same thread
+- **THEN** the answer prompt has `latestReply` A
+
+#### Scenario: Draft turn, then a normal turn
+
+- **GIVEN** a turn that gave a draft card with the fixed draft line
+- **WHEN** the next turn reads the key
+- **THEN** `latestReply` is only the draft line, with no draft text
+- **AND** after a normal answer B, the next turn has `latestReply` B
+
+#### Scenario: Failed, stopped or cut-off turn
+
+- **WHEN** a turn fails, the client stops it, or its answer is still cut off after the continuation
+- **THEN** the key is `''` and the next turn has no `latestReply`
+
+#### Scenario: Another member, same thread ID
+
+- **WHEN** two members use the same `threadId`
+- **THEN** their latest reply keys are different
+
 ### Requirement: Current intro draft in C1
 
-The C1 body MAY have `introDraft: { target: { type, uid }, text }` (contract change 4, section 11; LAB-3362). The object and its `target` SHALL be strict; `context.introTarget` does not change. `text` SHALL be 1 to 3500 characters after trim. A bad shape, an extra key, an empty text or a text over 3500 characters SHALL get the C1 400. `introDraft` is allowed with any `context.page` and with no `context`. An unknown or deleted target SHALL get 404 `INTRO_TARGET_NOT_FOUND` before the stream, with the lookup of the intro page (`findAgentTargetName`). The backend SHALL put the target and the text into the prompt context of this turn only. The agent SHALL use the text only when the member asks to change the draft. LAB-3367 R2: if the member makes a brief revision request such as "make it shorter", the agent SHALL revise this draft, also when the page or the mention chips of the message point to another member or team. R4: a member or team name in the revision, such as "mention that I know Acme Team", is part of the new text and SHALL NOT change the target. R3: if the member asks for a different draft or asks to change other content instead (for example "write the intro to Acme Team instead", "shorten your last answer" or a change to a news title), the agent SHALL follow that request and SHALL NOT use the draft text for it. These rules add no target and do not force a `draft_intro` call. `draft_intro` SHALL accept the `introDraft` target as a target of the turn, and SHALL check the sender eligibility and the target again. The backend SHALL NOT store `introDraft`, write a cache key for it, or write its text to a log line, error message or analytics event. The Husky thread summary has no extra rule (11.7 A). A Husky catch and the C1 controller catch SHALL log only `{ name, statusCode, message }` of an error, never the error object: an AI SDK `APICallError` holds `requestBodyValues`, the whole prompt. When the stream fails after the headers, the controller SHALL destroy the connection with no error argument. For `AI_InvalidToolArgumentsError`, `AI_TypeValidationError` and `AI_JSONParseError`, the message has the model input (for example the `draft_intro` text), so the log SHALL have only `name`, plus `toolName` when it is a tool of that call, and no `message`. The Husky answer stream `error` part SHALL use the same log form.
+The C1 body MAY have `introDraft: { target: { type, uid }, text }` (contract change 4, section 11; LAB-3362). The object and its `target` SHALL be strict; `context.introTarget` does not change. `text` SHALL be 1 to 3500 characters after trim. A bad shape, an extra key, an empty text or a text over 3500 characters SHALL get the C1 400. `introDraft` is allowed with any `context.page` and with no `context`. An unknown or deleted target SHALL get 404 `INTRO_TARGET_NOT_FOUND` before the stream, with the lookup of the intro page (`findAgentTargetName`). The backend SHALL put the target and the text into the prompt context of this turn only. The agent SHALL use the text only when the member asks to change the draft. LAB-3367 R2: if the member makes a brief revision request such as "make it shorter", the agent SHALL revise this draft, also when the page or the items added to the message point to another member or team. R4: a member or team name in the revision, such as "mention that I know Acme Team", is part of the new text and SHALL NOT change the target. Q1: in a revision, the agent SHALL keep the facts of the current text, because the member may have typed them, and SHALL add only facts the member gave. It SHALL NOT add or strengthen a role, shared work, experience or that someone can vouch for the member, when the member did not give it. F1: when the member explicitly asks to change "your last answer", the agent SHALL use `latestReply` (see "Latest reply in C1"). If `latestReply` is the intro draft line, the agent SHALL revise the draft. If it is a normal answer, the agent SHALL change that answer and SHALL NOT change the draft. If there is no `latestReply`, the agent SHALL ask which reply to change and leave the draft unchanged. A brief revision request that does not name the last answer SHALL revise the draft (R2). The prompt SHALL say: "A brief revision request that does not name your last answer revises this draft." F1 is prompt guidance: the backend gives `latestReply` but does not check the choice of the model. R3: if the member asks for a different draft or asks to change other content instead (for example "write the intro to Acme Team instead" or a change to a news title), the agent SHALL follow that request and SHALL NOT use the draft text for it. F2: a draft for a different member or team needs a target of the turn (the page, the items added to the message or the card). If the member gives only a name of a member or team that is not a target of the turn, the agent SHALL NOT call `draft_intro` for it, and SHALL ask the member to @mention it. A `draft_intro` refusal for a target that is not a target of the turn SHALL also ask the member to @mention the member or team. The `draft_intro` tool description does not change. These rules add no target and do not force a `draft_intro` call. `draft_intro` SHALL accept the `introDraft` target as a target of the turn, and SHALL check the sender eligibility and the target again. The backend SHALL NOT store `introDraft`, write a cache key for it, or write its text to a log line, error message or analytics event. The latest reply of a draft turn is only the fixed draft line (see "Latest reply in C1"). A Husky catch and the C1 controller catch SHALL log only `{ name, statusCode, message }` of an error, never the error object: an AI SDK `APICallError` holds `requestBodyValues`, the whole prompt. When the stream fails after the headers, the controller SHALL destroy the connection with no error argument. For `AI_InvalidToolArgumentsError`, `AI_TypeValidationError` and `AI_JSONParseError`, the message has the model input (for example the `draft_intro` text), so the log SHALL have only `name`, plus `toolName` when it is a tool of that call, and no `message`. The Husky answer stream `error` part SHALL use the same log form.
 
 #### Scenario: Make it shorter
 
@@ -334,9 +380,9 @@ The C1 body MAY have `introDraft: { target: { type, uid }, text }` (contract cha
 - **THEN** the prompt context has the card text
 - **AND** a `draft_intro` call for Grace gives one draft in `drafts`, with the short intro line
 
-#### Scenario: Brief revision next to another page target or a mention chip (R2)
+#### Scenario: Brief revision next to another page target or an added item (R2)
 
-- **GIVEN** an intro card that waits in the chat, on the intro page of another target or with a mention chip of another member
+- **GIVEN** an intro card that waits in the chat, on the intro page of another target or with an item added to the message for another member
 - **WHEN** the member sends "Make it shorter." with `introDraft`
 - **THEN** the prompt context tells the agent to revise this draft, also with that page or chip
 - **AND** a `draft_intro` call for the card target gives one draft in `drafts`
@@ -350,10 +396,32 @@ The C1 body MAY have `introDraft: { target: { type, uid }, text }` (contract cha
 
 #### Scenario: A request for a different draft or other content instead (R3)
 
-- **GIVEN** an intro card for Grace that waits in the chat
-- **WHEN** the member sends "Write the intro to Acme Team instead." or "Shorten your last answer."
+- **GIVEN** an intro card for Grace that waits in the chat, and a target of the turn for Acme Team (the page or an item added to the message)
+- **WHEN** the member sends "Write the intro to Acme Team instead."
 - **THEN** the prompt context tells the agent to follow that request and not to use the draft text
-- **AND** the targets of the turn do not change, and the turn has no draft without a `draft_intro` call
+- **AND** a `draft_intro` call for Acme Team gives one draft, and the targets of the turn do not change
+
+#### Scenario: Only the facts of the member (Q1)
+
+- **GIVEN** an intro card that waits in the chat
+- **WHEN** the member asks for a revision
+- **THEN** the prompt context tells the agent to keep the facts of the current text and to add only facts the member gave
+- **AND** not to add or strengthen a role, shared work, experience or a vouch that the member did not give
+
+#### Scenario: Your last answer (F1)
+
+- **GIVEN** an intro card that waits in the chat
+- **WHEN** the member sends "Shorten your last answer."
+- **THEN** the prompt context tells the agent to use `latestReply`: revise the draft when it is the draft line, change the answer and keep the draft when it is a normal answer, and ask which reply and leave the draft unchanged when there is no `latestReply`
+- **AND** the prompt context has "A brief revision request that does not name your last answer revises this draft."
+- **AND** the turn has no draft without a `draft_intro` call
+
+#### Scenario: A switch by name only (F2)
+
+- **GIVEN** an intro card for Grace that waits in the chat, and no other target of the turn
+- **WHEN** the member sends "Write the intro to Linus instead."
+- **THEN** the prompt context tells the agent to ask for an @mention and not to call `draft_intro` for a name
+- **AND** a `draft_intro` call for another uid gives the "not the intro target of this turn" refusal, which asks for an @mention, and no draft
 
 #### Scenario: Unknown introDraft target
 

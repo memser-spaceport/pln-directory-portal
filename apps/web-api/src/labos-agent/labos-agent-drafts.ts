@@ -70,7 +70,8 @@ export function draftIntroTool(ctx: McpActorContext, deps: DraftDeps): CoreTool 
       if (!target) {
         return (
           'The draft was refused: the target is not the intro target of this turn. Make no draft. ' +
-          'Ask the member to open "Ask the agent" from the profile of the member or team.'
+          'Ask the member to @mention the member or team in the message, ' +
+          'or to open "Ask the agent" from the profile of the member or team.'
         );
       }
       try {

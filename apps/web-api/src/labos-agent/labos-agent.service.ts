@@ -36,7 +36,7 @@ import { TeamNewsQueryService } from '../team-news/team-news-query.service';
 import { TeamsService } from '../teams/teams.service';
 import { LabosAgentAccessService } from './labos-agent-access.service';
 import { answerCounts } from './labos-agent-answer-counts';
-import { draftIntroTool, introDraftLine, IntroTurnTarget } from './labos-agent-drafts';
+import { draftIntroTool, INTRO_DRAFT_LINE, introDraftLine, IntroTurnTarget } from './labos-agent-drafts';
 import { searchMentions } from './labos-agent-mentions';
 import { mcpToolsAsAgentTools, newsLinkFields } from './labos-agent-news.tools';
 import {
@@ -55,12 +55,27 @@ import {
   teamPagePrompt,
   teamPageRow,
 } from './labos-agent-page-context';
-import { canChangeTeam, LabosAgentProposalStore, proposeTool, StoredProposal } from './labos-agent-proposals';
+import {
+  canChangeTeam,
+  keyPrefix,
+  LabosAgentProposalStore,
+  proposeTool,
+  StoredProposal,
+} from './labos-agent-proposals';
 import { webSources } from './labos-agent-sources';
 
 /** Read tools that run in chat, next to the AI search tools (contract section 3: S1 news, S2 profile). */
 const READ_TOOLS = ['list_news', 'get_news_item', 'get_my_profile', 'list_my_experiences'];
 const PROPOSE_TOOLS: readonly string[] = LABOS_AGENT_PROPOSE_TOOLS;
+
+/**
+ * LAB-3367 h3: the cache key of the latest agent reply for one member in one thread. The `<env>:labos-agent` prefix of
+ * the proposal keys keeps environments that share a Redis apart. JSON keeps the key free of collisions for any C1
+ * `threadId` string, and the namespace keeps it apart from the Husky `<threadId>:summary` key.
+ */
+export function latestReplyCacheKey(memberUid: string, threadId: string): string {
+  return `${keyPrefix()}:latest-reply:${JSON.stringify([memberUid, threadId])}`;
+}
 
 function agentError(
   Exception: new (body: object) => HttpException,
@@ -164,6 +179,8 @@ export class LabosAgentService {
           return { ...links, sources, ...answerCounts({ ...turn, ...links, sources }) };
         },
         persistHistory: false,
+        // LAB-3367 h3: the latest reply, scoped to the signed-in member and the thread. Never the raw thread ID.
+        latestReplyKey: latestReplyCacheKey(memberUid, body.threadId),
       }
     );
   }
@@ -439,12 +456,28 @@ export class LabosAgentService {
       `Then call draft_intro with type "${type}" and targetUid "${uid}" and the new text. ` +
       // LAB-3367: R2 brief revision = this draft; R4 a name in the edit = new text; R3 other draft or content wins.
       'If the member makes a brief revision request such as "make it shorter", revise this draft. ' +
-      'This rule applies also when the page or the mention chips of the message point to another member or team. ' +
+      'This rule applies also when the page or the items added to the message point to another member or team. ' +
       'A member or team name in the revision, such as "mention that I know Acme Team", is part of the new text. ' +
       'It does not change the target. ' +
+      // LAB-3367 Q1 (h2): keep the facts of the current text, add no facts that the member did not give.
+      'In a revision, keep the facts of the current text: the member may have typed them. ' +
+      'Add only facts the member gave. ' +
+      'Do not add or strengthen a role, shared work, experience or that someone can vouch for the member, ' +
+      'when the member did not give it. ' +
+      // LAB-3367 F1 (h1, h3): `latestReply` is the cached latest reply of this member in this thread. Prompt guidance.
+      'If the member asks to change your last answer, use latestReply: your latest reply in this chat. ' +
+      `If latestReply is the draft line "${INTRO_DRAFT_LINE}", revise this draft. ` +
+      'If latestReply is a normal answer, change that answer and do not change this draft. ' +
+      'If there is no latestReply, ask which reply to change and leave this draft unchanged. ' +
+      'A brief revision request that does not name your last answer revises this draft. ' +
       'If the member asks for a different draft or asks to change other content instead, follow that request. ' +
       'Do not use this draft text for that request. ' +
-      'Examples: "write the intro to Acme Team instead", "shorten your last answer". ' +
+      'Example: "write the intro to Acme Team instead" with Acme Team in the items added to the message. ' +
+      // LAB-3367 F2 (live QA): no new targets. A name alone is not a target.
+      'A draft for a different member or team needs a target of this turn: the page, the items added to the message ' +
+      'or this card. ' +
+      'If the member gives only a name, and that member or team is not a target of this turn, do not call ' +
+      'draft_intro for it. Ask the member to @mention that member or team in the message. ' +
       'Do not write the draft text in the answer.';
     return { promptContext, introTarget };
   }
