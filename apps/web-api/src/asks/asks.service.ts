@@ -122,6 +122,37 @@ export class AskService {
   }
 
   /**
+   * Authorizes the requester to edit an ask: a member of the owning team or project (or a directory admin;
+   * for a project, also its creator). An ask owned by neither is admin-only.
+   *
+   * @returns The requester.
+   */
+  private async authorizeAskEditor(ask: Ask & { team?: Team }, requesterEmailId: string): Promise<Member> {
+    if (ask.team) {
+      return this.teamsService.isTeamMemberOrAdmin(requesterEmailId, ask.team.uid);
+    }
+    const requester: any = await this.membersService.findMemberByEmail(requesterEmailId);
+    const project = ask.projectUid
+      ? await this.prisma.project.findUnique({
+          where: { uid: ask.projectUid },
+          select: { createdBy: true, maintainingTeamUid: true, contributingTeams: { select: { uid: true } } },
+        })
+      : null;
+    const teamUids = project ? [project.maintainingTeamUid, ...project.contributingTeams.map((t) => t.uid)] : [];
+    if (
+      !requester ||
+      !(
+        this.membersService.checkIfAdminUser(requester) ||
+        (project &&
+          (project.createdBy === requester.uid || this.membersService.isMemberPartOfTeams(requester, teamUids)))
+      )
+    ) {
+      throw new ForbiddenException('Requestor does not have permission to update this ask');
+    }
+    return requester;
+  }
+
+  /**
    * Updates an existing ask.
    *
    * @param {string} uid - The unique identifier of the ask to update.
@@ -147,11 +178,9 @@ export class AskService {
         team: true,
       });
       const team = ask.team;
-
-      let requester;
-      if (team) {
-        requester = await this.teamsService.isTeamMemberOrAdmin(requesterEmailId, team.uid);
-      }
+      const requester = await this.authorizeAskEditor(ask, requesterEmailId);
+      // The closer is always the authenticated requester, never a body-supplied uid.
+      const closedByUid = askData.closedByUid || askData.status === AskStatus.CLOSED ? requester.uid : undefined;
 
       if (ask.status === AskStatus.CLOSED) {
         throw new ForbiddenException('Cannot update a closed ask');
@@ -164,7 +193,7 @@ export class AskService {
         status: askData.status,
         closedReason: askData.closedReason,
         closedComment: askData.closedComment,
-        closedBy: askData.closedByUid ? { connect: { uid: askData.closedByUid } } : undefined,
+        closedBy: closedByUid ? { connect: { uid: closedByUid } } : undefined,
       };
 
       // Check if the ask is being closed
@@ -190,7 +219,7 @@ export class AskService {
           await this.notifyForAskStatusChange({
             ask: updatedAsk,
             requester,
-            closedByUid: askData.closedByUid,
+            closedByUid,
             team,
           });
         });
@@ -225,10 +254,10 @@ export class AskService {
       });
       const team = ask.team;
 
+      await this.authorizeAskEditor(ask, requesterEmailId);
+
       // If this is a team ask, we need to handle team-specific logic
       if (team) {
-        await this.teamsService.isTeamMemberOrAdmin(requesterEmailId, team.uid);
-
         // Get existing asks related to teamuid for logging
         const teamAsks = await this.prisma.ask.findMany({
           where: { teamUid: team.uid },
@@ -253,7 +282,6 @@ export class AskService {
       throw error;
     }
   }
-
 
   async notifyForAskStatusChange({
     ask,
