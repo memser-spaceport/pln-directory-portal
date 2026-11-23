@@ -57,6 +57,7 @@ export const HUSKY_SEARCH_STALLED_NOTICE =
 type AnswerMode = { kind: 'initial' } | { kind: 'continuation'; partialAnswer: string; toolResults: string };
 
 interface AnswerInput {
+  /** The chat history line, plus the `latestReply` line when `ContextualToolsOptions.latestReplyKey` is set. */
   historyPrompt: string;
   question: string;
   currentDate: string;
@@ -83,6 +84,14 @@ export interface ContextualToolsOptions {
   answerLine?: () => string | undefined;
   /** False: keep the thread summary in the cache only, and write nothing to MongoDB. Default true. */
   persistHistory?: boolean;
+  /**
+   * LAB-3367 h3: the cache key of the latest reply, for the LabOS agent only. The caller scopes the key (member and
+   * thread). With a key, the stream reads the value into the answer prompt as `latestReply`, then writes `''` before
+   * the stream starts. Before the stream closes, it writes the reply of this turn: only the answer line for a turn
+   * with that line, else the answer text. A failed, cancelled or still cut-off turn writes nothing, so the key stays
+   * `''`. A cache error does not stop the turn. AI search passes nothing.
+   */
+  latestReplyKey?: string;
   /**
    * Extra fields for the end of the streamed JSON object that need the finished turn, for example the answer counts
    * of the LabOS agent (LAB-3297). Called once, after `extraResponseFields`. A field with the key of a tail field
@@ -258,14 +267,26 @@ export class HuskyAiService {
 
     const chatSummaryFromDb = await this.huskyCacheDbService.get(`${threadId}:summary`);
     const historyPrompt = chatSummaryFromDb ? ` - chatHistory: ${chatSummaryFromDb}` : '';
+    const { latestReplyKey } = options;
+    const latestReply = latestReplyKey ? await this.takeLatestReply(latestReplyKey) : '';
+    const answerHistoryPrompt = latestReply
+      ? `${historyPrompt}\n  - latestReply: ${JSON.stringify(latestReply)}`
+      : historyPrompt;
     const model = this.getSearchModel();
 
     const encoder = new TextEncoder();
+    // LAB-3367 h3: true after the reader cancels the stream, for example when the C1 client disconnects.
+    let cancelled = false;
     const stream = new ReadableStream({
+      cancel: () => {
+        cancelled = true;
+      },
       start: async (controller) => {
         const enqueue = (text: string) => controller.enqueue(encoder.encode(text));
 
         let content = '';
+        // LAB-3367 h3: false when the answer stayed cut off after the continuation. Then no latest reply is written.
+        let complete = true;
         try {
           // Status lines stream as a JSON array ahead of `content`, so the client
           // can show the latest one during the tool phase. Closed on the first
@@ -290,7 +311,7 @@ export class HuskyAiService {
           enqueue('{ "steps": [');
           pushStep(UNDERSTANDING_STEP);
 
-          const input: AnswerInput = { historyPrompt, question, currentDate, pageContext };
+          const input: AnswerInput = { historyPrompt: answerHistoryPrompt, question, currentDate, pageContext };
           const answer = await this.streamAnswer(
             model,
             auth,
@@ -333,6 +354,7 @@ export class HuskyAiService {
               this.logger.error(
                 `Husky answer continuation for thread ${threadId}, chat ${chatId} was cut off as well (${continuation.reason})`
               );
+              complete = false;
               content += HUSKY_SEARCH_STALLED_NOTICE;
               emitText(encodeJsonStringFragment(HUSKY_SEARCH_STALLED_NOTICE));
             }
@@ -365,6 +387,18 @@ export class HuskyAiService {
             options.extraResponseFields,
             turnFields ? (payload) => turnFields(turnSummary(toolNames, payload)) : undefined
           );
+
+          // LAB-3367 h3: write before close, so the next C1 turn can read the reply as soon as the client sees the end.
+          // A draft turn stores only the answer line, never the draft text. A cut-off or cancelled turn stores nothing.
+          if (latestReplyKey && complete && !cancelled) {
+            await this.saveLatestReply(latestReplyKey, lastLine ? lastLine.trim() : content);
+            // A cancel during the write: the client gets no end, so the reply is not latest. Clear it again and do not
+            // close the cancelled stream. No await comes between this check and `controller.close()`.
+            if (cancelled) {
+              await this.saveLatestReply(latestReplyKey, '');
+              return;
+            }
+          }
 
           controller.close();
 
@@ -827,6 +861,35 @@ export class HuskyAiService {
       'threadId',
       threadId
     );
+  }
+
+  /**
+   * LAB-3367 h3: the latest reply under `key`, or '' when there is none or the read fails. Then writes '', so no older
+   * reply looks latest while this turn runs or after it fails. The log lines are fixed texts: a Redis error can hold
+   * the command arguments, that is, the reply text.
+   */
+  private async takeLatestReply(key: string): Promise<string> {
+    let value: unknown = null;
+    try {
+      value = await this.huskyCacheDbService.get(key);
+    } catch {
+      this.logger.error('Failed to read the latest reply of the LabOS agent thread');
+    }
+    try {
+      await this.huskyCacheDbService.set(key, '');
+    } catch {
+      this.logger.error('Failed to clear the latest reply of the LabOS agent thread');
+    }
+    return typeof value === 'string' ? value : '';
+  }
+
+  /** LAB-3367 h3: writes the reply of this turn. A failure is logged with a fixed text and does not stop the turn. */
+  private async saveLatestReply(key: string, reply: string): Promise<void> {
+    try {
+      await this.huskyCacheDbService.set(key, reply);
+    } catch {
+      this.logger.error('Failed to write the latest reply of the LabOS agent thread');
+    }
   }
 
   async updateChatSummary(chatId: string, rawChatHistory: any) {

@@ -29,7 +29,7 @@ export type StoredProposal = {
  * Keys start with the app environment (`ENVIRONMENT`), the same `<env>:` prefix as member proofs and member access.
  * Feature envs share the dev Redis, so one env never reads or closes another env's proposal.
  */
-const keyPrefix = () => `${process.env.ENVIRONMENT ?? 'local'}:labos-agent`;
+export const keyPrefix = () => `${process.env.ENVIRONMENT ?? 'local'}:labos-agent`;
 export const proposalRecordKey = (id: string) => `${keyPrefix()}:proposal:${id}`;
 const openKey = (id: string) => `${keyPrefix()}:proposal-open:${id}`;
 

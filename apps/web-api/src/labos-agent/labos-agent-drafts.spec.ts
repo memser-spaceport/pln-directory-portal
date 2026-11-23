@@ -25,7 +25,7 @@ import { LabosAgentAccessService } from './labos-agent-access.service';
 import { LabosAgentController } from './labos-agent.controller';
 import { INTRO_DRAFT_FAILED_TEXT, INTRO_DRAFT_LINE, INTRO_NOT_ELIGIBLE_TEXT } from './labos-agent-drafts';
 import { LabosAgentProposalStore } from './labos-agent-proposals';
-import { LabosAgentService } from './labos-agent.service';
+import { LabosAgentService, latestReplyCacheKey } from './labos-agent.service';
 
 /** Far from today, so the role end-date checks do not depend on the clock. */
 const PAST = new Date('2000-01-01T00:00:00.000Z');
@@ -146,7 +146,15 @@ function setup(sender: Partial<Person> = { roles: [portfolio()] }, permissions: 
   );
   const controller = new LabosAgentController(service);
   const req = { userEmail: 'ada@example.com' };
-  const res = { setHeader: jest.fn(), flushHeaders: jest.fn(), write: jest.fn(), end: jest.fn(), destroy: jest.fn() };
+  const res = {
+    setHeader: jest.fn(),
+    flushHeaders: jest.fn(),
+    write: jest.fn(),
+    end: jest.fn(),
+    destroy: jest.fn(),
+    on: jest.fn(),
+    off: jest.fn(),
+  };
 
   /** One chat turn: the model calls draft_intro with each args object, in order. */
   const turn = async (context: unknown, ...calls: Array<Record<string, unknown>>) => {
@@ -526,27 +534,28 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
 
   const BRIEF_REVISION = 'If the member makes a brief revision request such as "make it shorter", revise this draft.';
   const PAGE_OR_CHIPS =
-    'This rule applies also when the page or the mention chips of the message point to another member or team.';
+    'This rule applies also when the page or the items added to the message point to another member or team.';
   const NAME_IN_EDIT =
     'A member or team name in the revision, such as "mention that I know Acme Team", is part of the new text. ' +
     'It does not change the target.';
   const FACTS_ONLY =
-    'In a revision, use only facts the member gave. ' +
-    'Do not treat a fact as confirmed only because it is in the draft. ' +
-    'Do not add a role, shared work, experience or that someone can vouch for the member, ' +
+    'In a revision, keep the facts of the current text: the member may have typed them. ' +
+    'Add only facts the member gave. ' +
+    'Do not add or strengthen a role, shared work, experience or that someone can vouch for the member, ' +
     'when the member did not give it.';
   const LAST_ANSWER_IS_DRAFT =
-    '"Your last answer" is your latest reply in the chat history. ' +
-    `If that reply is the draft line "${INTRO_DRAFT_LINE}", revise this draft.`;
-  const LAST_ANSWER_IS_NORMAL = 'If that reply is a normal answer, change that answer and do not change this draft.';
-  const LAST_ANSWER_UNKNOWN =
-    'If the chat history does not show your latest reply, ask which reply to change and leave this draft unchanged.';
+    'If the member asks to change your last answer, use latestReply: your latest reply in this chat. ' +
+    `If latestReply is the draft line "${INTRO_DRAFT_LINE}", revise this draft.`;
+  const LAST_ANSWER_IS_NORMAL = 'If latestReply is a normal answer, change that answer and do not change this draft.';
+  const LAST_ANSWER_UNKNOWN = 'If there is no latestReply, ask which reply to change and leave this draft unchanged.';
+  const BRIEF_NOT_LAST_ANSWER = 'A brief request that does not name your last answer revises this draft.';
   const DIFFERENT_ITEM =
     'If the member asks for a different draft or asks to change other content instead, follow that request. ' +
     'Do not use this draft text for that request. ' +
-    'Example: "write the intro to Acme Team instead" with a mention chip for Acme Team.';
+    'Example: "write the intro to Acme Team instead" with Acme Team in the items added to the message.';
   const NAME_ONLY =
-    'A draft for a different member or team needs a target of this turn: the page, a mention chip or this card. ' +
+    'A draft for a different member or team needs a target of this turn: the page, the items added to the message ' +
+    'or this card. ' +
     'If the member gives only a name, and that member or team is not a target of this turn, do not call ' +
     'draft_intro for it. Ask the member to @mention that member or team in the message.';
   const RULES = [
@@ -557,6 +566,7 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
     LAST_ANSWER_IS_DRAFT,
     LAST_ANSWER_IS_NORMAL,
     LAST_ANSWER_UNKNOWN,
+    BRIEF_NOT_LAST_ANSWER,
     DIFFERENT_ITEM,
     NAME_ONLY,
   ];
@@ -631,7 +641,7 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
     expect(options.extraResponseFields.drafts).toEqual([draftFor({ ...ACME, name: 'Acme Team' })]);
   });
 
-  it('LAB-3367 Q1: a revision may use only facts the member gave', async () => {
+  it('LAB-3367 Q1: a revision keeps the facts of the current text and adds only facts the member gave', async () => {
     const h = setup();
     const options = await chat(h, {
       ...VALID,
@@ -644,7 +654,8 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
   it.each([
     ['the latest reply is the draft line: revise this draft', LAST_ANSWER_IS_DRAFT],
     ['the latest reply is a normal answer: change it and keep this draft', LAST_ANSWER_IS_NORMAL],
-    ['the history does not show the latest reply: ask, and keep this draft', LAST_ANSWER_UNKNOWN],
+    ['there is no latestReply: ask, and keep this draft', LAST_ANSWER_UNKNOWN],
+    ['the request does not name the last answer: revise this draft', BRIEF_NOT_LAST_ANSWER],
   ])('LAB-3367 F1: "Shorten your last answer." gets the guidance when %s', async (_name, rule) => {
     const h = setup();
     const options = await chat(h, {
@@ -653,7 +664,7 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
       introDraft: { target: GRACE, text: CARD_TEXT },
     });
 
-    // Prompt guidance only: the model sees the chat history summary, so the backend cannot check the choice.
+    // Prompt guidance only: the model reads latestReply from the Husky stream, so the backend cannot check the choice.
     expect(options.promptContext).toContain(rule);
     // No draft is forced: with no tool call, the turn has no draft and the model text streams.
     expect(options.extraResponseFields.drafts).toEqual([]);
@@ -699,10 +710,38 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
 
     expect(options.promptContext).toContain(NAME_ONLY);
     // The only target of the turn is the card. A name gives no new target, so draft_intro refuses another uid.
-    expect(await options.extraTools.draft_intro.execute({ type: 'member', targetUid: 'm-ada', text: SHORT })).toContain(
-      'not the intro target of this turn'
-    );
+    const refusal = await options.extraTools.draft_intro.execute({ type: 'member', targetUid: 'm-ada', text: SHORT });
+    expect(refusal).toContain('not the intro target of this turn');
+    // h5: the refusal also suggests an @mention. The tool description does not change.
+    expect(refusal).toContain('Ask the member to @mention the member or team in the message');
+    expect(options.extraTools.draft_intro.description).not.toContain('@mention');
     expect(options.extraResponseFields.drafts).toEqual([]);
+  });
+
+  it('LAB-3367 h3: the latest reply key is scoped to the signed-in member and the thread', async () => {
+    const h = setup();
+    const options = await chat(h, { ...SHORTER, introDraft: { target: GRACE, text: CARD_TEXT } });
+
+    expect(options.latestReplyKey).toBe(latestReplyCacheKey('m-ada', 'thread-1'));
+    // The env prefix of the proposal keys, so environments that share a Redis do not collide.
+    expect(options.latestReplyKey).toBe(`${APP_ENV.DEV}:labos-agent:latest-reply:["m-ada","thread-1"]`);
+    // Not the raw thread ID, and not the Husky summary key.
+    expect(options.latestReplyKey).not.toBe('thread-1');
+    expect(options.latestReplyKey).not.toBe('thread-1:summary');
+  });
+
+  it('LAB-3367 h3: the key of another member in the same thread is different, and IDs cannot collide', () => {
+    expect(latestReplyCacheKey('m-ada', 'thread-1')).not.toBe(latestReplyCacheKey('m-grace', 'thread-1'));
+    const env = process.env.ENVIRONMENT;
+    process.env.ENVIRONMENT = 'feature-a';
+    const featureA = latestReplyCacheKey('m-ada', 'thread-1');
+    process.env.ENVIRONMENT = 'feature-b';
+    expect(latestReplyCacheKey('m-ada', 'thread-1')).not.toBe(featureA);
+    process.env.ENVIRONMENT = env;
+    expect(latestReplyCacheKey('a:b', 'c')).not.toBe(latestReplyCacheKey('a', 'b:c'));
+    expect(latestReplyCacheKey('a","b', 'c')).not.toBe(latestReplyCacheKey('a', 'b","c'));
+    // A lone surrogate is a valid C1 threadId. JSON.stringify does not throw for it.
+    expect(() => latestReplyCacheKey('m-ada', '\ud800')).not.toThrow();
   });
 
   it.each([

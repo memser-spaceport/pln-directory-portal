@@ -65,6 +65,15 @@ export class LabosAgentController {
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
+    // LAB-3367 h3: when the client stops the turn or disconnects before the end, cancel the stream. The turn then
+    // writes no latest reply.
+    const abort = new AbortController();
+    const onClose = () => {
+      if (!res.writableEnded) abort.abort();
+    };
+    res.on('close', onClose);
+    // The client can disconnect while `agent.chat` runs, before this listener exists.
+    if (res.destroyed) abort.abort();
     try {
       await stream.pipeTo(
         new WritableStream({
@@ -74,13 +83,17 @@ export class LabosAgentController {
           close() {
             res.end();
           },
-        })
+        }),
+        { signal: abort.signal }
       );
     } catch (error) {
       // Headers are on the wire, so an error response is impossible; abort the connection. LAB-3362: log the safe
-      // fields only and destroy with no error, because an AI SDK APICallError holds the whole prompt.
-      this.logger.error(`LabOS agent chat stream failed: ${logSafeError(error)}`);
+      // fields only and destroy with no error, because an AI SDK APICallError holds the whole prompt. A client stop
+      // is not a failure, so it gets no log line.
+      if (!abort.signal.aborted) this.logger.error(`LabOS agent chat stream failed: ${logSafeError(error)}`);
       res.destroy();
+    } finally {
+      res.off('close', onClose);
     }
   }
 

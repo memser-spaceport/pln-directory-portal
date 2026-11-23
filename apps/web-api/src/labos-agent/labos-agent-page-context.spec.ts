@@ -375,7 +375,15 @@ function setup(viewer: Viewer = {}, env: string = APP_ENV.DEV) {
   );
   const controller = new LabosAgentController(service);
   const req = { userEmail: 'm-ada@example.com' };
-  const res = { setHeader: jest.fn(), flushHeaders: jest.fn(), write: jest.fn(), end: jest.fn(), destroy: jest.fn() };
+  const res = {
+    setHeader: jest.fn(),
+    flushHeaders: jest.fn(),
+    write: jest.fn(),
+    end: jest.fn(),
+    destroy: jest.fn(),
+    on: jest.fn(),
+    off: jest.fn(),
+  };
 
   /** One chat turn: the model calls draft_intro with each args object, in order. */
   const turn = async (context: unknown, ...calls: Array<Record<string, unknown>>) => {
