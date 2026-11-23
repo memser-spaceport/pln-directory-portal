@@ -20,6 +20,7 @@ import { IntroRequestsService } from '../intro-requests/intro-requests.service';
 import { PL_INFRA_POLICY_CODE } from '../pl-infra-members/pl-infra-members.constants';
 import { PL_PORTFOLIO_COMMUNITY_AFFILIATION } from '../teams/team-affiliation.constants';
 import { APP_ENV } from '../utils/constants';
+import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { LabosAgentAccessService } from './labos-agent-access.service';
 import { LabosAgentController } from './labos-agent.controller';
 import { INTRO_DRAFT_FAILED_TEXT, INTRO_DRAFT_LINE, INTRO_NOT_ELIGIBLE_TEXT } from './labos-agent-drafts';
@@ -59,7 +60,8 @@ const VALID = { threadId: 'thread-1', chatId: 'chat-1', message: 'Help me write 
 const MEMBER_CONTEXT = { page: 'intro', introTarget: { type: 'member', uid: 'm-grace' } };
 const TEAM_CONTEXT = { page: 'intro', introTarget: { type: 'team', uid: 't-acme' } };
 
-function setup(sender: Partial<Person> = { roles: [portfolio()] }) {
+/** `permissions` are the RBAC permissions of the sender, for example `member.search.read` for a member chip. */
+function setup(sender: Partial<Person> = { roles: [portfolio()] }, permissions: string[] = []) {
   process.env.ENVIRONMENT = APP_ENV.DEV;
   const people: Person[] = [
     { uid: 'm-ada', name: 'Ada', email: 'ada@example.com', deletedAt: null, roles: [], policies: [], ...sender },
@@ -96,7 +98,10 @@ function setup(sender: Partial<Person> = { roles: [portfolio()] }) {
             (!('deletedAt' in where) || item.deletedAt === where.deletedAt)
         );
         if (!person) return null;
-        return where.email ? requester(person, select) : { name: person.name };
+        if (where.email) return requester(person, select);
+        // The member page row and the member chip row (memberPageRow) ask for the bio. The fixture has no profile data.
+        if (select?.bio) return { uid: person.uid, name: person.name, bio: null, skills: [], teamMemberRoles: [] };
+        return { name: person.name };
       }),
       findUnique: jest.fn(async ({ where }: any) => {
         const person = people.find((item) => item.email === where.email || item.uid === where.uid);
@@ -132,7 +137,7 @@ function setup(sender: Partial<Person> = { roles: [portfolio()] }) {
     husky as any,
     { getTeamNewsItemDto: jest.fn() } as any,
     { forApp: jest.fn(() => []) } as any,
-    { getMemberAccess: jest.fn().mockResolvedValue({ effectivePermissions: [] }) } as any,
+    { getMemberAccess: jest.fn().mockResolvedValue({ effectivePermissions: permissions }) } as any,
     new LabosAgentProposalStore(cache as any),
     { adminCaps: jest.fn(async () => Object.fromEntries(MCP_SCOPE_KEYS.map((key) => [key, 'write']))) } as any,
     introRequests,
@@ -519,13 +524,22 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
     expect(options.extraResponseFields.drafts).toEqual([]);
   });
 
-  const BRIEF_REVISION =
-    'If the member makes a brief revision request such as "make it shorter" and does not refer to another item, ' +
-    'revise this draft.';
-  const OTHER_REFERENCE =
-    'If the member refers to a different item, follow that reference. Do not use this draft text for that request.';
+  const BRIEF_REVISION = 'If the member makes a brief revision request such as "make it shorter", revise this draft.';
+  const PAGE_OR_CHIPS =
+    'This rule applies also when the page or the mention chips of the message point to another member or team.';
+  const NAME_IN_EDIT =
+    'A member or team name in the revision, such as "mention that I know Acme Team", is part of the new text. ' +
+    'It does not change the target.';
+  const DIFFERENT_ITEM =
+    'If the member asks for a different draft or asks to change other content instead, follow that request. ' +
+    'Do not use this draft text for that request. ' +
+    'Examples: "write the intro to Acme Team instead", "shorten your last answer".';
+  const RULES = [BRIEF_REVISION, PAGE_OR_CHIPS, NAME_IN_EDIT, DIFFERENT_ITEM];
+  const ACME = { type: 'team' as const, uid: 't-acme' };
+  const draftFor = (target: { type: string; uid: string; name: string }) =>
+    expect.objectContaining({ target, text: SHORT });
 
-  it('LAB-3367 R2: a brief revision with no other reference revises the draft, also next to another page target', async () => {
+  it('LAB-3367 R2: "Make it shorter." revises this draft, also next to another page target', async () => {
     const h = setup();
     const options = await chat(h, {
       ...SHORTER,
@@ -533,17 +547,49 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
       introDraft: { target: GRACE, text: CARD_TEXT },
     });
 
-    expect(options.promptContext).toContain(BRIEF_REVISION);
+    for (const rule of RULES) expect(options.promptContext).toContain(rule);
     expect(options.promptContext).toContain('call draft_intro with type "member" and targetUid "m-grace"');
-    const result = await options.extraTools.draft_intro.execute({ type: 'member', targetUid: 'm-grace', text: SHORT });
-
-    expect(result).toContain(INTRO_DRAFT_LINE);
-    expect(options.extraResponseFields.drafts).toEqual([
-      expect.objectContaining({ target: { type: 'member', uid: 'm-grace', name: 'Grace Hopper' }, text: SHORT }),
-    ]);
+    expect(
+      await options.extraTools.draft_intro.execute({ type: 'member', targetUid: 'm-grace', text: SHORT })
+    ).toContain(INTRO_DRAFT_LINE);
+    expect(options.extraResponseFields.drafts).toEqual([draftFor({ ...GRACE, name: 'Grace Hopper' })]);
   });
 
-  it('LAB-3367 R3: a reference to another item wins, and the page target stays a permitted target', async () => {
+  it('LAB-3367 R2: "Make it shorter." revises this draft, also next to a member mention chip', async () => {
+    const h = setup(undefined, [MEMBER_PERMISSIONS.SEARCH_READ]);
+    const options = await chat(h, {
+      ...SHORTER,
+      mentions: [{ type: 'member', uid: 'm-grace' }],
+      introDraft: { target: ACME, text: CARD_TEXT },
+    });
+
+    // The chip is still a permitted target of the turn, but the rule sends the brief revision to the card.
+    expect(options.promptContext).toContain('Item 1 (member)');
+    expect(options.promptContext).toContain('call draft_intro with type "member" and targetUid "m-grace"');
+    expect(options.promptContext).toContain(BRIEF_REVISION);
+    expect(options.promptContext).toContain(PAGE_OR_CHIPS);
+    expect(options.promptContext).toContain('call draft_intro with type "team" and targetUid "t-acme"');
+    expect(await options.extraTools.draft_intro.execute({ type: 'team', targetUid: 't-acme', text: SHORT })).toContain(
+      INTRO_DRAFT_LINE
+    );
+    expect(options.extraResponseFields.drafts).toEqual([draftFor({ ...ACME, name: 'Acme Team' })]);
+  });
+
+  it('LAB-3367 R4: an edit that names a team is new text for this draft, and the target stays', async () => {
+    const h = setup();
+    const options = await chat(h, {
+      ...VALID,
+      message: 'Mention that I know Acme Team.',
+      context: TEAM_CONTEXT,
+      introDraft: { target: GRACE, text: CARD_TEXT },
+    });
+
+    expect(options.promptContext).toContain(NAME_IN_EDIT);
+    await options.extraTools.draft_intro.execute({ type: 'member', targetUid: 'm-grace', text: SHORT });
+    expect(options.extraResponseFields.drafts).toEqual([draftFor({ ...GRACE, name: 'Grace Hopper' })]);
+  });
+
+  it('LAB-3367 R3: a request for a different draft instead keeps the page target as a permitted target', async () => {
     const h = setup();
     const options = await chat(h, {
       ...VALID,
@@ -552,17 +598,15 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
       introDraft: { target: GRACE, text: CARD_TEXT },
     });
 
-    expect(options.promptContext).toContain(OTHER_REFERENCE);
+    expect(options.promptContext).toContain(DIFFERENT_ITEM);
     expect(options.promptContext).toContain('call draft_intro with type "team" and targetUid "t-acme"');
-    const result = await options.extraTools.draft_intro.execute({ type: 'team', targetUid: 't-acme', text: SHORT });
-
-    expect(result).toContain(INTRO_DRAFT_LINE);
-    expect(options.extraResponseFields.drafts).toEqual([
-      expect.objectContaining({ target: { type: 'team', uid: 't-acme', name: 'Acme Team' }, text: SHORT }),
-    ]);
+    expect(await options.extraTools.draft_intro.execute({ type: 'team', targetUid: 't-acme', text: SHORT })).toContain(
+      INTRO_DRAFT_LINE
+    );
+    expect(options.extraResponseFields.drafts).toEqual([draftFor({ ...ACME, name: 'Acme Team' })]);
   });
 
-  it('LAB-3367 R3: "shorten your last answer" gets the reference rule, and the turn has no draft until a tool call', async () => {
+  it('LAB-3367 R3: "Shorten your last answer." gets the different-item rule, and no draft is forced', async () => {
     const h = setup();
     const options = await chat(h, {
       ...VALID,
@@ -570,17 +614,23 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
       introDraft: { target: GRACE, text: CARD_TEXT },
     });
 
-    expect(options.promptContext).toContain(OTHER_REFERENCE);
-    // The prompt does not force draft_intro: with no tool call, the turn has no draft and the model text streams.
+    expect(options.promptContext).toContain(DIFFERENT_ITEM);
+    // With no tool call, the turn has no draft and the model text streams.
     expect(options.extraResponseFields.drafts).toEqual([]);
     expect(options.answerLine()).toBeUndefined();
   });
 
-  it('LAB-3367: a turn with no introDraft has no revision rule', async () => {
-    const h = setup();
-    const options = await chat(h, { ...SHORTER, context: TEAM_CONTEXT });
-    expect(options.promptContext).not.toContain(BRIEF_REVISION);
-    expect(options.promptContext).not.toContain(OTHER_REFERENCE);
+  it.each([
+    ['no context', {}],
+    ['the Home page', { context: { page: 'home' } }],
+    ['a member page', { context: { page: 'member', memberUid: 'm-grace' } }],
+    ['a member mention chip', { mentions: [{ type: 'member', uid: 'm-grace' }] }],
+  ])('LAB-3367: with no introDraft, %s gives no revision rule and no card text', async (_name, extra) => {
+    const h = setup(undefined, [MEMBER_PERMISSIONS.SEARCH_READ]);
+    const options = await chat(h, { ...SHORTER, ...extra });
+    for (const text of [...RULES, CARD_TEXT, 'An intro draft card waits']) {
+      expect(options.promptContext ?? '').not.toContain(text);
+    }
   });
 
   it('C4-R4: a turn with no introDraft has no draft text in the prompt context', async () => {
