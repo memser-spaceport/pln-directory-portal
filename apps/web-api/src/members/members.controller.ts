@@ -48,7 +48,6 @@ import { ServiceAuthGuard } from '../guards/service-auth.guard';
 import { LogService } from '../shared/log.service';
 import { ParticipantsReqValidationPipe } from '../pipes/participant-request-validation.pipe';
 import { IsVerifiedMemberInterceptor } from '../interceptors/verified-member.interceptor';
-import { isEmpty } from 'lodash';
 import { QueryCache } from '../decorators/query-cache.decorator';
 import {
   isRequestAuthenticated,
@@ -282,7 +281,7 @@ export class MemberController {
     if (referenceUid && referenceUid !== uid) {
       throw new BadRequestException('referenceUid must match the member uid in the path');
     }
-    if (!isEmpty(participantsRequest.newData.isVerified) && !this.membersService.checkIfAdminUser(requestor)) {
+    if (participantsRequest.newData.isVerified !== undefined && !this.membersService.checkIfAdminUser(requestor)) {
       throw new ForbiddenException(`Member isn't authorized to verify a member`);
     }
     return await this.membersService.updateMemberFromParticipantsRequest(
