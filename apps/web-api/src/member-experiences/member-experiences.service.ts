@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  ForbiddenException,
   NotFoundException,
   forwardRef,
   Inject
@@ -14,6 +15,8 @@ import {
 } from '../../../../libs/contracts/src/schema/member-experience';
 import { ParticipantsRequestService } from '../participants-request/participants-request.service';
 import { CacheService } from '../utils/cache/cache.service';
+import { MembersService } from '../members/members.service';
+import { isDirectoryAdmin } from '../utils/constants';
 
 @Injectable()
 export class MemberExperiencesService {
@@ -22,8 +25,22 @@ export class MemberExperiencesService {
     private logger: LogService,
     @Inject(forwardRef(() => ParticipantsRequestService))
     private participantsRequestService: ParticipantsRequestService,
-    private cacheService: CacheService
+    private cacheService: CacheService,
+    private membersService: MembersService
   ) { }
+
+  /**
+   * Only the owning member or a directory admin may write a member's experiences.
+   * Routes call this before create/update/remove; the body's memberUid is never trusted for authorization.
+   *
+   * @throws ForbiddenException when the requester is neither the member nor an admin
+   */
+  async assertSelfOrAdmin(memberUid: string | undefined, requesterEmailId: string) {
+    const requester: any = await this.membersService.findMemberByEmail(requesterEmailId);
+    if (!requester || (requester.uid !== memberUid && !isDirectoryAdmin(requester))) {
+      throw new ForbiddenException('Only the member or a directory admin can change this experience');
+    }
+  }
 
   /**
    * Creates a new member experience in the database.
@@ -94,6 +111,8 @@ export class MemberExperiencesService {
    */
   async update(uid: string, updateMemberExperiencedto: UpdateMemberExperienceDto, requesterEmailId: string) {
     try {
+      // The owner comes from the stored record; the body's memberUid is ignored below.
+      await this.assertSelfOrAdmin((await this.findOne(uid))?.memberUid, requesterEmailId);
       const { memberUid, ...experienceData } = updateMemberExperiencedto;
 
       // Trim title and company fields if they exist

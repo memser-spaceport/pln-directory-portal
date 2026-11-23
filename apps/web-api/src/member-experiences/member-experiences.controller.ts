@@ -33,8 +33,10 @@ export class MemberExperiencesController {
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation)
   async create(
-    @Body() body: CreateMemberExperienceDto
+    @Body() body: CreateMemberExperienceDto,
+    @Req() req
   ){
+    await this.memberExperiencesService.assertSelfOrAdmin(body.memberUid, req.userEmail);
     this.validateExperienceDates(body);
     return await this.memberExperiencesService.create(body);
   }
@@ -73,8 +75,11 @@ export class MemberExperiencesController {
   @ApiOkResponseFromZod(ResponseMemberExperienceSchema)
   @UseGuards(UserTokenValidation)
   async remove(
-    @ApiDecorator() { params: { uid } }: RouteShape['deleteMemberExperience']
+    @ApiDecorator() { params: { uid } }: RouteShape['deleteMemberExperience'],
+    @Req() req
   ) {
+    const experience = await this.memberExperiencesService.findOne(uid);
+    await this.memberExperiencesService.assertSelfOrAdmin(experience?.memberUid, req.userEmail);
     return await this.memberExperiencesService.remove(uid);
   }
 
