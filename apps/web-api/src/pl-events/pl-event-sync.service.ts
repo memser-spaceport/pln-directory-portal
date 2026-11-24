@@ -81,9 +81,13 @@ export class PLEventSyncService {
    */
   async syncEventDetailsOnly(body): Promise<{ updated: number }> {
     try {
-      const { selectedEventUids } = body ?? {};
-      const events = await this.fetchEventsFromService({ selectedEventUids });
-      if (!events) return { updated: 0 };
+      const { selectedEventUids, timeoutMs } = body ?? {};
+      const fetched = await this.fetchEventsFromService({ selectedEventUids, timeoutMs });
+      if (!fetched) return { updated: 0 };
+      // Only what was asked for, whatever the events service answers: one queue message must not rewrite every event.
+      const events = isEmpty(selectedEventUids)
+        ? fetched
+        : fetched.filter((event) => selectedEventUids.includes(event.event_id));
 
       const existingEvents = await this.prisma.pLEvent.findMany({
         where: {
@@ -128,7 +132,7 @@ export class PLEventSyncService {
    */
   private async fetchEventsFromService(params) {
     try {
-      const { selectedEventUids } = params;
+      const { selectedEventUids, timeoutMs } = params;
       const queryParams = new URLSearchParams({
         status: 'APPROVED',
         conference: ""
@@ -142,7 +146,8 @@ export class PLEventSyncService {
         {
           headers: {
             'origin': process.env.IRL_DOMAIN,
-          }
+          },
+          ...(timeoutMs ? { timeout: timeoutMs } : {}),
         }
       );
       if (!response.data || !response.data.events) {

@@ -106,6 +106,8 @@ export function toPLEventDetail(event: PLEventDetailRow, parts: PLEventDetailPar
   if (parts.viewerRow?.isSpeaker) roles.push('Speaker');
   if (parts.viewerRow?.isSponsor) roles.push('Sponsor');
 
+  const details = readEventDetails(event.additionalInfo);
+
   return {
     uid: event.uid,
     name: event.name,
@@ -137,8 +139,10 @@ export function toPLEventDetail(event: PLEventDetailRow, parts: PLEventDetailPar
           })),
         }
       : null,
+    // The event's own time zone, or the gathering's (LAB-3403).
+    timezone: details.timezone ?? event.location?.timezone ?? null,
     // Empty details for an event the sync has not stored them on yet, never missing fields.
-    details: readEventDetails(event.additionalInfo),
+    details,
     hosts: parts.hosts.map(toPerson).filter((p): p is NonNullable<typeof p> => !!p),
     goingCount: parts.goingCount,
     faces: parts.faces.map(toPerson).filter((p): p is NonNullable<typeof p> => !!p),

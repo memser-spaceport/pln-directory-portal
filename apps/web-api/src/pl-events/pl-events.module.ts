@@ -53,6 +53,7 @@ import { ProfileEventsService } from './profile-events.service';
     PLEventGuestsService,
     PLEventLocationAssociationService,
     PLEventAssociationService,
+    PLEventSyncService,
   ],
   imports: [
     forwardRef(() => MembersModule),

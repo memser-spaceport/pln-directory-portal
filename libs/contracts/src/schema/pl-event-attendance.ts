@@ -113,6 +113,8 @@ export const ResponsePLEventDetailSchema = z.object({
       ),
     })
     .nullable(),
+  /** The event's own time zone, or its gathering's; null when neither is known (LAB-3403). */
+  timezone: z.string().nullable(),
   details: PLEventDetailsSchema,
   hosts: z.array(PLEventPersonSchema),
   goingCount: z.number().int(),
