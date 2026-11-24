@@ -12,6 +12,8 @@ export type UpcomingEventsOptions = {
   limit?: number;
   /** `soonest`: `startDate` ascending. */
   sort?: 'soonest';
+  /** LAB-3403: also the events that have started and not ended, for the All Events page. */
+  ongoing?: true;
 };
 
 export const UPCOMING_EVENTS_MAX_DAYS = 365;
@@ -34,20 +36,25 @@ export function parseUpcomingEventsQuery(query: Record<string, unknown> | undefi
   if (sort !== undefined && sort !== '' && sort !== 'soonest') {
     throw new BadRequestException('sort must be "soonest"');
   }
+  const ongoing = query?.ongoing;
+  if (ongoing !== undefined && ongoing !== '' && ongoing !== 'true') {
+    throw new BadRequestException('ongoing must be "true"');
+  }
   return {
     ...(days !== undefined ? { days } : {}),
     ...(limit !== undefined ? { limit } : {}),
     ...(sort === 'soonest' ? { sort: 'soonest' as const } : {}),
+    ...(ongoing === 'true' ? { ongoing: true as const } : {}),
   };
 }
 
 /** The Prisma `findMany` arguments for these options, minus `select` (the service owns the shape). */
 export function upcomingEventsFindArgs(options: UpcomingEventsOptions, now: Date) {
+  const within = options.days ? { lte: new Date(now.getTime() + options.days * 24 * 60 * 60 * 1000) } : {};
   const where = {
-    startDate: {
-      gt: now,
-      ...(options.days ? { lte: new Date(now.getTime() + options.days * 24 * 60 * 60 * 1000) } : {}),
-    },
+    ...(options.ongoing
+      ? { endDate: { gt: now }, ...(options.days ? { startDate: within } : {}) }
+      : { startDate: { gt: now, ...within } }),
     isDeleted: false,
   };
   return {

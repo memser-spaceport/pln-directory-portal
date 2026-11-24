@@ -81,6 +81,30 @@ describe('EventConsumerHelper keeps event details (LAB-3214)', () => {
     expect(data).not.toHaveProperty('details');
   });
 
+  it('LAB-3403: a message that carries format only keeps the stored details', async () => {
+    const { helper, plEventsService } = setup({ uid: 'ev-1', additionalInfo: { irlLink: 'x', details } });
+    const trimmed = omit(EVENTS_SERVICE_EVENT, [
+      'tags',
+      'host',
+      'host_logo',
+      'access_type',
+      'access_option',
+      'co_hosts',
+      'sponsors',
+      'agenda',
+      'location_url',
+      'timezone',
+    ]);
+    const mapped = omit(await helper.mapEventData({ ...trimmed, format: 'HYBRID' }), 'associations');
+
+    await helper.syncEvent(mapped, 'loc-1', 'assoc-1', 'MANUALLY_MAPPED', {});
+
+    expect(plEventsService.updateEventByUid.mock.calls[0][1].additionalInfo).toEqual({
+      irlLink: 'x',
+      details: { ...details, format: 'HYBRID' },
+    });
+  });
+
   it('logs a malformed field and still syncs the event', async () => {
     const { helper, plEventsService, logger } = setup(null);
     const mapped = omit(await helper.mapEventData({ ...EVENTS_SERVICE_EVENT, agenda: 7 }), 'associations');

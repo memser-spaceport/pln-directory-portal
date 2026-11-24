@@ -53,6 +53,7 @@ The event read SHALL include `details`, taken from the events service:
 - `host` (`name`, `logo`), `coHosts`, `sponsors`
 - `agenda` (with its sessions)
 - `locationUrl`: the venue's map link, an `http` or `https` URL, or null (LAB-3332)
+- `timezone`: the event's own IANA time zone, or null (LAB-3403)
 
 A field the events service did not send SHALL be null or an empty list, never an error.
 
@@ -80,6 +81,22 @@ A field the events service did not send SHALL be null or an empty list, never an
 - **GIVEN** an event whose events-service record has no `location_url`, or an event synced before LAB-3332
 - **WHEN** the event is read
 - **THEN** `details.locationUrl` is null
+
+### Requirement: The event read has the event's time zone
+
+The event read SHALL include `timezone` (LAB-3403): the event's own time zone from its details, otherwise its gathering's, otherwise null.
+
+#### Scenario: The event has its own time zone
+
+- **GIVEN** an event with the time zone `America/Chicago` in a gathering that has none
+- **WHEN** the event is read
+- **THEN** `timezone` is `America/Chicago`
+
+#### Scenario: The event has no time zone of its own
+
+- **GIVEN** an event synced before LAB-3403 in a gathering with the time zone `Europe/Lisbon`
+- **WHEN** the event is read
+- **THEN** `timezone` is `Europe/Lisbon`
 
 ### Requirement: The event read includes hosts and an attendance summary
 
@@ -113,13 +130,19 @@ For a signed-out viewer of an `INVITE_ONLY` event, `goingCount` SHALL be 0 and `
 
 ### Requirement: Event sync keeps the event details
 
-Both event sync paths SHALL store the events service's `tags`, `access_type`, `access_option`, `format`, `host`, `host_logo`, `co_hosts`, `sponsors`, `agenda` and `location_url` on the event as its `details`, replacing earlier details. They SHALL NOT drop other fields already on the event. A malformed field SHALL be stored as empty and logged, and SHALL NOT fail the sync of that event. `location_url` SHALL be stored as `locationUrl` only when it is an absolute `http` or `https` URL; any other value (for example `javascript:`) SHALL be stored as null (LAB-3332).
+Both event sync paths SHALL store the events service's `tags`, `access_type`, `access_option`, `format`, `host`, `host_logo`, `co_hosts`, `sponsors`, `agenda`, `location_url` and `timezone` on the event as its `details`. The REST sync SHALL replace earlier details. A queue message does not carry every field, so an empty or missing field in it SHALL keep the stored value (LAB-3403). A `timezone` that is not a known IANA name SHALL be stored as null. They SHALL NOT drop other fields already on the event. A malformed field SHALL be stored as empty and logged, and SHALL NOT fail the sync of that event. `location_url` SHALL be stored as `locationUrl` only when it is an absolute `http` or `https` URL; any other value (for example `javascript:`) SHALL be stored as null (LAB-3332).
 
 #### Scenario: A synced event gains tags
 
 - **GIVEN** the events service sends event E with tags `["DeSci"]`
 - **WHEN** E is synced
 - **THEN** reading E returns `details.tags` with `DeSci`
+
+#### Scenario: A queue message without the details
+
+- **GIVEN** event E with tags and a host stored
+- **WHEN** a queue message for E carries only `format`
+- **THEN** E keeps its tags and host and takes the new format
 
 #### Scenario: A malformed agenda
 
@@ -133,6 +156,22 @@ Both event sync paths SHALL store the events service's `tags`, `access_type`, `a
 - **WHEN** E is synced
 - **THEN** E is saved with `details.locationUrl` null and its other details unchanged
 
+### Requirement: A queue message is followed by a read of the full details
+
+After a queue message saves an event, the system SHALL read that event from the events service over REST and replace its stored details (LAB-3403). It SHALL write only that event's details. The read SHALL have a time limit. When it fails, the event SHALL stay saved with its stored details, the failure SHALL be logged, and the message SHALL NOT be delivered again because of it. A message that saves no event, or deletes one, SHALL read nothing.
+
+#### Scenario: A tag is removed in the events portal
+
+- **GIVEN** event E with the tags `AI` and `FA3` stored
+- **WHEN** an admin removes `FA3` and the queue message for E arrives
+- **THEN** reading E returns `AI` only
+
+#### Scenario: The events service does not answer
+
+- **GIVEN** event E with tags stored
+- **WHEN** a queue message for E arrives and the REST read fails
+- **THEN** E has the message's name and dates, and keeps its tags
+
 ### Requirement: Existing events can be backfilled with details
 
 The internal sync endpoint `POST /v1/irl/events/sync` (internal auth only) SHALL accept `detailsOnly: true`. With it, the system SHALL fetch events from the events service and, for each event it already has (matched by external id), update only the stored details. It SHALL NOT create, delete or change any other field. It SHALL return how many events were updated.
@@ -143,6 +182,17 @@ The internal sync endpoint `POST /v1/irl/events/sync` (internal auth only) SHALL
 - **WHEN** the details-only sync runs
 - **THEN** the event has details
 - **AND** its slug, dates and name are unchanged
+
+### Requirement: Upcoming events can include the ones in progress
+
+`GET /v1/irl/events/upcoming` SHALL accept `ongoing=true` (LAB-3403). With it, the answer SHALL hold every event that has not ended, started or not. Without it, the answer SHALL hold only events that have not started, as before. Any other value SHALL answer 400.
+
+#### Scenario: A multi-day event on its second day
+
+- **GIVEN** an event that started yesterday and ends tomorrow
+- **WHEN** `GET /v1/irl/events/upcoming?ongoing=true` is called
+- **THEN** the event is in the answer
+- **AND** it is not in the answer without the parameter
 
 ### Requirement: Upcoming events carry their gathering uid
 

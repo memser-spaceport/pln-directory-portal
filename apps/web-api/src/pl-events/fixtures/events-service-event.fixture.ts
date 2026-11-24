@@ -15,6 +15,10 @@
  * (memser-spaceport/events-service, `src/schemas/event.schema.ts`) and is read as
  * `event.location_url` by the PL events app (`service/events.service.ts`).
  *
+ * `timezone` (LAB-3403) is read as `event.timezone` by the PL events app (`service/events.service.ts`).
+ *
+ * The QUEUE does not send all of it: on prod, 2026-11-24, every event it had written kept `format` only (LAB-3403).
+ *
  * Replace it with a trimmed real payload once one is captured (LAB-3211 task 4.1 checks
  * the stored details on the feature env against PL Events).
  */
@@ -31,6 +35,7 @@ export const EVENTS_SERVICE_EVENT = {
   updatedAt: '2026-11-01T00:00:00.000Z',
   event_logo: null,
   format: 'IN_PERSON',
+  timezone: 'America/Chicago',
   location_url: 'https://maps.example.org/?q=Fixture+Venue',
   access_type: 'Free',
   access_option: 'Free w/ RSVP',
