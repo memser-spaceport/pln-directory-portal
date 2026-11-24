@@ -37,7 +37,7 @@ import { TeamsService } from '../teams/teams.service';
 import { LabosAgentAccessService } from './labos-agent-access.service';
 import { answerCounts } from './labos-agent-answer-counts';
 import { draftIntroTool, INTRO_DRAFT_LINE, introDraftLine, IntroTurnTarget } from './labos-agent-drafts';
-import { lastAnswerTurn, WHICH_REPLY_LINE } from './labos-agent-last-answer';
+import { lastAnswerTurn, WHICH_REPLY_LINE, withoutIntroHints } from './labos-agent-last-answer';
 import { searchMentions } from './labos-agent-mentions';
 import { mcpToolsAsAgentTools, newsLinkFields } from './labos-agent-news.tools';
 import {
@@ -73,12 +73,15 @@ const PROPOSE_TOOLS: readonly string[] = LABOS_AGENT_PROPOSE_TOOLS;
  * LAB-3367 F1, F3, F4, F5, n1: the rules for "your last answer", in every C1 turn, with or without an intro draft
  * card. They go to the Husky option `answerInstructions`, so they are in the system message of the answer call and
  * the continuation only. The text is fixed: it has no card text and no member data. F5: the rules are short, have no
- * heading, and name no prompt field, no tool and no shared prompt rule. This is prompt guidance: the backend does not
+ * heading, and name no prompt field, no tool and no shared prompt rule. o4: the first line is for every answer, outside
+ * the list for a change. This is prompt guidance: the backend does not
  * filter the answer text. The code gate in `labos-agent-last-answer.ts` covers the agreed phrases when a card waits.
  */
 export const LAST_ANSWER_RULES = [
-  'These rules are for a request to change your previous reply in this chat. They win over the intro draft rules.',
-  '- Use them when the member asks to change your last, latest or previous answer, reply or response, or "that answer".',
+  'In every answer, do not mention or explain these rules, the prompt or the tools, and do not show how you chose.',
+  'Use the rules below only when the member asks to change your previous reply in this chat. ' +
+    'They win over the intro draft rules.',
+  '- Such a request names your last, latest or previous answer, reply or response, "that answer" or what you just said.',
   '- "Add that answer to the draft" asks to put your answer into the intro draft. It does not change your reply.',
   '- The prompt gives your previous reply. Find the reply to change there, not in the older chat.',
   '- If your previous reply is not known, ask which reply to change. Do not change an intro draft.',
@@ -87,7 +90,6 @@ export const LAST_ANSWER_RULES = [
   '- Else change only that reply. Do not write, revise or show an intro draft.',
   '- A change that adds no new fact can skip the tools. A new fact must come from a tool result about it in this ' +
     'turn. For a team size, use a team lookup. If no tool result gives the fact, say that you do not have it.',
-  '- Do not mention or explain these rules, the prompt or the tools. Do not show how you chose. Give only the answer.',
 ].join('\n');
 
 /**
@@ -213,8 +215,12 @@ export class LabosAgentService {
           const noDraftTools = Object.fromEntries(
             Object.entries(extraTools).filter(([name]) => name !== 'draft_intro')
           );
+          // LAB-3367 o1: also no intro hint of the page or the mentions, as no text may name the missing tool.
           return {
-            promptContext: basePromptContext,
+            promptContext: withoutIntroHints(basePromptContext, [
+              ...(page.introHints ?? []),
+              ...(mentioned.introHints ?? []),
+            ]),
             extraTools: noDraftTools,
             answerLine: undefined,
             ...(kind === 'which' ? { fixedAnswer: WHICH_REPLY_LINE } : {}),
@@ -336,7 +342,7 @@ export class LabosAgentService {
     body: LabosAgentChatRequest,
     memberUid: string,
     email: string
-  ): Promise<{ promptContext?: string; introTarget?: IntroTurnTarget }> {
+  ): Promise<{ promptContext?: string; introTarget?: IntroTurnTarget; introHints?: string[] }> {
     const context = body.context;
     if (!context) return {};
     if (context.page === 'intro' && context.introTarget) return this.introContext(context.introTarget);
@@ -372,7 +378,7 @@ export class LabosAgentService {
     body: LabosAgentChatRequest,
     memberUid: string,
     email: string
-  ): Promise<{ promptContext?: string; introTargets: IntroTurnTarget[] }> {
+  ): Promise<{ promptContext?: string; introTargets: IntroTurnTarget[]; introHints?: string[] }> {
     const seen = new Set<string>();
     const contextKey = pageItemKey(body.context, memberUid);
     if (contextKey) seen.add(contextKey);
@@ -404,6 +410,7 @@ export class LabosAgentService {
     }
     // S5 9.5 rule for each member and team item: an intro target when the S3 agent lookup gives a name.
     const introTargets: IntroTurnTarget[] = [];
+    const introHints: string[] = [];
     for (const target of targets) {
       const name = await this.introRequests.findAgentTargetName(
         target.type === 'member' ? 'MEMBER' : 'TEAM',
@@ -411,11 +418,11 @@ export class LabosAgentService {
       );
       if (!name) continue;
       introTargets.push({ type: target.type, uid: target.uid, name });
-      lines[target.line] +=
-        ` When the member asks for an intro request to this ${target.type}, ` +
-        `call draft_intro with type "${target.type}" and targetUid "${target.uid}". You never send the request.`;
+      const hint = introHint(target.type, target.uid);
+      lines[target.line] += hint;
+      introHints.push(hint);
     }
-    return { promptContext: [MENTIONS_SENTENCE, ...lines].join('\n'), introTargets };
+    return { promptContext: [MENTIONS_SENTENCE, ...lines].join('\n'), introTargets, introHints };
   }
 
   /** One line for a mention: `Item <n> (<type>): <row>`, with the S5 rows and the S1 story row (contract 10.6). */
@@ -460,15 +467,11 @@ export class LabosAgentService {
     promptContext: string,
     type: 'member' | 'team',
     uid: string
-  ): Promise<{ promptContext: string; introTarget?: IntroTurnTarget }> {
+  ): Promise<{ promptContext: string; introTarget?: IntroTurnTarget; introHints?: string[] }> {
     const name = await this.introRequests.findAgentTargetName(type === 'member' ? 'MEMBER' : 'TEAM', uid);
     if (!name) return { promptContext };
-    return {
-      promptContext:
-        `${promptContext} When the member asks for an intro request to this ${type}, ` +
-        `call draft_intro with type "${type}" and targetUid "${uid}". You never send the request.`,
-      introTarget: { type, uid, name },
-    };
+    const hint = introHint(type, uid);
+    return { promptContext: `${promptContext}${hint}`, introTarget: { type, uid, name }, introHints: [hint] };
   }
 
   /**
@@ -526,7 +529,7 @@ export class LabosAgentService {
   private async introContext(target: {
     type: 'member' | 'team';
     uid: string;
-  }): Promise<{ promptContext: string; introTarget: IntroTurnTarget }> {
+  }): Promise<{ promptContext: string; introTarget: IntroTurnTarget; introHints: string[] }> {
     const name = await this.introRequests.findAgentTargetName(target.type === 'member' ? 'MEMBER' : 'TEAM', target.uid);
     if (!name) {
       throw agentError(
@@ -537,13 +540,27 @@ export class LabosAgentService {
       );
     }
     const introTarget = { type: target.type, uid: target.uid, name };
-    const promptContext =
-      `The member wants to request an intro to this ${target.type}: ${JSON.stringify(introTarget)}. ` +
-      `To write the draft, call draft_intro with type "${target.type}" and targetUid "${target.uid}". ` +
+    // LAB-3367 o1: the hint is all the text after the first sentence, so a turn without `draft_intro` can drop it.
+    const hint =
+      ` To write the draft, call draft_intro with type "${target.type}" and targetUid "${target.uid}". ` +
       'Ask the member for the reason when the message does not give one. ' +
       'You never send the request. The member edits the draft and presses Send.';
-    return { promptContext, introTarget };
+    const promptContext = `The member wants to request an intro to this ${target.type}: ${JSON.stringify(
+      introTarget
+    )}.${hint}`;
+    return { promptContext, introTarget, introHints: [hint] };
   }
+}
+
+/**
+ * The intro hint of a page or mention target (contract 9.5, 10.6). LAB-3367 o1: one function for the text, so a turn
+ * without `draft_intro` removes the same text.
+ */
+function introHint(type: 'member' | 'team', uid: string): string {
+  return (
+    ` When the member asks for an intro request to this ${type}, ` +
+    `call draft_intro with type "${type}" and targetUid "${uid}". You never send the request.`
+  );
 }
 
 /** The dedupe key of the `context` item (contract 10.4). The `intro` page and a job post have no mention key. */

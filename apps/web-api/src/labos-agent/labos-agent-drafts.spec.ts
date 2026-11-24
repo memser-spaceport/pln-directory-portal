@@ -27,6 +27,7 @@ import { INTRO_DRAFT_FAILED_TEXT, INTRO_DRAFT_LINE, INTRO_NOT_ELIGIBLE_TEXT } fr
 import { LabosAgentProposalStore } from './labos-agent-proposals';
 import { LAST_ANSWER_RULES, LabosAgentService, latestReplyCacheKey } from './labos-agent.service';
 import { WHICH_REPLY_LINE } from './labos-agent-last-answer';
+import * as pageContextModule from './labos-agent-page-context';
 
 /** Far from today, so the role end-date checks do not depend on the clock. */
 const PAST = new Date('2000-01-01T00:00:00.000Z');
@@ -669,10 +670,13 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
   });
 
   /** LAST_ANSWER_RULES in lines, one per priority (LAB-3367 F1, F3, F4, F5, n1). */
+  const NO_RULE_TALK =
+    'In every answer, do not mention or explain these rules, the prompt or the tools, and do not show how you chose.';
   const RULES_WIN =
-    'These rules are for a request to change your previous reply in this chat. They win over the intro draft rules.';
+    'Use the rules below only when the member asks to change your previous reply in this chat. ' +
+    'They win over the intro draft rules.';
   const EXAMPLES =
-    '- Use them when the member asks to change your last, latest or previous answer, reply or response, or "that answer".';
+    '- Such a request names your last, latest or previous answer, reply or response, "that answer" or what you just said.';
   const CONTENT_NOT_CHANGE =
     '- "Add that answer to the draft" asks to put your answer into the intro draft. It does not change your reply.';
   const PREVIOUS_NOT_HISTORY =
@@ -686,9 +690,8 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
   const FACTS_FROM_TOOLS =
     '- A change that adds no new fact can skip the tools. A new fact must come from a tool result about it in this ' +
     'turn. For a team size, use a team lookup. If no tool result gives the fact, say that you do not have it.';
-  const NO_RULE_TALK =
-    '- Do not mention or explain these rules, the prompt or the tools. Do not show how you chose. Give only the answer.';
   const LAST_ANSWER_LINES = [
+    NO_RULE_TALK,
     RULES_WIN,
     EXAMPLES,
     CONTENT_NOT_CHANGE,
@@ -697,7 +700,6 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
     DRAFT_LINE_REVISES,
     NORMAL_WINS,
     FACTS_FROM_TOOLS,
-    NO_RULE_TALK,
   ];
 
   it('LAB-3367: LAST_ANSWER_RULES is these lines, so each priority test checks the real text', () => {
@@ -767,7 +769,8 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
     }
     expect(LAST_ANSWER_RULES).not.toContain('Always call at least one tool');
     expect(LAST_ANSWER_RULES).not.toContain('unknown');
-    expect(LAST_ANSWER_RULES).toContain(NO_RULE_TALK);
+    // o4: the F5 line is the first line, outside the list for a change, so it holds for every answer.
+    expect(LAST_ANSWER_RULES.split('\n')[0]).toBe(NO_RULE_TALK);
     // F4: the draft line with no card still asks which reply.
     expect(LAST_ANSWER_RULES).toContain(DRAFT_LINE_REVISES);
   });
@@ -821,6 +824,17 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
       ['add the team size to your last answer'],
       ['Shorten your previous reply.'],
       ['Rewrite YOUR  LATEST\nRESPONSE in one line.'],
+      ['Shorten your last answers.'],
+      // o3: a negated draft word does not point to the draft.
+      ['shorten your last answer, not the draft'],
+      ['Shorten your last answer but don’t change the draft.'],
+      ["Shorten your last answer and don't touch the Draft."],
+      ['Shorten your previous answer and leave the intro as it is.'],
+      ['Rewrite your last reply, keep the card.'],
+      ['Shorten your last answer without the draft.'],
+      // o5: what you said or wrote.
+      ['what you just said, make it shorter'],
+      ['Shorten what you wrote.'],
     ])('"%s" after a normal answer: no draft tool and no card text for the turn', async (message) => {
       const { options, turn } = await turnFor(message, NORMAL);
 
@@ -837,8 +851,9 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
 
     it.each([
       ['an unknown reply (first turn, Stop or a cache failure)', ''],
-      ['the fixed question (K3)', WHICH_REPLY_LINE],
-    ])('after %s: the fixed question, no draft tool and no card text', async (_name, latestReply) => {
+      ['a blank reply', '  \n'],
+      ['the fixed answer (K3)', WHICH_REPLY_LINE],
+    ])('after %s: the fixed answer, no draft tool and no card text', async (_name, latestReply) => {
       const { turn } = await turnFor('Shorten your last answer.', latestReply, { ...card, context: TEAM_CONTEXT });
       // The page context of the turn stays. Only the card text goes.
       expect(turn.promptContext).toBeTruthy();
@@ -846,6 +861,48 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
       expect(turn.extraTools).not.toHaveProperty('draft_intro');
       expect(turn.promptContext ?? '').not.toContain(CARD_TEXT);
       expect(turn).toHaveProperty('answerLine', undefined);
+    });
+
+    it('o3: after Stop, a message with no change word goes to the model, with no draft tool and no card text', async () => {
+      const { turn } = await turnFor('Your last answer did not load. What is new in LabOS?', '');
+      expect(turn).not.toHaveProperty('fixedAnswer');
+      expect(turn.extraTools).not.toHaveProperty('draft_intro');
+      expect(turn.promptContext ?? '').not.toContain(CARD_TEXT);
+      expect(turn).toHaveProperty('answerLine', undefined);
+    });
+
+    it('the fixed answer gives the full recovery request, not an open question', () => {
+      expect(WHICH_REPLY_LINE).toBe(
+        'I cannot tell which reply to change, so I changed nothing. Send the full request again: say ' +
+          '"make the draft shorter" for the intro draft, or paste the text to change.'
+      );
+    });
+
+    it('keeps every other tool, and drops only draft_intro', async () => {
+      const def = { name: 'list_news', description: 'News.', inputSchema: {}, execute: jest.fn() };
+      jest.spyOn(LabosAgentService.prototype as any, 'tools').mockResolvedValue([def]);
+      const { options, turn } = await turnFor('Shorten your last answer.', NORMAL);
+      expect(Object.keys(options.extraTools).sort()).toEqual(['draft_intro', 'list_news']);
+      expect(Object.keys(turn.extraTools)).toEqual(['list_news']);
+      expect(turn.extraTools.list_news).toBe(options.extraTools.list_news);
+    });
+
+    it.each([
+      ['F4: a member page that is also the card target', { context: { page: 'member', memberUid: 'm-grace' } }],
+      ['a team page', { context: { page: 'team', teamUid: 't-acme' } }],
+      ['the intro page', { context: TEAM_CONTEXT }],
+      ['a member mention', { mentions: [{ type: 'member', uid: 'm-grace' }] }],
+    ])('o1: on %s, the turn has no text that names draft_intro', async (_name, extra) => {
+      const h = setup(undefined, [MEMBER_PERMISSIONS.SEARCH_READ]);
+      jest.spyOn(pageContextModule, 'teamPagePrompt').mockResolvedValue('Team page.');
+      const options = await chat(h, { ...VALID, message: 'Shorten your last answer.', ...card, ...extra });
+      expect(options.promptContext).toContain('draft_intro');
+      for (const latestReply of [NORMAL, '']) {
+        const turn = options.latestReplyTurn(latestReply);
+        expect(turn.promptContext ?? '').not.toContain('draft_intro');
+        expect(turn.promptContext ?? '').not.toContain(CARD_TEXT);
+        expect(turn.extraTools).not.toHaveProperty('draft_intro');
+      }
     });
 
     it('after the real draft line: no change, so the draft revision still works', async () => {
@@ -858,6 +915,14 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
       ['F5 repro: "add that answer to the draft"', 'add that answer to the draft'],
       ['a named draft target', 'Add your last answer to the draft.'],
       ['a named intro target', 'Put your previous answer into the intro.'],
+      // o3: card, introduction and plurals name the draft too, in any letter case.
+      ['a named card', 'add your last answer to the card'],
+      ['a named introduction', 'put your previous answer into the introduction'],
+      ['a plural draft word', 'Use your last answer in both DRAFTS.'],
+      ['"include" with a named intro', 'Include your latest response in the Intro.'],
+      ['"make the draft shorter"', 'make the draft shorter'],
+      ['"shorten the intro"', 'shorten the intro'],
+      ['no "your" (a boundary of the check)', 'Shorten last answer.'],
       ['an implicit brief revision', 'Make it shorter.'],
       ['"that answer" (prompt rules only)', 'Make that answer shorter.'],
       ['a name only', 'Write the intro to Grace instead.'],

@@ -1105,6 +1105,7 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
       const keys = [...cache.get.mock.calls, ...cache.set.mock.calls].map((call) => call[0]);
       expect(keys.every((key) => key === 'thread-1:summary')).toBe(true);
       expect(answerPrompt(0)).not.toContain('latestReply');
+      expect(answerPrompt(0)).not.toContain('Previous reply');
     });
 
     it('writes the reply before the stream closes, so an immediate follow-up reads it before the summary', async () => {
@@ -1140,6 +1141,8 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
       expect(answerPrompt(1)).toContain('Previous reply: "First answer."');
       // The structured tail call does not get latestReply.
       expect(streamObjectMock.mock.calls[1][0].prompt).not.toContain('latestReply');
+      expect(streamObjectMock.mock.calls[1][0].prompt).not.toContain('Previous reply');
+      expect(streamObjectMock.mock.calls[1][0].prompt).not.toContain('First answer."');
     });
 
     it('a draft turn stores only the answer line, and the next normal turn replaces it', async () => {
@@ -1201,6 +1204,24 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
         expect(body).toContain('Shorter.');
         expect(body).not.toContain(LINE);
         expect(store.get(KEY)).toBe('Shorter.');
+      });
+
+      it('o1: the retry after an empty cut-off answer keeps the tools and the prompt context of the turn', async () => {
+        store.set(KEY, 'A normal answer.');
+        // Nothing streamed and no tool result: the stream starts the answer again, with tools.
+        streamTextMock.mockReturnValueOnce(answerStream([], 'length')).mockReturnValueOnce(answerStream(['Shorter.']));
+        await turn({
+          promptContext: 'Page only.\nCard-text-7f3a',
+          extraTools: tools(['list_news', 'draft_intro']),
+          latestReplyTurn: () => ({ promptContext: 'Page only.', extraTools: tools(['list_news']) }),
+        });
+
+        expect(streamTextMock).toHaveBeenCalledTimes(2);
+        for (const [call] of streamTextMock.mock.calls) {
+          expect(call.tools).toHaveProperty('list_news');
+          expect(call.tools).not.toHaveProperty('draft_intro');
+          expect(JSON.stringify(call)).not.toContain('Card-text-7f3a');
+        }
       });
 
       it('an empty result keeps the options of the caller', async () => {
