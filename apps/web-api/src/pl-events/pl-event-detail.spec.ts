@@ -228,6 +228,24 @@ describe('PLEventsService.getPLEventDetail (LAB-3213)', () => {
     const detail = await service.getPLEventDetail('ev-1', VIEWER);
     expect(detail.location).toBeNull();
   });
+
+  it("timezone is the event's own, then the gathering's, then null (LAB-3403)", async () => {
+    const own = { details: mapEventDetails(EVENTS_SERVICE_EVENT) };
+    const none = { details: mapEventDetails({ ...EVENTS_SERVICE_EVENT, timezone: undefined }) };
+    const cases: Array<[Record<string, unknown>, string | null]> = [
+      [{ additionalInfo: own }, 'America/Chicago'],
+      [{ additionalInfo: own, location: null }, 'America/Chicago'],
+      [{ additionalInfo: none }, 'Europe/Lisbon'],
+      [{ additionalInfo: null }, 'Europe/Lisbon'],
+      [{ additionalInfo: none, location: null }, null],
+    ];
+    for (const [overrides, expected] of cases) {
+      const { service } = makeService(eventRow(overrides));
+      const detail = await service.getPLEventDetail('ev-1', null);
+      expect(detail.timezone).toBe(expected);
+      expect(ResponsePLEventDetailSchema.safeParse(detail).success).toBe(true);
+    }
+  });
 });
 
 describe('pl-event-detail helpers (LAB-3213)', () => {

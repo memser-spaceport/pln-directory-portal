@@ -11,7 +11,7 @@ import { TeamsService } from '../teams/teams.service';
 import { getFilenameFromUrl, getFileTypeFromUrl } from '../utils/helper/helper';
 import { PLEvent, PLEventLocation, PLEventType, PLEventLocationAssociation } from '@prisma/client';
 import { CacheService } from '../utils/cache/cache.service';
-import { mapEventDetails, withEventDetails } from '../pl-events/pl-event-details.mapper';
+import { keepStoredDetails, mapEventDetails, withEventDetails } from '../pl-events/pl-event-details.mapper';
 import { 
   PLEventAssociationInputSchema, 
   PLEventAssociationInput,
@@ -188,11 +188,19 @@ export class EventConsumerHelper {
   ): Promise<string> {
     const existingEvent = await this.findEventByExternalId(event.externalId, tx);
 
-    // `details` is not a column: it is merged into `additionalInfo`, keeping any other key (LAB-3214).
+    // `details` is not a column: it is merged into `additionalInfo`, keeping any other key (LAB-3214). The message does
+    // not carry every detail, so an empty one never replaces a stored one (LAB-3403).
     const { details, ...eventFields } = event;
     const eventData = {
       ...eventFields,
-      ...(details ? { additionalInfo: withEventDetails(existingEvent?.additionalInfo, details) } : {}),
+      ...(details
+        ? {
+            additionalInfo: withEventDetails(
+              existingEvent?.additionalInfo,
+              keepStoredDetails(existingEvent?.additionalInfo, details)
+            ),
+          }
+        : {}),
       locationStatus,
       locationUid,
       pLEventLocationAssociationUid: associationUid
