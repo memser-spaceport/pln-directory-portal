@@ -19,7 +19,7 @@ import { APP_ENV } from '../utils/constants';
 import { LabosAgentAccessService } from './labos-agent-access.service';
 import { answerCounts } from './labos-agent-answer-counts';
 import { LabosAgentController } from './labos-agent.controller';
-import { LabosAgentService } from './labos-agent.service';
+import { LAST_ANSWER_RULES, LabosAgentService } from './labos-agent.service';
 import { mcpToolsAsAgentTools, newsLinkFields, newsLinkLines, withNewsStoryLinks } from './labos-agent-news.tools';
 import { NO_PAGE_SENTENCE } from './labos-agent-page-context';
 import { buildSourceRefs } from '../husky/source-refs';
@@ -249,7 +249,10 @@ describe('LabosAgentController', () => {
     expect(query.getTeamNewsItemDto).not.toHaveBeenCalled();
     expect(husky.createContextualToolsResponse.mock.calls[0][3].promptContext).toContain('Home');
     // S6-C37 (LAB-3318, contract 10.6): no context and no mentions give the no-page sentence and no page data.
-    expect(husky.createContextualToolsResponse.mock.calls[1][3].promptContext).toBe(NO_PAGE_SENTENCE);
+    // LAB-3367 F4: the rules for your last answer follow in every turn.
+    expect(husky.createContextualToolsResponse.mock.calls[1][3].promptContext).toBe(
+      `${NO_PAGE_SENTENCE}\n${LAST_ANSWER_RULES}`
+    );
   });
 
   it('destroys the connection when the stream fails after the headers', async () => {

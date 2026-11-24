@@ -1071,6 +1071,13 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
       expect(answerPrompt(1)).not.toContain('chatHistory');
     });
 
+    it('LAB-3367 F3: a stored reply is JSON text, so a reply "unknown" differs from the unknown marker', async () => {
+      store.set(KEY, 'unknown');
+      streamTextMock.mockReturnValueOnce(answerStream(['Next.']));
+      await turn();
+      expect(answerPrompt(0)).toContain('latestReply: "unknown"');
+    });
+
     it('a follow-up after the summary gets the chat history and latestReply', async () => {
       streamTextMock.mockReturnValueOnce(answerStream(['First answer.'])).mockReturnValueOnce(answerStream(['Ok.']));
 
@@ -1160,6 +1167,13 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
       expect(store.get(KEY)).toBe('');
       expect(logger.error).not.toHaveBeenCalled();
       expect(generateTextMock).not.toHaveBeenCalled();
+
+      // LAB-3367 F3: the next turn sees that the latest reply is unknown, as the bare word, not as JSON text.
+      streamTextMock.mockReturnValueOnce(answerStream(['Next.']));
+      await turn();
+      expect(answerPrompt(1)).toContain('latestReply: unknown');
+      expect(answerPrompt(1)).not.toContain('Old reply.');
+      expect(answerPrompt(1)).not.toContain('latestReply: "unknown"');
     });
 
     it('a cancel while the reply write is pending clears the key again and does not close the stream', async () => {
@@ -1260,7 +1274,7 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
         // The clear went out before the read timed out, as the next cache call of this turn.
         expect(clearOrder).toBe(readOrder + 1);
         // A timed-out read is not used, because it can be old.
-        expect(answerPrompt(0)).not.toContain('latestReply');
+        expect(answerPrompt(0)).toContain('latestReply: unknown');
         expect(logger.error).toHaveBeenCalledWith(`Timed out reading and clearing the ${KEY_LOG}`);
         expect(store.get(KEY)).toBe('New reply.');
 
@@ -1378,7 +1392,7 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
       await flushBackgroundWork();
 
       expect(body.content).toBe('Secret-reply-3d7e');
-      expect(answerPrompt(0)).not.toContain('latestReply');
+      expect(answerPrompt(0)).toContain('latestReply: unknown');
       const lines = logger.error.mock.calls.map((call) => call.join(' '));
       expect(lines).toEqual(
         expect.arrayContaining([

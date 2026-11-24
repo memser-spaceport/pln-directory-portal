@@ -53,6 +53,9 @@ export const DEFAULT_HUSKY_SEARCH_STALL_TIMEOUT_MS = 30_000;
  */
 export const LATEST_REPLY_CACHE_TIMEOUT_MS = 1_000;
 
+/** LAB-3367 F3: the `latestReply` prompt value when the latest reply is not known. A stored reply is JSON text. */
+export const LATEST_REPLY_UNKNOWN = 'unknown';
+
 /** Appended to an answer that stayed incomplete after the one continuation attempt. */
 export const HUSKY_SEARCH_STALLED_NOTICE =
   '\n\n_The answer was cut short because the AI provider stopped responding. Please try again._';
@@ -93,7 +96,8 @@ export interface ContextualToolsOptions {
   persistHistory?: boolean;
   /**
    * LAB-3367 h3: the cache key of the latest reply, for the LabOS agent only. The caller scopes the key (member and
-   * thread). With a key, the stream reads the value into the answer prompt as `latestReply`, then writes `''` before
+   * thread). With a key, the stream reads the value into the answer prompt as `latestReply` (`unknown` when empty,
+   * LAB-3367 F3), then writes `''` before
    * the stream starts. Before the stream closes, it writes the reply of this turn: only the answer line for a turn
    * with that line, else the answer text. A failed, cancelled or still cut-off turn writes nothing, so the key stays
    * `''`. A cache error does not stop the turn. AI search passes nothing.
@@ -276,8 +280,10 @@ export class HuskyAiService {
     const historyPrompt = chatSummaryFromDb ? ` - chatHistory: ${chatSummaryFromDb}` : '';
     const { latestReplyKey } = options;
     const latestReply = latestReplyKey ? await this.takeLatestReply(latestReplyKey) : '';
-    const answerHistoryPrompt = latestReply
-      ? `${historyPrompt}\n  - latestReply: ${JSON.stringify(latestReply)}`
+    // LAB-3367 F3: with a key, an empty value (a first turn, or a stopped, failed or cut-off turn, or a cache
+    // failure) is the bare word `unknown`. A stored reply is JSON text, so it is always in quotes.
+    const answerHistoryPrompt = latestReplyKey
+      ? `${historyPrompt}\n  - latestReply: ${latestReply ? JSON.stringify(latestReply) : LATEST_REPLY_UNKNOWN}`
       : historyPrompt;
     const model = this.getSearchModel();
 
