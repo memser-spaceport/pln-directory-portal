@@ -30,6 +30,13 @@ The global search index (`event` in OpenSearch, filled by `lambda/lambda-opensea
 events only. An event that stops being visible is removed from the index on the next run of the Lambda. Deploy the
 Lambda after the migration that adds `PLEvent.status`, because its query reads that column.
 
+## Which gatherings are listed
+
+`GET /v1/irl/locations` (the IRL Gatherings list) returns every gathering that is not deleted and has at least one
+visible event. A gathering that a new event creates is listed as soon as that event is approved; one whose events are
+all drafts, pending, rejected or deleted is not. Gatherings with a `priority` come first, lowest first, then the ones
+without, each group by name. `priority` only orders the list; nothing sets it when a gathering is created.
+
 ## Event fields
 
 Time zone, format, access, tags, host name, venue address and position, the all-day flag and the registration and

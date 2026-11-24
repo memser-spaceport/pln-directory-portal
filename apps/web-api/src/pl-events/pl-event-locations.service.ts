@@ -18,6 +18,12 @@ import { CacheService } from '../utils/cache/cache.service';
 import { isIRLNotificationsEnabled } from '../utils/constants';
 import { VISIBLE_PL_EVENT_WHERE, visiblePLEventSql, withoutPrivateEventFields } from './pl-event-visibility';
 
+/** The IRL Gatherings order: by priority (gatherings without one last), then by name. */
+export const DEFAULT_LOCATION_ORDER: Prisma.PLEventLocationOrderByWithRelationInput[] = [
+  { priority: 'asc' },
+  { location: 'asc' },
+];
+
 @Injectable()
 export class PLEventLocationsService {
   constructor(
@@ -100,38 +106,24 @@ export class PLEventLocationsService {
    */
   async getPLEventLocations(queryOptions: Prisma.PLEventLocationFindManyArgs): Promise<FormattedLocationWithEvents[]> {
     try {
+      // A gathering is listed once it has a visible event, so a city that a new event creates shows at once.
+      // Gatherings with a priority come first, in its order; Postgres sorts the ones without (NULL) after them.
+      const where: Prisma.PLEventLocationWhereInput = {
+        ...queryOptions.where,
+        isDeleted: false,
+        events: { some: { ...VISIBLE_PL_EVENT_WHERE } },
+      };
+      const orderBy = queryOptions.orderBy ?? DEFAULT_LOCATION_ORDER;
       if (queryOptions.select) {
         // If select is present, use the query as-is but add filter for locations with events
-        const locations = await this.prisma.pLEventLocation.findMany({
-          ...queryOptions,
-          where: {
-            ...queryOptions.where,
-            priority: {
-              not: null
-            },
-            events: {
-              some: {
-                ...VISIBLE_PL_EVENT_WHERE,
-              }
-            }
-          }
-        });
+        const locations = await this.prisma.pLEventLocation.findMany({ ...queryOptions, where, orderBy });
         // No transformation, just return as is (cast for compatibility)
         return locations as unknown as FormattedLocationWithEvents[];
       }
       const locations = await this.prisma.pLEventLocation.findMany({
         ...queryOptions,
-        where: {
-          ...queryOptions.where,
-          priority: {
-            not: null
-          },
-          events: {
-            some: {
-              ...VISIBLE_PL_EVENT_WHERE,
-            }
-          }
-        },
+        where,
+        orderBy,
         include: {
           events: {
             where: {

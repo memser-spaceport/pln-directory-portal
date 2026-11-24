@@ -145,9 +145,9 @@ So a wrong mapping row sends every new event of that city to the wrong gathering
 country differs from their gathering's country. On prod on 2026-11-20 it returned one row: San Juan, Argentina,
 mapped to the gathering "san juan" of Puerto Rico, with no events.
 
-A gathering has a page on IRL Gatherings only when it has a `priority`. A gathering that an event creates has none,
-so its events show on All Events, in the event drawer and on profiles, and the city gets its page when a priority is
-set on the gathering. Query 8 lists the gatherings with upcoming events and no page.
+A gathering that an event creates is listed on IRL Gatherings as soon as it has an approved event, after the
+gatherings that have a `priority` (see "Which gatherings are listed" in [EVENTS.md](./EVENTS.md)). Query 8 lists the
+gatherings with upcoming events and no priority: set one to move a city up the list.
 
 ## Count queries
 
@@ -214,7 +214,7 @@ WHERE NOT a."isDeleted" AND NOT l."isDeleted"
   AND l.country IS NOT NULL AND l.country <> ''
   AND lower(a.country) <> lower(l.country);
 
--- 8. Gatherings with upcoming events and no IRL Gatherings page (no priority).
+-- 8. Gatherings with upcoming events and no priority (listed last on IRL Gatherings).
 SELECT l.uid, l.location, l.country,
        count(*) AS upcoming_events
 FROM "PLEventLocation" l
