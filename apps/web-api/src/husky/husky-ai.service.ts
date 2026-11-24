@@ -73,6 +73,8 @@ interface AnswerInput {
   currentDate: string;
   /** Prompt lines from ContextualToolsOptions.promptContext, or ''. */
   pageContext: string;
+  /** ContextualToolsOptions.answerInstructions, or ''. It goes at the end of the system message (LAB-3367 k7). */
+  answerInstructions: string;
 }
 
 /**
@@ -103,6 +105,12 @@ export interface ContextualToolsOptions {
    * `''`. A cache error does not stop the turn. AI search passes nothing.
    */
   latestReplyKey?: string;
+  /**
+   * LAB-3367 k2, k7: extra text for the system message of the answer call and of the continuation, after the shared
+   * prompt. The structured tail call does not get it. Give only fixed rules, never member or card text. The LabOS
+   * agent uses it for the rules for "your last answer". AI search passes nothing.
+   */
+  answerInstructions?: string;
   /**
    * Extra fields for the end of the streamed JSON object that need the finished turn, for example the answer counts
    * of the LabOS agent (LAB-3297). Called once, after `extraResponseFields`. A field with the key of a tail field
@@ -324,7 +332,13 @@ export class HuskyAiService {
           enqueue('{ "steps": [');
           pushStep(UNDERSTANDING_STEP);
 
-          const input: AnswerInput = { historyPrompt: answerHistoryPrompt, question, currentDate, pageContext };
+          const input: AnswerInput = {
+            historyPrompt: answerHistoryPrompt,
+            question,
+            currentDate,
+            pageContext,
+            answerInstructions: options.answerInstructions ?? '',
+          };
           const answer = await this.streamAnswer(
             model,
             auth,
@@ -511,7 +525,7 @@ export class HuskyAiService {
     const generation =
       mode.kind === 'initial'
         ? {
-            system: HUSKY_CONTEXTUAL_TOOLS_SYSTEM_PROMPT,
+            system: withAnswerInstructions(HUSKY_CONTEXTUAL_TOOLS_SYSTEM_PROMPT, input.answerInstructions),
             tools: { ...this.huskyAiToolsService.getTools(auth), ...extraTools },
             maxSteps: 5,
             prompt: `
@@ -522,7 +536,7 @@ export class HuskyAiService {
           `,
           }
         : {
-            system: HUSKY_CONTEXTUAL_TOOLS_CONTINUATION_PROMPT,
+            system: withAnswerInstructions(HUSKY_CONTEXTUAL_TOOLS_CONTINUATION_PROMPT, input.answerInstructions),
             prompt: `
           ${input.historyPrompt}
             - question: ${input.question}
@@ -1100,4 +1114,9 @@ export class HuskyAiService {
 
 function turnSummary(toolNames: string[], payload: HuskyStoredContext): ContextualTurnSummary {
   return { toolNames, sources: payload.sources ?? [], sourceRefs: payload.sourceRefs ?? [] };
+}
+
+/** LAB-3367 k7: the shared system prompt, then the caller's answer instructions. With none, the prompt is unchanged. */
+function withAnswerInstructions(system: string, answerInstructions: string): string {
+  return answerInstructions ? `${system}\n\n${answerInstructions}` : system;
 }

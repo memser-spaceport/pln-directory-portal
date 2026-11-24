@@ -26,7 +26,7 @@ import { APP_ENV } from '../utils/constants';
 import { LabosAgentAccessService } from './labos-agent-access.service';
 import { LabosAgentController } from './labos-agent.controller';
 import { LabosAgentProposalStore } from './labos-agent-proposals';
-import { LAST_ANSWER_RULES, LabosAgentService } from './labos-agent.service';
+import { LabosAgentService } from './labos-agent.service';
 import {
   HOME_MENTION_SENTENCE,
   JOB_BOARD_SENTENCE,
@@ -39,15 +39,6 @@ import {
   PROFILE_PAGE_SENTENCE,
   TEAM_PAGE_SENTENCE,
 } from './labos-agent-page-context';
-
-/**
- * LAB-3367 F4: every turn ends with LAST_ANSWER_RULES. The page and mention tests check the part before them exactly.
- */
-function pagePart(promptContext: unknown): string {
-  const prompt = promptContext as string;
-  expect(prompt.endsWith(`\n${LAST_ANSWER_RULES}`)).toBe(true);
-  return prompt.slice(0, -LAST_ANSWER_RULES.length - 1);
-}
 
 const NEWS_ITEM = {
   uid: 'news-1',
@@ -403,7 +394,7 @@ function setup(viewer: Viewer = {}, env: string = APP_ENV.DEV) {
     return {
       texts,
       drafts: options.extraResponseFields.drafts as Array<Record<string, any>>,
-      prompt: pagePart(options.promptContext),
+      prompt: options.promptContext as string,
     };
   };
   /** S6: one chat turn with any extra body fields (for example `mentions`). */
@@ -415,7 +406,7 @@ function setup(viewer: Viewer = {}, env: string = APP_ENV.DEV) {
     return {
       texts,
       drafts: options.extraResponseFields.drafts as Array<Record<string, any>>,
-      prompt: pagePart(options.promptContext),
+      prompt: options.promptContext as string,
     };
   };
   const chatErrorBody = (extra: Record<string, unknown>) =>

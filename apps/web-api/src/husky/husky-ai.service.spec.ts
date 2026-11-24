@@ -22,6 +22,11 @@ jest.mock('./tools/irl-events.tool', () => ({ IrlEventsTool: jest.fn() }));
 jest.mock('./tools/husky-ai-tools.serivice', () => ({ HuskyAiToolsService: jest.fn() }));
 
 import { streamText, streamObject, generateText } from 'ai';
+import {
+  HUSKY_CONTEXTUAL_TOOLS_CONTINUATION_PROMPT,
+  HUSKY_CONTEXTUAL_TOOLS_STRUCTURED_PROMPT,
+  HUSKY_CONTEXTUAL_TOOLS_SYSTEM_PROMPT,
+} from '../utils/ai-prompts';
 import { AISDKError, APICallError, TypeValidationError } from '@ai-sdk/provider';
 import { HuskyResponseSchema } from 'libs/contracts/src/schema/husky-chat';
 import { answerCounts } from '../labos-agent/labos-agent-answer-counts';
@@ -1015,6 +1020,52 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
       const raw = await readAll(await service.createContextualToolsResponse(chatInfo, false));
 
       expect(HuskyResponseSchema.parse(JSON.parse(raw)).content).toBe('One answer.');
+    });
+  });
+
+  describe('answerInstructions (LAB-3367 k2, k7)', () => {
+    const RULES = '## Caller rules\n- A fixed rule.';
+    const TAIL = '{"followUpQuestions":[],"sources":[],"actions":[]}';
+
+    beforeEach(() => {
+      cache.get.mockResolvedValue(null);
+      streamObjectMock.mockImplementation(() => structuredStream([TAIL]));
+    });
+
+    it('adds the text to the end of the system message of the answer call and the continuation, not of the tail', async () => {
+      streamTextMock
+        .mockReturnValueOnce(answerStream(['Half'], 'length'))
+        .mockReturnValueOnce(answerStream([' and the rest.']));
+
+      await readAll(
+        await service.createContextualToolsResponse(chatInfo, false, undefined, {
+          answerInstructions: RULES,
+          promptContext: 'Page text.',
+        })
+      );
+
+      expect(streamTextMock).toHaveBeenCalledTimes(2);
+      expect(streamTextMock.mock.calls[0][0].system).toBe(`${HUSKY_CONTEXTUAL_TOOLS_SYSTEM_PROMPT}\n\n${RULES}`);
+      expect(streamTextMock.mock.calls[1][0].system).toBe(`${HUSKY_CONTEXTUAL_TOOLS_CONTINUATION_PROMPT}\n\n${RULES}`);
+      // Not in the user prompt of any call, and not in the structured tail.
+      for (const call of streamTextMock.mock.calls) expect(call[0].prompt).not.toContain('A fixed rule.');
+      const tail = streamObjectMock.mock.calls[0][0];
+      expect(tail.system).toBe(HUSKY_CONTEXTUAL_TOOLS_STRUCTURED_PROMPT);
+      expect(tail.prompt).not.toContain('A fixed rule.');
+      // The page context still goes to every call, as before.
+      expect(tail.prompt).toContain('Page text.');
+    });
+
+    it('AI search passes nothing: the shared system messages do not change', async () => {
+      streamTextMock
+        .mockReturnValueOnce(answerStream(['Half'], 'length'))
+        .mockReturnValueOnce(answerStream([' and the rest.']));
+
+      await readAll(await service.createContextualToolsResponse(chatInfo, false));
+
+      expect(streamTextMock.mock.calls[0][0].system).toBe(HUSKY_CONTEXTUAL_TOOLS_SYSTEM_PROMPT);
+      expect(streamTextMock.mock.calls[1][0].system).toBe(HUSKY_CONTEXTUAL_TOOLS_CONTINUATION_PROMPT);
+      expect(streamObjectMock.mock.calls[0][0].system).toBe(HUSKY_CONTEXTUAL_TOOLS_STRUCTURED_PROMPT);
     });
   });
 

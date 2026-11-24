@@ -249,10 +249,12 @@ describe('LabosAgentController', () => {
     expect(query.getTeamNewsItemDto).not.toHaveBeenCalled();
     expect(husky.createContextualToolsResponse.mock.calls[0][3].promptContext).toContain('Home');
     // S6-C37 (LAB-3318, contract 10.6): no context and no mentions give the no-page sentence and no page data.
-    // LAB-3367 F4: the rules for your last answer follow in every turn.
-    expect(husky.createContextualToolsResponse.mock.calls[1][3].promptContext).toBe(
-      `${NO_PAGE_SENTENCE}\n${LAST_ANSWER_RULES}`
-    );
+    expect(husky.createContextualToolsResponse.mock.calls[1][3].promptContext).toBe(NO_PAGE_SENTENCE);
+    // LAB-3367 F4, k2, k7: the rules for your last answer go in every turn, as answerInstructions, not in the context.
+    for (const call of husky.createContextualToolsResponse.mock.calls) {
+      expect(call[3].answerInstructions).toBe(LAST_ANSWER_RULES);
+      expect(call[3].promptContext).not.toContain('your last answer');
+    }
   });
 
   it('destroys the connection when the stream fails after the headers', async () => {
