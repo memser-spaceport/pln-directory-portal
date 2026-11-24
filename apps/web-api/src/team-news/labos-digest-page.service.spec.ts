@@ -560,28 +560,18 @@ describe('LabosDigestPageService', () => {
       return built;
     };
 
-    it('reads the issue signed out with no member data, and forum posts locked', async () => {
-      const { service, prisma } = signedOut();
+    it('reads the issue signed out with no member data and no forum posts', async () => {
+      const { service, prisma, forum } = signedOut();
       const page = await service.readIssueByUid('iss-1', null);
       expect(page.stories.map((s) => [s.uid, s.isTopStory, s.choice, s.followsTeam])).toEqual([
         ['b', true, null, false],
         ['a', false, null, false],
       ]);
       expect(page).toMatchObject({ firstName: null, isTeamMember: false, issues: [] });
-      expect(page.forumPosts).toEqual([
-        {
-          tid: 101,
-          title: 'Busy thread',
-          locked: true,
-          authorName: null,
-          authorRole: null,
-          authorTeam: null,
-          authorAvatarUrl: null,
-          contentHtml: null,
-          url: 'https://web/forum/topics/1/101',
-          replyCount: 3,
-        },
-      ]);
+      // LAB-3355: no forum section for a signed-out reader, so not even the titles reach them.
+      expect(page).toMatchObject({ forumPosts: [], forumUnavailable: false });
+      expect(JSON.stringify(page)).not.toContain('Busy thread');
+      expect(forum.read).not.toHaveBeenCalled();
       // No member query at all: not the issue's member, not anyone's.
       expect(prisma.member.findUnique).not.toHaveBeenCalled();
       expect(prisma.labosDigestChoice.findMany).not.toHaveBeenCalled();
@@ -615,10 +605,17 @@ describe('LabosDigestPageService', () => {
         expect.objectContaining({ where: { memberUid: 'reader' } })
       );
       expect(page.issues).toEqual([]);
-      expect(page.forumPosts[0]).toMatchObject({ locked: true, contentHtml: null });
     });
 
-    it('unlocks the forum posts for a reader who may read the forum', async () => {
+    it('sends no forum posts to a member without forum access (LAB-3355)', async () => {
+      const { service, forum } = signedOut();
+      const page = await service.readIssueByUid('iss-1', { uid: 'reader', canReadForum: false });
+      expect(page).toMatchObject({ forumPosts: [], forumUnavailable: false });
+      expect(JSON.stringify(page)).not.toContain('Busy thread');
+      expect(forum.read).not.toHaveBeenCalled();
+    });
+
+    it('sends the forum posts in full to a reader who may read the forum', async () => {
       const { service } = signedOut();
       const page = await service.readIssueByUid('iss-1', { uid: 'm1', canReadForum: true });
       expect(page.forumPosts).toEqual([post]);

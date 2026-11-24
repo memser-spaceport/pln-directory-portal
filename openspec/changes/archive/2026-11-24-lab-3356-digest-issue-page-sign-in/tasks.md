@@ -28,6 +28,6 @@
 
 ## 5. Verify and ship
 
-- [ ] 5.1 Deploy the `lab-3345` feature env; with a minted env link: exchange → issue read signed out (no member data, locked forum) → signed in as a test member (own data) → More saves for that member → `choices` returns 410
-- [ ] 5.2 Archive this change in the backend PR into `lab-3345`
-- [ ] 5.3 File the follow-up: remove `POST page` once the released frontend no longer calls it
+- [x] 5.1 Deploy the `lab-3345` feature env; with a minted env link: exchange → issue read signed out (no member data, locked forum) → signed in as a test member (own data) → More saves for that member → `choices` returns 410
+- [x] 5.2 Archive this change (done in the LAB-3355 PR: the `lab-3345` PR merged without it)
+- [x] 5.3 File the follow-up (LAB-3359): remove `POST page` once the released frontend no longer calls it
