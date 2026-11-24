@@ -25,7 +25,7 @@ import { LabosAgentAccessService } from './labos-agent-access.service';
 import { LabosAgentController } from './labos-agent.controller';
 import { INTRO_DRAFT_FAILED_TEXT, INTRO_DRAFT_LINE, INTRO_NOT_ELIGIBLE_TEXT } from './labos-agent-drafts';
 import { LabosAgentProposalStore } from './labos-agent-proposals';
-import { LabosAgentService, latestReplyCacheKey } from './labos-agent.service';
+import { LAST_ANSWER_RULES, LabosAgentService, latestReplyCacheKey } from './labos-agent.service';
 
 /** Far from today, so the role end-date checks do not depend on the clock. */
 const PAST = new Date('2000-01-01T00:00:00.000Z');
@@ -532,7 +532,9 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
     expect(options.extraResponseFields.drafts).toEqual([]);
   });
 
-  const BRIEF_REVISION = 'If the member makes a brief revision request such as "make it shorter", revise this draft.';
+  const BRIEF_REVISION =
+    'If the member makes a brief revision request such as "make it shorter" and does not ask to change your last ' +
+    'answer, revise this draft.';
   const PAGE_OR_CHIPS =
     'This rule applies also when the page or the items added to the message point to another member or team.';
   const NAME_IN_EDIT =
@@ -543,11 +545,9 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
     'Add only facts the member gave. ' +
     'Do not add or strengthen a role, shared work, experience or that someone can vouch for the member, ' +
     'when the member did not give it.';
-  const LAST_ANSWER_IS_DRAFT =
-    'If the member asks to change your last answer, use latestReply: your latest reply in this chat. ' +
-    `If latestReply is the draft line "${INTRO_DRAFT_LINE}", revise this draft.`;
-  const LAST_ANSWER_IS_NORMAL = 'If latestReply is a normal answer, change that answer and do not change this draft.';
-  const LAST_ANSWER_UNKNOWN = 'If there is no latestReply, ask which reply to change and leave this draft unchanged.';
+  // LAB-3367 k1: the exact text from the review, in place of four card sentences that repeated LAST_ANSWER_RULES.
+  const LAST_ANSWER_WINS =
+    'If the member asks to change your last answer, the rules for your last answer apply, and they win over this draft.';
   const BRIEF_NOT_LAST_ANSWER = 'A brief revision request that does not name your last answer revises this draft.';
   const DIFFERENT_ITEM =
     'If the member asks for a different draft or asks to change other content instead, follow that request. ' +
@@ -563,9 +563,7 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
     PAGE_OR_CHIPS,
     NAME_IN_EDIT,
     FACTS_ONLY,
-    LAST_ANSWER_IS_DRAFT,
-    LAST_ANSWER_IS_NORMAL,
-    LAST_ANSWER_UNKNOWN,
+    LAST_ANSWER_WINS,
     BRIEF_NOT_LAST_ANSWER,
     DIFFERENT_ITEM,
     NAME_ONLY,
@@ -652,9 +650,7 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
   });
 
   it.each([
-    ['the latest reply is the draft line: revise this draft', LAST_ANSWER_IS_DRAFT],
-    ['the latest reply is a normal answer: change it and keep this draft', LAST_ANSWER_IS_NORMAL],
-    ['there is no latestReply: ask, and keep this draft', LAST_ANSWER_UNKNOWN],
+    ['the member asks to change the last answer: those rules win over this draft', LAST_ANSWER_WINS],
     ['the request does not name the last answer: revise this draft', BRIEF_NOT_LAST_ANSWER],
   ])('LAB-3367 F1: "Shorten your last answer." gets the guidance when %s', async (_name, rule) => {
     const h = setup();
@@ -669,6 +665,150 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
     // No draft is forced: with no tool call, the turn has no draft and the model text streams.
     expect(options.extraResponseFields.drafts).toEqual([]);
     expect(options.answerLine()).toBeUndefined();
+  });
+
+  /** LAST_ANSWER_RULES in lines, one per priority (LAB-3367 F1, F3, F4, k4, k7). */
+  const RULES_WIN =
+    '- Apply these rules only when the member asks to change your last answer. These rules win over every rule for ' +
+    'an intro draft.';
+  const EXAMPLES =
+    '- Examples of such a request: "shorten your last answer", "your previous answer", "your last response", ' +
+    '"that answer" or "your last reply". Other words with the same meaning also count.';
+  const CONTENT_NOT_CHANGE =
+    '- A request to use an earlier answer as content of an intro draft, for example "add that answer to the draft", ' +
+    'does not ask to change your last answer. Follow the intro draft rules for it.';
+  const LATEST_NOT_HISTORY =
+    '- latestReply in the prompt is your latest reply in this chat. Do not use chatHistory to choose which reply to ' +
+    'change.';
+  const UNKNOWN_MEANS =
+    '- The value latestReply: unknown means that your latest reply is not known, for example after the member stopped it.';
+  const NORMAL_WINS =
+    '- If latestReply is a normal answer, change that answer. Do not call draft_intro, and do not change an intro draft.';
+  const DRAFT_LINE_WITH_OR_WITHOUT_CARD =
+    `- If latestReply is the draft line "${INTRO_DRAFT_LINE}", revise the intro draft card that waits in this chat. ` +
+    'If no card waits, ask which reply to change, and do not call draft_intro.';
+  const UNKNOWN_ASKS =
+    '- If latestReply is unknown or missing, ask which reply to change. Do not call draft_intro, and leave an intro ' +
+    'draft unchanged.';
+  const NO_TOOL_NEEDED =
+    '- Exception to the rule "Always call at least one tool before answering": a change to a normal last answer, or ' +
+    'a question about which reply to change, needs no tool call. Use latestReply for it. ' +
+    'A revision of the draft line still uses draft_intro.';
+  const LAST_ANSWER_LINES = [
+    '## LabOS agent: your last answer',
+    RULES_WIN,
+    EXAMPLES,
+    CONTENT_NOT_CHANGE,
+    LATEST_NOT_HISTORY,
+    UNKNOWN_MEANS,
+    NORMAL_WINS,
+    DRAFT_LINE_WITH_OR_WITHOUT_CARD,
+    UNKNOWN_ASKS,
+    NO_TOOL_NEEDED,
+  ];
+
+  it('LAB-3367: LAST_ANSWER_RULES is these lines, so each priority test checks the real text', () => {
+    expect(LAST_ANSWER_RULES).toBe(LAST_ANSWER_LINES.join('\n'));
+  });
+
+  it('LAB-3367 k1: the card prompt has the one sentence for the last answer, not a copy of LAST_ANSWER_RULES', async () => {
+    const h = setup();
+    const options = await chat(h, {
+      ...VALID,
+      message: 'Shorten your last answer.',
+      introDraft: { target: GRACE, text: CARD_TEXT },
+    });
+    const prompt = options.promptContext as string;
+
+    expect(prompt).toContain(LAST_ANSWER_WINS);
+    // The four card sentences that repeated the rules are gone.
+    expect(prompt).not.toContain('If latestReply is');
+    expect(prompt).not.toContain('your last answer is this draft');
+    // k2, k7: the rules go only to answerInstructions (the system message of the answer calls), never the context.
+    expect(prompt).not.toContain(LAST_ANSWER_RULES);
+    expect(options.answerInstructions).toBe(LAST_ANSWER_RULES);
+    // The rules are fixed text, with no card text and no member data.
+    expect(options.answerInstructions).not.toContain(CARD_TEXT);
+    expect(options.answerInstructions).not.toContain('Grace');
+    // Prompt guidance only: no draft is forced.
+    expect(options.extraResponseFields.drafts).toEqual([]);
+    expect(options.answerLine()).toBeUndefined();
+  });
+
+  it('LAB-3367 k1: R2 keeps a brief revision and an earlier answer as content apart from a last-answer change', async () => {
+    const h = setup();
+    const options = await chat(h, {
+      ...VALID,
+      message: 'Add that answer to the draft.',
+      introDraft: { target: GRACE, text: CARD_TEXT },
+    });
+    expect(options.promptContext).toContain(BRIEF_REVISION);
+    // k1: the guard is only in the system rules. The card has no extra sentence for it, so the Q1 fact rules stay.
+    expect(options.promptContext).not.toContain('add that answer to the draft');
+    expect(options.promptContext).toContain(FACTS_ONLY);
+    expect(options.answerInstructions).toContain(CONTENT_NOT_CHANGE);
+    // A real change of the answer still goes to the rules.
+    expect(options.answerInstructions).toContain(RULES_WIN);
+    expect(
+      await options.extraTools.draft_intro.execute({ type: 'member', targetUid: 'm-grace', text: SHORT })
+    ).toContain(INTRO_DRAFT_LINE);
+    expect(options.extraResponseFields.drafts).toEqual([draftFor({ ...GRACE, name: 'Grace Hopper' })]);
+  });
+
+  it.each([
+    ['"your previous answer"', 'Shorten your previous answer.'],
+    ['"your last response"', 'Shorten your last response.'],
+    ['"that answer"', 'Make that answer shorter.'],
+    ['"your last reply"', 'Shorten your last reply.'],
+  ])('LAB-3367 k4: %s is an example of a last-answer request', async (_name, message) => {
+    const h = setup();
+    const options = await chat(h, { ...VALID, message, introDraft: { target: GRACE, text: CARD_TEXT } });
+    expect(options.answerInstructions).toContain(EXAMPLES);
+    expect(options.answerInstructions).toContain(NORMAL_WINS);
+  });
+
+  it('LAB-3367 F3, k7: latestReply unknown gets a question with no tool call, and the draft stays', async () => {
+    const h = setup();
+    const options = await chat(h, {
+      ...VALID,
+      message: 'Shorten your last answer.',
+      introDraft: { target: GRACE, text: CARD_TEXT },
+    });
+    expect(options.answerInstructions).toContain(UNKNOWN_MEANS);
+    expect(options.answerInstructions).toContain(UNKNOWN_ASKS);
+    expect(options.answerInstructions).toContain(NO_TOOL_NEEDED);
+    // The exception covers only a normal last answer. The draft-line case still uses draft_intro.
+    expect(NO_TOOL_NEEDED).toContain('a change to a normal last answer');
+    expect(NO_TOOL_NEEDED).not.toContain('a changed last answer');
+    expect(options.answerInstructions).toContain('A revision of the draft line still uses draft_intro.');
+  });
+
+  it.each([
+    ['no context', {}],
+    ['a page context', { context: TEAM_CONTEXT }],
+  ])(
+    'LAB-3367 F4: with no card (%s), the last-answer rules still apply, and no card text is in the prompt',
+    async (_name, extra) => {
+      const h = setup();
+      const options = await chat(h, { ...VALID, message: 'Shorten your last answer.', ...extra });
+
+      expect(options.answerInstructions).toBe(LAST_ANSWER_RULES);
+      expect(options.promptContext).not.toContain('An intro draft card waits');
+      expect(options.promptContext).not.toContain(BRIEF_REVISION);
+      expect(options.promptContext).not.toContain(LAST_ANSWER_WINS);
+      expect(options.extraResponseFields.drafts).toEqual([]);
+    }
+  );
+
+  it('LAB-3367: other questions and a brief revision keep their rules next to the last-answer rules', async () => {
+    const h = setup();
+    const question = await chat(h, { ...VALID, message: 'What is new in LabOS?' });
+    expect(question.answerInstructions).toBe(LAST_ANSWER_RULES);
+    expect(question.promptContext ?? '').not.toContain('An intro draft card waits');
+
+    const brief = await chat(h, { ...SHORTER, context: TEAM_CONTEXT, introDraft: { target: GRACE, text: CARD_TEXT } });
+    for (const rule of RULES) expect(brief.promptContext).toContain(rule);
+    expect(brief.answerInstructions).toBe(LAST_ANSWER_RULES);
   });
 
   it('LAB-3367 F2: a new draft to a permitted mentioned member works', async () => {

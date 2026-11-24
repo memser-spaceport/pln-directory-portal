@@ -22,6 +22,11 @@ jest.mock('./tools/irl-events.tool', () => ({ IrlEventsTool: jest.fn() }));
 jest.mock('./tools/husky-ai-tools.serivice', () => ({ HuskyAiToolsService: jest.fn() }));
 
 import { streamText, streamObject, generateText } from 'ai';
+import {
+  HUSKY_CONTEXTUAL_TOOLS_CONTINUATION_PROMPT,
+  HUSKY_CONTEXTUAL_TOOLS_STRUCTURED_PROMPT,
+  HUSKY_CONTEXTUAL_TOOLS_SYSTEM_PROMPT,
+} from '../utils/ai-prompts';
 import { AISDKError, APICallError, TypeValidationError } from '@ai-sdk/provider';
 import { HuskyResponseSchema } from 'libs/contracts/src/schema/husky-chat';
 import { answerCounts } from '../labos-agent/labos-agent-answer-counts';
@@ -1018,6 +1023,52 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
     });
   });
 
+  describe('answerInstructions (LAB-3367 k2, k7)', () => {
+    const RULES = '## Caller rules\n- A fixed rule.';
+    const TAIL = '{"followUpQuestions":[],"sources":[],"actions":[]}';
+
+    beforeEach(() => {
+      cache.get.mockResolvedValue(null);
+      streamObjectMock.mockImplementation(() => structuredStream([TAIL]));
+    });
+
+    it('adds the text to the end of the system message of the answer call and the continuation, not of the tail', async () => {
+      streamTextMock
+        .mockReturnValueOnce(answerStream(['Half'], 'length'))
+        .mockReturnValueOnce(answerStream([' and the rest.']));
+
+      await readAll(
+        await service.createContextualToolsResponse(chatInfo, false, undefined, {
+          answerInstructions: RULES,
+          promptContext: 'Page text.',
+        })
+      );
+
+      expect(streamTextMock).toHaveBeenCalledTimes(2);
+      expect(streamTextMock.mock.calls[0][0].system).toBe(`${HUSKY_CONTEXTUAL_TOOLS_SYSTEM_PROMPT}\n\n${RULES}`);
+      expect(streamTextMock.mock.calls[1][0].system).toBe(`${HUSKY_CONTEXTUAL_TOOLS_CONTINUATION_PROMPT}\n\n${RULES}`);
+      // Not in the user prompt of any call, and not in the structured tail.
+      for (const call of streamTextMock.mock.calls) expect(call[0].prompt).not.toContain('A fixed rule.');
+      const tail = streamObjectMock.mock.calls[0][0];
+      expect(tail.system).toBe(HUSKY_CONTEXTUAL_TOOLS_STRUCTURED_PROMPT);
+      expect(tail.prompt).not.toContain('A fixed rule.');
+      // The page context still goes to every call, as before.
+      expect(tail.prompt).toContain('Page text.');
+    });
+
+    it('AI search passes nothing: the shared system messages do not change', async () => {
+      streamTextMock
+        .mockReturnValueOnce(answerStream(['Half'], 'length'))
+        .mockReturnValueOnce(answerStream([' and the rest.']));
+
+      await readAll(await service.createContextualToolsResponse(chatInfo, false));
+
+      expect(streamTextMock.mock.calls[0][0].system).toBe(HUSKY_CONTEXTUAL_TOOLS_SYSTEM_PROMPT);
+      expect(streamTextMock.mock.calls[1][0].system).toBe(HUSKY_CONTEXTUAL_TOOLS_CONTINUATION_PROMPT);
+      expect(streamObjectMock.mock.calls[0][0].system).toBe(HUSKY_CONTEXTUAL_TOOLS_STRUCTURED_PROMPT);
+    });
+  });
+
   describe('latestReplyKey (LAB-3367 h3)', () => {
     const KEY = 'labos-agent:latest-reply:["m-1","thread-1"]';
     const LINE = 'Here is a draft intro. Edit it in the card, then send.';
@@ -1069,6 +1120,13 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
       expect(store.has('thread-1:summary')).toBe(false);
       expect(answerPrompt(1)).toContain(`latestReply: ${JSON.stringify('First "answer".')}`);
       expect(answerPrompt(1)).not.toContain('chatHistory');
+    });
+
+    it('LAB-3367 F3: a stored reply is JSON text, so a reply "unknown" differs from the unknown marker', async () => {
+      store.set(KEY, 'unknown');
+      streamTextMock.mockReturnValueOnce(answerStream(['Next.']));
+      await turn();
+      expect(answerPrompt(0)).toContain('latestReply: "unknown"');
     });
 
     it('a follow-up after the summary gets the chat history and latestReply', async () => {
@@ -1160,6 +1218,13 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
       expect(store.get(KEY)).toBe('');
       expect(logger.error).not.toHaveBeenCalled();
       expect(generateTextMock).not.toHaveBeenCalled();
+
+      // LAB-3367 F3: the next turn sees that the latest reply is unknown, as the bare word, not as JSON text.
+      streamTextMock.mockReturnValueOnce(answerStream(['Next.']));
+      await turn();
+      expect(answerPrompt(1)).toContain('latestReply: unknown');
+      expect(answerPrompt(1)).not.toContain('Old reply.');
+      expect(answerPrompt(1)).not.toContain('latestReply: "unknown"');
     });
 
     it('a cancel while the reply write is pending clears the key again and does not close the stream', async () => {
@@ -1260,7 +1325,7 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
         // The clear went out before the read timed out, as the next cache call of this turn.
         expect(clearOrder).toBe(readOrder + 1);
         // A timed-out read is not used, because it can be old.
-        expect(answerPrompt(0)).not.toContain('latestReply');
+        expect(answerPrompt(0)).toContain('latestReply: unknown');
         expect(logger.error).toHaveBeenCalledWith(`Timed out reading and clearing the ${KEY_LOG}`);
         expect(store.get(KEY)).toBe('New reply.');
 
@@ -1378,7 +1443,7 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
       await flushBackgroundWork();
 
       expect(body.content).toBe('Secret-reply-3d7e');
-      expect(answerPrompt(0)).not.toContain('latestReply');
+      expect(answerPrompt(0)).toContain('latestReply: unknown');
       const lines = logger.error.mock.calls.map((call) => call.join(' '));
       expect(lines).toEqual(
         expect.arrayContaining([

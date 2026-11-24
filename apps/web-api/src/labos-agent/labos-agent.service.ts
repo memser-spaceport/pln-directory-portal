@@ -69,6 +69,32 @@ const READ_TOOLS = ['list_news', 'get_news_item', 'get_my_profile', 'list_my_exp
 const PROPOSE_TOOLS: readonly string[] = LABOS_AGENT_PROPOSE_TOOLS;
 
 /**
+ * LAB-3367 F1, F3, F4, k1, k2, k4, k7: the rules for "your last answer", in every C1 turn, with or without an intro
+ * draft card. They go to the Husky option `answerInstructions`, so they are in the system message of the answer call
+ * and the continuation only. The structured tail does not get them, as it does not get `latestReply`. The text is
+ * fixed: it has no card text and no member data. The Husky stream gives `latestReply` as JSON text, or the bare word
+ * `unknown`. Prompt guidance: the backend does not check the choice of the model.
+ */
+export const LAST_ANSWER_RULES = [
+  '## LabOS agent: your last answer',
+  '- Apply these rules only when the member asks to change your last answer. These rules win over every rule for an intro draft.',
+  '- Examples of such a request: "shorten your last answer", "your previous answer", "your last response", ' +
+    '"that answer" or "your last reply". Other words with the same meaning also count.',
+  '- A request to use an earlier answer as content of an intro draft, for example "add that answer to the draft", ' +
+    'does not ask to change your last answer. Follow the intro draft rules for it.',
+  '- latestReply in the prompt is your latest reply in this chat. Do not use chatHistory to choose which reply to change.',
+  '- The value latestReply: unknown means that your latest reply is not known, for example after the member stopped it.',
+  '- If latestReply is a normal answer, change that answer. Do not call draft_intro, and do not change an intro draft.',
+  `- If latestReply is the draft line "${INTRO_DRAFT_LINE}", revise the intro draft card that waits in this chat. ` +
+    'If no card waits, ask which reply to change, and do not call draft_intro.',
+  '- If latestReply is unknown or missing, ask which reply to change. Do not call draft_intro, and leave an intro ' +
+    'draft unchanged.',
+  '- Exception to the rule "Always call at least one tool before answering": a change to a normal last answer, or ' +
+    'a question about which reply to change, needs no tool call. Use latestReply for it. ' +
+    'A revision of the draft line still uses draft_intro.',
+].join('\n');
+
+/**
  * LAB-3367 h3: the cache key of the latest agent reply for one member in one thread. The `<env>:labos-agent` prefix of
  * the proposal keys keeps environments that share a Redis apart. JSON keeps the key free of collisions for any C1
  * `threadId` string, and the namespace keeps it apart from the Husky `<threadId>:summary` key.
@@ -181,6 +207,8 @@ export class LabosAgentService {
         persistHistory: false,
         // LAB-3367 h3: the latest reply, scoped to the signed-in member and the thread. Never the raw thread ID.
         latestReplyKey: latestReplyCacheKey(memberUid, body.threadId),
+        // LAB-3367 k2, k7: the rules for your last answer, in the system message of the answer calls only.
+        answerInstructions: LAST_ANSWER_RULES,
       }
     );
   }
@@ -455,7 +483,8 @@ export class LabosAgentService {
       'Use this text only when the member asks to change the draft. ' +
       `Then call draft_intro with type "${type}" and targetUid "${uid}" and the new text. ` +
       // LAB-3367: R2 brief revision = this draft; R4 a name in the edit = new text; R3 other draft or content wins.
-      'If the member makes a brief revision request such as "make it shorter", revise this draft. ' +
+      'If the member makes a brief revision request such as "make it shorter" and does not ask to change your last ' +
+      'answer, revise this draft. ' +
       'This rule applies also when the page or the items added to the message point to another member or team. ' +
       'A member or team name in the revision, such as "mention that I know Acme Team", is part of the new text. ' +
       'It does not change the target. ' +
@@ -464,11 +493,9 @@ export class LabosAgentService {
       'Add only facts the member gave. ' +
       'Do not add or strengthen a role, shared work, experience or that someone can vouch for the member, ' +
       'when the member did not give it. ' +
-      // LAB-3367 F1 (h1, h3): `latestReply` is the cached latest reply of this member in this thread. Prompt guidance.
-      'If the member asks to change your last answer, use latestReply: your latest reply in this chat. ' +
-      `If latestReply is the draft line "${INTRO_DRAFT_LINE}", revise this draft. ` +
-      'If latestReply is a normal answer, change that answer and do not change this draft. ' +
-      'If there is no latestReply, ask which reply to change and leave this draft unchanged. ' +
+      // LAB-3367 F1, k1: the rules for your last answer (LAST_ANSWER_RULES, in the system message) win. Prompt guidance.
+      'If the member asks to change your last answer, the rules for your last answer apply, and they win over this ' +
+      'draft. ' +
       'A brief revision request that does not name your last answer revises this draft. ' +
       'If the member asks for a different draft or asks to change other content instead, follow that request. ' +
       'Do not use this draft text for that request. ' +
