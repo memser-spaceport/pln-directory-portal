@@ -43,6 +43,16 @@ export function isHttpUrl(value: string): boolean {
   }
 }
 
+/** True only for a time zone name the runtime knows, for example `America/Chicago`. */
+export function isTimeZoneName(value: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export const PLEventDetailsSchema = z.object({
   tags: z.array(PLEventDetailsTagSchema),
   accessType: z.string().nullable(),
@@ -58,6 +68,11 @@ export const PLEventDetailsSchema = z.object({
    * LAB-3332 do not have it; reads always return it (null when absent).
    */
   locationUrl: z.string().refine(isHttpUrl, 'expected an http or https URL').nullable().optional(),
+  /**
+   * LAB-3403: the event's own time zone (IANA name), or null. Optional because details stored before LAB-3403 do not
+   * have it; reads always return it (null when absent).
+   */
+  timezone: z.string().refine(isTimeZoneName, 'expected an IANA time zone').nullable().optional(),
 });
 
 export type PLEventDetailsParty = z.infer<typeof PLEventDetailsPartySchema>;
@@ -77,6 +92,7 @@ export function emptyPLEventDetails(): PLEventDetails {
     sponsors: [],
     agenda: null,
     locationUrl: null,
+    timezone: null,
   };
 }
 
