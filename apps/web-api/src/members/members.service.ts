@@ -1094,7 +1094,11 @@ export class MembersService {
     }
   }
 
-  async createMemberFromSignUpData(memberData: any): Promise<Member> {
+  async createMemberFromSignUpData(signUpData: any): Promise<Member> {
+    // Every caller is a self-service sign-up (anonymous, or any logged-in user on the legacy
+    // POST /v1/participants-request); verification is an admin action, so never honour it here.
+    const memberData = { ...signUpData };
+    delete memberData.isVerified;
     let createdMember: any;
     await this.prisma.$transaction(async (tx) => {
       const { member } = await this.prepareMemberFromParticipantRequest(null, memberData, null, tx);
@@ -4068,7 +4072,7 @@ export class MembersService {
       project?: { projectUid?: string } | string;
     }
   ): Promise<{ uid: string }> {
-    // create a new member with accessLevel=L0 (existing flow)
+    // create a new member with accessLevel=L0 (existing flow; drops client-supplied isVerified)
     const member = await this.createMemberFromSignUpData(signUpDto);
 
     // in one txn — persist Member.role / Member.teamEmail (if provided) and
@@ -4110,10 +4114,10 @@ export class MembersService {
    * - If isTeamNew = true:
    *    - Create a new Team with accessLevel = 'L0'
    *    - Attach the given member to that team via TeamMemberRole
-   *      (even if the member is not "approved" yet).
+   *      as its lead (even if the member is not "approved" yet).
    * - Else:
    *    - Resolve an existing team by uid or name
-   *    - Attach the given member to that team via TeamMemberRole.
+   *    - Attach the given member to that team via TeamMemberRole, not as lead.
    *
    */
   private async attachTeamAndRoleTx(
@@ -4220,7 +4224,8 @@ export class MembersService {
         role: finalRole,
         roleTags,
         mainTeam: true,
-        teamLead: true,
+        // joining an existing team never grants lead; only the creator of a new team leads it
+        teamLead: !!isTeamNew,
       },
       update: {
         role: finalRole,
