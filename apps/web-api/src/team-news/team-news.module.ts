@@ -11,6 +11,7 @@ import { TeamNewsServiceController } from './team-news-service.controller';
 import { LabosDigestAdminController } from './labos-digest-admin.controller';
 import { LabosDigestServiceController } from './labos-digest-service.controller';
 import { LabosDigestPublicController } from './labos-digest-public.controller';
+import { LabosDigestReaderController } from './labos-digest-reader.controller';
 import { LabosDigestPageService } from './labos-digest-page.service';
 import { LabosDigestForumReader } from './labos-digest-forum.reader';
 import { LabosDigestService } from './labos-digest.service';
@@ -44,6 +45,7 @@ import { LabosDigestEmailSettingsService } from './labos-digest-email-settings.s
     LabosDigestAdminController,
     LabosDigestServiceController,
     LabosDigestPublicController,
+    LabosDigestReaderController,
   ],
   providers: [
     LabosDigestEmailSettingsService,

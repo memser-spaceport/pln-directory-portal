@@ -7,6 +7,7 @@ import { JobBoardSignUpSchema } from 'libs/contracts/src/schema/job-application'
 import { JOB_ASPIRANT_POLICY_CODE, MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import type { MembersService } from '../members/members.service';
 import type { PrismaService } from '../shared/prisma.service';
+import type { MemberSignUpNotificationsService } from '../member-sign-up-notifications/member-sign-up-notifications.service';
 import { JobOpeningsSignUpService } from './job-openings-sign-up.service';
 
 type PrismaMock = {
@@ -29,14 +30,37 @@ describe('JobOpeningsSignUpService', () => {
   let service: JobOpeningsSignUpService;
   let membersService: { createMemberAndAttach: jest.Mock };
   let prisma: PrismaMock;
+  let notifications: { notifySignUp: jest.Mock; notifyJobAspirantSignUp: jest.Mock };
 
   beforeEach(() => {
     membersService = { createMemberAndAttach: jest.fn().mockResolvedValue({ uid: 'member-1' }) };
     prisma = buildPrismaMock();
+    notifications = {
+      notifySignUp: jest.fn().mockResolvedValue(undefined),
+      notifyJobAspirantSignUp: jest.fn().mockResolvedValue(undefined),
+    };
     service = new JobOpeningsSignUpService(
       membersService as unknown as MembersService,
-      prisma as unknown as PrismaService
+      prisma as unknown as PrismaService,
+      notifications as unknown as MemberSignUpNotificationsService
     );
+  });
+
+  it('posts a Job Aspirant sign-up to both channels after assigning the policy', async () => {
+    await service.signUp({ name: 'Ada', email: 'ada@example.com', role: 'Engineer' });
+
+    expect(notifications.notifyJobAspirantSignUp).toHaveBeenCalledWith('member-1');
+    expect(notifications.notifySignUp).toHaveBeenCalledWith('member-1');
+    expect(prisma.policyAssignment.upsert.mock.invocationCallOrder[0]).toBeLessThan(
+      notifications.notifySignUp.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('posts a sign-up with a team only to the sign-up channel', async () => {
+    await service.signUp({ name: 'Ada', email: 'ada@example.com', role: 'Engineer', team: { uid: 'team-1' } });
+
+    expect(notifications.notifySignUp).toHaveBeenCalledWith('member-1');
+    expect(notifications.notifyJobAspirantSignUp).not.toHaveBeenCalled();
   });
 
   it('creates a member with job-board signUpSource and role', async () => {
@@ -325,6 +349,7 @@ describe('JobOpeningsSignUpService', () => {
 
     expect(prisma.policy.findUnique).not.toHaveBeenCalled();
     expect(prisma.policyAssignment.upsert).not.toHaveBeenCalled();
+    expect(notifications.notifySignUp).not.toHaveBeenCalled();
   });
 
   it('does not create a JobApplication', async () => {

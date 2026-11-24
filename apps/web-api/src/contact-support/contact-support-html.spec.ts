@@ -1,6 +1,5 @@
 import {
   clipTelegramText,
-  escapeTelegramHtml,
   stripInlineDataImages,
   supportPageLine,
   TELEGRAM_MESSAGE_MAX_LENGTH,
@@ -27,12 +26,6 @@ describe('toSupportEmailHtml', () => {
     expect(html).toContain('Hi');
     expect(html).toContain('[image omitted]');
     expect(html).not.toContain('data:image');
-  });
-});
-
-describe('escapeTelegramHtml', () => {
-  it('escapes the characters Telegram HTML mode treats as markup', () => {
-    expect(escapeTelegramHtml('a < b & c > d')).toBe('a &lt; b &amp; c &gt; d');
   });
 });
 

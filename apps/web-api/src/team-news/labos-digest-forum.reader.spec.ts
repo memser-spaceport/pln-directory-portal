@@ -21,6 +21,7 @@ describe('toDigestForumPost', () => {
     expect(toDigestForumPost(topic(5), 'https://web')).toEqual({
       tid: 5,
       title: 'Grants & funding',
+      locked: false,
       authorName: 'Ada L',
       authorRole: 'Lead',
       authorTeam: 'Team A',
