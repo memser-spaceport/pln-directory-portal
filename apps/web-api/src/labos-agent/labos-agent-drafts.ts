@@ -53,6 +53,10 @@ export function draftIntroTool(ctx: McpActorContext, deps: DraftDeps): CoreTool 
     description:
       'Write a draft intro request from the member to a member or team in the page context or the items of the message. ' +
       `The text is from ${MIN} to ${MAX} characters, in the voice of the member: who they are, what they ask, and why. ` +
+      // LAB-3367 Q1 (Oleg): the exact fact rule for new drafts and revisions. The card rules for a revision stay.
+      'Add only facts the member gave or a tool returned. ' +
+      'When the member asks you to mention something about themselves, use their words. ' +
+      'Do not add experience, duration, results, roles or opinions they did not give. ' +
       'The tool only makes a draft card. The member edits it and presses Send. Nothing is sent. ' +
       'Call it before you write the answer. Do not write the draft text in the answer: the card shows it. ' +
       'Use it only for an intro target of this turn. Make one draft for one target. When there is no target, ask the member to open ' +

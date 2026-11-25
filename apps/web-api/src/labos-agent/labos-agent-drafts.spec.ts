@@ -60,6 +60,11 @@ const SENDERS: Array<[string, Partial<Person>, boolean]> = [
 
 const VALID = { threadId: 'thread-1', chatId: 'chat-1', message: 'Help me write an intro request to Grace.' };
 const MEMBER_CONTEXT = { page: 'intro', introTarget: { type: 'member', uid: 'm-grace' } };
+/** LAB-3367 Q1 (Oleg): the exact fact rule, in the tool description that new drafts and revisions share. */
+const DRAFT_FACTS_RULE =
+  'Add only facts the member gave or a tool returned. ' +
+  'When the member asks you to mention something about themselves, use their words. ' +
+  'Do not add experience, duration, results, roles or opinions they did not give.';
 const TEAM_CONTEXT = { page: 'intro', introTarget: { type: 'team', uid: 't-acme' } };
 
 /** `permissions` are the RBAC permissions of the sender, for example `member.search.read` for a member chip. */
@@ -421,6 +426,12 @@ describe('LabOS agent intro draft answer (LAB-3362 D4)', () => {
     expect(options.answerLine()).toBeUndefined();
   });
 
+  it('LAB-3367 Q1: a new intro draft gets the exact fact rule', async () => {
+    const h = setup();
+    const { options } = await h.turn(MEMBER_CONTEXT);
+    expect(options.extraTools.draft_intro.description).toContain(DRAFT_FACTS_RULE);
+  });
+
   it('tells the model not to repeat the draft text in the answer', async () => {
     const h = setup();
     const { texts, options } = await h.turn(MEMBER_CONTEXT, { type: 'member', targetUid: 'm-grace', text: TEXT });
@@ -648,6 +659,18 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
       message: 'Make it warmer.',
       introDraft: { target: GRACE, text: CARD_TEXT },
     });
+    expect(options.promptContext).toContain(FACTS_ONLY);
+  });
+
+  it('LAB-3367 Q1: a draft revision gets the exact fact rule and keeps the card fact rules', async () => {
+    const h = setup();
+    const options = await chat(h, {
+      ...VALID,
+      // Oleg's repro (retest 2): a team draft and "mention that I know Lit Protocol".
+      message: 'mention that I know Lit Protocol',
+      introDraft: { target: ACME, text: CARD_TEXT },
+    });
+    expect(options.extraTools.draft_intro.description).toContain(DRAFT_FACTS_RULE);
     expect(options.promptContext).toContain(FACTS_ONLY);
   });
 

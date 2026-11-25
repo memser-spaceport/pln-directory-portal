@@ -396,10 +396,10 @@ The backend SHALL give the model the card target and text only for this turn, ex
 - **R2:** A brief request such as "make it shorter" SHALL revise the draft when the message does not name the last answer. This rule applies when the page or the items in the message point to a different target.
 - **R3:** If the member asks for a different draft or asks to change other content, the agent SHALL NOT use the current draft text.
 - **R4:** A member or team name in the revision SHALL be part of the text. It SHALL NOT change the target.
-- **Q1:** The agent SHALL keep the facts of the current draft and add only facts the member gave. Do not add or strengthen a role, shared work, experience or a vouch that the member did not give.
+- **Q1:** The agent SHALL keep the facts of the current draft and add only facts the member gave. Do not add or strengthen a role, shared work, experience or a vouch that the member did not give. The `draft_intro` description SHALL have this rule for new drafts and revisions (Oleg, Q1): "Add only facts the member gave or a tool returned. When the member asks you to mention something about themselves, use their words. Do not add experience, duration, results, roles or opinions they did not give." Facts about the member come only from the member. Facts about other context can also come from a tool.
 - **F2:** For a different member or team named without a valid target, the agent SHALL ask for an @mention and SHALL NOT call `draft_intro`. If the tool refuses a target outside the turn, it also asks for an @mention.
 
-These rules add no target and do not force a `draft_intro` call. The tool description does not change. `draft_intro` SHALL accept the `introDraft` target as a target of the turn. It SHALL check the sender eligibility and the target again. The backend SHALL NOT store `introDraft` or write its text to a log line, error message or analytics event. The latest reply of a draft turn is only the fixed draft line.
+These rules add no target and do not force a `draft_intro` call. Only the Q1 fact rule is in the tool description. `draft_intro` SHALL accept the `introDraft` target as a target of the turn. It SHALL check the sender eligibility and the target again. The backend SHALL NOT store `introDraft` or write its text to a log line, error message or analytics event. The latest reply of a draft turn is only the fixed draft line.
 
 A Husky catch and the C1 controller catch SHALL log only `{ name, statusCode, message }` of an error, not the error object. An AI SDK `APICallError` holds the whole prompt in `requestBodyValues`. When the stream fails after the headers, the controller SHALL destroy the connection with no error argument. For `AI_InvalidToolArgumentsError`, `AI_TypeValidationError` and `AI_JSONParseError`, the log SHALL have only `name` and `toolName` if it is a tool of that call. The Husky answer stream `error` part SHALL use the same log form.
 
@@ -437,6 +437,13 @@ A Husky catch and the C1 controller catch SHALL log only `{ name, statusCode, me
 - **WHEN** the member asks for a revision
 - **THEN** the prompt context tells the agent to keep the facts of the current text and to add only facts the member gave
 - **AND** not to add or strengthen a role, shared work, experience or a vouch that the member did not give
+
+#### Scenario: The member's own words in new drafts and revisions (Q1)
+
+- **GIVEN** a new intro draft turn, or a team intro card that waits in the chat
+- **WHEN** the member sends "mention that I know Lit Protocol"
+- **THEN** the `draft_intro` description tells the agent to add only facts the member gave or a tool returned, and to use the member's words for facts about the member
+- **AND** not to add experience, duration, results, roles or opinions that the member did not give
 
 #### Scenario: Your last answer (F1)
 
