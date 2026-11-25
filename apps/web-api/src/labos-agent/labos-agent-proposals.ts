@@ -33,6 +33,11 @@ export const keyPrefix = () => `${process.env.ENVIRONMENT ?? 'local'}:labos-agen
 export const proposalRecordKey = (id: string) => `${keyPrefix()}:proposal:${id}`;
 const openKey = (id: string) => `${keyPrefix()}:proposal-open:${id}`;
 
+/** LAB-3367 B3: the kept chip target (type and uid only) of one member and thread, for 10 minutes. */
+export type PendingIntroTarget = { type: 'member' | 'team'; uid: string };
+export const introTargetKey = (memberUid: string, threadId: string) =>
+  `${keyPrefix()}:intro-target:${JSON.stringify([memberUid, threadId])}`;
+
 /** Proposals in the shared cache (Redis). No database table (contract assumption 5). */
 @Injectable()
 export class LabosAgentProposalStore {
@@ -51,6 +56,23 @@ export class LabosAgentProposalStore {
   /** Redis DEL answers 1 to exactly one caller, so only one confirm or cancel closes a proposal (as member proofs). */
   async claim(id: string): Promise<boolean> {
     return (await (this.cache.del as (key: string) => Promise<unknown>)(openKey(id))) === 1;
+  }
+
+  async saveIntroTarget(key: string, target: PendingIntroTarget): Promise<void> {
+    await this.cache.set(key, { type: target.type, uid: target.uid }, { ttl: 10 * 60 });
+  }
+
+  /** LAB-3367 B3: reads and removes the kept target, so it applies to one turn only. */
+  async takeIntroTarget(key: string): Promise<PendingIntroTarget | undefined> {
+    const value = await this.cache.get<PendingIntroTarget>(key);
+    if (!value) return undefined;
+    await this.cache.del(key);
+    const valid = (value.type === 'member' || value.type === 'team') && typeof value.uid === 'string' && value.uid;
+    return valid ? { type: value.type, uid: value.uid } : undefined;
+  }
+
+  async clearIntroTarget(key: string): Promise<void> {
+    await this.cache.del(key);
   }
 
   async close(stored: StoredProposal, status: StoredProposal['status']): Promise<void> {

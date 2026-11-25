@@ -79,6 +79,34 @@ export function profileToolsLine(names: readonly string[]): string {
   return `To read the member’s own LabOS profile, you can call ${tools.join(' or ')}. ${first}`;
 }
 
+/** LAB-3367 B2 (Oleg): the fixed answer to a bare "add that" right after a draft turn. The card does not change. */
+export const ADD_THAT_LINE =
+  'I did not change the draft, so it keeps the text from your earlier messages. ' +
+  'To add a new detail, write the detail in your message.';
+
+/** LAB-3367 B2: the whole message is only "add that", "add it to the draft", "put this in the intro" and the like. */
+export const isBareAddThat = (message: string) =>
+  /^\s*(?:please\s+)?(?:add|put|include|use)\s+(?:that|this|it)(?:\s+(?:to|in|into)\s+(?:the|my|this)\s+(?:intro\s+)?(?:draft|intro|card))?(?:\s*,?\s*please)?\s*[.!]?\s*$/i.test(
+    message
+  );
+
+/** LAB-3367 B4 (Oleg): the experience claims that a revision must not add. Mild phrases are post-v0. */
+const CLAIM_WORDS =
+  /\b(?:experience[ds]?|expert(?:ise|s)?|hands-on|track\s+record|seasoned|veteran|proven|well-versed|background\s+in)\b/gi;
+
+/** LAB-3367 B4: the claim words of `text` that are not in the card text or the message. No card gives []. */
+export function addedClaims(text: string, cardText: string | undefined, message: string | undefined): string[] {
+  if (cardText === undefined) return [];
+  const known = `${cardText}\n${message ?? ''}`.toLowerCase().replace(/\s+/g, ' ');
+  const found = (text.match(CLAIM_WORDS) ?? []).map((word) => word.toLowerCase().replace(/\s+/g, ' '));
+  return [...new Set(found)].filter((word) => !known.includes(word));
+}
+
+/** LAB-3367 B4: the refusal for a stronger draft with a new claim. It names no member text. */
+export const ADDED_CLAIM_TEXT =
+  'The draft was refused: it adds a claim that the member did not give. ' +
+  'Write it again. Only reorder or reword the facts of the current text. Do not add experience or expertise.';
+
 /** The answer line while the turn has a draft, else undefined. For `ContextualToolsOptions.answerLine`. */
 export function introDraftLine(drafts: LabosAgentDraft[]): string | undefined {
   return drafts.length ? INTRO_DRAFT_LINE : undefined;
@@ -102,6 +130,10 @@ export type DraftDeps = {
   drafts: LabosAgentDraft[];
   /** LAB-3367 t3: the names of the read tools of this turn, so the description names only the profile tools there. */
   readTools?: readonly string[];
+  /** LAB-3367 B4: the waiting card and the message, for the claim check. B3: `onDraft` clears the kept target. */
+  card?: { type: string; uid: string; text: string };
+  message?: string;
+  onDraft?: () => Promise<void>;
 };
 
 /**
@@ -158,6 +190,10 @@ export function draftIntroTool(ctx: McpActorContext, deps: DraftDeps): CoreTool 
             `Write it again with ${MIN} to ${MAX} characters.`
           );
         }
+        // LAB-3367 B4: a revision of the card adds no experience claim.
+        const card =
+          deps.card && deps.card.type === target.type && deps.card.uid === target.uid ? deps.card : undefined;
+        if (addedClaims(text, card?.text, deps.message).length) return ADDED_CLAIM_TEXT;
         // 5. One draft per turn: a valid second call replaces the first.
         const draft: LabosAgentDraft = {
           draftId: `dr_${randomUUID()}`,
@@ -169,6 +205,7 @@ export function draftIntroTool(ctx: McpActorContext, deps: DraftDeps): CoreTool 
           source: 'agent',
         };
         deps.drafts.push(draft);
+        await deps.onDraft?.();
         return (
           `Draft ${draft.draftId} is ready for ${name}. Nothing is sent. ` +
           'The card shows the draft. Do not repeat the draft text. ' +
