@@ -40,6 +40,7 @@ import {
   DRAFT_FACTS_RULE,
   DRAFT_LIMITS_RULE,
   INTRO_DRAFT_REPLY_LABEL,
+  INTRO_REASON_RULE,
   draftIntroTool,
   INTRO_DRAFT_LINE,
   INTRO_DRAFT_LINE_FORMS,
@@ -50,7 +51,11 @@ import {
 import {
   asksAgainAfterFailure,
   asksForChange,
+  ASK_WHAT_LINE,
+  DRAFT_CARD_REPLY_LINE,
   isPastedText,
+  isUnknownReply,
+  namesNoTopic,
   lastAnswerTurn,
   WHICH_REPLY_LINE,
   withoutIntroHints,
@@ -111,11 +116,19 @@ export const LAST_ANSWER_RULES = [
     'turn. For a team size, use a team lookup. If no tool result gives the fact, say that you do not have it.',
 ].join('\n');
 
-/** LAB-3367 G1: an explicit request about the page target. Only then the answer turn keeps the page context. */
-const NAMES_PAGE = /\bthis\s+(?:team|member|story|job|page)\b/i;
+/**
+ * LAB-3367 G1, w3: an explicit request about the page target. Only then the answer turn keeps the page context. Only
+ * "this", not "the".
+ */
+const NAMES_PAGE =
+  /\bthis\s+(?:team|member|story|job|page|company|org|organi[sz]ation|project|person|profile|article|role|position|opening)\b/i;
 
 /** LAB-3367 G1: the rule for an inline text after "shorten this:" (`isPastedText`). */
 export const PASTED_TEXT_RULE = 'Change only the text after the colon in the question. Write only the changed text.';
+
+/** LAB-3367 w2: the pasted text keeps the words of the member, also "this team". The turn has no page context. */
+export const PASTED_WORDS_RULE =
+  'Keep the words of the member in the text, also words such as "this team". Do not put a name in their place.';
 
 /** LAB-3367 G1: the rule when the member asks to change a known previous reply. */
 export const PREVIOUS_REPLY_RULE = 'Change only the text in Previous reply.';
@@ -126,7 +139,10 @@ export const CARD_OPEN_RULE =
 
 /** LAB-3367 G7: the rule after a failed reply that is not known. The turn has no `Previous reply` line. */
 export const ASK_AGAIN_RULE =
-  'Your previous reply did not reach the member. Answer the message as a new question with the tools.';
+  'Your previous reply did not reach the member. Answer the message as a new question with the tools. ' +
+  // LAB-3367 w1 (Oleg): the exact sentence. The turn also has no chat history and no draft tool.
+  'If the message does not say what to answer, ask what to answer. Do not use an older request. ' +
+  'When the message names a topic, answer only that topic. Do not write an intro draft.';
 
 /**
  * LAB-3367 G1, G4, G7: the fixed rules of one turn after `LAST_ANSWER_RULES`. They have no member or card text.
@@ -258,35 +274,43 @@ export class LabosAgentService {
         // LAB-3367 F1, F3, K3: a code gate for the agreed phrases when a card waits (labos-agent-last-answer.ts).
         latestReplyTurn: (latestReply) => {
           const kind = lastAnswerTurn(body.message, Boolean(card), latestReply);
-          // LAB-3367 G7: after a failed reply that is not known, answer as a new question, with no Previous reply line.
-          const askAgain = kind !== 'which' && asksAgainAfterFailure(body.message, latestReply);
-          if (kind === 'model') {
-            return askAgain ? { omitLatestReply: true, answerInstructions: lastAnswerTurnRules([ASK_AGAIN_RULE]) } : {};
-          }
-          // No draft tool and no card text, so this turn cannot change or show the draft.
-          const noDraftTools = Object.fromEntries(
-            Object.entries(extraTools).filter(([name]) => name !== 'draft_intro')
-          );
+          const pasted = isPastedText(body.message);
+          // LAB-3367 G7, w1: after a failed reply that is not known, answer as a new question, with no Previous reply
+          // line, no chat history and no draft tool, also with no card.
+          const askAgain =
+            kind !== 'which' && kind !== 'card' && !pasted && asksAgainAfterFailure(body.message, latestReply);
+          // w2: a pasted text gets no page context and no draft tool, also with no card.
+          if (kind === 'model' && !askAgain && !pasted) return {};
+          // No draft tool and no card text, so this turn cannot change or show the draft (all paths below).
+          const noDraft = {
+            extraTools: Object.fromEntries(Object.entries(extraTools).filter(([name]) => name !== 'draft_intro')),
+            answerLine: undefined,
+          };
           // LAB-3367 o1: also no intro hint of the page or the mentions, as no text may name the missing tool.
           const hints = [...(page.introHints ?? []), ...(mentioned.introHints ?? [])];
-          if (kind === 'which') {
-            return {
-              promptContext: withoutIntroHints(basePromptContext, hints),
-              extraTools: noDraftTools,
-              answerLine: undefined,
-              fixedAnswer: WHICH_REPLY_LINE,
-            };
-          }
-          // G1: the page goes only when the message names it ("this team"), so an answer edit is not about the page.
-          const pagePart = NAMES_PAGE.test(body.message) ? page.promptContext : undefined;
+          const fixedAnswer =
+            kind === 'which'
+              ? WHICH_REPLY_LINE
+              : kind === 'card'
+              ? DRAFT_CARD_REPLY_LINE
+              : askAgain && namesNoTopic(body.message)
+              ? ASK_WHAT_LINE
+              : undefined;
+          // G1, w2, w3: the page goes only when the message names it ("this team") and the text is not pasted. The intro
+          // page context says that the member wants an intro, so it never goes to these turns.
+          const pagePart =
+            !pasted && body.context?.page !== 'intro' && NAMES_PAGE.test(body.message) ? page.promptContext : undefined;
           const answerContext = [pagePart, mentioned.promptContext].filter(Boolean).join('\n') || undefined;
+          const recovery = askAgain ? { omitLatestReply: true, omitHistory: true } : {};
+          if (fixedAnswer !== undefined) {
+            return { promptContext: withoutIntroHints(answerContext, hints), ...noDraft, ...recovery, fixedAnswer };
+          }
           const reply = latestReply.trim();
-          const knownReply = Boolean(reply) && reply !== WHICH_REPLY_LINE && reply !== INTRO_DRAFT_LINE;
-          const pasted = isPastedText(body.message);
+          const knownReply = !isUnknownReply(reply) && reply !== INTRO_DRAFT_LINE;
           const rules = [
-            CARD_OPEN_RULE,
+            ...(card ? [CARD_OPEN_RULE] : []),
             ...(pasted
-              ? [PASTED_TEXT_RULE]
+              ? [PASTED_TEXT_RULE, PASTED_WORDS_RULE]
               : askAgain
               ? [ASK_AGAIN_RULE]
               : knownReply && asksForChange(body.message)
@@ -295,10 +319,9 @@ export class LabosAgentService {
           ];
           return {
             promptContext: withoutIntroHints(answerContext, hints),
-            extraTools: noDraftTools,
-            answerLine: undefined,
+            ...noDraft,
             answerInstructions: lastAnswerTurnRules(rules),
-            ...(askAgain && !pasted ? { omitLatestReply: true } : {}),
+            ...recovery,
           };
         },
         // LAB-3367: model text that is only the draft line is not a draft turn.
@@ -623,7 +646,7 @@ export class LabosAgentService {
     // LAB-3367 o1: the hint is all the text after the first sentence, so a turn without `draft_intro` can drop it.
     const hint =
       ` To write the draft, call draft_intro with type "${target.type}" and targetUid "${target.uid}". ` +
-      'Ask the member for the reason when the message does not give one. ' +
+      `${INTRO_REASON_RULE} ` +
       'You never send the request. The member edits the draft and presses Send.';
     const promptContext = `The member wants to request an intro to this ${target.type}: ${JSON.stringify(
       introTarget
@@ -639,7 +662,9 @@ export class LabosAgentService {
 function introHint(type: 'member' | 'team', uid: string): string {
   return (
     ` When the member asks for an intro request to this ${type}, ` +
-    `call draft_intro with type "${type}" and targetUid "${uid}". You never send the request.`
+    `call draft_intro with type "${type}" and targetUid "${uid}". ` +
+    // LAB-3367 G8: the same reason rule on each page, as on the intro page.
+    `${INTRO_REASON_RULE} You never send the request.`
   );
 }
 

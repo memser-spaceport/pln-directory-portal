@@ -89,6 +89,11 @@ export type LatestReplyTurn = Partial<
   fixedAnswer?: string;
   /** LAB-3367 G7: true to send no `Previous reply` line in the answer prompt of this turn. */
   omitLatestReply?: boolean;
+  /**
+   * LAB-3367 w1: true to send no chat history (the thread summary) in the answer, the continuation and the structured
+   * tail of this turn. So a recovery turn cannot use an older request.
+   */
+  omitHistory?: boolean;
 };
 
 /**
@@ -325,7 +330,7 @@ export class HuskyAiService {
     }
 
     const chatSummaryFromDb = await this.huskyCacheDbService.get(`${threadId}:summary`);
-    const historyPrompt = chatSummaryFromDb ? ` - chatHistory: ${chatSummaryFromDb}` : '';
+    const threadHistoryPrompt = chatSummaryFromDb ? ` - chatHistory: ${chatSummaryFromDb}` : '';
     const { latestReplyKey } = options;
     const latestReply = latestReplyKey ? await this.takeLatestReply(latestReplyKey) : '';
     // LAB-3367 F1, F3, K3: the caller can change the prompt context, the extra tools and the answer line of this turn
@@ -333,6 +338,8 @@ export class HuskyAiService {
     const turn: ContextualToolsOptions & LatestReplyTurn = options.latestReplyTurn
       ? { ...options, ...options.latestReplyTurn(latestReply) }
       : options;
+    // LAB-3367 w1: a recovery turn gets no chat history, also in the structured tail.
+    const historyPrompt = turn.omitHistory ? '' : threadHistoryPrompt;
     // LAB-3367 F6, t7b: the model text never has the reserved line (the draft line) or its other forms when the turn
     // has no answer line. Only with `reservedReply`, so AI search does not change.
     const override = new AnswerOverride(

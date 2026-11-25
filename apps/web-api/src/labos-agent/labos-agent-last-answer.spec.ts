@@ -321,8 +321,12 @@ describe('LAB-3367 p1-p4: lastAnswerTurn wordings', () => {
     expect(lastAnswerTurn('keep the draft and shorten your last answer', true, INTRO_DRAFT_LINE)).toBe('which');
   });
 
-  it('v1: after the draft line, a keep clause with no change word still gets an answer turn', () => {
-    expect(lastAnswerTurn('keep the draft, what was your last answer about?', true, INTRO_DRAFT_LINE)).toBe('answer');
+  it('Oleg item 4: after the draft line, a keep clause with no change word gets the fixed card line', () => {
+    expect(lastAnswerTurn('keep the draft, what was your last answer about?', true, INTRO_DRAFT_LINE)).toBe('card');
+    // A failure word asks again: the model answers, with no draft tool.
+    expect(
+      lastAnswerTurn('keep the draft, your last answer was cut off, tell me about Lit', true, INTRO_DRAFT_LINE)
+    ).toBe('answer');
   });
 
   it.each([
