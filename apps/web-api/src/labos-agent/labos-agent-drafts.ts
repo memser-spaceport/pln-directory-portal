@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { LABOS_AGENT_INTRO_DRAFT_LIMITS, LabosAgentDraft } from 'libs/contracts/src/schema/labos-agent';
 import { IntroRequestsService } from '../intro-requests/intro-requests.service';
 import { McpActorContext } from '../mcp/mcp-tools';
+import { stripHtmlToPlainText } from '../team-news/team-news-body-html.util';
 
 /** The intro target of this turn, with the name from the database (C3 lookup). */
 export type IntroTurnTarget = LabosAgentDraft['target'];
@@ -80,9 +81,7 @@ export function profileToolsLine(names: readonly string[]): string {
 }
 
 /** LAB-3367 B2 (Oleg): the fixed answer to a bare "add that" right after a draft turn. The card does not change. */
-export const ADD_THAT_LINE =
-  'I did not change the draft, so it keeps the text from your earlier messages. ' +
-  'To add a new detail, write the detail in your message.';
+export const ADD_THAT_LINE = 'I did not change the draft.';
 
 /** LAB-3367 B2: the whole message is only "add that", "add it to the draft", "put this in the intro" and the like. */
 export const isBareAddThat = (message: string) =>
@@ -102,10 +101,96 @@ export function addedClaims(text: string, cardText: string | undefined, message:
   return [...new Set(found)].filter((word) => !known.includes(word));
 }
 
-/** LAB-3367 B4: the refusal for a stronger draft with a new claim. It names no member text. */
+/** LAB-3367 B4: one spelling for the claim words, so "hands on" and "experienced" match "hands-on" and "experience". */
+const sameWords = (text: string) =>
+  text
+    .toLowerCase()
+    .replace(/[\u2010\u2011]/g, '-')
+    .replace(/\b(hands|well)\s+(on|versed)\b/g, '$1-$2')
+    .replace(/\btrack\s+record\b/g, 'track-record')
+    .replace(/\bexperience[ds]\b/g, 'experience');
+
+/** The words that carry no fact. Not "your": "experience with your team" is a claim about the target. */
+const FILLER = new Set(
+  (
+    'i me my we us our am is are was were be been have has had having a an the some also as of in on at for from with ' +
+    "to by and or that this it too so bring brings can could would will i'm i've i'd we're we've"
+  ).split(' ')
+);
+
+const words = (text: string) =>
+  (
+    sameWords(text)
+      .replace(/’/g, "'")
+      .match(/[\p{L}\p{N}][\p{L}\p{N}'-]*/gu) ?? []
+  ).map((word) => word.replace(/(?<=\p{L}{3})s$/u, ''));
+
+/** The parts of a text with one claim each: "I lead fundraising and I have experience with IPFS" has two. */
+const CLAIM_PART_END =
+  /[.;:!?\n()]+|(?:,\s*)?\b(?:which|because|but|so)\b|(?:,|\band\b)\s*(?=(?:i|we|my|our|have|has|am|are|would|want)\b)/i;
+
+/**
+ * LAB-3367 B4: true when each part of `text` with a claim word of `claims` is an own fact of the member: all its words
+ * are in ONE fact. So "experience with IPFS" does not allow "experience in the grants space".
+ */
+export function claimsAreOwn(text: string, claims: readonly string[], facts: readonly string[]): boolean {
+  const factWords = facts.map((fact) => new Set(words(fact)));
+  const parts = text
+    .split(CLAIM_PART_END)
+    .filter((part) => claims.some((claim) => part.toLowerCase().replace(/\s+/g, ' ').includes(claim)));
+  return (
+    parts.length > 0 &&
+    parts.every((part) => {
+      const needed = words(part).filter((word) => !FILLER.has(word));
+      return factWords.some((known) => needed.every((word) => known.has(word)));
+    })
+  );
+}
+
+/** The member says it about themselves: "I have ...", "I'm an ...", "my ... experience", "10 years of experience in". */
+const CLAIM = CLAIM_WORDS.source;
+const OWN_CLAIM = new RegExp(
+  String.raw`\b(?:i|we)(?:['’](?:m|ve|re)|\s+(?:also\s+)?(?:am|are|was|were|have|had|got|gained|bring|built|worked\s+as))\b` +
+    String.raw`|\b(?:my|our)\s+(?:[\w-]+\s+){0,2}?${CLAIM}` +
+    String.raw`|^\s*(?:[\w+]+\s+){0,3}?years\s+of\s+(?:hands[\s-]on\s+)?experience\b|^\s*(?:hands[\s-]on\s+)?(?:experience|expertise)\s+(?:with|in)\b`,
+  'i'
+);
+/** Not a fact about the member: a negation, or a claim about another person. */
+const NOT_OWN = new RegExp(
+  String.raw`\b(?:not|no|never|without|remove|drop|delete|pretend|sound|as\s+if|they|he|she)\b|n['’]t\b` +
+    String.raw`|\b(?:your|their|his|her)\s+(?:[\w-]+\s+){0,2}?${CLAIM}`,
+  'i'
+);
+
+/** LAB-3367 B4: the sentences of a member message that state an own experience claim. No question, no negation. */
+export function ownClaims(message: string): string[] {
+  return message
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((sentence) => sentence.trim().slice(0, 300))
+    .filter((sentence) => new RegExp(CLAIM, 'i').test(sentence) && !sentence.endsWith('?'))
+    .filter((sentence) => OWN_CLAIM.test(sentence) && !NOT_OWN.test(sentence));
+}
+
+/** LAB-3367 B4: the facts of a profile tool result: each sentence of a text, and each entry of a list as one fact. */
+export function profileFacts(value: unknown): string[] {
+  if (typeof value === 'string') return stripHtmlToPlainText(value).split(/(?<=[.!?])\s+|\n+/);
+  if (Array.isArray(value)) {
+    return value.map((item) =>
+      typeof item === 'string'
+        ? item
+        : Object.values(item ?? {})
+            .filter((field) => typeof field === 'string')
+            .join(' ')
+    );
+  }
+  return value && typeof value === 'object' ? Object.values(value).flatMap(profileFacts) : [];
+}
+
+/** LAB-3367 B4: the refusal for a draft with a new claim. It names no member text. */
 export const ADDED_CLAIM_TEXT =
   'The draft was refused: it adds a claim that the member did not give. ' +
-  'Write it again. Only reorder or reword the facts of the current text. Do not add experience or expertise.';
+  'Write it again. Use only the facts of the current text, of the member’s messages and of their LabOS profile, in ' +
+  'the same words. Do not add other experience or expertise.';
 
 /** The answer line while the turn has a draft, else undefined. For `ContextualToolsOptions.answerLine`. */
 export function introDraftLine(drafts: LabosAgentDraft[]): string | undefined {
@@ -130,10 +215,13 @@ export type DraftDeps = {
   drafts: LabosAgentDraft[];
   /** LAB-3367 t3: the names of the read tools of this turn, so the description names only the profile tools there. */
   readTools?: readonly string[];
-  /** LAB-3367 B4: the waiting card and the message, for the claim check. B3: `onDraft` clears the kept target. */
+  /**
+   * LAB-3367 B4: the waiting card and the message, for the claim check. `ownFacts` gives the own facts of the member
+   * (earlier messages, LabOS profile). It runs only when the draft has a claim that the card and the message do not.
+   */
   card?: { type: string; uid: string; text: string };
   message?: string;
-  onDraft?: () => Promise<void>;
+  ownFacts?: () => Promise<string[]>;
 };
 
 /**
@@ -190,10 +278,11 @@ export function draftIntroTool(ctx: McpActorContext, deps: DraftDeps): CoreTool 
             `Write it again with ${MIN} to ${MAX} characters.`
           );
         }
-        // LAB-3367 B4: a revision of the card adds no experience claim.
+        // LAB-3367 B4: a revision of the card adds no experience claim that is not an own fact of the member.
         const card =
           deps.card && deps.card.type === target.type && deps.card.uid === target.uid ? deps.card : undefined;
-        if (addedClaims(text, card?.text, deps.message).length) return ADDED_CLAIM_TEXT;
+        const claims = addedClaims(text, card?.text, deps.message);
+        if (claims.length && !claimsAreOwn(text, claims, (await deps.ownFacts?.()) ?? [])) return ADDED_CLAIM_TEXT;
         // 5. One draft per turn: a valid second call replaces the first.
         const draft: LabosAgentDraft = {
           draftId: `dr_${randomUUID()}`,
@@ -205,7 +294,6 @@ export function draftIntroTool(ctx: McpActorContext, deps: DraftDeps): CoreTool 
           source: 'agent',
         };
         deps.drafts.push(draft);
-        await deps.onDraft?.();
         return (
           `Draft ${draft.draftId} is ready for ${name}. Nothing is sent. ` +
           'The card shows the draft. Do not repeat the draft text. ' +
