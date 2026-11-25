@@ -39,13 +39,32 @@ export const DRAFT_FACTS_RULE =
   'strengthen experience, duration, results, roles, opinions, shared work or a vouch about the member from anywhere ' +
   'else. Facts about the target can come from the page or a tool.';
 
+/**
+ * LAB-3367 G8 (Oleg): the limits of the draft text, for new drafts and revisions. The `draft_intro` description and the
+ * card prompt use this same text, after `DRAFT_FACTS_RULE`.
+ */
+export const DRAFT_LIMITS_RULE =
+  'When a fact is not given, leave it out. A short draft is correct. ' +
+  'To know a member, a team or a project is not experience with it: do not write that the member has experience, ' +
+  'skills or work with it. Do not add a reason for the intro that the member did not give. ' +
+  'For a request such as "make it more convincing", only reorder or reword the facts of the current text. ' +
+  'If the draft needs a reason and the member gave none, make no draft and ask the member for the reason.';
+
+/** LAB-3367 G3: the bare words for the draft line in the `Previous reply` line of the answer prompt. */
+export const INTRO_DRAFT_REPLY_LABEL = 'an intro draft card';
+
 /** LAB-3367 t3: the read tools for the member's own LabOS profile. */
 export const PROFILE_READ_TOOLS = ['get_my_profile', 'list_my_experiences'] as const;
 
-/** LAB-3367 t3: the sentence that names the profile read tools of this turn, or '' when the turn has none. */
+/**
+ * LAB-3367 t3, G8: the sentences that name the profile read tools of this turn, or '' when the turn has none. With
+ * `get_my_profile`, the model calls it before the first draft.
+ */
 export function profileToolsLine(names: readonly string[]): string {
   const tools = PROFILE_READ_TOOLS.filter((name) => names.includes(name));
-  return tools.length ? `To read the member’s own LabOS profile, you can call ${tools.join(' or ')}. ` : '';
+  if (!tools.length) return '';
+  const first = tools.includes('get_my_profile') ? 'Call get_my_profile before the first draft. ' : '';
+  return `To read the member’s own LabOS profile, you can call ${tools.join(' or ')}. ${first}`;
 }
 
 /** The answer line while the turn has a draft, else undefined. For `ContextualToolsOptions.answerLine`. */
@@ -83,9 +102,11 @@ export function draftIntroTool(ctx: McpActorContext, deps: DraftDeps): CoreTool 
   return tool({
     description:
       'Write a draft intro request from the member to a member or team in the page context or the items of the message. ' +
-      `The text is from ${MIN} to ${MAX} characters, in the voice of the member: who they are, what they ask, and why. ` +
+      `The text is from ${MIN} to ${MAX} characters, in the voice of the member: who they are, what they ask, and why (only a reason that the member gave). ` +
       // LAB-3367 Q1, s4, t3 (Oleg): the exact fact rule for new drafts and revisions, and the profile tools of the turn.
       `${DRAFT_FACTS_RULE} ` +
+      // LAB-3367 G8: leave out facts that are not given, and add no reason or experience.
+      `${DRAFT_LIMITS_RULE} ` +
       profileToolsLine(deps.readTools ?? []) +
       'The tool only makes a draft card. The member edits it and presses Send. Nothing is sent. ' +
       'Call it before you write the answer. Do not write the draft text in the answer: the card shows it. ' +

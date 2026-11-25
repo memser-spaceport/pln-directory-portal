@@ -13,6 +13,9 @@
  * the text ends inside a form, it holds back that end, so a bold form is not cut to the plain line when the closing
  * marks come in the next chunk. The held text stays across an initial generation and its continuation (`held`), and
  * `flush` gives it once, when all generations end. Other text, also other bold or italic marks, does not change.
+ *
+ * LAB-3367 G3: with `reserved`, the first text with no letter or digit (for example `**` or `.`) is also held until
+ * text with a letter or digit comes. At the end, it goes out only when the filter removed no line.
  */
 export class AnswerOverride {
   /** True after the override dropped text, until the next text that streams. */
@@ -20,6 +23,15 @@ export class AnswerOverride {
 
   /** LAB-3367 F6: model text held back, because it can be the start of `reserved`. */
   private heldText = '';
+
+  /** LAB-3367 G3: the first output with no letter or digit, held until text with a letter or digit comes. */
+  private leadText = '';
+
+  /** LAB-3367 G3: true after output with a letter or digit. */
+  private started = false;
+
+  /** LAB-3367 G3: true after the filter removed a line. */
+  private removed = false;
 
   /** LAB-3367 t7b: each reserved line, plain and in balanced bold, longest first. */
   private readonly forms: string[];
@@ -32,7 +44,12 @@ export class AnswerOverride {
 
   /** LAB-3367 t7a: the model text that the filter holds back now, without the lines. It is part of the answer so far. */
   held(): string {
-    return this.scan(this.heldText, true).out;
+    return this.leadText + this.scan(this.heldText, true, false).out;
+  }
+
+  /** LAB-3367 G3: true after the filter removed a reserved line from the model text. */
+  removedLine(): boolean {
+    return this.removed;
   }
 
   /** True while the override replaces the answer text. */
@@ -43,20 +60,51 @@ export class AnswerOverride {
   /** The text to stream for `chunk`. `written` is the answer text of the turn so far. */
   filter(chunk: string, written: string): string {
     if (this.isOn()) {
-      if (chunk || this.heldText) this.dropped = true;
-      this.heldText = '';
-      return '';
+      if (chunk || !/^[*_]*$/.test(this.heldText)) this.dropped = true;
+      return this.takeLead() + this.heldMarks();
     }
-    if (!this.dropped) return this.withoutReserved(chunk);
+    if (!this.dropped) return this.lead(this.withoutReserved(chunk));
     // The break before the text came with the dropped text. At the start of the answer the text needs none.
     const next = written.trim() ? chunk : chunk.replace(/^\s+/, '');
     if (next) this.dropped = false;
-    return this.withoutReserved(next);
+    return this.lead(this.withoutReserved(next));
   }
 
-  /** LAB-3367 F6: the held text after all generations, or ''. While the override is on, the held text is dropped. */
+  /** LAB-3367 F6: the held text after all generations, or ''. While the override is on, only held marks stay (u4). */
   flush(): string {
-    const out = this.isOn() ? '' : this.scan(this.heldText, true).out;
+    if (this.isOn()) return this.takeLead() + this.heldMarks();
+    const out = this.lead(this.scan(this.heldText, true).out);
+    this.heldText = '';
+    // G3: a first text with no letter or digit goes out only when the filter removed no line.
+    const lead = this.removed ? '' : this.leadText;
+    this.leadText = '';
+    return out + lead;
+  }
+
+  /** LAB-3367 G3: `out`, or '' while the output has no letter or digit yet. Then `out` is held in `leadText`. */
+  private lead(out: string): string {
+    if (this.started || !this.forms.length || !out) return out;
+    if (!/[\p{L}\p{N}]/u.test(out)) {
+      this.leadText += out;
+      return '';
+    }
+    this.started = true;
+    return this.takeLead() + out;
+  }
+
+  /** LAB-3367 G3: the held first text, once. */
+  private takeLead(): string {
+    const out = this.leadText;
+    this.leadText = '';
+    return out;
+  }
+
+  /**
+   * LAB-3367 u4: while the override is on, the held text goes. Only held text that is all marks (`*`, `**`, `_` or
+   * `__` right before the `draft_intro` call) stays, because it is text before the tool call, not a start of the line.
+   */
+  private heldMarks(): string {
+    const out = /^[*_]+$/.test(this.heldText) ? this.heldText : '';
     this.heldText = '';
     return out;
   }
@@ -73,13 +121,14 @@ export class AnswerOverride {
    * LAB-3367 t7: `text` without the forms, from left to right. When `final` is false, the end of `text` that can
    * still become a form is held. When `final` is true, nothing is held.
    */
-  private scan(text: string, final: boolean): { out: string; held: string } {
+  private scan(text: string, final: boolean, trackRemoval = true): { out: string; held: string } {
     let out = '';
     let i = 0;
     while (i < text.length) {
       const match = this.matchAt(text, i, final);
       if (match === 'partial') return { out, held: text.slice(i) };
       if (match > 0) {
+        if (trackRemoval) this.removed = true;
         i += match;
         continue;
       }

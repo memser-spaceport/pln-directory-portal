@@ -23,9 +23,23 @@ import { APP_ENV } from '../utils/constants';
 import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { LabosAgentAccessService } from './labos-agent-access.service';
 import { LabosAgentController } from './labos-agent.controller';
-import { INTRO_DRAFT_FAILED_TEXT, INTRO_DRAFT_LINE, INTRO_NOT_ELIGIBLE_TEXT } from './labos-agent-drafts';
+import {
+  INTRO_DRAFT_FAILED_TEXT,
+  INTRO_DRAFT_LINE,
+  INTRO_NOT_ELIGIBLE_TEXT,
+  profileToolsLine,
+  DRAFT_LIMITS_RULE,
+} from './labos-agent-drafts';
 import { LabosAgentProposalStore } from './labos-agent-proposals';
-import { LAST_ANSWER_RULES, LabosAgentService, latestReplyCacheKey } from './labos-agent.service';
+import {
+  ASK_AGAIN_RULE,
+  CARD_OPEN_RULE,
+  LAST_ANSWER_RULES,
+  LabosAgentService,
+  latestReplyCacheKey,
+  PASTED_TEXT_RULE,
+  PREVIOUS_REPLY_RULE,
+} from './labos-agent.service';
 import { WHICH_REPLY_LINE } from './labos-agent-last-answer';
 import * as pageContextModule from './labos-agent-page-context';
 
@@ -448,11 +462,50 @@ describe('LabOS agent intro draft answer (LAB-3362 D4)', () => {
     expect(options.extraTools.draft_intro.description).toContain(DRAFT_FACTS_RULE);
   });
 
-  it('LAB-3367 t3: with no profile read tool, the description names none', async () => {
-    jest.spyOn(LabosAgentService.prototype as any, 'tools').mockResolvedValue([]);
+  it.each([[[]], [['search_members']]])(
+    'LAB-3367 t3: with the tools %j and no profile read tool, the description names none',
+    async (names) => {
+      const defs = names.map((name) => ({ name, description: name, inputSchema: {}, execute: jest.fn() }));
+      jest.spyOn(LabosAgentService.prototype as any, 'tools').mockResolvedValue(defs);
+      const h = setup();
+      const { options } = await h.turn(MEMBER_CONTEXT);
+      const description: string = options.extraTools.draft_intro.description;
+      expect(description).not.toMatch(/get_my_profile|list_my_experiences|search_members/);
+      // Mutant: no "you can call ." with an empty tool list.
+      expect(description).not.toContain('you can call');
+      expect(description).not.toContain('LabOS profile, ');
+      expect(description).toContain(DRAFT_FACTS_RULE);
+    }
+  );
+
+  // LAB-3367 G8 (Oleg): the exact limit lines, so a change of the text shows in review.
+  const G8_LIMITS =
+    'When a fact is not given, leave it out. A short draft is correct. ' +
+    'To know a member, a team or a project is not experience with it: do not write that the member has experience, ' +
+    'skills or work with it. Do not add a reason for the intro that the member did not give. ' +
+    'For a request such as "make it more convincing", only reorder or reword the facts of the current text. ' +
+    'If the draft needs a reason and the member gave none, make no draft and ask the member for the reason.';
+
+  it('LAB-3367 G8: the draft_intro description and the card prompt give the draft limits', async () => {
     const h = setup();
     const { options } = await h.turn(MEMBER_CONTEXT);
-    expect(options.extraTools.draft_intro.description).not.toMatch(/get_my_profile|list_my_experiences/);
+    expect(DRAFT_LIMITS_RULE).toBe(G8_LIMITS);
+    const description: string = options.extraTools.draft_intro.description;
+    expect(description).toContain(`${DRAFT_FACTS_RULE} ${G8_LIMITS}`);
+    expect(description).toContain('and why (only a reason that the member gave)');
+  });
+
+  it('LAB-3367 G8: with get_my_profile, the model calls it before the first draft', () => {
+    expect(profileToolsLine(['get_my_profile'])).toContain('Call get_my_profile before the first draft.');
+    expect(profileToolsLine(['get_my_profile', 'list_my_experiences'])).toContain(
+      'Call get_my_profile before the first draft.'
+    );
+    expect(profileToolsLine(['list_my_experiences'])).not.toContain('get_my_profile');
+  });
+
+  it('LAB-3367 t3: profileToolsLine gives no text for no profile read tool', () => {
+    expect(profileToolsLine([])).toBe('');
+    expect(profileToolsLine(['search_members'])).toBe('');
   });
 
   it('tells the model not to repeat the draft text in the answer', async () => {
@@ -549,6 +602,15 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
       expect.objectContaining({ target: { type: 'member', uid: 'm-grace', name: 'Grace Hopper' }, text: SHORT })
     );
     expect(options.answerLine()).toBe(INTRO_DRAFT_LINE);
+  });
+
+  it('LAB-3367 G8: the card prompt gives the draft limits after the fact rule', async () => {
+    const options = await chat(setup(), {
+      ...VALID,
+      message: 'make it more convincing',
+      introDraft: { target: GRACE, text: CARD_TEXT },
+    });
+    expect(options.promptContext).toContain(`${DRAFT_FACTS_RULE} ${DRAFT_LIMITS_RULE}`);
   });
 
   it('C4-R3: introDraft works next to another page context, and the target is checked again', async () => {
@@ -725,9 +787,11 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
   const PREVIOUS_NOT_HISTORY =
     '- The prompt gives your previous reply. Find the reply to change there, not in the older chat.';
   const UNKNOWN_ASKS =
-    '- If your previous reply is not known, ask which reply to change. Do not change an intro draft.';
+    '- If your previous reply is not known, ask which reply to change unless this turn asks you to answer as a new question. ' +
+    'Do not change an intro draft.';
+  // G3: the prompt gives the draft line as bare words, so the rule does not quote the line.
   const DRAFT_LINE_REVISES =
-    `- If your previous reply is the line "${INTRO_DRAFT_LINE}", revise the intro draft that waits in this chat. ` +
+    '- If your previous reply is an intro draft card, revise the intro draft that waits in this chat. ' +
     'If no intro draft waits, ask which reply to change.';
   const NORMAL_WINS = '- Else change only that reply. Do not write, revise or show an intro draft.';
   const FACTS_FROM_TOOLS =
@@ -982,6 +1046,94 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
         expect(turn.promptContext ?? '').not.toContain(CARD_TEXT);
         expect(turn.extraTools).not.toHaveProperty('draft_intro');
       }
+    });
+
+    describe('LAB-3367 G (Oleg QA p1795618192018809)', () => {
+      const lines = (turn: { answerInstructions?: string }) => (turn.answerInstructions ?? '').split('\n');
+
+      it('G1: an answer edit drops the page context, but keeps the mentions', async () => {
+        const h = setup(undefined, [MEMBER_PERMISSIONS.SEARCH_READ]);
+        jest.spyOn(pageContextModule, 'teamPagePrompt').mockResolvedValue('Team page Acme.');
+        const extra = { context: { page: 'team', teamUid: 't-acme' } };
+        const options = await chat(h, { ...VALID, message: 'Shorten your last answer.', ...card, ...extra });
+        expect(options.promptContext).toContain('Team page Acme.');
+        expect(options.latestReplyTurn(NORMAL).promptContext ?? '').not.toContain('Team page Acme.');
+      });
+
+      it.each([['this team'], ['this member'], ['this story'], ['this job'], ['this page']])(
+        'G1: "%s" in the message keeps the page context',
+        async (words) => {
+          const h = setup(undefined, [MEMBER_PERMISSIONS.SEARCH_READ]);
+          jest.spyOn(pageContextModule, 'teamPagePrompt').mockResolvedValue('Team page Acme.');
+          const message = `Shorten your last answer about ${words}.`;
+          const options = await chat(h, { ...VALID, message, ...card, context: { page: 'team', teamUid: 't-acme' } });
+          expect(options.latestReplyTurn(NORMAL).promptContext).toContain('Team page Acme.');
+        }
+      );
+
+      it('G1, G4: a change of a known reply gets the card line and "Change only the text in Previous reply."', async () => {
+        const { turn } = await turnFor('Shorten your last answer.', NORMAL);
+        expect(lines(turn)).toEqual([...LAST_ANSWER_RULES.split('\n'), CARD_OPEN_RULE, PREVIOUS_REPLY_RULE]);
+        expect(PREVIOUS_REPLY_RULE).toBe('Change only the text in Previous reply.');
+        expect(CARD_OPEN_RULE).toBe(
+          'An intro draft card is open in the chat. This request is not about it. Do not say that there is no draft.'
+        );
+        expect(turn).not.toHaveProperty('omitLatestReply');
+      });
+
+      it('G1: a pasted text gets only the colon rule, also after a known reply', async () => {
+        for (const reply of [NORMAL, '', INTRO_DRAFT_LINE]) {
+          const { turn } = await turnFor('shorten this: We build open tools for research teams.', reply);
+          expect(lines(turn).slice(-2)).toEqual([CARD_OPEN_RULE, PASTED_TEXT_RULE]);
+          expect(turn.answerInstructions).not.toContain(PREVIOUS_REPLY_RULE);
+          expect(turn).not.toHaveProperty('omitLatestReply');
+        }
+        expect(PASTED_TEXT_RULE).toBe(
+          'Change only the text after the colon in the question. Write only the changed text.'
+        );
+      });
+
+      it('G4: a question about the last answer with no change word gets the card line only', async () => {
+        const { turn } = await turnFor('keep the draft, what was your last answer about?', NORMAL);
+        expect(lines(turn).slice(-1)).toEqual([CARD_OPEN_RULE]);
+      });
+
+      it('G7: an unknown reply and a failure word: no Previous reply line, answer as a new question', async () => {
+        for (const reply of ['', WHICH_REPLY_LINE]) {
+          const { turn } = await turnFor('Your last answer did not load. What is new in LabOS?', reply);
+          expect(turn.omitLatestReply).toBe(true);
+          expect(lines(turn).slice(-2)).toEqual([CARD_OPEN_RULE, ASK_AGAIN_RULE]);
+          expect(turn).not.toHaveProperty('fixedAnswer');
+        }
+        expect(ASK_AGAIN_RULE).toContain('Answer the message as a new question with the tools.');
+      });
+
+      it('G7: also with no card, the turn omits the Previous reply line', async () => {
+        const h = setup();
+        const options = await chat(h, { ...VALID, message: 'your last answer was cut off, tell me about Lit again' });
+        const turn = options.latestReplyTurn('');
+        expect(turn.omitLatestReply).toBe(true);
+        expect(lines(turn).slice(-1)).toEqual([ASK_AGAIN_RULE]);
+        expect(options.latestReplyTurn(NORMAL)).toEqual({});
+      });
+
+      it('G7: a known reply keeps the Previous reply line', async () => {
+        const { turn } = await turnFor('Your last answer was cut off. Shorten it.', NORMAL);
+        expect(turn).not.toHaveProperty('omitLatestReply');
+      });
+
+      it('G3: the options give the bare words for the draft line', async () => {
+        const { options } = await turnFor('Shorten your last answer.', NORMAL);
+        expect(options.reservedReplyLabel).toBe('an intro draft card');
+        expect(options.reservedReply).toBe(INTRO_DRAFT_LINE);
+      });
+
+      it('v1: straight after the draft, "keep the draft and shorten your last answer" gets the fixed line', async () => {
+        const { turn } = await turnFor('keep the draft and shorten your last answer', INTRO_DRAFT_LINE);
+        expect(turn.fixedAnswer).toBe(WHICH_REPLY_LINE);
+        expect(turn.extraTools).not.toHaveProperty('draft_intro');
+        expect(turn.promptContext ?? '').not.toContain(CARD_TEXT);
+      });
     });
 
     it('after the real draft line: no change, so the draft revision still works', async () => {
