@@ -102,6 +102,17 @@ describe('venue search and place resolve (Google mocked)', () => {
     await expect(service.resolvePlace({})).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('answers 503, not 404, when Google refuses the lookup', async () => {
+    axiosGet.mockResolvedValueOnce({ data: { status: 'REQUEST_DENIED', results: [] } });
+    await expect(service.resolvePlace({ address: 'Shibuya Crossing' })).rejects.toBeInstanceOf(
+      ServiceUnavailableException
+    );
+    axiosGet.mockResolvedValueOnce({ data: { status: 'OVER_QUERY_LIMIT', results: [] } });
+    await expect(service.resolvePlace({ address: 'Shibuya Crossing' })).rejects.toBeInstanceOf(
+      ServiceUnavailableException
+    );
+  });
+
   it('returns the place with a null time zone when the time zone lookup fails', async () => {
     axiosGet.mockResolvedValueOnce(GEOCODE).mockRejectedValueOnce(new Error('timeout'));
     expect((await service.resolvePlace({ placeId: 'place-tokyo' })).timezone).toBeNull();

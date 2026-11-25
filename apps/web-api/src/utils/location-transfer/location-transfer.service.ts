@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { IAirtableMember } from '@protocol-labs-network/airtable';
 import axios from 'axios';
 import { PrismaService } from '../../shared/prisma.service';
@@ -225,8 +225,9 @@ export class LocationTransferService {
 
   /**
    * One place by its Google place id, or by an address text: the formatted address, its parts, the position, a map
-   * link and the IANA time zone. A text that matches no place answers 404. A failed time zone lookup returns the
-   * place with `timezone: null`.
+   * link and the IANA time zone. A text that matches no place answers 404; a lookup Google refuses (a bad key, a
+   * quota) answers 503, so the form does not read it as an unknown place. A failed time zone lookup returns the place
+   * with `timezone: null`.
    */
   async resolvePlace(input: { placeId?: string | null; address?: string | null }) {
     const placeId = (input.placeId ?? '').trim();
@@ -237,6 +238,10 @@ export class LocationTransferService {
     const geocode = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
       params: { ...(placeId ? { place_id: placeId } : { address }), key: process.env.GOOGLE_PLACES_API_KEY },
     });
+    const status: string | undefined = geocode.data?.status;
+    if (status && status !== 'OK' && status !== 'ZERO_RESULTS') {
+      throw new ServiceUnavailableException('The place could not be looked up right now. Please try again.');
+    }
     const place = geocode.data?.results?.[0];
     if (!place?.geometry?.location) {
       throw new NotFoundException('No place matches this address');
