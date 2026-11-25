@@ -7,18 +7,33 @@
  * goes out. When `line` gives nothing again (for example a refused second `draft_intro` call removed the draft), the
  * model text streams again, so the member sees the refusal and no line.
  *
- * LAB-3367 F6: with `reserved` (the same line), model text is never that line while the override is off. The filter
- * removes the line from the model text, also when it comes in more than one chunk: it holds back the end of the text
- * while that end can be the start of the line. The held text stays across an initial generation and its continuation. `flush` gives it once, when all generations end.
+ * LAB-3367 F6, t7: with `reserved` (the same line and its other forms), model text is never one of these lines while
+ * the override is off. The filter removes each line, plain or in balanced bold (`**line**` or `__line__`), and also
+ * when it comes in more than one chunk. It reads the text from left to right and tries the longest form first. When
+ * the text ends inside a form, it holds back that end, so a bold form is not cut to the plain line when the closing
+ * marks come in the next chunk. The held text stays across an initial generation and its continuation (`held`), and
+ * `flush` gives it once, when all generations end. Other text, also other bold or italic marks, does not change.
  */
 export class AnswerOverride {
   /** True after the override dropped text, until the next text that streams. */
   private dropped = false;
 
   /** LAB-3367 F6: model text held back, because it can be the start of `reserved`. */
-  private held = '';
+  private heldText = '';
 
-  constructor(private readonly line?: () => string | undefined, private readonly reserved?: string) {}
+  /** LAB-3367 t7b: each reserved line, plain and in balanced bold, longest first. */
+  private readonly forms: string[];
+
+  constructor(private readonly line?: () => string | undefined, reserved: readonly string[] = []) {
+    this.forms = [...new Set(reserved.filter(Boolean))]
+      .flatMap((form) => [`**${form}**`, `__${form}__`, form])
+      .sort((a, b) => b.length - a.length);
+  }
+
+  /** LAB-3367 t7a: the model text that the filter holds back now, without the lines. It is part of the answer so far. */
+  held(): string {
+    return this.scan(this.heldText, true).out;
+  }
 
   /** True while the override replaces the answer text. */
   isOn(): boolean {
@@ -28,8 +43,8 @@ export class AnswerOverride {
   /** The text to stream for `chunk`. `written` is the answer text of the turn so far. */
   filter(chunk: string, written: string): string {
     if (this.isOn()) {
-      if (chunk || this.held) this.dropped = true;
-      this.held = '';
+      if (chunk || this.heldText) this.dropped = true;
+      this.heldText = '';
       return '';
     }
     if (!this.dropped) return this.withoutReserved(chunk);
@@ -41,19 +56,50 @@ export class AnswerOverride {
 
   /** LAB-3367 F6: the held text after all generations, or ''. While the override is on, the held text is dropped. */
   flush(): string {
-    const out = this.isOn() ? '' : this.held;
-    this.held = '';
+    const out = this.isOn() ? '' : this.scan(this.heldText, true).out;
+    this.heldText = '';
     return out;
   }
 
-  /** LAB-3367 F6: `chunk` after the held text, without `reserved`. The end that can start `reserved` is held back. */
+  /** LAB-3367 F6: `chunk` after the held text, without the lines. The end that can start a line is held back. */
   private withoutReserved(chunk: string): string {
-    if (!this.reserved) return chunk;
-    const text = (this.held + chunk).split(this.reserved).join('');
-    let keep = Math.min(text.length, this.reserved.length - 1);
-    while (keep > 0 && !this.reserved.startsWith(text.slice(text.length - keep))) keep -= 1;
-    this.held = text.slice(text.length - keep);
-    return text.slice(0, text.length - keep);
+    if (!this.forms.length) return chunk;
+    const { out, held } = this.scan(this.heldText + chunk, false);
+    this.heldText = held;
+    return out;
+  }
+
+  /**
+   * LAB-3367 t7: `text` without the forms, from left to right. When `final` is false, the end of `text` that can
+   * still become a form is held. When `final` is true, nothing is held.
+   */
+  private scan(text: string, final: boolean): { out: string; held: string } {
+    let out = '';
+    let i = 0;
+    while (i < text.length) {
+      const match = this.matchAt(text, i, final);
+      if (match === 'partial') return { out, held: text.slice(i) };
+      if (match > 0) {
+        i += match;
+        continue;
+      }
+      out += text[i];
+      i += 1;
+    }
+    return { out, held: '' };
+  }
+
+  /**
+   * The length of the longest form at `i`, or 0. 'partial' when the text ends inside a form that is longer than any
+   * complete form at `i`, so a bold form goes before its plain line. Each check reads at most one form length.
+   */
+  private matchAt(text: string, i: number, final: boolean): number | 'partial' {
+    const left = text.length - i;
+    for (const form of this.forms) {
+      if (text.startsWith(form, i)) return form.length;
+      if (!final && left < form.length && form.startsWith(text.slice(i))) return 'partial';
+    }
+    return 0;
   }
 
   /** The line to add when the turn ends with the override on, or ''. */

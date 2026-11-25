@@ -29,8 +29,12 @@ const LAST_CONTENT_VERB = /^[\s\S]*\b(?:add|put|use|include|mention|tell|say|wri
 const REVISION_AFTER_CONTENT =
   /\b(?:to|shorten|rewrite|reword|rephrase|change|edit|revise|simplify|summari[sz]e|condense|trim|cut)\b/i;
 
-/** LAB-3367 s1: the verbs after "and" or "but" that end a keep or leave clause: "keep the draft and shorten ...". */
-const CHANGE_VERBS = String.raw`(?:shorten|rewrite|reword|rephrase|change|edit|revise|fix|add|remove|delete|expand|simplify|summari[sz]e|condense|trim|cut|make|translate|redo)`;
+/**
+ * LAB-3367 s1, t5: the verbs after "and" or "but" that end a keep or leave clause: "keep the draft and shorten ...".
+ * "make", "change", "edit" and "fix" count only before "your". "keep the draft and add your last answer to it" is a
+ * draft edit.
+ */
+const CHANGE_VERBS = String.raw`(?:shorten|rewrite|reword|rephrase|revise|expand|simplify|summari[sz]e|condense|trim|cut|translate|redo|(?:make|change|edit|fix)\s+your)`;
 
 /** LAB-3367 o3: the words that name the intro draft, also in the plural. */
 const DRAFT_WORDS = String.raw`(?:drafts?|intros?|introductions?|cards?)`;
@@ -52,12 +56,13 @@ const DRAFT_WORD = new RegExp(String.raw`\b${DRAFT_WORDS}\b`, 'i');
  *   one more word that is not "again" does not count: "do not make the draft longer" is a draft edit.
  * - After "keep" or "leave", only at the end of the clause (s1): the end of the text, a line break, a punctuation mark,
  *   a bracket or a dash; before "alone", "unchanged", "untouched", "intact", "the same", "like it", "please", "for
- *   now", "as it", "as is" or "as they"; or before "and" or "but", optional "please" or "just", and a change verb.
+ *   now", "as-is", "as it", "as is" or "as they"; or before "and" or "but", optional "please" or "just", and a change
+ *   verb (`CHANGE_VERBS`).
  *   "keep the intro short" and "keep the intro as short as it is" are draft edits.
  */
 const DRAFT_EDIT_AFTER_MAKE = String.raw`\s+make\s+(?:(?:the|my|this)\s+)?${DRAFT_PHRASE}\s+(?!again\b)[\w'’]+`;
 const KEEP_CLAUSE_END =
-  String.raw`(?=[^\S\n]*(?:$|[\n.,;:!?()[\]{}\-–—]|(?:alone|unchanged|untouched|intact|the\s+same|like\s+it|please|for\s+now|as\s+(?:it|is|they))\b` +
+  String.raw`(?=[^\S\n]*(?:$|[\n.,;:!?()[\]{}\-–—]|(?:alone|unchanged|untouched|intact|the\s+same|like\s+it|please|for\s+now|as-is|as\s+(?:it|is|they))\b` +
   String.raw`|(?:and|but)\s+(?:(?:please|just)\s+)?${CHANGE_VERBS}\b))`;
 const NEGATED_DRAFT_WORD = new RegExp(
   String.raw`\b(?:(?:not|don['’]?t|never)(?!${DRAFT_EDIT_AFTER_MAKE})|without|instead\s+of)\b(?:\s+[\w'’]+){0,3}?\s+${DRAFT_PHRASE}\b` +
@@ -69,18 +74,46 @@ const NEGATED_DRAFT_WORD = new RegExp(
  * LAB-3367 o3, p4: the change words. Only a message with one of them gets the fixed answer when the latest reply is
  * not known, for example "shorten your last answer". "Your last answer did not load. What is new in LabOS?" has none.
  * "cut" does not count after "was" or "got", or before "off" or "short": "your last answer was cut off" tells what
- * happened. F6 adds "simpler", "brief", "concise", "translate", "redo" and "in <n> sentences".
+ * happened.
  */
 const CHANGE_WORD =
-  /\b(?:shorten|shorter|rewrite|reword|rephrase|change|edit|revise|fix|add|remove|delete|expand|longer|simplify|simpler|summari[sz]e|condense|trim|brief|concise|translate|redo)\b|\bin\s+(?:\d+|one|two|three|four|five)\s+sentences?\b|(?<!\b(?:was|got)\s+)\bcut\b(?!\s+(?:off|short)\b)|\btoo\s+long\b/i;
+  /\b(?:shorten|shorter|rewrite|reword|rephrase|change|edit|revise|fix|add|remove|delete|expand|longer|simplify|summari[sz]e|condense|trim)\b|(?<!\b(?:was|got)\s+)\bcut\b(?!\s+(?:off|short)\b)|\btoo\s+long\b/i;
+
+/** LAB-3367 F6: more change words: "simpler", "brief", "concise", "translate", "redo" and "in <n> sentences". */
+const F6_CHANGE_WORD =
+  /\b(?:simpler|brief|concise|translate|redo)\b|\bin\s+(?:\d+|one|two|three|four|five)\s+sentences?\b/i;
 
 /**
- * LAB-3367 review item 4: a request to change a text that the member pastes after a colon or a line break, at the start
- * of the message: "shorten this: <text>", "rewrite the following text:\n<text>". "shorten this draft: ..." does not
- * match, so it stays a draft request.
+ * LAB-3367 t4: the message tells that the answer failed. Then the F6 change words do not count: "your last answer was
+ * cut off, tell me about Lit Protocol again in two sentences" asks for the answer again, not for a change.
+ */
+const ANSWER_FAILED = /\b(?:did\s*n[o']?t\s+load|didn’t\s+load|was\s+cut\s+off|got\s+cut\s+off|failed|stopped)\b/i;
+
+/** LAB-3367 o3, F6, t4: true when the message asks to change the reply. */
+function asksForChange(message: string): boolean {
+  return CHANGE_WORD.test(message) || (F6_CHANGE_WORD.test(message) && !ANSWER_FAILED.test(message));
+}
+
+/**
+ * LAB-3367 review item 4, t2: a request to change a text that the member pastes after a colon or a line break, at the
+ * start of the message: "shorten this: <text>", "rewrite the following text:\n<text>". The group is the text.
  */
 const PASTED_TEXT =
-  /^\s*(?:please\s+)?(?:shorten|rewrite|reword|rephrase|simplify|summari[sz]e|condense|trim|edit|fix|translate|cut)\s+(?:this|the\s+following)(?:\s+(?:text|paragraph|message))?[^\S\n]*(?::|\n)\s*\S/i;
+  /^\s*(?:please\s+)?(?:shorten|rewrite|reword|rephrase|simplify|summari[sz]e|condense|trim|edit|fix|translate|cut)\s+(?:this|the\s+following)(?:\s+(?:text|paragraph|message))?[^\S\n]*(?::|\n)([\s\S]*)$/i;
+
+/** LAB-3367 t2: the start of an edit instruction, not a pasted text: "edit this: add my PS to it". */
+const EDIT_START = /^\s*(?:add|remove|make|keep|mention|use|change|the\s+name\s+is)\b/i;
+
+/**
+ * LAB-3367 t2: true for a pasted text. The text has 4 or more words and does not start with an edit verb, and the
+ * message has no draft word. "fix this: the name is wrong, it is Grace", "rewrite this: more friendly" and "shorten
+ * this draft: ..." are draft edits.
+ */
+function isPastedText(message: string): boolean {
+  const text = PASTED_TEXT.exec(message)?.[1];
+  if (text === undefined || DRAFT_WORD.test(message) || EDIT_START.test(text)) return false;
+  return (text.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? []).length >= 4;
+}
 
 /** LAB-3367 p3: true when one "what you said" in `message` names the previous reply, not content for the draft. */
 function saysWhatYouSaid(message: string): boolean {
@@ -112,7 +145,7 @@ export function namesOwnLastAnswer(message: string): boolean {
  * - 'model': no change. No card waits, the message does not name the last answer, or the latest reply is the draft
  *   line (`INTRO_DRAFT_LINE`), so a revision of the card is correct.
  * - 'answer': the turn has no `draft_intro` tool, no card text and no intro hints. The message changes a pasted text
- *   (`PASTED_TEXT`, review item 4), or the latest reply is a normal answer, or it is not known and the message has no
+ *   (`isPastedText`, review item 4, t2), or the latest reply is a normal answer, or it is not known and the message has no
  *   change word.
  * - 'which': the latest reply is not known ('') or is `WHICH_REPLY_LINE`, and the message has a change word. The turn
  *   also gets the fixed answer `WHICH_REPLY_LINE`.
@@ -120,11 +153,11 @@ export function namesOwnLastAnswer(message: string): boolean {
 export function lastAnswerTurn(message: string, hasCard: boolean, latestReply: string): 'model' | 'answer' | 'which' {
   if (!hasCard) return 'model';
   // Review item 4: the pasted text is the text to change, so the card cannot change, with any latest reply.
-  if (PASTED_TEXT.test(message)) return 'answer';
+  if (isPastedText(message)) return 'answer';
   if (!namesOwnLastAnswer(message)) return 'model';
   const reply = latestReply.trim();
   if (reply === INTRO_DRAFT_LINE) return 'model';
-  if ((!reply || reply === WHICH_REPLY_LINE) && CHANGE_WORD.test(message)) return 'which';
+  if ((!reply || reply === WHICH_REPLY_LINE) && asksForChange(message)) return 'which';
   return 'answer';
 }
 

@@ -40,8 +40,10 @@ import {
   DRAFT_FACTS_RULE,
   draftIntroTool,
   INTRO_DRAFT_LINE,
+  INTRO_DRAFT_LINE_FORMS,
   introDraftLine,
   IntroTurnTarget,
+  NO_CHANGE_LINE,
 } from './labos-agent-drafts';
 import { lastAnswerTurn, WHICH_REPLY_LINE, withoutIntroHints } from './labos-agent-last-answer';
 import { searchMentions } from './labos-agent-mentions';
@@ -184,7 +186,12 @@ export class LabosAgentService {
     );
     // S3 (LAB-3300): an agent-only tool, not in McpToolCatalog, so the admin MCP caps do not apply. It writes nothing.
     const drafts: LabosAgentDraft[] = [];
-    const draftIntro = draftIntroTool(ctx, { introRequests: this.introRequests, targets: introTargets, drafts });
+    const draftIntro = draftIntroTool(ctx, {
+      introRequests: this.introRequests,
+      targets: introTargets,
+      drafts,
+      readTools: reads.map((def) => def.name),
+    });
 
     const extraTools = { ...mcpToolsAsAgentTools(reads, ctx), ...proposeTools, draft_intro: draftIntro };
 
@@ -234,6 +241,9 @@ export class LabosAgentService {
         },
         // LAB-3367: model text that is only the draft line is not a draft turn.
         reservedReply: INTRO_DRAFT_LINE,
+        // LAB-3367 t7b, t1: the other forms of the draft line, and the answer when no text is left.
+        reservedReplyForms: INTRO_DRAFT_LINE_FORMS,
+        emptyReplyLine: NO_CHANGE_LINE,
       }
     );
   }

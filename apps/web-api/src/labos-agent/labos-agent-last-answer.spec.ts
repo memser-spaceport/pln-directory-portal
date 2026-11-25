@@ -160,6 +160,52 @@ describe('LAB-3367 p1-p4: lastAnswerTurn wordings', () => {
     expect(lastAnswerTurn(message, true, INTRO_DRAFT_LINE)).toBe('model');
   });
 
+  it.each([
+    // t2 (Oleg review of b98a55d): real draft edits after "edit / fix / rewrite this:" keep the draft path.
+    ['edit this: add my PS to it'],
+    ['fix this: the name is wrong, it is Grace'],
+    ['rewrite this: more friendly'],
+    ['shorten this: remove the second sentence please'],
+    ['rewrite this: make it sound more like me'],
+    ['shorten this: the intro is too long for Grace'],
+  ])('t2: "%s" keeps the draft path', (message) => {
+    for (const reply of [NORMAL, INTRO_DRAFT_LINE]) expect(lastAnswerTurn(message, true, reply)).toBe('model');
+  });
+
+  it.each([
+    // t5: after "keep the draft and", only a change of the reply ends the clause.
+    ['keep the draft and add your last answer to it'],
+    ['keep the draft and mention your last answer'],
+  ])('t5: "%s" keeps the draft path', (message) => {
+    expect(lastAnswerTurn(message, true, NORMAL)).toBe('model');
+  });
+
+  it.each([
+    ['keep the draft as-is, shorten your last answer'],
+    ['keep the draft and make your last answer shorter'],
+    ['keep the draft but fix your last answer'],
+    ['keep the draft and expand your last answer'],
+  ])('as-is, t5: "%s" names the previous reply', (message) => {
+    expect(lastAnswerTurn(message, true, NORMAL)).toBe('answer');
+  });
+
+  it.each([
+    // t4: a failed answer and a request to say it again, not a change of the reply.
+    ['your last answer was cut off, tell me about Lit Protocol again in two sentences'],
+    ['your last answer did not load, give me a brief summary of Lit Protocol'],
+    ['your last answer failed. Translate the news about Lit for me'],
+    ['your last answer stopped, give me a concise list of teams'],
+  ])('t4: after Stop, "%s" goes to the model with no draft tool, not the fixed answer', (message) => {
+    expect(lastAnswerTurn(message, true, '')).toBe('answer');
+  });
+
+  it.each([['your last answer was cut off. Shorten your last answer'], ['make your last answer simpler']])(
+    't4: after Stop, "%s" still gets the fixed answer',
+    (message) => {
+      expect(lastAnswerTurn(message, true, '')).toBe('which');
+    }
+  );
+
   it('the real draft line keeps the draft path', () => {
     expect(lastAnswerTurn('shorten your last answer, not the intro draft', true, INTRO_DRAFT_LINE)).toBe('model');
   });

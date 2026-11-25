@@ -1302,6 +1302,114 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
         expect(JSON.parse(body).content).toBe(`A. ${start}${HUSKY_SEARCH_STALLED_NOTICE}`);
       });
 
+      const EMPTY = 'I did not change anything. Please say it again in other words.';
+
+      it('t1: a turn whose text is only the reserved line gets the empty-reply line and stores not known', async () => {
+        streamTextMock.mockReturnValueOnce(answerStream([` ${LINE}\n`]));
+        const body = await turn({ reservedReply: LINE, emptyReplyLine: EMPTY });
+        expect(JSON.parse(body).content.trim()).toBe(EMPTY);
+        expect(body).not.toContain(LINE);
+        expect(store.get(KEY)).toBe('');
+      });
+
+      it('t1: a refused draft (answer line off again) with only the line also gets the empty-reply line', async () => {
+        // The first chunk comes while a draft is on. Then the refusal clears the draft, and the model writes the line.
+        let draft = true;
+        const answerLine = () => (draft ? LINE : undefined);
+        async function* parts() {
+          yield 'Dropped.';
+          draft = false;
+          yield LINE;
+        }
+        streamTextMock.mockReturnValueOnce({ textStream: parts(), finishReason: Promise.resolve('stop') });
+        const body = await turn({ reservedReply: LINE, emptyReplyLine: EMPTY, answerLine });
+        expect(JSON.parse(body).content.trim()).toBe(EMPTY);
+        expect(store.get(KEY)).toBe('');
+      });
+
+      it('t1: no empty-reply line with no reserved line (AI search) or with text left', async () => {
+        streamTextMock.mockReturnValueOnce(answerStream([' ']));
+        expect(JSON.parse(await turn({ emptyReplyLine: EMPTY })).content).toBe(' ');
+        streamTextMock.mockReturnValueOnce(answerStream([`Ok. ${LINE}`]));
+        expect(JSON.parse(await turn({ reservedReply: LINE, emptyReplyLine: EMPTY })).content).toBe('Ok. ');
+      });
+
+      it('t7a: a held start of the line goes into the continuation once, not twice', async () => {
+        streamTextMock
+          .mockReturnValueOnce(answerStream(['Here is a'], 'length'))
+          .mockReturnValueOnce(answerStream(['Here is a list of teams.']));
+        const body = await turn({ reservedReply: LINE });
+        // The held text makes a continuation, not a new answer, with the held text in the partial answer.
+        expect(streamTextMock.mock.calls[1][0].prompt).toContain('partialAnswer: Here is a');
+        expect(JSON.parse(body).content).toBe('Here is a list of teams.');
+      });
+
+      it('t7b: the stream removes the bold line and the "Here’s" form, and keeps other bold text', async () => {
+        const HERES = LINE.replace('Here is', 'Here’s');
+        streamTextMock.mockReturnValueOnce(
+          answerStream([`**Note:** ok.\n\n**${LINE.slice(0, 12)}`, `${LINE.slice(12)}**\n\n__${HERES}__ ${HERES}`])
+        );
+        const body = await turn({ reservedReply: LINE, reservedReplyForms: [HERES] });
+        expect(JSON.parse(body).content).toBe('**Note:** ok.\n\n\n\n ');
+      });
+
+      describe('t7: a line split near its closing marks', () => {
+        const HERES = LINE.replace('Here is', 'Here’s');
+        const forms = [LINE, HERES].flatMap((line) => [line, `**${line}**`, `__${line}__`]);
+        // Each split point from the last letter of the line to the end of the closing marks.
+        const cases = forms.flatMap((form) => {
+          const end = form.lastIndexOf('.');
+          return Array.from({ length: form.length - end + 1 }, (_, k) => [form, end + k] as const);
+        });
+
+        it.each(cases)('removes %j split at %i, and keeps the text around it', async (form, at) => {
+          const text = `Ok. ${form} Done.`;
+          const cut = 4 + at;
+          streamTextMock.mockReturnValueOnce(answerStream([text.slice(0, cut), text.slice(cut)]));
+          const body = await turn({ reservedReply: LINE, reservedReplyForms: [HERES] });
+          expect(JSON.parse(body).content).toBe('Ok.  Done.');
+        });
+
+        it.each(cases)('gives the empty-reply line for only %j split at %i (t1)', async (form, at) => {
+          streamTextMock.mockReturnValueOnce(answerStream([form.slice(0, at), form.slice(at)]));
+          const body = await turn({ reservedReply: LINE, reservedReplyForms: [HERES], emptyReplyLine: EMPTY });
+          expect(JSON.parse(body).content.trim()).toBe(EMPTY);
+          expect(body).not.toContain('*');
+          expect(store.get(KEY)).toBe('');
+        });
+
+        it('completes a held bold line in the continuation, with no stray marks', async () => {
+          streamTextMock
+            .mockReturnValueOnce(answerStream([`Ok. **${LINE}`], 'length'))
+            .mockReturnValueOnce(answerStream(['** More text.']));
+          const body = await turn({ reservedReply: LINE });
+          expect(streamTextMock).toHaveBeenCalledTimes(2);
+          expect(streamTextMock.mock.calls[1][0].prompt).not.toContain(LINE);
+          expect(JSON.parse(body).content).toBe('Ok.  More text.');
+        });
+
+        it('completes a cut answer that is only a held bold line, with no stray marks', async () => {
+          streamTextMock
+            .mockReturnValueOnce(answerStream([`**${LINE}`], 'length'))
+            .mockReturnValueOnce(answerStream(['**Done.']));
+          const body = await turn({ reservedReply: LINE });
+          expect(streamTextMock.mock.calls[1][0].prompt).not.toContain(LINE);
+          expect(JSON.parse(body).content).toBe('Done.');
+        });
+
+        it.each([
+          [`${LINE}**Bold**`, '**Bold**'],
+          [`**Note ${LINE}**`, '**Note **'],
+          [`**${LINE}*`, '***'],
+          ['**Here is a list** of _teams_.', '**Here is a list** of _teams_.'],
+        ])('removes only the line and its balanced bold in %j', async (text, kept) => {
+          for (const at of [0, 2, 7, text.length - 2, text.length - 1]) {
+            streamTextMock.mockReturnValueOnce(answerStream([text.slice(0, at), text.slice(at)]));
+            expect(JSON.parse(await turn({ reservedReply: LINE })).content).toBe(kept);
+          }
+        });
+      });
+
       it('F6: text that only starts like the reserved line still streams', async () => {
         const start = LINE.slice(0, 8);
         streamTextMock.mockReturnValueOnce(answerStream([`A. ${start}`]));

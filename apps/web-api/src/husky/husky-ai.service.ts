@@ -135,6 +135,16 @@ export interface ContextualToolsOptions {
    */
   reservedReply?: string;
   /**
+   * LAB-3367 t7b: with `reservedReply`, other forms of that line, for example "Here’s" for "Here is". The stream
+   * removes these forms and the line, also in bold, from the model text of a turn with no answer line.
+   */
+  reservedReplyForms?: string[];
+  /**
+   * LAB-3367 t1: with `reservedReply`, a fixed line for a turn with no answer line and no text after trim, for example
+   * when the stream removed the reserved line. The latest reply stays '' (not known). AI search passes nothing.
+   */
+  emptyReplyLine?: string;
+  /**
    * Extra fields for the end of the streamed JSON object that need the finished turn, for example the answer counts
    * of the LabOS agent (LAB-3297). Called once, after `extraResponseFields`. A field with the key of a tail field
    * replaces it in the body, for example the agent `sources` (LAB-3362 D2). AI search passes nothing.
@@ -314,8 +324,12 @@ export class HuskyAiService {
     const turn: ContextualToolsOptions & LatestReplyTurn = options.latestReplyTurn
       ? { ...options, ...options.latestReplyTurn(latestReply) }
       : options;
-    // LAB-3367 F6: the model text never has the reserved line (the draft line) when the turn has no answer line.
-    const override = new AnswerOverride(turn.answerLine, options.reservedReply);
+    // LAB-3367 F6, t7b: the model text never has the reserved line (the draft line) or its other forms when the turn
+    // has no answer line. Only with `reservedReply`, so AI search does not change.
+    const override = new AnswerOverride(
+      turn.answerLine,
+      options.reservedReply ? [options.reservedReply, ...(options.reservedReplyForms ?? [])] : []
+    );
     const pageContext = turn.promptContext ? `  - pageContext: ${turn.promptContext}` : '';
     // LAB-3367 F3, F5: with a key, an empty value (a first turn, or a stopped, failed or cut-off turn, or a cache
     // failure) is the bare words `not available`. A stored reply is JSON text, so it is always in quotes.
@@ -401,10 +415,11 @@ export class HuskyAiService {
             );
             // Nothing reached the client yet and no context was gathered: start over.
             // Otherwise complete the visible text from the context already in hand.
+            // LAB-3367 t7a: the text that the override holds back is part of the answer so far. The continuation
+            // repeats nothing of it: its opening is compared with this partial answer, and the held text goes first.
+            const partialAnswer = content + override.held();
             const mode: AnswerMode =
-              content || toolResults
-                ? { kind: 'continuation', partialAnswer: content, toolResults }
-                : { kind: 'initial' };
+              partialAnswer || toolResults ? { kind: 'continuation', partialAnswer, toolResults } : { kind: 'initial' };
             const continuation = await this.streamAnswer(
               model,
               auth,
@@ -437,6 +452,14 @@ export class HuskyAiService {
             content += lastLine;
             emitText(encodeJsonStringFragment(lastLine));
           }
+          // LAB-3367 t1: with `reservedReply` only, a turn with no draft and no text (for example the model wrote only
+          // the draft line, also after a refused draft tool) gets `emptyReplyLine`. The latest reply stays not known.
+          const emptyAnswer =
+            !lastLine && Boolean(options.reservedReply) && turn.fixedAnswer === undefined && !content.trim();
+          if (emptyAnswer && options.emptyReplyLine) {
+            content += options.emptyReplyLine;
+            emitText(encodeJsonStringFragment(options.emptyReplyLine));
+          }
 
           if (stepsOpen) {
             stepsOpen = false;
@@ -468,11 +491,9 @@ export class HuskyAiService {
           if (latestReplyKey && complete) {
             // LAB-3367: model text that is the same as `reservedReply` is not that line, so it is stored as not known.
             const reply = lastLine ? lastLine.trim() : content;
-            // F6: the stream removed the line from the model text, so text with nothing more is also not known.
+            // F6, t1: the stream removed the line from the model text, so text with nothing more is also not known.
             const reserved =
-              !lastLine &&
-              Boolean(options.reservedReply) &&
-              (!content.trim() || content.trim() === options.reservedReply);
+              !lastLine && Boolean(options.reservedReply) && (emptyAnswer || content.trim() === options.reservedReply);
             await this.saveLatestReply(latestReplyKey, reserved ? '' : reply);
             // A cancel during the write: the client gets no end, so the reply is not latest. Clear it again and do not
             // close the cancelled stream. No await comes between this check and `controller.close()`.
