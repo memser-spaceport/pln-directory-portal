@@ -42,8 +42,13 @@ const STRICT_WISH = new RegExp(
   String.raw`^\s*(?:i|we)(?:\s+(?:want|need|would\s+like)|['’]d\s+like)\s+${NEW}${INTRO}\s+to\s+(?=this\s)`,
   'i'
 );
-/** The recipient ends its clause. Not "this person in charge", "@Kyle or Gitcoin", "@Acme, @Kyle and ...". */
-const CLAUSE_END = String.raw`(?=\s*(?:$|[.;:!?](?=\s|$)|,(?!\s*(?:and\b|or\b|@))|\n)|\s+(?:because|about|please)\b|\s+[-–—]\s)`;
+/** After the recipient: nothing, or "please". */
+const TAIL_END = /^(?:,?\s+please)?\s*[.!?]*\s*$/i;
+/** After the recipient: the reason, "because", "about" or ". I want". Not "this team I want to meet". */
+const TAIL_REASON =
+  /^(?:,?\s+please)?(?:(?:\s*[.,;:!?]+|\s+[-–—])?\s+(?:because|about)|(?:\s*[.,;:!?]+\s+|\s*\n\s*|\s+[-–—]\s+)(?:i|we)(?:\s+(?:want|need|would\s+like)|['’]d\s+like))\s+(?=\S)/i;
+/** In the reason: a second sentence, an item, or a second thought ("I want both", "I want Dana instead"). */
+const NOT_A_REASON = /[.!?;]\s+\S|\n\s*\S|@|\b(?:both|instead|rather|else|other|another)\b/i;
 /** A negation anywhere: "I don't want", "No need to", "No wait". */
 const NEGATION = /\b(?:no|not|never|without|cannot)\b|\b(?:can|don|doesn|didn|won|isn|aren|wouldn|shouldn)['’]?t\b/i;
 
@@ -136,22 +141,37 @@ function typeRecipient(text: string): TypeWord | undefined {
   return match ? { word: match[1].toLowerCase(), type: match[2] ? 'team' : 'member' } : undefined;
 }
 
-/** The message names the page in any way: its name or first name, "this page", "this member" on a member page, "she". */
+/** "this member", "the person", "the page", "the other member" on a member page. */
+function hasPageWords(text: string, page: IntroTurnTarget): boolean {
+  const words = page.type === 'team' ? TEAM_WORDS : MEMBER_WORDS;
+  return new RegExp(String.raw`\b(?:this|that|the)\s+(?:page\s+|other\s+)?(?:page|${words})\b`, 'i').test(text);
+}
+
+/** The message names the page in any way: its name or first name, "the page", "the member" on a member page, "she". */
 function mentionsPage(message: string, page: IntroTurnTarget, chip: IntroTurnTarget): boolean {
   // "@Grace Kim" is not the page Grace Hopper, and "@Acme Team" is not the page Acme.
   const rest = message.replace(new RegExp(`@?${escaped(chip.name)}`, 'gi'), ' ');
   if (hasWord(chip.name.length > page.name.length ? rest : message, page.name)) return true;
   const first = firstName(page.name);
   if (first && hasWord(rest, first)) return true;
-  const words = page.type === 'team' ? TEAM_WORDS : MEMBER_WORDS;
-  if (new RegExp(String.raw`\bthis\s+(?:page|${words})\b`, 'i').test(rest)) return true;
+  if (hasPageWords(rest, page)) return true;
   return page.type === 'member' && /\b(?:he|she|him|her|his|hers)\b/i.test(rest);
 }
 
+/** The text after the recipient only ends the message or gives the reason in one sentence, and names no chip. */
+function isPlainTail(tail: string, chips: readonly IntroTurnTarget[]): boolean {
+  if (TAIL_END.test(tail)) return true;
+  const start = TAIL_REASON.exec(tail);
+  if (!start) return false;
+  const reason = tail.slice(start[0].length);
+  return !NOT_A_REASON.test(reason) && !chips.some((chip) => hasWord(reason, chip.name));
+}
+
 /**
- * The one chip that the member chose (X2). The message STARTS with the request, the recipient ("this team", or the
- * @name right after "intro to" / "introduce me to") ENDS its clause, and the message has no negation, no second
- * "intro to" and does not name the page.
+ * The one chip that the member chose (X2). The message STARTS with the request, then comes the recipient ("this team",
+ * or the @name right after "intro to" / "introduce me to"), and then only the end or one sentence with the reason. The
+ * message has no negation, no second "intro to" and does not name the page. A correction in the same message
+ * ("Actually the member", "Wait, to Dana") is none of this, so it is not clear.
  */
 function chosenChip(
   message: string,
@@ -162,14 +182,15 @@ function chosenChip(
   if (!request || NEGATION.test(message) || [...message.matchAll(INTRO_TO)].length > 1) return undefined;
   const text = message.slice(request[0].length);
   const word = new RegExp(String.raw`^this\s+(?:(${TEAM_WORDS})|(${MEMBER_WORDS}))\b`, 'i').exec(text);
-  const ends = (recipient: string) => new RegExp(`^${recipient}${CLAUSE_END}`, 'i').test(text);
-  // "this team @Acme Team": the app writes the chip into the text.
   const type = word && (word[1] ? 'team' : 'member');
-  const named = chips.filter((chip) =>
-    type
-      ? chip.type === type && ends(String.raw`this\s+[a-z]+(?:,?\s+@${escaped(chip.name)})?`)
-      : ends(String.raw`(?:the\s+)?@?${escaped(chip.name)}`)
-  );
+  const named = chips.filter((chip) => {
+    // "this team @Acme Team": the app writes the chip into the text.
+    const source = word
+      ? String.raw`${word[0]}(?:,?\s+@${escaped(chip.name)})?`
+      : `(?:the\\s+)?@?${escaped(chip.name)}`;
+    const recipient = !type || chip.type === type ? new RegExp(`^${source}`, 'i').exec(text) : null;
+    return !!recipient && isPlainTail(text.slice(recipient[0].length), chips);
+  });
   if (named.length !== 1) return undefined;
   return page && mentionsPage(message, page, named[0]) ? undefined : named[0];
 }
@@ -205,7 +226,7 @@ function isOwnTeam(message: string, chip: IntroTurnTarget): boolean {
  * What a message asks for with its chips.
  * - a target: the one chip that the member chose (`chosenChip`).
  * - 'unclear': any other ask for an intro with a chip that can be the recipient. The chip and the page stay targets.
- * - undefined: no ask, the page is the recipient, or the chip is the own team of the member ("I work at @Acme").
+ * - undefined: no ask, the page is the recipient, or the chip is only the own team of the member ("I work at @Acme").
  */
 export function introAsk(
   message: string,
@@ -216,24 +237,19 @@ export function introAsk(
   const chip = chosenChip(message, chips, page);
   if (chip) return chip;
   const asked = requests(message);
-  if (
-    page &&
-    asked.some(({ text }) => isPage(text, page, chips)) &&
-    !asked.some(({ text }) => namesChip(text, chips, page))
-  ) {
-    return undefined;
-  }
+  const toChip = asked.some(({ text }) => namesChip(text, chips, page));
+  if (page && !toChip && asked.some(({ text }) => isPage(text, page, chips))) return undefined;
   const asks = asked.length > 0 || (ASKS.test(message.replace(PAST, ' ')) && !CANCELS.test(message));
-  return asks && (!page || chips.length > 1 || !isOwnTeam(message, chips[0])) ? 'unclear' : undefined;
+  return asks && (!page || toChip || chips.length > 1 || !isOwnTeam(message, chips[0])) ? 'unclear' : undefined;
 }
 
 /** True when the message has a request with a recipient. A message about the waiting card mostly has none. */
 export const hasIntroRequest = (message: string) => requests(message).length > 0;
 
 /** The recipient can be a chip: its name, or a type word of its type and not of the page type. */
-function namesChip(text: string, chips: readonly IntroTurnTarget[], page: IntroTurnTarget): boolean {
+function namesChip(text: string, chips: readonly IntroTurnTarget[], page: IntroTurnTarget | undefined): boolean {
   const type = typeRecipient(text)?.type;
-  return chips.some((chip) => startsWithName(text, chip.name) || (chip.type === type && type !== page.type));
+  return chips.some((chip) => startsWithName(text, chip.name) || (chip.type === type && type !== page?.type));
 }
 
 /** How a turn uses the kept targets. `both`: the page is also named, so the page is a target too. */
@@ -274,11 +290,10 @@ const namesKept = (text: string, kept: readonly IntroTurnTarget[]) =>
   kept.some((target) => startsWithName(text, target.name) || startsWithFirstName(text, target.name));
 
 function namesPage(message: string, kept: readonly IntroTurnTarget[], page: IntroTurnTarget): boolean {
-  if (hasWord(message, page.name) || /\b(?:this|the)\s+page\b/i.test(message)) return true;
+  if (hasWord(message, page.name)) return true;
   const first = firstName(page.name);
   if (page.type === 'member' && first && hasWord(message, first)) return true;
   // "the member instead", "Not the team, the person": each type word of the message.
-  const words = page.type === 'team' ? TEAM_WORDS : MEMBER_WORDS;
-  if (new RegExp(String.raw`\b(?:this|that|the)\s+(?:page\s+|other\s+)?(?:${words})\b`, 'i').test(message)) return true;
+  if (hasPageWords(message, page)) return true;
   return page.type === 'member' && kept.every((t) => t.type === 'team') && /\b(?:he|she|him|her)\b/i.test(message);
 }

@@ -2129,6 +2129,65 @@ describe('LAB-3367 B2, B3, B4 (Oleg live QA on 8fcac6ca)', () => {
       ['Grace', 'Kyle Weiss', 'I want an intro to @Kyle Weiss'],
       ['Grace', 'Kyle Weiss', 'To get an intro to @Kyle Weiss'],
       ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss at Gitcoin'],
+      // Round 24: a correction in the same message, or the chip only as the source.
+      ['Grace', 'Acme Team', 'Draft an intro to this team. I work at @Acme Team'],
+      ['Grace', 'Acme Team', 'Draft an intro to this company. I lead @Acme Team'],
+      ['Grace', 'Acme Team', 'Draft an intro to this company. @Acme Team told me about it'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team; @Acme Team sent me'],
+      ['Grace', 'Acme Team', 'Draft an intro to this org because @Acme Team works with them'],
+      ['Grace', 'Acme Team', 'Draft an intro to this project. We at @Acme Team want feedback'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team about a pilot with @Acme Team'],
+      ['Grace', 'Acme Team', 'Introduce me to this team. My team is @Acme Team'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team - I run @Acme Team'],
+      ['Grace', 'Acme Team', 'Draft an intro to this company, I work at @Acme Team'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to this person. @Kyle Weiss sent me'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to this member. @Kyle Weiss told me about them'],
+      ['Gitcoin', 'Kyle Weiss', 'Introduce me to this person because @Kyle Weiss knows them'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to this person about what @Kyle Weiss told me'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team. Wait, to Dana'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team. I mean the member'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team. Sorry, the person on the page'],
+      ['Grace', 'Acme Team', 'Draft an intro to @Acme Team. Actually the member'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team; rather the profile owner'],
+      ['Grace', 'Acme Team', 'Draft an intro to @Acme Team? Or the person?'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team. Oops, I meant the page'],
+      ['Grace', 'Acme Team', 'Draft an intro to @Acme Team, then one for the member'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss. Wait, to Dana'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss. I mean the team'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss? Or the team?'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss, through the team'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss. They can introduce me'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss. Wait, the company'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss. Wait, them'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss; first ask the team'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team. I want the member instead'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team. I want the person, rather'],
+      ['Grace', 'Acme Team', 'Draft an intro to @Acme Team. I would like the member too'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team please, or the person'],
+      ['Grace', 'Acme Team', 'Draft an intro to @Acme Team. I want to write to the person first'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team. I want both'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team because the member told me about it'],
+      ['Grace', 'Acme Team', 'Draft an intro to @Acme Team. The member told me about it'],
+      ['Grace', 'Acme Team', 'Draft an intro to @Acme Team. I met the person at a summit'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss. I want the team instead'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss. I would like the team too'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss. Sorry, the team'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to this member. I meant the company'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss because the team told me to'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team. I want feedback. Wait, to Dana'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team. I want feedback; or write to Dana'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team because I want feedback\nWait, to Dana'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team. I want Dana instead'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team. I need the other one'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team. I want feedback for @Zeta'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team because I work at Acme Team'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team I want to meet'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team please, or to Dana'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team, thanks to that person'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team about the other member'],
+      ['Grace', 'Acme Team', 'Draft an intro to @Acme Team. I have experience with IPFS'],
+      ['Grace', 'Acme Team', 'Draft an intro to @Acme Team. I lead my team'],
+      ['Grace', 'Acme Team', "Draft an intro to this team's founder"],
     ])('X2 strict: on the page of %s, the chip %s is not chosen by "%s"', (pageName, chipName, message) => {
       const page: IntroTurnTarget =
         pageName === 'Grace'
@@ -2139,6 +2198,26 @@ describe('LAB-3367 B2, B3, B4 (Oleg live QA on 8fcac6ca)', () => {
           ? { type: 'team', uid: 't-acme', name: chipName }
           : { type: 'member', uid: 'm-kyle', name: chipName };
       expect(introAsk(message, [chip], page)).toBe('unclear');
+    });
+
+    it.each([
+      ['Kyle Weiss', 'Draft an intro to this person. @Kyle Weiss sent me'],
+      ['Acme Team', 'Draft an intro to this team. I work at @Acme Team'],
+      ['Acme Team', 'Draft an intro to this company. I lead @Acme Team'],
+    ])('X2 strict: with no page, the chip %s is not chosen by "%s"', (name, message) => {
+      const chip: IntroTurnTarget = { type: name === 'Acme Team' ? 'team' : 'member', uid: 'u-1', name };
+      expect(introAsk(message, [chip], undefined)).toBe('unclear');
+    });
+
+    it('X2: a correction in the same message keeps both, and the reason turn too', async () => {
+      const h = h2();
+      const ask = { ...PAGE, message: 'Draft an intro to @Acme Team. Actually the member', mentions: [ACME] };
+      const first = await chat(h, ask);
+      expect(await targets(first.options)).toEqual(['m-grace', 't-acme']);
+      expect(first.prompt).not.toContain(WRONG);
+      const reason = await chat(h, REASON);
+      expect(await targets(reason.options)).toEqual(['m-grace', 't-acme']);
+      expect(reason.prompt).not.toContain(WRONG);
     });
 
     it('X2 strict: a name that shares words with the page, and two chips', () => {
@@ -2184,6 +2263,11 @@ describe('LAB-3367 B2, B3, B4 (Oleg live QA on 8fcac6ca)', () => {
       'Draft an intro to this team because we build the same thing',
       'Draft an intro to this team @Acme Team . I want feedback',
       'Draft an intro to this company',
+      'Draft an intro to this team, about our roadmap',
+      'Draft an intro to this team - I need help with v1.2 of our SDK!',
+      "Draft an intro to this team please. We'd like feedback, docs and a pilot",
+      'Draft an intro to this team\nI want feedback',
+      'Draft an intro to @Acme Team ?',
       'Draft an intro to @Acme Team',
       'Draft an intro to the @Acme Team',
       'Draft an intro to acme team please',
@@ -2218,11 +2302,13 @@ describe('LAB-3367 B2, B3, B4 (Oleg live QA on 8fcac6ca)', () => {
       expect(h.store.size).toBe(0);
     });
 
-    it('two chips: the one after "intro to" is the recipient, also without the hint of the other; two recipients stay', async () => {
+    it('two chips: the one after "intro to" is the recipient, also without the hint of the other; two named chips stay', async () => {
       const body = { ...PAGE, mentions: [ACME, KYLE] };
-      const one = await chat(h2(), { ...body, message: 'Draft an intro to @Acme Team, I know @Kyle Weiss' });
+      const one = await chat(h2(), { ...body, message: 'Draft an intro to @Acme Team. I want feedback' });
       expect(await targets(one.options)).toEqual(['t-acme']);
       expect(one.prompt).not.toContain('targetUid "m-kyle"');
+      const known = await chat(h2(), { ...body, message: 'Draft an intro to @Acme Team, I know @Kyle Weiss' });
+      expect(await targets(known.options)).toEqual(['m-grace', 'm-kyle', 't-acme']);
       const two = await chat(h2(), { ...body, message: 'Draft an intro to @Acme Team and @Kyle Weiss' });
       expect(await targets(two.options)).toEqual(['m-grace', 'm-kyle', 't-acme']);
     });
