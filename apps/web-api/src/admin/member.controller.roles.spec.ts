@@ -172,6 +172,16 @@ describe('MemberController access-code and email changes', () => {
     expect(memberService.createMemberByAdmin).toHaveBeenCalledWith(body);
   });
 
+  it('ignores blank access codes on create but still rejects real ones', async () => {
+    const blank = { email: 'new@example.com', roleCodes: [''] };
+    await controller.addNewMember(hostAdminReq, blank);
+    expect(memberService.createMemberByAdmin).toHaveBeenCalledWith(blank);
+
+    await expect(controller.addNewMember(hostAdminReq, { email: 'new@example.com', roleCodes: ['x'] })).rejects.toThrow(
+      ForbiddenException
+    );
+  });
+
   it('lets a directory admin create a member with access codes', async () => {
     const body = { email: 'new@example.com', permissionCodes: ['directory.admin.full'] };
     await controller.addNewMember(directoryAdminReq, body);

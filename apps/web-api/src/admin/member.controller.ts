@@ -231,7 +231,9 @@ export class MemberController {
   @Post('/create')
   @UseGuards(DemoDayAdminAuthGuard)
   async addNewMember(@Req() req: any, @Body() body: any): Promise<Member> {
-    const accessCodes = ['roleCodes', 'policyCodes', 'permissionCodes'].flatMap((key) => body?.[key] ?? []);
+    const accessCodes = ['roleCodes', 'policyCodes', 'permissionCodes']
+      .flatMap((key) => body?.[key] ?? [])
+      .filter(Boolean);
     if (accessCodes.length > 0 && !this.isDirectoryAdmin(req)) {
       throw new ForbiddenException('Only directory admins can assign access codes');
     }
