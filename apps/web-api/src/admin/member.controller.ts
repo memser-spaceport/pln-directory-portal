@@ -59,8 +59,7 @@ export class MemberController {
   private async scopeRolesToRequester(req: any, uid: string, roles: string[]): Promise<string[]>;
   private async scopeRolesToRequester(req: any, uid: string, roles?: string[]): Promise<string[] | undefined>;
   private async scopeRolesToRequester(req: any, uid: string, roles?: string[]): Promise<string[] | undefined> {
-    const permissions: string[] = req.user?.effectivePermissionCodes ?? req.user?.permissions ?? [];
-    if (roles === undefined || permissions.includes(ADMIN_PERMISSIONS.DIRECTORY_FULL)) return roles;
+    if (roles === undefined || this.isDirectoryAdmin(req)) return roles;
     const requested = roles.map((r) => r.trim().toUpperCase()).filter((r) => r.length > 0);
     const member = await this.memberService.findMemberByUid(uid);
     const held = member.memberRoles.map((r) => r.name);
@@ -69,6 +68,25 @@ export class MemberController {
     }
     const kept = held.filter((n) => n !== 'DEMO_DAY_ADMIN');
     return requested.includes('DEMO_DAY_ADMIN') ? [...kept, 'DEMO_DAY_ADMIN'] : kept;
+  }
+
+  private isDirectoryAdmin(req: any): boolean {
+    const permissions: string[] = req.user?.effectivePermissionCodes ?? req.user?.permissions ?? [];
+    return permissions.includes(ADMIN_PERMISSIONS.DIRECTORY_FULL);
+  }
+
+  /**
+   * Only directory admins may change a member's email: the new address signs in as that member.
+   * Compares case-insensitively, as MemberService.checkIfEmailChanged does. Null and '' both mean
+   * no email, so resending either for a member without one is not a change; any other non-string is.
+   */
+  private async assertEmailUnchanged(req: any, uid: string, email: unknown): Promise<void> {
+    if (email === undefined || this.isDirectoryAdmin(req)) return;
+    const member = await this.memberService.findMemberByUid(uid);
+    const incoming = email ?? '';
+    if (typeof incoming !== 'string' || (member.email ?? '').toLowerCase() !== incoming.toLowerCase()) {
+      throw new ForbiddenException('Only directory admins can change a member email');
+    }
   }
 
   @Get()
@@ -212,7 +230,11 @@ export class MemberController {
 
   @Post('/create')
   @UseGuards(DemoDayAdminAuthGuard)
-  async addNewMember(@Body() body: any): Promise<Member> {
+  async addNewMember(@Req() req: any, @Body() body: any): Promise<Member> {
+    const accessCodes = ['roleCodes', 'policyCodes', 'permissionCodes'].flatMap((key) => body?.[key] ?? []);
+    if (accessCodes.length > 0 && !this.isDirectoryAdmin(req)) {
+      throw new ForbiddenException('Only directory admins can assign access codes');
+    }
     return this.memberService.createMemberByAdmin(
       body as CreateMemberDto & {
         roleCodes?: string[];
@@ -225,7 +247,8 @@ export class MemberController {
   @Patch('/edit/:uid')
   @UseGuards(DemoDayAdminAuthGuard)
   @UsePipes(ZodValidationPipe)
-  async editMember(@Param('uid') uid: string, @Body() body: UpdateMemberDto): Promise<string> {
+  async editMember(@Req() req: any, @Param('uid') uid: string, @Body() body: UpdateMemberDto): Promise<string> {
+    await this.assertEmailUnchanged(req, uid, body.email);
     return this.memberService.updateMemberByAdmin(uid, body);
   }
 
@@ -246,15 +269,24 @@ export class MemberController {
   /**
    * Updates a member to a verfied user.
    *
+   * Only directory admins may change the member's email or access codes; for other admins the
+   * member's current access is kept.
+   *
    * @param body - participation request data with updated member details
    * @returns updated member object
    */
   @Patch('/:uid')
   @UseGuards(DemoDayAdminAuthGuard)
-  async updateMemberAndVerify(@Param('uid') uid, @Body() participantsRequest) {
+  async updateMemberAndVerify(@Req() req: any, @Param('uid') uid, @Body() participantsRequest) {
+    await this.assertEmailUnchanged(req, uid, (participantsRequest?.newData ?? participantsRequest)?.email);
     const requestor = await this.memberService.findMemberByRole();
     const requestorEmail = requestor?.email ?? '';
-    return await this.memberService.updateMemberFromParticipantsRequest(uid, participantsRequest, requestorEmail, true);
+    return await this.memberService.updateMemberFromParticipantsRequest(
+      uid,
+      participantsRequest,
+      requestorEmail,
+      this.isDirectoryAdmin(req)
+    );
   }
 
   /**
