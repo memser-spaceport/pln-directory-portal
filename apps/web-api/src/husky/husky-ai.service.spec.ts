@@ -1286,6 +1286,28 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
         );
       });
 
+      it('w1: omitHistory sends no chat history to the answer, the continuation or the tail', async () => {
+        store.set('thread-1:summary', 'The member asked for a Gitcoin intro draft.');
+        streamTextMock
+          .mockReturnValueOnce(answerStream(['Half'], 'length'))
+          .mockReturnValueOnce(answerStream([' and the rest.']));
+        await turn({ latestReplyTurn: () => ({ omitLatestReply: true, omitHistory: true }) });
+        expect(streamTextMock).toHaveBeenCalledTimes(2);
+        for (const [call] of [...streamTextMock.mock.calls, ...streamObjectMock.mock.calls]) {
+          expect(JSON.stringify(call)).not.toContain('Gitcoin');
+          expect(JSON.stringify(call)).not.toContain('chatHistory');
+        }
+        expect(streamObjectMock).toHaveBeenCalledTimes(1);
+      });
+
+      it('w1: with no omitHistory, the chat history stays in the answer and the tail', async () => {
+        store.set('thread-1:summary', 'The member asked for a Gitcoin intro draft.');
+        streamTextMock.mockReturnValueOnce(answerStream(['Ok.']));
+        await turn({ latestReplyTurn: () => ({}) });
+        expect(answerPrompt(0)).toContain('chatHistory: The member asked for a Gitcoin intro draft.');
+        expect(JSON.stringify(streamObjectMock.mock.calls[0][0])).toContain('Gitcoin');
+      });
+
       it('G7: omitLatestReply sends no Previous reply line, and the turn still stores its reply', async () => {
         streamTextMock.mockReturnValueOnce(answerStream(['New answer.']));
         await turn({ latestReplyTurn: () => ({ omitLatestReply: true }) });

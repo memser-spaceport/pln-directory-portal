@@ -29,6 +29,7 @@ import {
   INTRO_NOT_ELIGIBLE_TEXT,
   profileToolsLine,
   DRAFT_LIMITS_RULE,
+  INTRO_REASON_RULE,
 } from './labos-agent-drafts';
 import { LabosAgentProposalStore } from './labos-agent-proposals';
 import {
@@ -38,9 +39,10 @@ import {
   LabosAgentService,
   latestReplyCacheKey,
   PASTED_TEXT_RULE,
+  PASTED_WORDS_RULE,
   PREVIOUS_REPLY_RULE,
 } from './labos-agent.service';
-import { WHICH_REPLY_LINE } from './labos-agent-last-answer';
+import { ASK_WHAT_LINE, DRAFT_CARD_REPLY_LINE, WHICH_REPLY_LINE } from './labos-agent-last-answer';
 import * as pageContextModule from './labos-agent-page-context';
 
 /** Far from today, so the role end-date checks do not depend on the clock. */
@@ -479,12 +481,17 @@ describe('LabOS agent intro draft answer (LAB-3362 D4)', () => {
   );
 
   // LAB-3367 G8 (Oleg): the exact limit lines, so a change of the text shows in review.
+  // LAB-3367 G8 final round: only the member's words or profile facts, keep concrete details, ask for a reason.
   const G8_LIMITS =
     'When a fact is not given, leave it out. A short draft is correct. ' +
-    'To know a member, a team or a project is not experience with it: do not write that the member has experience, ' +
-    'skills or work with it. Do not add a reason for the intro that the member did not give. ' +
+    'Use only the words of the member and the facts of their LabOS profile. ' +
+    'Do not add experience, work, skills, an intent or a reason that the member did not give. ' +
+    'To know a member, a team or a project is not experience with it. ' +
+    'Keep each concrete detail in the words of the member. ' +
+    'Do not make it more general. ' +
+    'For a new draft: if the member gave no reason for the intro, make no draft and ask the member for the reason. ' +
     'For a request such as "make it more convincing", only reorder or reword the facts of the current text. ' +
-    'If the draft needs a reason and the member gave none, make no draft and ask the member for the reason.';
+    'Add no new fact.';
 
   it('LAB-3367 G8: the draft_intro description and the card prompt give the draft limits', async () => {
     const h = setup();
@@ -962,8 +969,8 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
       ['the fixed answer (K3)', WHICH_REPLY_LINE],
     ])('after %s: the fixed answer, no draft tool and no card text', async (_name, latestReply) => {
       const { turn } = await turnFor('Shorten your last answer.', latestReply, { ...card, context: TEAM_CONTEXT });
-      // The page context of the turn stays. Only the card text goes.
-      expect(turn.promptContext).toBeTruthy();
+      // LAB-3367 w1: the fixed answer runs no model call. The intro page context (the intro intent) does not go.
+      expect(turn.promptContext ?? '').not.toContain('wants to request an intro');
       expect(turn.fixedAnswer).toBe(WHICH_REPLY_LINE);
       expect(turn.extraTools).not.toHaveProperty('draft_intro');
       expect(turn.promptContext ?? '').not.toContain(CARD_TEXT);
@@ -1084,7 +1091,7 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
       it('G1: a pasted text gets only the colon rule, also after a known reply', async () => {
         for (const reply of [NORMAL, '', INTRO_DRAFT_LINE]) {
           const { turn } = await turnFor('shorten this: We build open tools for research teams.', reply);
-          expect(lines(turn).slice(-2)).toEqual([CARD_OPEN_RULE, PASTED_TEXT_RULE]);
+          expect(lines(turn).slice(-3)).toEqual([CARD_OPEN_RULE, PASTED_TEXT_RULE, PASTED_WORDS_RULE]);
           expect(turn.answerInstructions).not.toContain(PREVIOUS_REPLY_RULE);
           expect(turn).not.toHaveProperty('omitLatestReply');
         }
@@ -1133,6 +1140,137 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
         expect(turn.fixedAnswer).toBe(WHICH_REPLY_LINE);
         expect(turn.extraTools).not.toHaveProperty('draft_intro');
         expect(turn.promptContext ?? '').not.toContain(CARD_TEXT);
+      });
+    });
+
+    describe('LAB-3367 final QA (Oleg p1795624672059359)', () => {
+      const TEAM_PAGE = { context: { page: 'team', teamUid: 't-acme' } };
+      const MEMBER_PAGE = { context: { page: 'member', memberUid: 'm-grace' } };
+      const lines = (turn: { answerInstructions?: string }) => (turn.answerInstructions ?? '').split('\n');
+      const W1_EXACT = 'If the message does not say what to answer, ask what to answer. Do not use an older request.';
+      async function teamTurn(message: string, latestReply: string, extra: Record<string, unknown>) {
+        const h = setup(undefined, [MEMBER_PERMISSIONS.SEARCH_READ]);
+        jest.spyOn(pageContextModule, 'teamPagePrompt').mockResolvedValue('Team page Acme.');
+        const options = await chat(h, { ...VALID, message, ...extra });
+        return { options, turn: options.latestReplyTurn(latestReply) };
+      }
+      const noDraftText = (turn: { promptContext?: string; extraTools: Record<string, unknown> }) => {
+        expect(turn.extraTools).not.toHaveProperty('draft_intro');
+        expect(turn.promptContext ?? '').not.toContain('draft_intro');
+        expect(turn.promptContext ?? '').not.toContain(CARD_TEXT);
+        expect(turn.promptContext ?? '').not.toContain('wants to request an intro');
+      };
+
+      it('w1: ASK_AGAIN_RULE has the exact sentence, the topic rule and no draft', () => {
+        expect(ASK_AGAIN_RULE).toContain(W1_EXACT);
+        expect(ASK_AGAIN_RULE).toContain('When the message names a topic, answer only that topic.');
+        expect(ASK_AGAIN_RULE).toContain('Do not write an intro draft.');
+      });
+
+      it.each([
+        ['the member page with a card', { ...card, ...MEMBER_PAGE }],
+        ['the member page with no card', MEMBER_PAGE],
+        ['the intro page with a card', { ...card, context: TEAM_CONTEXT }],
+        ['the intro page with no card', { context: TEAM_CONTEXT }],
+        ['no page and no card', {}],
+      ])('w1a: on %s, Stop and "tell me about Lit Protocol again" answer only Lit', async (_name, extra) => {
+        for (const reply of ['', WHICH_REPLY_LINE, ASK_WHAT_LINE]) {
+          const message = 'your last answer was cut off, tell me about Lit Protocol again';
+          const { turn } = await teamTurn(message, reply, extra);
+          expect(turn).not.toHaveProperty('fixedAnswer');
+          expect(turn).toMatchObject({ omitLatestReply: true, omitHistory: true, answerLine: undefined });
+          expect(lines(turn)).toContain(ASK_AGAIN_RULE);
+          noDraftText(turn);
+        }
+      });
+
+      it.each([
+        ['your last answer failed, try again'],
+        ['your last answer was cut off, continue'],
+        ['Your last answer did not load. Please try again.'],
+        ['what you said got cut off, go on'],
+      ])('w1b: "%s" asks what to answer, with no model call and no draft, with or without a card', async (message) => {
+        for (const extra of [{ ...card, ...MEMBER_PAGE }, MEMBER_PAGE, { context: TEAM_CONTEXT }, {}]) {
+          for (const reply of ['', WHICH_REPLY_LINE, ASK_WHAT_LINE]) {
+            const { turn } = await teamTurn(message, reply, extra);
+            expect(turn.fixedAnswer).toBe(ASK_WHAT_LINE);
+            expect(turn).toMatchObject({ omitLatestReply: true, omitHistory: true });
+            noDraftText(turn);
+          }
+        }
+        expect(ASK_WHAT_LINE).toBe(
+          'I do not know what you asked before, so I did not answer. Please tell me what to answer.'
+        );
+      });
+
+      it('w1: after a known reply, the recovery path does not apply', async () => {
+        const { turn } = await teamTurn('your last answer failed, try again', NORMAL, MEMBER_PAGE);
+        expect(turn).toEqual({});
+      });
+
+      it.each([
+        ['with a card', card],
+        ['with no card', {}],
+      ])('w2: "shorten this: ... this team ..." %s gets no page context and no draft tool', async (_name, extra) => {
+        const message = 'shorten this: Our lab helps this team ship faster. We build tools.';
+        const { turn } = await teamTurn(message, NORMAL, { ...extra, ...TEAM_PAGE });
+        expect(turn.promptContext ?? '').not.toContain('Team page Acme.');
+        expect(turn.promptContext ?? '').not.toContain('t-acme');
+        expect(lines(turn).slice(-2)).toEqual([PASTED_TEXT_RULE, PASTED_WORDS_RULE]);
+        expect(turn).not.toHaveProperty('fixedAnswer');
+        noDraftText(turn);
+        // The message text goes to the model as the member wrote it: no name in place of "this team".
+        expect(PASTED_WORDS_RULE).toBe(
+          'Keep the words of the member in the text, also words such as "this team". Do not put a name in their place.'
+        );
+      });
+
+      it.each([
+        'company',
+        'org',
+        'organization',
+        'project',
+        'person',
+        'profile',
+        'article',
+        'role',
+        'position',
+        'opening',
+      ])('w3: "this %s" keeps the page context, "the %s" does not', async (noun) => {
+        const kept = await teamTurn(`Shorten your last answer about this ${noun}.`, NORMAL, { ...card, ...TEAM_PAGE });
+        expect(kept.turn.promptContext).toContain('Team page Acme.');
+        const dropped = await teamTurn(`Shorten your last answer about the ${noun}.`, NORMAL, {
+          ...card,
+          ...TEAM_PAGE,
+        });
+        expect(dropped.turn.promptContext ?? '').not.toContain('Team page Acme.');
+      });
+
+      it('item 4: straight after a draft, "keep the draft, what was your last answer about?" gets the card line', async () => {
+        const { turn } = await turnFor('keep the draft, what was your last answer about?', INTRO_DRAFT_LINE);
+        expect(turn.fixedAnswer).toBe(DRAFT_CARD_REPLY_LINE);
+        expect(DRAFT_CARD_REPLY_LINE).toBe(
+          'My last answer was the intro draft in the card. I did not change it. To change it, say “make the draft shorter”.'
+        );
+        expect(DRAFT_CARD_REPLY_LINE).not.toMatch(/profile/i);
+        noDraftText(turn);
+        // v1 stays: an edit right after the draft gets the which line.
+        const edit = await turnFor('keep the draft and shorten your last answer', INTRO_DRAFT_LINE);
+        expect(edit.turn.fixedAnswer).toBe(WHICH_REPLY_LINE);
+      });
+
+      it.each([
+        ['the team page', TEAM_PAGE],
+        ['the member page', MEMBER_PAGE],
+        ['the intro page ("Ask the agent")', { context: TEAM_CONTEXT }],
+        ['a mention', { mentions: [{ type: 'member', uid: 'm-grace' }] }],
+      ])('G8: on %s, the intro hint asks for a missing reason', async (_name, extra) => {
+        const { options } = await teamTurn('Draft an intro request to this team', NORMAL, extra);
+        expect(options.promptContext).toContain(INTRO_REASON_RULE);
+        expect(options.extraTools.draft_intro.description).toContain(DRAFT_LIMITS_RULE);
+        expect(INTRO_REASON_RULE).toBe(
+          'If the member gave no reason for the intro, make no draft and ask the member for the reason.'
+        );
       });
     });
 

@@ -10,6 +10,25 @@ export const WHICH_REPLY_LINE =
   'I cannot tell which reply to change, so I changed nothing. To change the intro draft, say “make the draft shorter”.';
 
 /**
+ * LAB-3367 w1: the fixed answer after a failed reply that is not known, when the message does not say what to answer
+ * ("your last answer failed, try again"). No older request is used.
+ */
+export const ASK_WHAT_LINE = 'I do not know what you asked before, so I did not answer. Please tell me what to answer.';
+
+/**
+ * LAB-3367 Oleg item 4: the fixed answer to a question about the last answer right after a draft card ("keep the
+ * draft, what was your last answer about?"). It tells only what happened: the card, with no profile change.
+ */
+export const DRAFT_CARD_REPLY_LINE =
+  'My last answer was the intro draft in the card. I did not change it. To change it, say “make the draft shorter”.';
+
+/** LAB-3367 w1: a reply that does not tell what the agent answered. The checks treat it as not known. */
+export function isUnknownReply(latestReply: string): boolean {
+  const reply = latestReply.trim();
+  return !reply || reply === WHICH_REPLY_LINE || reply === ASK_WHAT_LINE;
+}
+
+/**
  * LAB-3367 F1, F3, K3: the literal phrases that name the agent's own previous reply. They match only as whole words,
  * in any letter case. This is a narrow check for the agreed examples, not a language guess: other words for the same
  * request go to the model, with the prompt rules.
@@ -144,9 +163,26 @@ export function isPastedText(message: string): boolean {
  * again"), and the reply is not known. Then the turn answers the message as a new question with the tools.
  */
 export function asksAgainAfterFailure(message: string, latestReply: string): boolean {
-  const reply = latestReply.trim();
-  if (reply && reply !== WHICH_REPLY_LINE) return false;
+  if (!isUnknownReply(latestReply)) return false;
   return namesOwnLastAnswer(message) && ANSWER_FAILED.test(message);
+}
+
+/**
+ * LAB-3367 w1: the words of a recovery message that do not name a topic: "your last answer failed, try again", "your
+ * last answer was cut off, continue". Each other word (for example "Lit") names a topic.
+ */
+const NO_TOPIC_WORDS = new Set(
+  (
+    'your last latest previous answer answers reply replies response responses what you just said wrote was got ' +
+    "cut off did didn’t didn't didnt not load failed stopped try again continue retry please go on finish it " +
+    'that the and so now then can could would will resend send redo do tell me more answering'
+  ).split(' ')
+);
+
+/** LAB-3367 w1: true when the recovery message does not say what to answer. Then the turn gets `ASK_WHAT_LINE`. */
+export function namesNoTopic(message: string): boolean {
+  const words = message.toLowerCase().match(/[\p{L}\p{N}][\p{L}\p{N}'’]*/gu) ?? [];
+  return words.every((word) => NO_TOPIC_WORDS.has(word));
 }
 
 /** LAB-3367 p3: true when one "what you said" in `message` names the previous reply, not content for the draft. */
@@ -183,10 +219,16 @@ export function namesOwnLastAnswer(message: string): boolean {
  * - 'answer': the turn has no `draft_intro` tool, no card text and no intro hints. The message changes a pasted text
  *   (`isPastedText`, review item 4, t2), or the latest reply is a normal answer, or it is not known and the message has no
  *   change word.
- * - 'which': the latest reply is not known ('') or is `WHICH_REPLY_LINE`, and the message has a change word. The turn
- *   also gets the fixed answer `WHICH_REPLY_LINE`.
+ * - 'which': the latest reply is not known ('', `WHICH_REPLY_LINE` or `ASK_WHAT_LINE`), and the message has a change
+ *   word. The turn also gets the fixed answer `WHICH_REPLY_LINE`.
+ * - 'card': right after the draft line, a keep clause and a question about the last answer with no change word and no
+ *   failure word. The turn gets the fixed answer `DRAFT_CARD_REPLY_LINE` (Oleg item 4).
  */
-export function lastAnswerTurn(message: string, hasCard: boolean, latestReply: string): 'model' | 'answer' | 'which' {
+export function lastAnswerTurn(
+  message: string,
+  hasCard: boolean,
+  latestReply: string
+): 'model' | 'answer' | 'which' | 'card' {
   if (!hasCard) return 'model';
   // Review item 4: the pasted text is the text to change, so the card cannot change, with any latest reply.
   if (isPastedText(message)) return 'answer';
@@ -197,9 +239,11 @@ export function lastAnswerTurn(message: string, hasCard: boolean, latestReply: s
     // the draft line. Other negations ("not the intro draft") keep the draft path there.
     if (!KEEPS_DRAFT.test(message) && !NO_DRAFT_NOW.test(message)) return 'model';
     // v1: then the previous reply is the draft card, so no other reply can change. A change gets the fixed answer.
-    return asksForChange(message) ? 'which' : 'answer';
+    if (asksForChange(message)) return 'which';
+    // Oleg item 4: the previous reply is the card, so a fixed text tells it. The model cannot invent another reply.
+    return ANSWER_FAILED.test(message) ? 'answer' : 'card';
   }
-  if ((!reply || reply === WHICH_REPLY_LINE) && asksForChange(message)) return 'which';
+  if (isUnknownReply(reply) && asksForChange(message)) return 'which';
   return 'answer';
 }
 
