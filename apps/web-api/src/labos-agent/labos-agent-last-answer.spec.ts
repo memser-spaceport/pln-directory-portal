@@ -206,6 +206,107 @@ describe('LAB-3367 p1-p4: lastAnswerTurn wordings', () => {
     }
   );
 
+  it.each([
+    // u1 (Oleg live QA of 4eebb0e): a text that starts with a small letter is a draft edit, not a pasted text.
+    ['edit this: please add my PS to the end'],
+    ['rewrite this: say Monday and not Friday'],
+    ['fix this: there is a typo in the first line'],
+  ])('u1: "%s" keeps the draft path', (message) => {
+    for (const reply of [NORMAL, '', INTRO_DRAFT_LINE]) expect(lastAnswerTurn(message, true, reply)).toBe('model');
+  });
+
+  it.each([
+    // Mutants: EDIT_START words with a capital letter and 4 or more words, so the small-letter rule (u1) is not why.
+    ['edit this: Keep the part about Lit please'],
+    ['edit this: Mention that I met Grace in Lisbon'],
+    ['fix this: Use my full name in the first line'],
+    ['rewrite this: Change the last line to a question'],
+  ])('t2: "%s" (an edit verb with a capital letter) keeps the draft path', (message) => {
+    for (const reply of [NORMAL, INTRO_DRAFT_LINE]) expect(lastAnswerTurn(message, true, reply)).toBe('model');
+  });
+
+  it('t2: a pasted text needs 4 words, not 3', () => {
+    expect(lastAnswerTurn('shorten this: We build tools.', true, INTRO_DRAFT_LINE)).toBe('model');
+    expect(lastAnswerTurn('shorten this: We build open tools.', true, INTRO_DRAFT_LINE)).toBe('answer');
+  });
+
+  it.each([
+    // Group A (Oleg live QA of 4eebb0e): "keep the draft" with "exactly", "only" or "then" protects the draft.
+    ['keep the draft exactly the same, shorten your last answer'],
+    ['keep the draft exactly as it is and shorten your last answer'],
+    ['keep the draft and only shorten your last answer'],
+    ['keep the draft then shorten your last answer'],
+    // u3: a change of the reply after "keep the draft and".
+    ['keep the draft and remove the last line of your last answer'],
+    ['keep the draft and add a list to your last answer'],
+    ['keep the draft and make only your last answer shorter'],
+    ['keep the draft and change only your last answer'],
+  ])('Group A: "%s" protects the draft after each latest reply', (message) => {
+    expect(lastAnswerTurn(message, true, NORMAL)).toBe('answer');
+    expect(lastAnswerTurn(message, true, '')).toBe('which');
+    // The member asks to keep the draft, so the draft tool is off also right after the draft line.
+    expect(lastAnswerTurn(message, true, INTRO_DRAFT_LINE)).toBe('answer');
+  });
+
+  it.each([
+    // Group A: "don't make the draft now / yet" counts like "again".
+    ['shorten your last answer, don’t make the draft now'],
+    ["shorten your last answer, don't make the draft yet"],
+  ])('Group A: "%s" names the previous reply', (message) => {
+    expect(lastAnswerTurn(message, true, NORMAL)).toBe('answer');
+    expect(lastAnswerTurn(message, true, '')).toBe('which');
+    // The member asks for no draft now, so the draft tool is off also right after the draft line.
+    expect(lastAnswerTurn(message, true, INTRO_DRAFT_LINE)).toBe('answer');
+  });
+
+  it.each([
+    // Group A stays narrow: other negations and real draft edits keep the draft path after the draft line.
+    ['shorten your last answer, not the intro draft'],
+    ['shorten your last answer, don’t make the draft again'],
+    ['add your last answer, do not make the draft longer'],
+    ['add your last answer, but not now'],
+  ])('Group A: after the draft line, "%s" keeps the draft path', (message) => {
+    expect(lastAnswerTurn(message, true, INTRO_DRAFT_LINE)).toBe('model');
+  });
+
+  it.each([
+    // u3 order: the reply as content for the draft is a draft edit.
+    ['keep the draft and add your last answer to it'],
+    ['keep the draft and put your last answer to the end'],
+    ['keep the draft and add a line from your last answer'],
+    ['keep the draft and add the point of your last answer'],
+  ])('u3: "%s" keeps the draft path', (message) => {
+    for (const reply of [NORMAL, '', INTRO_DRAFT_LINE]) expect(lastAnswerTurn(message, true, reply)).toBe('model');
+  });
+
+  it('u3: "remove ... from your last answer" changes the reply', () => {
+    expect(lastAnswerTurn('keep the draft and remove the list from your last answer', true, NORMAL)).toBe('answer');
+  });
+
+  it.each([
+    // Mutant: "make", "change", "edit" and "fix" end the keep clause only before "your".
+    ['keep the draft and make it match your last answer'],
+    ['keep the draft and change it with your last answer'],
+    ['keep the draft and edit it with your last answer'],
+    ['keep the draft and fix it with your last answer'],
+    // u3: "to your last answer" changes the reply; "your last answer to it" is content for the draft.
+    ['keep the draft and add your last answer to it'],
+  ])('t5: "%s" keeps the draft path', (message) => {
+    expect(lastAnswerTurn(message, true, NORMAL)).toBe('model');
+  });
+
+  it.each([
+    // Mutants: the curly "didn’t load" and "got cut off" are failure statements (t4).
+    ['your last answer didn’t load, tell me about Lit Protocol again in two sentences'],
+    ['your last answer got cut off, give me a brief summary of Lit Protocol'],
+  ])('t4: after Stop, "%s" goes to the model with no draft tool', (message) => {
+    expect(lastAnswerTurn(message, true, '')).toBe('answer');
+  });
+
+  it('t4: with no failure statement, "in two sentences" gets the fixed answer after Stop', () => {
+    expect(lastAnswerTurn('tell me your last answer again in two sentences', true, '')).toBe('which');
+  });
+
   it('the real draft line keeps the draft path', () => {
     expect(lastAnswerTurn('shorten your last answer, not the intro draft', true, INTRO_DRAFT_LINE)).toBe('model');
   });

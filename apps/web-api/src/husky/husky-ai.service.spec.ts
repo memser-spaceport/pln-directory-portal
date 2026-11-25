@@ -1417,6 +1417,64 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
         expect(JSON.parse(body).content).toBe(`A. ${start}`);
       });
 
+      describe('LAB-3367 follow-up mutants', () => {
+        const HERES = LINE.replace('Here is', 'Here’s');
+        const draftStream = (before: string[], after: string[]) => {
+          let on = false;
+          streamTextMock.mockImplementationOnce(() => ({
+            fullStream: (async function* () {
+              for (const textDelta of before) yield { type: 'text-delta', textDelta };
+              yield { type: 'tool-call', toolCallId: 'c1', toolName: 'draft_intro' };
+              on = true;
+              for (const textDelta of after) yield { type: 'text-delta', textDelta };
+            })(),
+            finishReason: Promise.resolve('stop'),
+          }));
+          return () => (on ? LINE : undefined);
+        };
+
+        it('AI search: with no reserved line, the filter is off, also for the line forms', async () => {
+          const text = `A. ${LINE} **${LINE}** ${HERES}`;
+          streamTextMock.mockReturnValueOnce(answerStream([text.slice(0, 20), text.slice(20)]));
+          const body = await readAll(await service.createContextualToolsResponse(chatInfo, false));
+          expect(JSON.parse(body).content).toBe(text);
+        });
+
+        it('forms with no reservedReply do not turn the filter on', async () => {
+          const text = `A. ${HERES} **${HERES}**`;
+          streamTextMock.mockReturnValueOnce(answerStream([text.slice(0, 9), text.slice(9)]));
+          const body = await turn({ reservedReplyForms: [HERES], emptyReplyLine: EMPTY });
+          expect(JSON.parse(body).content).toBe(text);
+        });
+
+        it('t1: the no-change line is never in the stored latest reply', async () => {
+          streamTextMock.mockReturnValueOnce(answerStream([`**${LINE}**`]));
+          await turn({ reservedReply: LINE, reservedReplyForms: [HERES], emptyReplyLine: EMPTY });
+          expect(store.get(KEY)).toBe('');
+          expect(JSON.stringify(cache.set.mock.calls)).not.toContain(EMPTY);
+        });
+
+        it.each([['*'], ['**'], ['_'], ['__']])(
+          'u4: the marks %j right before a draft_intro call stay, with the draft line',
+          async (marks) => {
+            for (const after of [[], ['Hi Grace, Draft-text-91c2.']]) {
+              const answerLine = draftStream([`I will write it ${marks}`], after);
+              const body = await turn({ reservedReply: LINE, answerLine });
+              expect(JSON.parse(body).content).toBe(`I will write it ${marks}\n\n${LINE}`);
+            }
+          }
+        );
+
+        it('u4: held text that is not only marks goes while the draft is on', async () => {
+          for (const after of [[], ['Hi Grace, Draft-text-91c2.']]) {
+            const answerLine = draftStream(['Ok. ', LINE.slice(0, 9)], after);
+            const body = await turn({ reservedReply: LINE, answerLine });
+            expect(JSON.parse(body).content).toBe(`Ok. \n\n${LINE}`);
+            expect(body).not.toContain('Draft-text-91c2');
+          }
+        });
+      });
+
       it('F6: with no reserved line, the model text does not change', async () => {
         streamTextMock.mockReturnValueOnce(answerStream([LINE]));
         const body = await turn();

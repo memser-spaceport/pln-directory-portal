@@ -43,9 +43,8 @@ export class AnswerOverride {
   /** The text to stream for `chunk`. `written` is the answer text of the turn so far. */
   filter(chunk: string, written: string): string {
     if (this.isOn()) {
-      if (chunk || this.heldText) this.dropped = true;
-      this.heldText = '';
-      return '';
+      if (chunk || !/^[*_]*$/.test(this.heldText)) this.dropped = true;
+      return this.heldMarks();
     }
     if (!this.dropped) return this.withoutReserved(chunk);
     // The break before the text came with the dropped text. At the start of the answer the text needs none.
@@ -54,9 +53,20 @@ export class AnswerOverride {
     return this.withoutReserved(next);
   }
 
-  /** LAB-3367 F6: the held text after all generations, or ''. While the override is on, the held text is dropped. */
+  /** LAB-3367 F6: the held text after all generations, or ''. While the override is on, only held marks stay (u4). */
   flush(): string {
-    const out = this.isOn() ? '' : this.scan(this.heldText, true).out;
+    if (this.isOn()) return this.heldMarks();
+    const out = this.scan(this.heldText, true).out;
+    this.heldText = '';
+    return out;
+  }
+
+  /**
+   * LAB-3367 u4: while the override is on, the held text goes. Only held text that is all marks (`*`, `**`, `_` or
+   * `__` right before the `draft_intro` call) stays, because it is text before the tool call, not a start of the line.
+   */
+  private heldMarks(): string {
+    const out = /^[*_]+$/.test(this.heldText) ? this.heldText : '';
     this.heldText = '';
     return out;
   }

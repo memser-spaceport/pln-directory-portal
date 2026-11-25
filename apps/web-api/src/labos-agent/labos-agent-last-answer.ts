@@ -30,11 +30,19 @@ const REVISION_AFTER_CONTENT =
   /\b(?:to|shorten|rewrite|reword|rephrase|change|edit|revise|simplify|summari[sz]e|condense|trim|cut)\b/i;
 
 /**
- * LAB-3367 s1, t5: the verbs after "and" or "but" that end a keep or leave clause: "keep the draft and shorten ...".
- * "make", "change", "edit" and "fix" count only before "your". "keep the draft and add your last answer to it" is a
- * draft edit.
+ * LAB-3367 s1, t5, u3: the verbs after "and", "but" or "then" that end a keep or leave clause: "keep the draft and
+ * shorten ...". "make", "change", "edit" and "fix" count only before "your" (also "only your" or "just your"). "keep the
+ * draft and add your last answer to it" is a draft edit.
  */
-const CHANGE_VERBS = String.raw`(?:shorten|rewrite|reword|rephrase|revise|expand|simplify|summari[sz]e|condense|trim|cut|translate|redo|(?:make|change|edit|fix)\s+your)`;
+const CHANGE_VERBS = String.raw`(?:shorten|rewrite|reword|rephrase|revise|expand|simplify|summari[sz]e|condense|trim|cut|translate|redo|(?:make|change|edit|fix)\s+(?:(?:only|just)\s+)?your)`;
+
+/**
+ * LAB-3367 u3: a change of the previous reply, later in the same sentence. "add" or "put" needs "to your last answer"
+ * ("add a list to your last answer"). "remove" or "delete" needs "of", "from" or "in your last answer" ("remove the last
+ * line of your last answer"). "add your last answer to it" and "add a line from your last answer" are draft edits.
+ */
+const YOUR_REPLY = String.raw`your\s+(?:last|latest|previous)\s+(?:answers?|repl(?:y|ies)|responses?)\b`;
+const REPLY_EDIT = String.raw`(?:(?:add|put)\b[^.!?\n]*?\bto\s+${YOUR_REPLY}|(?:remove|delete)\b[^.!?\n]*?\b(?:of|from|in)\s+${YOUR_REPLY})`;
 
 /** LAB-3367 o3: the words that name the intro draft, also in the plural. */
 const DRAFT_WORDS = String.raw`(?:drafts?|intros?|introductions?|cards?)`;
@@ -56,18 +64,33 @@ const DRAFT_WORD = new RegExp(String.raw`\b${DRAFT_WORDS}\b`, 'i');
  *   one more word that is not "again" does not count: "do not make the draft longer" is a draft edit.
  * - After "keep" or "leave", only at the end of the clause (s1): the end of the text, a line break, a punctuation mark,
  *   a bracket or a dash; before "alone", "unchanged", "untouched", "intact", "the same", "like it", "please", "for
- *   now", "as-is", "as it", "as is" or "as they"; or before "and" or "but", optional "please" or "just", and a change
- *   verb (`CHANGE_VERBS`).
+ *   now", "as-is", "as it", "as is" or "as they" (also after "exactly"); or before optional "and" or "but", optional
+ *   "then", optional "please", "just" or "only", and a change verb (`CHANGE_VERBS`), or "add", "remove", "delete" or
+ *   "put" with "to your last answer", or "remove" or "delete" with "of / from / in your last answer", later in the
+ *   sentence (`REPLY_EDIT`, Group A, u3).
+ * - "don't make the draft now" and "... yet" count like "again" (Group A).
  *   "keep the intro short" and "keep the intro as short as it is" are draft edits.
  */
-const DRAFT_EDIT_AFTER_MAKE = String.raw`\s+make\s+(?:(?:the|my|this)\s+)?${DRAFT_PHRASE}\s+(?!again\b)[\w'’]+`;
+const DRAFT_EDIT_AFTER_MAKE = String.raw`\s+make\s+(?:(?:the|my|this)\s+)?${DRAFT_PHRASE}\s+(?!(?:again|now|yet)\b)[\w'’]+`;
 const KEEP_CLAUSE_END =
-  String.raw`(?=[^\S\n]*(?:$|[\n.,;:!?()[\]{}\-–—]|(?:alone|unchanged|untouched|intact|the\s+same|like\s+it|please|for\s+now|as-is|as\s+(?:it|is|they))\b` +
-  String.raw`|(?:and|but)\s+(?:(?:please|just)\s+)?${CHANGE_VERBS}\b))`;
+  String.raw`(?=[^\S\n]*(?:$|[\n.,;:!?()[\]{}\-–—]|(?:exactly\s+)?(?:alone|unchanged|untouched|intact|the\s+same|like\s+it|please|for\s+now|as-is|as\s+(?:it|is|they))\b` +
+  String.raw`|(?:(?:and|but)\s+)?(?:then\s+)?(?:(?:please|just|only)\s+)?(?:${CHANGE_VERBS}\b|${REPLY_EDIT})))`;
+const KEPT_DRAFT = String.raw`\b(?:keep|leave)\b(?:\s+[\w'’]+){0,3}?\s+${DRAFT_PHRASE}\b${KEEP_CLAUSE_END}`;
 const NEGATED_DRAFT_WORD = new RegExp(
-  String.raw`\b(?:(?:not|don['’]?t|never)(?!${DRAFT_EDIT_AFTER_MAKE})|without|instead\s+of)\b(?:\s+[\w'’]+){0,3}?\s+${DRAFT_PHRASE}\b` +
-    String.raw`|\b(?:keep|leave)\b(?:\s+[\w'’]+){0,3}?\s+${DRAFT_PHRASE}\b${KEEP_CLAUSE_END}`,
+  String.raw`\b(?:(?:not|don['’]?t|never)(?!${DRAFT_EDIT_AFTER_MAKE})|without|instead\s+of)\b(?:\s+[\w'’]+){0,3}?\s+${DRAFT_PHRASE}\b|${KEPT_DRAFT}`,
   'gi'
+);
+
+/** LAB-3367 Group A: the member asks to keep the draft as it is ("keep the draft and shorten your last answer"). */
+const KEEPS_DRAFT = new RegExp(KEPT_DRAFT, 'i');
+
+/**
+ * LAB-3367 Group A: "don't make the draft now" or "... yet" (also "not", "do not" or "never"). Like a keep clause, it
+ * protects the draft also after the draft line. "not the intro draft" and "don't make the draft longer" do not match.
+ */
+const NO_DRAFT_NOW = new RegExp(
+  String.raw`\b(?:not|don['’]?t|never)\s+make\s+(?:(?:the|my|this|a|an)\s+)?${DRAFT_PHRASE}\s+(?:now|yet)\b`,
+  'i'
 );
 
 /**
@@ -105,13 +128,14 @@ const PASTED_TEXT =
 const EDIT_START = /^\s*(?:add|remove|make|keep|mention|use|change|the\s+name\s+is)\b/i;
 
 /**
- * LAB-3367 t2: true for a pasted text. The text has 4 or more words and does not start with an edit verb, and the
- * message has no draft word. "fix this: the name is wrong, it is Grace", "rewrite this: more friendly" and "shorten
+ * LAB-3367 t2, u1: true for a pasted text. The text has 4 or more words and does not start with an edit verb or a
+ * small letter, and the message has no draft word. "fix this: the name is wrong, it is Grace", "rewrite this: more friendly" and "shorten
  * this draft: ..." are draft edits.
  */
 function isPastedText(message: string): boolean {
   const text = PASTED_TEXT.exec(message)?.[1];
-  if (text === undefined || DRAFT_WORD.test(message) || EDIT_START.test(text)) return false;
+  // u1: a text that starts with a small letter is an edit instruction: "edit this: please add my PS to the end".
+  if (text === undefined || DRAFT_WORD.test(message) || EDIT_START.test(text) || /^\s*\p{Ll}/u.test(text)) return false;
   return (text.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? []).length >= 4;
 }
 
@@ -143,7 +167,9 @@ export function namesOwnLastAnswer(message: string): boolean {
 /**
  * LAB-3367 F1, F3, K3, o3: how a C1 turn handles a message that names "your last answer".
  * - 'model': no change. No card waits, the message does not name the last answer, or the latest reply is the draft
- *   line (`INTRO_DRAFT_LINE`), so a revision of the card is correct.
+ *   line (`INTRO_DRAFT_LINE`), so a revision of the card is correct. A message that keeps the draft ("keep the draft
+ *   and shorten your last answer") or "don't make the draft now / yet" does not get this path after the draft line
+ *   (Group A).
  * - 'answer': the turn has no `draft_intro` tool, no card text and no intro hints. The message changes a pasted text
  *   (`isPastedText`, review item 4, t2), or the latest reply is a normal answer, or it is not known and the message has no
  *   change word.
@@ -156,7 +182,9 @@ export function lastAnswerTurn(message: string, hasCard: boolean, latestReply: s
   if (isPastedText(message)) return 'answer';
   if (!namesOwnLastAnswer(message)) return 'model';
   const reply = latestReply.trim();
-  if (reply === INTRO_DRAFT_LINE) return 'model';
+  // Group A: an explicit "keep the draft ..." or "don't make the draft now / yet" protects the draft also right after
+  // the draft line. Other negations ("not the intro draft") keep the draft path there.
+  if (reply === INTRO_DRAFT_LINE && !KEEPS_DRAFT.test(message) && !NO_DRAFT_NOW.test(message)) return 'model';
   if ((!reply || reply === WHICH_REPLY_LINE) && asksForChange(message)) return 'which';
   return 'answer';
 }

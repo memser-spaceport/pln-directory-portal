@@ -23,7 +23,12 @@ import { APP_ENV } from '../utils/constants';
 import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { LabosAgentAccessService } from './labos-agent-access.service';
 import { LabosAgentController } from './labos-agent.controller';
-import { INTRO_DRAFT_FAILED_TEXT, INTRO_DRAFT_LINE, INTRO_NOT_ELIGIBLE_TEXT } from './labos-agent-drafts';
+import {
+  INTRO_DRAFT_FAILED_TEXT,
+  INTRO_DRAFT_LINE,
+  INTRO_NOT_ELIGIBLE_TEXT,
+  profileToolsLine,
+} from './labos-agent-drafts';
 import { LabosAgentProposalStore } from './labos-agent-proposals';
 import { LAST_ANSWER_RULES, LabosAgentService, latestReplyCacheKey } from './labos-agent.service';
 import { WHICH_REPLY_LINE } from './labos-agent-last-answer';
@@ -448,11 +453,25 @@ describe('LabOS agent intro draft answer (LAB-3362 D4)', () => {
     expect(options.extraTools.draft_intro.description).toContain(DRAFT_FACTS_RULE);
   });
 
-  it('LAB-3367 t3: with no profile read tool, the description names none', async () => {
-    jest.spyOn(LabosAgentService.prototype as any, 'tools').mockResolvedValue([]);
-    const h = setup();
-    const { options } = await h.turn(MEMBER_CONTEXT);
-    expect(options.extraTools.draft_intro.description).not.toMatch(/get_my_profile|list_my_experiences/);
+  it.each([[[]], [['search_members']]])(
+    'LAB-3367 t3: with the tools %j and no profile read tool, the description names none',
+    async (names) => {
+      const defs = names.map((name) => ({ name, description: name, inputSchema: {}, execute: jest.fn() }));
+      jest.spyOn(LabosAgentService.prototype as any, 'tools').mockResolvedValue(defs);
+      const h = setup();
+      const { options } = await h.turn(MEMBER_CONTEXT);
+      const description: string = options.extraTools.draft_intro.description;
+      expect(description).not.toMatch(/get_my_profile|list_my_experiences|search_members/);
+      // Mutant: no "you can call ." with an empty tool list.
+      expect(description).not.toContain('you can call');
+      expect(description).not.toContain('LabOS profile, ');
+      expect(description).toContain(DRAFT_FACTS_RULE);
+    }
+  );
+
+  it('LAB-3367 t3: profileToolsLine gives no text for no profile read tool', () => {
+    expect(profileToolsLine([])).toBe('');
+    expect(profileToolsLine(['search_members'])).toBe('');
   });
 
   it('tells the model not to repeat the draft text in the answer', async () => {
