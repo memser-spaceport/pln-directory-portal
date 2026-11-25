@@ -48,7 +48,7 @@ export const DRAFT_LIMITS_RULE =
   'Use only the words of the member and the facts of their LabOS profile. ' +
   'Do not add experience, work, skills, an intent or a reason that the member did not give. ' +
   'To know a member, a team or a project is not experience with it. ' +
-  'Keep each concrete detail in the words of the member, for example "I ran two small grants rounds". ' +
+  'Keep each concrete detail in the words of the member. ' +
   'Do not make it more general. ' +
   // LAB-3367 G8: ask on every page, the same text as the page hints (INTRO_REASON_RULE).
   'For a new draft: if the member gave no reason for the intro, make no draft and ask the member for the reason. ' +
