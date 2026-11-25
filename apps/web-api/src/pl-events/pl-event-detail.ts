@@ -154,6 +154,8 @@ export function toPLEventDetail(event: PLEventDetailRow, parts: PLEventDetailPar
   if (parts.viewerRow?.isSpeaker) roles.push('Speaker');
   if (parts.viewerRow?.isSponsor) roles.push('Sponsor');
 
+  const details = assembleEventDetails(event.additionalInfo, event);
+
   return {
     uid: event.uid,
     name: event.name,
@@ -185,13 +187,14 @@ export function toPLEventDetail(event: PLEventDetailRow, parts: PLEventDetailPar
           })),
         }
       : null,
-    timezone: event.timezone ?? event.location?.timezone ?? null,
+    // The event's own time zone (the typed column, else the stored details), or the gathering's.
+    timezone: details.timezone ?? event.location?.timezone ?? null,
     allDay: event.isAllDay === true,
     venue: eventVenue(event),
     registrationUrl: event.registrationUrl ?? null,
     meetingUrl: event.meetingUrl ?? null,
     // Empty details for an event that has none, never missing fields.
-    details: assembleEventDetails(event.additionalInfo, event),
+    details,
     hosts: parts.hosts.map(toPerson).filter((p): p is NonNullable<typeof p> => !!p),
     goingCount: parts.goingCount,
     faces: parts.faces.map(toPerson).filter((p): p is NonNullable<typeof p> => !!p),

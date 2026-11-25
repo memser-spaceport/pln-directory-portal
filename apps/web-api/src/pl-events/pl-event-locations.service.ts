@@ -703,7 +703,7 @@ export class PLEventLocationsService {
       });
       if (existingLocation) {
         this.logger.info(`Location already exists with similar coordinates. City: ${location.location}, Existing: (${existingLocation.latitude}, ${existingLocation.longitude})`);
-        throw new ConflictException(`Location already exists : ${location.location}`);
+        return existingLocation;
       }
 
       // If no existing location found or deviation is greater than 2 degrees, create new location

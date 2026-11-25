@@ -1,4 +1,5 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { createHash, timingSafeEqual } from 'crypto';
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '../utils/jwt/jwt.service';
 import { LogService } from '../shared/log.service';
 import { MemberRole } from '../utils/constants';
@@ -13,9 +14,13 @@ export class AdminService {
    * @param username - Admin username
    * @param password - Admin password
    * @returns Object containing access token on successful login
+   * @throws NotFoundException when ADMIN_LEGACY_LOGIN_ENABLED is not true
    * @throws UnauthorizedException if credentials are invalid
    */
   async login(username: string, password: string): Promise<{ code: number; accessToken: string }> {
+    if (process.env.ADMIN_LEGACY_LOGIN_ENABLED !== 'true') {
+      throw new NotFoundException();
+    }
     if (!this.isValidAdminCredentials(username, password)) {
       this.logger.error('Invalid credentials provided for admin login.');
       throw new UnauthorizedException('Invalid credentials');
@@ -34,6 +39,15 @@ export class AdminService {
   private isValidAdminCredentials(username: string, password: string): boolean {
     const validUsername = process.env.ADMIN_LOGIN_USERNAME;
     const validPassword = process.env.ADMIN_LOGIN_PASSWORD;
-    return username === validUsername && password === validPassword;
+    if (!validUsername || !validPassword) return false;
+    const usernameMatches = safeEqual(username, validUsername);
+    const passwordMatches = safeEqual(password, validPassword);
+    return usernameMatches && passwordMatches;
   }
+}
+
+/** Constant-time compare. Hashing makes the buffers the same length. */
+function safeEqual(a: string, b: string): boolean {
+  const digest = (value: string) => createHash('sha256').update(value).digest();
+  return timingSafeEqual(digest(a), digest(b));
 }

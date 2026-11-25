@@ -12,11 +12,8 @@ import { fuzzyMatches, longestWord, textMentions } from './fuzzy-match.util';
 import { VISIBLE_PL_EVENT_WHERE } from '../../pl-events/pl-event-visibility';
 
 const MAX_EVENTS = 10;
-/**
- * Attendees come from the same paginated service the IRL Gatherings page uses; one page this
- * size covers all but the largest gatherings, and the output says so when it does not.
- */
-const ATTENDEE_FETCH_LIMIT = 300;
+/** Page size for the public guest list. That route caps `limit` at this value. */
+const ATTENDEE_PAGE_LIMIT = 100;
 const MAX_ATTENDEES_SHOWN = 40;
 /**
  * Each event's attendee lookup is a heavy multi-join query over every guest at its location;
@@ -332,12 +329,24 @@ export class IrlEventsTool {
     if (!event.locationUid) {
       return { attendees: [], fetched: 0, total: 0 };
     }
-    const rows: Attendee[] = await this.guestsService.getPLEventGuestsByLocationAndType(
-      event.locationUid,
-      { filteredEvents: [event.uid], limit: ATTENDEE_FETCH_LIMIT, page: 1 },
-      viewer
-    );
-    const total = rows[0]?.count ?? rows.length;
+    const rows: Attendee[] = [];
+    let total = 0;
+    let page = 1;
+    while (true) {
+      const pageRows: Attendee[] = await this.guestsService.getPLEventGuestsByLocationAndType(
+        event.locationUid,
+        { filteredEvents: [event.uid], limit: ATTENDEE_PAGE_LIMIT, page },
+        viewer
+      );
+      if (page === 1) {
+        total = pageRows[0]?.count ?? pageRows.length;
+      }
+      rows.push(...pageRows);
+      if (pageRows.length < ATTENDEE_PAGE_LIMIT) {
+        break;
+      }
+      page += 1;
+    }
     let attendees = rows;
     if (args.guestName) {
       // The page service only applies its name search to event-level guests, not to guests

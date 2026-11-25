@@ -93,9 +93,13 @@ export class PLEventSyncService {
       return { updated: 0, skipped: true, reason: 'EVENTS_LOCAL_SUBMIT_ENABLED is on: LabOS owns events' };
     }
     try {
-      const { selectedEventUids } = body ?? {};
-      const events = await this.fetchEventsFromService({ selectedEventUids });
-      if (!events) return { updated: 0 };
+      const { selectedEventUids, timeoutMs } = body ?? {};
+      const fetched = await this.fetchEventsFromService({ selectedEventUids, timeoutMs });
+      if (!fetched) return { updated: 0 };
+      // Only what was asked for, whatever the events service answers: one queue message must not rewrite every event.
+      const events = isEmpty(selectedEventUids)
+        ? fetched
+        : fetched.filter((event) => selectedEventUids.includes(event.event_id));
 
       // pl-event-visibility: the backfill matches its own events by externalId, whatever their status.
       const existingEvents = await this.prisma.pLEvent.findMany({
@@ -144,7 +148,7 @@ export class PLEventSyncService {
    */
   private async fetchEventsFromService(params) {
     try {
-      const { selectedEventUids } = params;
+      const { selectedEventUids, timeoutMs } = params;
       const queryParams = new URLSearchParams({
         status: 'APPROVED',
         conference: ""
@@ -158,7 +162,8 @@ export class PLEventSyncService {
         {
           headers: {
             'origin': process.env.IRL_DOMAIN,
-          }
+          },
+          ...(timeoutMs ? { timeout: timeoutMs } : {}),
         }
       );
       if (!response.data || !response.data.events) {

@@ -58,26 +58,16 @@ export const PAST_ISSUES_LIMIT = 8;
 type DigestIssue = Pick<DigestLinkPayload, 'f' | 's' | 'n' | 'l' | 'p'> & { uid?: string };
 
 /**
- * Who reads the page (LAB-3356). `null` is a signed-out reader: no member data at all. `canReadForum` gives them
- * the forum posts' bodies and authors.
+ * Who reads the page (LAB-3356). `null` is a signed-out reader: no member data at all. Only a reader with
+ * `canReadForum` gets the forum posts (LAB-3355).
  */
 export type DigestViewer = { uid: string; canReadForum: boolean } | null;
 
-/** A forum post for a reader who may not read the forum: what the row shows, nothing from the post itself. */
-export function lockForumPost(post: LabosDigestPageForumPost): LabosDigestPageForumPost {
-  return {
-    tid: post.tid,
-    title: post.title,
-    locked: true,
-    authorName: null,
-    authorRole: null,
-    authorTeam: null,
-    authorAvatarUrl: null,
-    contentHtml: null,
-    url: post.url,
-    replyCount: post.replyCount,
-  };
-}
+/**
+ * The forum part of the page for a reader who may not read the forum (LAB-3355): no posts at all, so no title, reply
+ * count or URL reaches them, and no forum call is made for them. Not "unavailable": there is just nothing to show.
+ */
+const NO_FORUM = { posts: [] as LabosDigestPageForumPost[], unavailable: false };
 
 type Tx = Prisma.TransactionClient;
 
@@ -182,8 +172,8 @@ export class LabosDigestPageService {
 
   /**
    * LAB-3356: one issue by id, for anyone. `viewer` is the signed-in member reading it (any member, not only the
-   * one it was sent to), or null signed out: then no name, choices, follows, topics or Past issues. Forum bodies and
-   * authors only for a viewer who may read the forum.
+   * one it was sent to), or null signed out: then no name, choices, follows, topics or Past issues. Forum posts only
+   * for a viewer who may read the forum (LAB-3355).
    * @throws NotFoundException for an unknown issue.
    */
   async readIssueByUid(issueUid: string, viewer: DigestViewer): Promise<LabosDigestPage> {
@@ -242,7 +232,7 @@ export class LabosDigestPageService {
             select: { newsItemUid: true, choice: true },
           })
         : ([] as { newsItemUid: string; choice: LabosDigestChoiceKind }[]),
-      this.forum.read(issue.p),
+      viewer?.canReadForum ? this.forum.read(issue.p) : NO_FORUM,
       viewer
         ? this.prisma.follow.findMany({
             where: { memberUid: viewer.uid, entityType: 'TEAM' },
@@ -318,7 +308,7 @@ export class LabosDigestPageService {
       sentAt: issue.s,
       firstName: member?.name?.trim().split(/\s+/)[0] || null,
       stories,
-      forumPosts: viewer?.canReadForum ? forum.posts : forum.posts.map(lockForumPost),
+      forumPosts: forum.posts,
       forumUnavailable: forum.unavailable,
       isTeamMember: activeRoles > 0,
       nextSendAt: nextDigestSendAt(issue.f, now).toISOString(),

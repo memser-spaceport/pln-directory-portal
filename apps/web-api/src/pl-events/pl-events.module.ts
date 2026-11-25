@@ -70,6 +70,7 @@ import { ImagesModule } from '../images/images.module';
     PLEventLocationAssociationService,
     PLEventAssociationService,
     PLEventWriteService,
+    PLEventSyncService,
   ],
   imports: [
     forwardRef(() => MembersModule),

@@ -2,15 +2,18 @@ import {
   BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Param,
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
   UsePipes,
 } from '@nestjs/common';
 import { AdminAuthGuard, DemoDayAdminAuthGuard } from '../guards/admin-auth.guard';
+import { ADMIN_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 
 import { ZodValidationPipe } from '@abitia/zod-dto';
 import {
@@ -47,6 +50,26 @@ export class MemberController {
     private readonly memberEnrichmentService: MemberEnrichmentService,
     private readonly memberEnrichmentJob: MemberEnrichmentJob
   ) {}
+
+  /**
+   * Directory admins may set any roles. Demo day admins may only grant or revoke DEMO_DAY_ADMIN:
+   * the member's other roles are always preserved, and resending a role the member already holds
+   * (whole-roster UIs do) is allowed. Granting any other role is rejected with 403.
+   */
+  private async scopeRolesToRequester(req: any, uid: string, roles: string[]): Promise<string[]>;
+  private async scopeRolesToRequester(req: any, uid: string, roles?: string[]): Promise<string[] | undefined>;
+  private async scopeRolesToRequester(req: any, uid: string, roles?: string[]): Promise<string[] | undefined> {
+    const permissions: string[] = req.user?.effectivePermissionCodes ?? req.user?.permissions ?? [];
+    if (roles === undefined || permissions.includes(ADMIN_PERMISSIONS.DIRECTORY_FULL)) return roles;
+    const requested = roles.map((r) => r.trim().toUpperCase()).filter((r) => r.length > 0);
+    const member = await this.memberService.findMemberByUid(uid);
+    const held = member.memberRoles.map((r) => r.name);
+    if (requested.some((r) => r !== 'DEMO_DAY_ADMIN' && !held.includes(r))) {
+      throw new ForbiddenException('Only directory admins can grant roles other than DEMO_DAY_ADMIN');
+    }
+    const kept = held.filter((n) => n !== 'DEMO_DAY_ADMIN');
+    return requested.includes('DEMO_DAY_ADMIN') ? [...kept, 'DEMO_DAY_ADMIN'] : kept;
+  }
 
   @Get()
   @UseGuards(DemoDayAdminAuthGuard)
@@ -248,12 +271,12 @@ export class MemberController {
 
   /**
    * Updates member roles (replaces the whole set) and returns the updated member.
-   * Only directory/super admins are allowed to call this endpoint.
+   * Directory admins may set any roles; demo day admins only DEMO_DAY_ADMIN.
    */
   @Patch(':uid/roles')
   @UseGuards(DemoDayAdminAuthGuard)
-  async updateMemberRoles(@Param('uid') uid: string, @Body() body: UpdateMemberRolesDto) {
-    return await this.memberService.updateMemberRolesByUid(uid, body.roles);
+  async updateMemberRoles(@Req() req: any, @Param('uid') uid: string, @Body() body: UpdateMemberRolesDto) {
+    return await this.memberService.updateMemberRolesByUid(uid, await this.scopeRolesToRequester(req, uid, body.roles));
   }
 
   /**
@@ -264,9 +287,14 @@ export class MemberController {
   @Patch(':uid/roles-and-hosts')
   @UseGuards(DemoDayAdminAuthGuard)
   async updateMemberRolesAndHosts(
+    @Req() req: any,
     @Param('uid') uid: string,
     @Body() body: UpdateMemberRolesAndHostsDto
   ): Promise<Member> {
-    return await this.memberService.updateMemberRolesAndHosts(uid, body.roles, body.hosts);
+    return await this.memberService.updateMemberRolesAndHosts(
+      uid,
+      await this.scopeRolesToRequester(req, uid, body.roles),
+      body.hosts
+    );
   }
 }

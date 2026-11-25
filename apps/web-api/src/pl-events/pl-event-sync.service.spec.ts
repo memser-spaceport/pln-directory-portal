@@ -167,6 +167,43 @@ describe('PLEventSyncService.syncEventDetailsOnly (LAB-3214 backfill)', () => {
     );
   });
 
+  it('LAB-3403: asked for one event, writes only that one, whatever the events service answers', async () => {
+    serviceReturns([EVENTS_SERVICE_EVENT, { ...EVENTS_SERVICE_EVENT, event_id: 'other' }]);
+    const { service, prisma } = setup([
+      { uid: 'ev-1', externalId: EVENTS_SERVICE_EVENT.event_id, additionalInfo: null },
+      { uid: 'ev-2', externalId: 'other', additionalInfo: null },
+    ]);
+
+    await expect(
+      service.syncEventDetailsOnly({ selectedEventUids: [EVENTS_SERVICE_EVENT.event_id] })
+    ).resolves.toEqual({ updated: 1 });
+
+    expect(prisma.pLEvent.update.mock.calls.map(([args]) => args.where.uid)).toEqual(['ev-1']);
+    expect(mockedAxios.get.mock.calls[0][0]).toContain(`event_id=${EVENTS_SERVICE_EVENT.event_id}`);
+  });
+
+  it('LAB-3403: replaces the stored details, so a tag removed in the portal goes', async () => {
+    serviceReturns([{ ...EVENTS_SERVICE_EVENT, tags: [] }]);
+    const { service, prisma } = setup([
+      { uid: 'ev-1', externalId: EVENTS_SERVICE_EVENT.event_id, additionalInfo: { details } },
+    ]);
+
+    await service.syncEventDetailsOnly({ selectedEventUids: [EVENTS_SERVICE_EVENT.event_id] });
+
+    expect(prisma.pLEvent.update.mock.calls[0][0].data.additionalInfo.details).toEqual({ ...details, tags: [] });
+  });
+
+  it('LAB-3403: a time limit is passed on only when it is given', async () => {
+    serviceReturns([]);
+    const { service } = setup([]);
+
+    await service.syncEventDetailsOnly({ selectedEventUids: ['a'], timeoutMs: 10_000 });
+    await service.syncEventDetailsOnly({});
+
+    expect(mockedAxios.get.mock.calls[0][1]).toMatchObject({ timeout: 10_000 });
+    expect(mockedAxios.get.mock.calls[1][1]).not.toHaveProperty('timeout');
+  });
+
   it('returns 0 when the events service sends nothing', async () => {
     mockedAxios.get.mockResolvedValue({ data: {} });
     const { service, prisma } = setup([]);

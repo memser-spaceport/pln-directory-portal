@@ -576,26 +576,32 @@ export class ProjectsService {
         existingData
       );
 
-      if (data.uid) {
-        if (data.isDeleted) {
+      // Ownership fields are never taken from the client: the ask is bound to the authorized path project.
+      const { uid, isDeleted, ...rest } = data;
+      const fields = { ...rest, projectUid: undefined, teamUid: undefined };
+      if (uid) {
+        // The authZ check above covers the path project only, so the target ask must belong to it.
+        const ask = await this.prisma.ask.findFirst({ where: { uid, projectUid }, select: { uid: true } });
+        if (!ask) {
+          throw new ForbiddenException(`Ask ${uid} does not belong to project ${projectUid}`);
+        }
+        if (isDeleted) {
           //deleting asks
           res = await this.prisma.ask.delete({
-            where: { uid: data.uid },
+            where: { uid },
           });
         } else {
           //updating asks
           res = await this.prisma.ask.update({
-            where: { uid: data.uid },
-            data: {
-              ...data,
-            },
+            where: { uid },
+            data: fields,
           });
         }
       } else {
         //creating asks
         res = await this.prisma.ask.create({
           data: {
-            ...data,
+            ...fields,
             projectUid,
           },
         });

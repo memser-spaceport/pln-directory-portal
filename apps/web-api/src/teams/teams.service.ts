@@ -466,6 +466,13 @@ export class TeamsService {
     requestorEmail: string
   ): Promise<Team> {
     const updatedTeam: any = teamParticipantRequest.newData;
+    // Only rows the loop below acts on matter; untouched rows (no status) are ignored there.
+    const actedStatuses = ['Add', 'Update', 'Delete'];
+    if (
+      updatedTeam?.teamMemberRoles?.some((role) => actedStatuses.includes(role?.status) && role?.teamUid !== teamUid)
+    ) {
+      throw new ForbiddenException('teamMemberRoles must belong to the team being updated');
+    }
     let result;
     this.logger.info(`Going to update information about the '${teamUid}' team`);
     const requestor = await this.membersService.findMemberByEmail(requestorEmail);
@@ -1508,6 +1515,17 @@ export class TeamsService {
   async addEditTeamAsk(teamUid, teamName, requesterEmailId, data) {
     let addEditResponse;
 
+    // Ownership fields are never taken from the client: the ask is bound to the authorized path team.
+    // Checked before the try block below, which swallows errors.
+    const { uid, isDeleted, ...rest } = data;
+    const fields = { ...rest, teamUid: undefined, projectUid: undefined };
+    if (uid) {
+      const ask = await this.prisma.ask.findFirst({ where: { uid, teamUid }, select: { uid: true } });
+      if (!ask) {
+        throw new ForbiddenException(`Ask ${uid} does not belong to team ${teamUid}`);
+      }
+    }
+
     try {
       //get existing asks related to teamuid
       const teamAsks = await this.prisma.ask.findMany({
@@ -1515,18 +1533,18 @@ export class TeamsService {
       });
 
       await this.prisma.$transaction(async (tx) => {
-        if (data.uid) {
-          if (data.isDeleted) {
+        if (uid) {
+          if (isDeleted) {
             //deleting asks
             addEditResponse = await this.prisma.ask.delete({
-              where: { uid: data.uid },
+              where: { uid },
             });
           } else {
             //updating asks
             addEditResponse = await this.prisma.ask.update({
-              where: { uid: data.uid },
+              where: { uid },
               data: {
-                ...data,
+                ...fields,
                 closedAt: data.status === AskStatus.CLOSED ? new Date() : null,
               },
             });
@@ -1535,7 +1553,7 @@ export class TeamsService {
           //inserting asks
           addEditResponse = await tx.ask.create({
             data: {
-              ...data,
+              ...fields,
               teamUid: teamUid,
             },
           });

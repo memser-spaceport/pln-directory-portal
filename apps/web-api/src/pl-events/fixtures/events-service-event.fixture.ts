@@ -17,6 +17,9 @@
  *
  * `timezone`, `meeting_link` and `address_info` are the old submission form's payload keys
  * (pl-events-submission, `add-event-form.tsx`); the typed columns read them (LAB-3281).
+ * The details also keep `timezone` (LAB-3403).
+ *
+ * The QUEUE does not send all of it: on prod, 2026-11-24, every event it had written kept `format` only (LAB-3403).
  *
  * Replace it with a trimmed real payload once one is captured (LAB-3211 task 4.1 checks
  * the stored details on the feature env against PL Events).

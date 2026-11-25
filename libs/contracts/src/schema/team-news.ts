@@ -804,8 +804,8 @@ export const LabosDigestPageForumPostSchema = z.object({
   tid: z.number().int(),
   title: z.string(),
   /**
-   * LAB-3356: true when the reader may not read the forum (signed out, or no forum read permission). A locked post
-   * has its title, reply count and URL only: author fields and `contentHtml` are null.
+   * Always false (LAB-3355): a reader who may not read the forum gets no forum posts at all, where LAB-3356 sent them
+   * locked (title, reply count and URL only). Kept so a client that reads it doesn't break.
    */
   locked: z.boolean(),
   authorName: z.string().nullable(),

@@ -3,7 +3,7 @@ import {
   PLEventDetailsSchema,
   SyncPLEventsBodySchema,
 } from 'libs/contracts/src/schema/pl-event-details';
-import { mapEventDetails, readEventDetails, withEventDetails } from './pl-event-details.mapper';
+import { keepStoredDetails, mapEventDetails, readEventDetails, withEventDetails } from './pl-event-details.mapper';
 import { EVENTS_SERVICE_EVENT } from './fixtures/events-service-event.fixture';
 
 describe('mapEventDetails (LAB-3214)', () => {
@@ -28,6 +28,7 @@ describe('mapEventDetails (LAB-3214)', () => {
       locationUrl: 'https://maps.example.org/?q=Fixture+Venue',
       contactInfos: null,
       locationInstructions: null,
+      timezone: 'Europe/Lisbon',
     });
     expect(onInvalid).not.toHaveBeenCalled();
   });
@@ -251,5 +252,55 @@ describe('SyncPLEventsBodySchema (LAB-3214)', () => {
   it('rejects a details-only flag that is not a boolean', () => {
     expect(SyncPLEventsBodySchema.safeParse({ detailsOnly: 'yes' }).success).toBe(false);
     expect(SyncPLEventsBodySchema.safeParse({ selectedEventUids: 'a' }).success).toBe(false);
+  });
+});
+
+describe('mapEventDetails: timezone (LAB-3403)', () => {
+  it('keeps a time zone the runtime knows', () => {
+    const onInvalid = jest.fn();
+    expect(mapEventDetails({ timezone: ' America/Chicago ' }, onInvalid).timezone).toBe('America/Chicago');
+    expect(onInvalid).not.toHaveBeenCalled();
+  });
+
+  it('reads a missing, empty or unknown one as null and reports only the unknown', () => {
+    const onInvalid = jest.fn();
+    for (const timezone of [undefined, null, '', '  ']) {
+      expect(mapEventDetails({ timezone }, onInvalid).timezone).toBeNull();
+    }
+    expect(onInvalid).not.toHaveBeenCalled();
+    expect(mapEventDetails({ timezone: 'Mars/Olympus' }, onInvalid).timezone).toBeNull();
+    expect(onInvalid).toHaveBeenCalledWith('timezone', 'expected an IANA time zone');
+  });
+
+  it('details stored before it read as null; a stored one reads back', () => {
+    expect(readEventDetails({ details: { tags: [] } }).timezone).toBeNull();
+    expect(readEventDetails({ details: { timezone: 'Asia/Dubai' } }).timezone).toBe('Asia/Dubai');
+  });
+});
+
+describe('keepStoredDetails (LAB-3403)', () => {
+  const full = mapEventDetails(EVENTS_SERVICE_EVENT);
+
+  it('a message with format only keeps every stored detail and takes the new format', () => {
+    const kept = keepStoredDetails({ details: full }, mapEventDetails({ format: 'VIRTUAL' }));
+    expect(kept).toEqual({ ...full, format: 'VIRTUAL' });
+  });
+
+  it('empty values keep the stored ones too', () => {
+    const empty = mapEventDetails({ tags: [], co_hosts: [], sponsors: [], host: '', agenda: { sessions: [] } });
+    expect(keepStoredDetails({ details: full }, empty)).toEqual(full);
+  });
+
+  it('a filled value replaces the stored one', () => {
+    const kept = keepStoredDetails({ details: full }, mapEventDetails({ tags: ['FA4'], host: 'YC' }));
+    expect(kept.tags).toEqual([{ name: 'FA4', color: null }]);
+    expect(kept.host).toEqual({ name: 'YC', logo: null });
+    expect(kept.sponsors).toEqual(full.sponsors);
+  });
+
+  it('with nothing stored, returns the message as it is', () => {
+    for (const additionalInfo of [undefined, null, {}, { details: null }]) {
+      expect(keepStoredDetails(additionalInfo, full)).toEqual(full);
+    }
   });
 });

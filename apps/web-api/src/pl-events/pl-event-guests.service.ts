@@ -24,6 +24,24 @@ import path from 'path';
 import { IrlGatheringPushCandidatesService } from './push/irl-gathering-push-candidates.service';
 import { VISIBLE_PL_EVENT_WHERE, withoutPrivateEventFields } from './pl-event-visibility';
 
+const GUEST_LIST_DEFAULT_LIMIT = 10;
+const GUEST_LIST_MAX_LIMIT = 100;
+const GUEST_LIST_DEFAULT_PAGE = 1;
+
+/** Public query keys for GET /v1/irl/locations/:uid/guests. Internal fetch options are not in this list. */
+const GUEST_LIST_PUBLIC_QUERY_KEYS = [
+  'type',
+  'search',
+  'sortBy',
+  'sortDirection',
+  'eventUid',
+  'filteredEvents',
+  'topics',
+  'isHost',
+  'isSpeaker',
+  'isSponsor',
+] as const;
+
 @Injectable()
 export class PLEventGuestsService {
   constructor(
@@ -412,6 +430,32 @@ export class PLEventGuestsService {
     }
   }
 
+  private guestListFetchOptions(query): Record<string, unknown> {
+    const source = query ?? {};
+    const options: Record<string, unknown> = {};
+    for (const key of GUEST_LIST_PUBLIC_QUERY_KEYS) {
+      if (source[key] !== undefined) {
+        options[key] = source[key];
+      }
+    }
+    const limit = this.positiveQueryInt(source.limit);
+    const page = this.positiveQueryInt(source.page);
+    options.limit = limit === null ? GUEST_LIST_DEFAULT_LIMIT : Math.min(limit, GUEST_LIST_MAX_LIMIT);
+    options.page = page === null ? GUEST_LIST_DEFAULT_PAGE : page;
+    return options;
+  }
+
+  private positiveQueryInt(value: unknown): number | null {
+    if (typeof value !== 'number' && typeof value !== 'string') {
+      return null;
+    }
+    const parsed = typeof value === 'number' ? value : Number(value.trim());
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      return null;
+    }
+    return parsed;
+  }
+
   /**
    * This method retrieves event guests by location and type (upcoming or past events).
    * @param locationUid The unique identifier of the event location
@@ -425,11 +469,12 @@ export class PLEventGuestsService {
    */
   async getPLEventGuestsByLocationAndType(locationUid: string, query, member) {
     try {
+      const listQuery = this.guestListFetchOptions(query);
       let events: PLEvent[];
-      const { type, filteredEvents } = query;
+      const { type, filteredEvents } = listQuery as { type?: string; filteredEvents?: string[] };
       // LAB-3213: `eventUid` asks for the guests of exactly one event, without gathering-level guests.
       const strictEventUid =
-        typeof query?.eventUid === 'string' && query.eventUid.trim() ? query.eventUid.trim() : null;
+        typeof listQuery.eventUid === 'string' && listQuery.eventUid.trim() ? listQuery.eventUid.trim() : null;
 
       if (type === 'upcoming') {
         events = await this.eventLocationsService.getUpcomingEventsByLocation(locationUid);
@@ -461,11 +506,11 @@ export class PLEventGuestsService {
             loggedInMemberUid: member?.uid ?? null,
             filteredEventsCount: Array.isArray(filteredEvents) ? filteredEvents.length : 0,
             eventsCountAfterFilter: Array.isArray(events) ? events.length : 0,
-            page: query?.page ?? 1,
-            limit: query?.limit ?? 10,
-            sortBy: query?.sortBy ?? null,
-            sortDirection: query?.sortDirection ?? null,
-            search: query?.search ?? null,
+            page: listQuery.page,
+            limit: listQuery.limit,
+            sortBy: listQuery.sortBy ?? null,
+            sortDirection: listQuery.sortDirection ?? null,
+            search: listQuery.search ?? null,
             strictEventUid,
             includeLocationOnlyGuests: !strictEventUid,
             windowStart: window?.start ?? null,
@@ -479,8 +524,7 @@ export class PLEventGuestsService {
         windowStart: window?.start ?? null,
         windowEnd: window?.end ?? null,
         includeLocationOnlyGuests: true,
-        ...query,
-        // Set after the spread so a query string can't widen a strict list.
+        ...listQuery,
         ...(strictEventUid ? { eventUids: [strictEventUid], includeLocationOnlyGuests: false } : {}),
         loggedInMemberUid: member ? member?.uid : null,
       });
@@ -1325,7 +1369,15 @@ export class PLEventGuestsService {
    *                          Can be 'memberName', 'teamName', or 'eventName'.
    * @returns {string} SQL orderBy clause to apply the sorting.
    */
-  applySorting(sortBy: string, sortDirection: string, uid: string) {
+  applySorting(sortBy: string, sortDirection: any, uid: string) {
+    // Only 'asc' | 'desc' may reach SQL; arrays resolve like buildOuterOrderBy (last non-empty item), junk -> asc.
+    // uid is interpolated below, so it must look like an id or it is ignored.
+    const last = Array.isArray(sortDirection)
+      ? [...sortDirection].reverse().find((x) => typeof x === 'string' && x.trim().length > 0) ??
+        sortDirection[sortDirection.length - 1]
+      : sortDirection;
+    sortDirection = String(last ?? '').trim().toLowerCase() === 'desc' ? 'desc' : 'asc';
+    uid = typeof uid === 'string' && /^[A-Za-z0-9_-]+$/.test(uid) ? uid : '';
     // Apply sorting based on the selected field
     switch (sortBy) {
       case 'member':

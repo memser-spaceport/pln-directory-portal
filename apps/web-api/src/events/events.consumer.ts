@@ -8,6 +8,10 @@ import { UPSERT, DELETE } from '../utils/constants';
 import { EventConsumerHelper } from './event-consumer.helper';
 import { EventGuestSyncHelper } from './event-guests-sync.helper';
 import { isLocalEventSubmitEnabled } from '../pl-events/pl-event-submit.constants';
+import { PLEventSyncService } from '../pl-events/pl-event-sync.service';
+
+/** A slow events service must not hold up the queue. */
+const DETAILS_REFRESH_TIMEOUT_MS = 10_000;
 
 export type EventOperationType = 'UPSERT'| 'DELETE';
 
@@ -26,7 +30,8 @@ export class EventsConsumer {
     private prisma: PrismaService,
     private plEventsService: PLEventsService,
     private helperService: EventConsumerHelper,
-    private guestSyncHelper: EventGuestSyncHelper
+    private guestSyncHelper: EventGuestSyncHelper,
+    private eventSyncService: PLEventSyncService
   ) {}
 
   /**
@@ -53,7 +58,9 @@ export class EventsConsumer {
       const formattedEvent = await this.helperService.mapEventData(event);
       switch (type) {
         case UPSERT:
-          await this.handleEventUpsert(formattedEvent, { ...location, ...event.address_info, isInferred });
+          if (await this.handleEventUpsert(formattedEvent, { ...location, ...event.address_info, isInferred })) {
+            await this.refreshEventDetails(formattedEvent.externalId);
+          }
           break;
         case DELETE:
           await this.handleEventDeletion(formattedEvent);
@@ -80,11 +87,12 @@ export class EventsConsumer {
    * 
    * @param event - Event data
    * @param location - Location data
+   * @returns true when the event was saved, false when it was left out for having no location
    */
-  private async handleEventUpsert(event, location): Promise<void> {
+  private async handleEventUpsert(event, location): Promise<boolean> {
     try {
       this.logger.info(`Upserting event: ${event.externalId}`, 'EventsConsumer');
-      await this.prisma.$transaction(async (tx) => {
+      return await this.prisma.$transaction(async (tx) => {
         // Step 1: Handle location (only for physical events)
         const { locationUid, associationUid } = event?.type !== PLEventType.VIRTUAL 
           ? await this.helperService.handleLocationAndAssociation(location, tx)
@@ -92,7 +100,7 @@ export class EventsConsumer {
 
         if (!locationUid) {
           this.logger.error(`Location not found for event: ${event.externalId} with type: ${event.type}`, 'EventsConsumer');
-          return;
+          return false;
         }
         
         const locationStatus = location.isInferred 
@@ -125,10 +133,32 @@ export class EventsConsumer {
           processedAssociations,
           tx
         );
+        return true;
       });
     } catch (error) {
       this.logger.error(`Error handling event upsert: ${error.message}`, error.stack, 'EventsConsumer');
       throw error;
+    }
+  }
+
+  /**
+   * LAB-3403: the message carries only part of the event's details, so the rest is read from the events service right
+   * after the event is saved. A failure is logged and nothing else: the event is saved and keeps its stored details,
+   * and throwing would make SQS deliver the whole message again.
+   * @param externalId - The event's id in the events service
+   */
+  private async refreshEventDetails(externalId: string): Promise<void> {
+    try {
+      await this.eventSyncService.syncEventDetailsOnly({
+        selectedEventUids: [externalId],
+        timeoutMs: DETAILS_REFRESH_TIMEOUT_MS,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Could not refresh the details of event ${externalId}: ${error.message}`,
+        error.stack,
+        'EventsConsumer'
+      );
     }
   }
 
