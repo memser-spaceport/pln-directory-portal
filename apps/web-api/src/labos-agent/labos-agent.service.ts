@@ -442,7 +442,7 @@ export class LabosAgentService {
       await drop();
       return undefined;
     }
-    // A new unclear ask adds its chips: the kept targets stay possible.
+    // A new unclear ask adds its chips and the page: the kept targets stay possible.
     const added = unclear ? others.filter((item) => !kept.some((target) => sameTarget(target, item))) : [];
     const paused = use === 'pause' && !added.length;
     const pending: PendingIntroTarget = {
@@ -450,7 +450,7 @@ export class LabosAgentService {
       targets: uniqueTargets([...added, ...kept])
         .slice(0, MAX_KEPT_TARGETS)
         .map(({ type, uid }) => ({ type, uid })),
-      ...(use === 'both' || paused || moved ? { both: true } : {}),
+      ...(use === 'both' || paused || moved || added.length ? { both: true } : {}),
       ...(added.length ? { unclear: true } : {}),
     };
     if (JSON.stringify(pending) !== JSON.stringify(stored)) await save(pending);

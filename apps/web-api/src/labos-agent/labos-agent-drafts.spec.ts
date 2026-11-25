@@ -35,8 +35,10 @@ import {
   DRAFT_LIMITS_RULE,
   INTRO_REASON_RULE,
   ownClaims,
+  IntroTurnTarget,
 } from './labos-agent-drafts';
 import { introTargetKey, LabosAgentProposalStore, ownClaimsKey } from './labos-agent-proposals';
+import { introAsk } from './labos-agent-intro-target';
 import {
   ASK_AGAIN_RULE,
   CARD_OPEN_RULE,
@@ -1802,6 +1804,8 @@ describe('LAB-3367 B2, B3, B4 (Oleg live QA on 8fcac6ca)', () => {
     'I was introduced to Grace last year and want feedback',
     'the page instead',
     'Switch it to an intro to Grace',
+    "an intro to Grace's team",
+    "Draft an intro to Grace Hopper's team",
   ])('R1: "%s" names the page in another way, so both stay until a draft', async (message) => {
     const h = withCache();
     await chat(h, ASK);
@@ -2011,6 +2015,24 @@ describe('LAB-3367 B2, B3, B4 (Oleg live QA on 8fcac6ca)', () => {
       'Can I have an intro for @Acme Team?',
       'Draft an intro, I work with this team',
       'Introduce this team to Grace',
+      'Draft an intro request for this team',
+      'I want an intro with this team',
+      'Intro to @Acme Team please',
+      'Draft an intro to the team',
+      'Draft an intro to @Acme Team, Grace Hopper told me about it',
+      'Draft an intro to @Acme Team. Grace sent me',
+      'Draft an intro to @Acme Team. She sent me',
+      'Draft an intro to this team and say hi',
+      'Draft an intro to @Acme Team, or someone else',
+      'Draft an intro to this team. I do not want a long text',
+      "Draft an intro to this team. I can't find a contact",
+      "I don't want an intro to Grace, draft an intro to @Acme Team",
+      'Sure, I want an intro to @Acme Team',
+      'I want an intro to @Acme Team',
+      "Draft an intro to this member's team",
+      "Draft an intro to Grace's team @Acme Team",
+      'I want an intro with @Acme Team, I built the project they fund',
+      'Draft an intro for @Acme Team. I lead my team and want feedback',
     ])('D1, member page, "%s": both, also in the reason turn', async (message) => {
       const h = h2();
       expect(await targets((await chat(h, { ...MEMBER_PAGE, message })).options)).toEqual(['m-grace', 't-acme']);
@@ -2031,16 +2053,19 @@ describe('LAB-3367 B2, B3, B4 (Oleg live QA on 8fcac6ca)', () => {
       expect(h.store.size).toBe(0);
     });
 
-    it('D1: an unclear ask for another chip keeps the first target too, and does not add the page', async () => {
-      const h = h2();
-      await chat(h, ASK);
-      const ask = { ...PAGE, message: 'Draft an intro for @Kyle Weiss', mentions: [KYLE] };
-      expect(await targets((await chat(h, ask)).options)).toEqual(['m-kyle', 't-acme']);
-      const reason = await chat(h, REASON);
-      expect(await targets(reason.options)).toEqual(['m-kyle', 't-acme']);
-      expect(reason.prompt).not.toContain('or the page');
-      expect(reason.prompt).not.toContain(WRONG);
-    });
+    it.each(['Draft an intro for @Kyle Weiss', 'Draft an intro here instead. @Kyle Weiss sent me'])(
+      'D1: with a kept team, the unclear ask "%s" adds its chip and the page',
+      async (message) => {
+        const h = h2();
+        await chat(h, ASK);
+        const all = ['m-grace', 'm-kyle', 't-acme'];
+        expect(await targets((await chat(h, { ...PAGE, message, mentions: [KYLE] })).options)).toEqual(all);
+        const reason = await chat(h, REASON);
+        expect(await targets(reason.options)).toEqual(all);
+        expect(reason.prompt).toContain('or the page');
+        expect(reason.prompt).not.toContain(WRONG);
+      }
+    );
 
     it('D1: an unclear ask on another page replaces the kept target, and a draft there ends it', async () => {
       const h = h2();
@@ -2049,6 +2074,91 @@ describe('LAB-3367 B2, B3, B4 (Oleg live QA on 8fcac6ca)', () => {
       await chat(h, { context, message: 'Draft an intro for @Kyle Weiss', mentions: [KYLE] });
       const reason = { context, message: 'I want feedback on our roadmap.' };
       expect(await targets((await chat(h, reason)).options)).toEqual(['m-kyle', 't-beta']);
+    });
+
+    /** Round 23: the chip is only mentioned, or the recipient is not clear. Each of these chose the chip before. */
+    it.each([
+      ['Grace', 'Kyle Weiss', 'Ask Grace to make an intro to @Kyle Weiss'],
+      ['Grace', 'Kyle Weiss', 'Write her a message to ask for an intro to @Kyle Weiss'],
+      ['Grace', 'Kyle Weiss', 'Draft an intro that asks her to make an intro to @Kyle Weiss'],
+      ['Grace', 'Kyle Weiss', 'Help me ask Grace to give me an intro to @Kyle Weiss'],
+      ['Grace', 'Kyle Weiss', 'I want her to give me an intro to @Kyle Weiss'],
+      ['Grace', 'Kyle Weiss', 'I want Grace to make an intro to @Kyle Weiss'],
+      ['Grace', 'Kyle Weiss', 'Draft an intro. I want an intro to @Kyle Weiss from her'],
+      ['Grace', 'Kyle Weiss', 'Write to Grace, I want an intro to @Kyle Weiss'],
+      ['Grace', 'Kyle Weiss', 'Could Grace make an intro to @Kyle Weiss? Draft a message to her'],
+      ['Grace', 'Kyle Weiss', 'Draft a message to Grace: please introduce me to @Kyle Weiss'],
+      ['Grace', 'Acme Team', 'Draft an intro for this team to Grace'],
+      ['Grace', 'Acme Team', 'Write an intro for this team to her'],
+      ['Grace', 'Acme Team', 'Draft an intro for this company to Grace Hopper'],
+      ['Grace', 'Acme Team', 'Draft an intro for this project to share with Grace'],
+      ['Grace', 'Acme Team', 'Draft an intro for the team I run'],
+      ['Grace', 'Acme Team', 'Draft an intro for the company I work at, @Acme Team'],
+      ['Grace', 'Acme Team', 'Introduce this team, @Acme Team, to Grace'],
+      ['Grace', 'Acme Team', 'Draft an intro with the project details'],
+      ['Grace', 'Acme Team', 'Draft an intro with this project as the topic'],
+      ['Grace', 'Acme Team', 'Write an intro with the company name in it'],
+      ['Grace', 'Acme Team', 'Write an intro message with this team as the reason'],
+      ['Grace', 'Acme Team', 'Draft an intro with the team name'],
+      ['Grace', 'Acme Team', 'Draft an intro for the project'],
+      ['Grace', 'Acme Team', 'Draft an intro with this team in mind'],
+      ['Gitcoin', 'Kyle Weiss', 'Ask Gitcoin to make an intro to @Kyle Weiss'],
+      ['Gitcoin', 'Kyle Weiss', 'Ask them to make an intro to @Kyle Weiss'],
+      ['Gitcoin', 'Kyle Weiss', 'Write to the team to ask for an intro to @Kyle Weiss'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro with this person in cc'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro with the profile of @Kyle Weiss'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro with this person as a reference'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro for the person in charge, @Kyle Weiss sent me'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to the person in charge of grants, @Kyle Weiss sent me'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to the person who runs grants. I know @Kyle Weiss'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to the person @Kyle Weiss told me about'],
+      ['Gitcoin', 'Kyle Weiss', 'I need an intro to the person leading partnerships; @Kyle Weiss suggested it'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to that person at Gitcoin, @Kyle Weiss knows them'],
+      ['Gitcoin', 'Kyle Weiss', "I don't want to send an intro to @Kyle Weiss"],
+      ['Gitcoin', 'Kyle Weiss', 'I do not want you to draft an intro to @Kyle Weiss'],
+      ['Gitcoin', 'Kyle Weiss', 'No need to draft an intro to @Kyle Weiss, I know them'],
+      ['Gitcoin', 'Kyle Weiss', 'Rather than draft an intro to @Kyle Weiss, write to Gitcoin'],
+      ['Gitcoin', 'Kyle Weiss', 'Should I send an intro to @Kyle Weiss or to Gitcoin?'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss or Gitcoin'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss. No wait, to Gitcoin'],
+      ['Gitcoin', 'Kyle Weiss', 'I asked you to draft an intro to @Kyle Weiss, now do Gitcoin'],
+      ['Gitcoin', 'Kyle Weiss', 'Intro to @Kyle Weiss is done, now Gitcoin'],
+      ['Gitcoin', 'Kyle Weiss', 'My plan was to send an intro to @Kyle Weiss. Now I prefer Gitcoin'],
+      ['Grace', 'Kyle Weiss', 'mention that I would like an intro to @Kyle Weiss'],
+      ['Grace', 'Kyle Weiss', 'add that I want an intro to @Kyle Weiss'],
+      ['Grace', 'Kyle Weiss', 'I want an intro to @Kyle Weiss'],
+      ['Grace', 'Kyle Weiss', 'To get an intro to @Kyle Weiss'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss at Gitcoin'],
+    ])('X2 strict: on the page of %s, the chip %s is not chosen by "%s"', (pageName, chipName, message) => {
+      const page: IntroTurnTarget =
+        pageName === 'Grace'
+          ? { type: 'member', uid: 'm-grace', name: 'Grace Hopper' }
+          : { type: 'team', uid: 't-gitcoin', name: 'Gitcoin' };
+      const chip: IntroTurnTarget =
+        chipName === 'Acme Team'
+          ? { type: 'team', uid: 't-acme', name: chipName }
+          : { type: 'member', uid: 'm-kyle', name: chipName };
+      expect(introAsk(message, [chip], page)).toBe('unclear');
+    });
+
+    it('X2 strict: a name that shares words with the page, and two chips', () => {
+      const member = (uid: string, name: string): IntroTurnTarget => ({ type: 'member', uid, name });
+      const team = (uid: string, name: string): IntroTurnTarget => ({ type: 'team', uid, name });
+      const kim = member('m-kim', 'Grace Kim');
+      const grace = member('m-grace', 'Grace Hopper');
+      expect(introAsk('Draft an intro to @Grace Kim', [kim], grace)).toBe(kim);
+      expect(introAsk('Draft an intro to @Grace Kim. Grace sent me', [kim], grace)).toBe('unclear');
+      const acme = team('t-1', 'Acme');
+      const acmeTeam = team('t-2', 'Acme Team');
+      expect(introAsk('Draft an intro to @Acme Team', [acme, acmeTeam], grace)).toBe(acmeTeam);
+      expect(introAsk('Draft an intro to @Acme Team', [acmeTeam], acme)).toBe(acmeTeam);
+      expect(introAsk('Draft an intro to @Acme, not the page', [acme], team('t-3', 'Acme Labs'))).toBe('unclear');
+      expect(introAsk('Draft an intro to @Acme. Acme Labs sent me', [acme], team('t-3', 'Acme Labs'))).toBe('unclear');
+      // Two chips of the type, the same name, or two recipients.
+      expect(introAsk('Draft an intro to this team', [acme, acmeTeam], grace)).toBe('unclear');
+      expect(introAsk('Draft an intro to @Acme', [acme, team('t-4', 'Acme')], grace)).toBe('unclear');
+      expect(introAsk('Draft an intro to @Acme, @Grace Kim and me', [acme, kim], undefined)).toBe('unclear');
+      expect(introAsk('Draft an intro to @Acme', [acme], undefined)).toBe(acme);
     });
 
     it('D1: with a waiting card, only a request with a recipient is an ask', async () => {
@@ -2069,16 +2179,23 @@ describe('LAB-3367 B2, B3, B4 (Oleg live QA on 8fcac6ca)', () => {
     });
 
     it.each([
-      'Draft an intro to @Acme Team',
-      'Draft an intro request to @Acme Team. I want feedback.',
-      'Introduce me to @Acme Team',
-      'Draft an intro to @Acme Team, Grace Hopper told me about it',
+      'Draft an intro to this team',
+      'Draft an intro to this team. I want feedback on our roadmap.',
+      'Draft an intro to this team because we build the same thing',
+      'Draft an intro to this team @Acme Team . I want feedback',
       'Draft an intro to this company',
-      'Draft an intro request for this team',
-      'I want an intro with this team',
+      'Draft an intro to @Acme Team',
+      'Draft an intro to the @Acme Team',
+      'Draft an intro to acme team please',
+      'Draft an intro request to @Acme Team. I want feedback.',
+      'Hi, please write me a short intro to @Acme Team, I want feedback',
+      'Can you draft an intro to this team?',
+      'Help me write an intro to this team',
+      'I want to request an intro to @Acme Team',
+      "I'd like an intro to this team",
+      'Make an intro to this team about our roadmap',
+      'Introduce me to this team',
       'Can you introduce us to @Acme Team?',
-      'Hi! Intro to @Acme Team please',
-      "I don't want an intro to Grace, draft an intro to @Acme Team",
     ])('member page, "%s": only the team chip', async (message) => {
       const h = h2();
       expect(await targets((await chat(h, { ...MEMBER_PAGE, message })).options)).toEqual(['t-acme']);

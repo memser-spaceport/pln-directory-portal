@@ -2,7 +2,8 @@ import { IntroTurnTarget } from './labos-agent-drafts';
 
 /**
  * LAB-3367 B3: which intro target a C1 message means. Pure checks of the message text, so the service only reads and
- * writes the kept targets. When the text is not clear, the answer is never "only the page": the kept targets stay.
+ * writes the kept targets. A chip is chosen only by one strict rule (`chosenChip`); everything else is not clear and
+ * keeps the chip AND the page. Do not add words to the strict rule: a miss is safe there, a wrong choice is not.
  */
 
 const INTRO = String.raw`intro(?:duction)?s?(?:\s+(?:request|message|note|draft|email|text))?`;
@@ -14,14 +15,14 @@ const START = String.raw`(?:^|[.!?;,:\n]\s*)(?:(?:hi|hello|hey|ok(?:ay)?|yes|yea
 const NEW = '(?:(?:an?|another|one|new|short|quick|brief|warm|good|first|separate)\\s+)*';
 const VERBS = String.raw`(?:re)?draft|write|prepare|compose|create|generate|request|make|do|send|start|get|give|want|need|like|love|prefer|ask\s+for|asking\s+for|looking\s+for|help\s+(?:me\s+|us\s+)?with|(?:can|could|may)\s+(?:i|we)\s+(?:please\s+)?have|rather\s+have`;
 
-/** A request with its recipient: the text after the match. Group 1 is the preposition. No past form is here. */
+/** A request with its recipient: the text after the match. No past form is here. It never chooses a chip. */
 const REQUESTS = [
   // "Draft an intro to ...", "I want an intro request for ...", "an intro with ..." at the start of a clause.
-  String.raw`(?:${START}${NEW}|\b(?:${VERBS})\s+(?:(?:me|us|it)\s+)?(?:(?:the|my|our)\s+)?${NEW})${INTRO}\s+(to|for|with)\s+(?=\S)`,
+  String.raw`(?:${START}${NEW}|\b(?:${VERBS})\s+(?:(?:me|us|it)\s+)?(?:(?:the|my|our)\s+)?${NEW})${INTRO}\s+(?:to|for|with)\s+(?=\S)`,
   // "Introduce me to ...", "Can you introduce us to ...". Not "Kyle offered to introduce me to ...".
-  String.raw`(?:${START}|\b(?:can|could|would|will)\s+(?:you|we)\s+(?:please\s+|also\s+)?|\bplease\s+|\b(?:want|like|need)\s+(?:you\s+)?to\s+)introduce\s+(?:(?:me|us)\s+(to|with)\s+)?(?=\S)`,
+  String.raw`(?:${START}|\b(?:can|could|would|will)\s+(?:you|we)\s+(?:please\s+|also\s+)?|\bplease\s+|\b(?:want|like|need)\s+(?:you\s+)?to\s+)introduce\s+(?:(?:me|us)\s+(?:to|with)\s+)?(?=\S)`,
   // "I already have an intro to @Kyle, now draft one to this team".
-  String.raw`\b(?:draft|write|prepare|compose|create|make|send)\s+(?:me\s+|us\s+)?one\s+(to|for|with)\s+(?=\S)`,
+  String.raw`\b(?:draft|write|prepare|compose|create|make|send)\s+(?:me\s+|us\s+)?one\s+(?:to|for|with)\s+(?=\S)`,
 ].map((source) => new RegExp(source, 'gi'));
 
 /** Before a request, in the same clause: it is not a request of now ("Did you send an intro to", "he can give me ..."). */
@@ -29,8 +30,22 @@ const NOT_NOW =
   /\b(?:did|didn['’]t|after|since|when|already|thanks?|thank\s+you|said|told|offered|promised|he|she|they|who|can['’]t)\b/i;
 /** "not an intro to Grace", "I don't want an intro to Grace": not a recipient. */
 const NEGATED = /(?:\b(?:not|no|never)|n['’]t)\s+(?:\w+\s+)?(?:an?\s+|the\s+)?$/i;
-/** After the name: the intro is done ("an intro to @Kyle went well"), or the recipient is not the name ("@Kyle's team"). */
-const NOT_THE_NAME = /^(?:\s+(?:was|were|went|worked|happened|helped)\b|['’]s\b)/i;
+/** The strict request, at the start of the message: "[Can you] draft an intro to", "Introduce me to". */
+const STRICT_REQUEST = new RegExp(
+  String.raw`^\s*(?:(?:hi|hello|hey|ok(?:ay)?|yes|please)\b[,.!]?\s+)*` +
+    String.raw`(?:(?:can|could|would|will)\s+you\s+(?:please\s+)?|help\s+me\s+(?:to\s+)?|(?:i|we)(?:\s+(?:want|need|would\s+like)|['’]d\s+like)\s+(?:you\s+)?to\s+)?` +
+    String.raw`(?:(?:draft|write|make|prepare|create|request)\s+(?:me\s+|us\s+)?(?:the\s+)?${NEW}${INTRO}|introduce\s+(?:me|us))\s+to\s+`,
+  'i'
+);
+/** "I'd like an intro to this team". Only with a type word: "I want an intro to @Kyle" can be the reason of a page ask. */
+const STRICT_WISH = new RegExp(
+  String.raw`^\s*(?:i|we)(?:\s+(?:want|need|would\s+like)|['’]d\s+like)\s+${NEW}${INTRO}\s+to\s+(?=this\s)`,
+  'i'
+);
+/** The recipient ends its clause. Not "this person in charge", "@Kyle or Gitcoin", "@Acme, @Kyle and ...". */
+const CLAUSE_END = String.raw`(?=\s*(?:$|[.;:!?](?=\s|$)|,(?!\s*(?:and\b|or\b|@))|\n)|\s+(?:because|about|please)\b|\s+[-–—]\s)`;
+/** A negation anywhere: "I don't want", "No need to", "No wait". */
+const NEGATION = /\b(?:no|not|never|without|cannot)\b|\b(?:can|don|doesn|didn|won|isn|aren|wouldn|shouldn)['’]?t\b/i;
 
 /** Any "intro to", also a past one ("Thanks for the intro to", "I was introduced to"). */
 const INTRO_TO = /\b(?:intro(?:s|duction|ductions)?|introduced?)(?:\s+[\w'’]+){0,2}?\s+to\s+(?=\S)/gi;
@@ -88,8 +103,8 @@ function startsWithFirstName(text: string, name: string): boolean {
   return !/^\s+\p{Lu}\p{Ll}/u.test(text.slice(text.toLowerCase().indexOf(first.toLowerCase()) + first.length));
 }
 
-/** A recipient in the message: the preposition ("to", "for", "with" or none) and the text after it. */
-type Recipient = { preposition?: string; text: string };
+/** A recipient in the message: the text after "intro to / for / with". */
+type Recipient = { text: string };
 
 /** The requests of the message with a recipient, in order: "Draft an intro to ...". No past form, no negation. */
 function requests(message: string): Recipient[] {
@@ -104,10 +119,7 @@ function requests(message: string): Recipient[] {
           .at(-1) ?? '';
       return !NOT_NOW.test(clause) && !NEGATED.test(message.slice(0, start));
     })
-    .map((match) => ({
-      preposition: match[1]?.toLowerCase(),
-      text: message.slice((match.index ?? 0) + match[0].length),
-    }));
+    .map((match) => ({ text: message.slice((match.index ?? 0) + match[0].length) }));
 }
 
 /** Each "intro to" of the message that is not negated, also a past one. */
@@ -124,13 +136,50 @@ function typeRecipient(text: string): TypeWord | undefined {
   return match ? { word: match[1].toLowerCase(), type: match[2] ? 'team' : 'member' } : undefined;
 }
 
-/** "this member" on a member page: the message names the page. */
-const thisPageType = (message: string, page: IntroTurnTarget | undefined) =>
-  !!page &&
-  new RegExp(String.raw`\bthis\s+(?:${page.type === 'team' ? TEAM_WORDS : MEMBER_WORDS})\b`, 'i').test(message);
+/** The message names the page in any way: its name or first name, "this page", "this member" on a member page, "she". */
+function mentionsPage(message: string, page: IntroTurnTarget, chip: IntroTurnTarget): boolean {
+  // "@Grace Kim" is not the page Grace Hopper, and "@Acme Team" is not the page Acme.
+  const rest = message.replace(new RegExp(`@?${escaped(chip.name)}`, 'gi'), ' ');
+  if (hasWord(chip.name.length > page.name.length ? rest : message, page.name)) return true;
+  const first = firstName(page.name);
+  if (first && hasWord(rest, first)) return true;
+  const words = page.type === 'team' ? TEAM_WORDS : MEMBER_WORDS;
+  if (new RegExp(String.raw`\bthis\s+(?:page|${words})\b`, 'i').test(rest)) return true;
+  return page.type === 'member' && /\b(?:he|she|him|her|his|hers)\b/i.test(rest);
+}
+
+/**
+ * The one chip that the member chose (X2). The message STARTS with the request, the recipient ("this team", or the
+ * @name right after "intro to" / "introduce me to") ENDS its clause, and the message has no negation, no second
+ * "intro to" and does not name the page.
+ */
+function chosenChip(
+  message: string,
+  chips: readonly IntroTurnTarget[],
+  page: IntroTurnTarget | undefined
+): IntroTurnTarget | undefined {
+  const request = STRICT_REQUEST.exec(message) ?? STRICT_WISH.exec(message);
+  if (!request || NEGATION.test(message) || [...message.matchAll(INTRO_TO)].length > 1) return undefined;
+  const text = message.slice(request[0].length);
+  const word = new RegExp(String.raw`^this\s+(?:(${TEAM_WORDS})|(${MEMBER_WORDS}))\b`, 'i').exec(text);
+  const ends = (recipient: string) => new RegExp(`^${recipient}${CLAUSE_END}`, 'i').test(text);
+  // "this team @Acme Team": the app writes the chip into the text.
+  const type = word && (word[1] ? 'team' : 'member');
+  const named = chips.filter((chip) =>
+    type
+      ? chip.type === type && ends(String.raw`this\s+[a-z]+(?:,?\s+@${escaped(chip.name)})?`)
+      : ends(String.raw`(?:the\s+)?@?${escaped(chip.name)}`)
+  );
+  if (named.length !== 1) return undefined;
+  return page && mentionsPage(message, page, named[0]) ? undefined : named[0];
+}
 
 /** The recipient is the page: its name, "this page", "this member" on a member page, "her". */
 function isPage(text: string, page: IntroTurnTarget, others: readonly IntroTurnTarget[]): boolean {
+  // "Grace's team" and "this member's team" are not the page.
+  const owner = [page.name, firstName(page.name) ?? page.name].map(escaped).join('|');
+  if (new RegExp(String.raw`^(?:the\s+)?(?:@?(?:${owner})|(?:this|that|the)\s+\w+)['’]s\b`, 'i').test(text))
+    return false;
   if (startsWithName(text, page.name) || startsWithFirstName(text, page.name)) return true;
   if (/^(?:this|the)\s+page\b/i.test(text)) return true;
   const named = typeRecipient(text);
@@ -141,7 +190,7 @@ function isPage(text: string, page: IntroTurnTarget, others: readonly IntroTurnT
 
 /** "I lead this team", "I work at @Acme", "this team is mine": the own team of the member, not a recipient. */
 function isOwnTeam(message: string, chip: IntroTurnTarget): boolean {
-  const team = String.raw`(?:(?:this|the|my)\s+(?:${TEAM_WORDS})\b|@?${escaped(chip.name)}(?![\p{L}\p{N}]|['’]s))`;
+  const team = String.raw`(?:this\s+(?:${TEAM_WORDS})\b|@?${escaped(chip.name)}(?![\p{L}\p{N}]|['’]s))`;
   return (
     chip.type === 'team' &&
     new RegExp(
@@ -154,10 +203,9 @@ function isOwnTeam(message: string, chip: IntroTurnTarget): boolean {
 
 /**
  * What a message asks for with its chips.
- * - a target: the one chip that the member chose (X2): its @name comes right after "intro to" in a request, or a type
- *   word right after "intro to / for / with" names its type and not the page type.
- * - 'unclear': an ask for an intro with a chip that can be the recipient ("Draft an intro for @Acme Team").
- * - undefined: no ask, the page is the recipient, or the message only mentions the chip ("I work at @Acme").
+ * - a target: the one chip that the member chose (`chosenChip`).
+ * - 'unclear': any other ask for an intro with a chip that can be the recipient. The chip and the page stay targets.
+ * - undefined: no ask, the page is the recipient, or the chip is the own team of the member ("I work at @Acme").
  */
 export function introAsk(
   message: string,
@@ -165,14 +213,13 @@ export function introAsk(
   page: IntroTurnTarget | undefined
 ): IntroTurnTarget | 'unclear' | undefined {
   if (!chips.length) return undefined;
+  const chip = chosenChip(message, chips, page);
+  if (chip) return chip;
   const asked = requests(message);
-  const chip = asked.length === 1 ? chosenBy(asked[0], chips, page) : undefined;
-  if (chip && introTos(message).length < 2 && !thisPageType(message, page)) return chip;
   if (
-    !chip &&
     page &&
     asked.some(({ text }) => isPage(text, page, chips)) &&
-    !asked.some((item) => chosenBy(item, chips, page))
+    !asked.some(({ text }) => namesChip(text, chips, page))
   ) {
     return undefined;
   }
@@ -183,31 +230,10 @@ export function introAsk(
 /** True when the message has a request with a recipient. A message about the waiting card mostly has none. */
 export const hasIntroRequest = (message: string) => requests(message).length > 0;
 
-function chosenBy(
-  { preposition, text }: Recipient,
-  chips: readonly IntroTurnTarget[],
-  page: IntroTurnTarget | undefined
-): IntroTurnTarget | undefined {
-  const named =
-    preposition === 'to' ? [...chips, ...(page ? [page] : [])].filter((t) => startsWithName(text, t.name)) : [];
-  if (named.length) {
-    // The longest name wins: "Acme Team" over "Acme". Two targets with one name are not clear.
-    const longest = Math.max(...named.map((target) => target.name.length));
-    const best = named.filter((target) => target.name.length === longest);
-    const rest = text
-      .replace(/^the\s+/i, '')
-      .replace(/^@/, '')
-      .slice(longest);
-    // "to @Acme Team and @Kyle Weiss" has two recipients, so both stay.
-    return best.length > 1 || best[0] === page || /^\s*(?:and|or|&)\s+@/i.test(rest) || NOT_THE_NAME.test(rest)
-      ? undefined
-      : best[0];
-  }
+/** The recipient can be a chip: its name, or a type word of its type and not of the page type. */
+function namesChip(text: string, chips: readonly IntroTurnTarget[], page: IntroTurnTarget): boolean {
   const type = typeRecipient(text)?.type;
-  // "Introduce this team to Grace": the team is not the recipient.
-  if (!type || type === page?.type || (!preposition && /^\S+\s+\S+\s+to\b/.test(text))) return undefined;
-  const ofType = chips.filter((item) => item.type === type);
-  return ofType.length === 1 ? ofType[0] : undefined;
+  return chips.some((chip) => startsWithName(text, chip.name) || (chip.type === type && type !== page.type));
 }
 
 /** How a turn uses the kept targets. `both`: the page is also named, so the page is a target too. */
@@ -230,7 +256,8 @@ export function keptTargetUse(
   const recipients = [request, ...introTos(message.replace(PAST, ' '))].filter((text): text is string => !!text);
   for (const text of recipients) {
     if (namesKept(text, kept)) return page && namesPage(message, kept, page) ? 'both' : 'kept';
-    if (page && isPage(text, page, [])) continue;
+    // Also "Grace's team": the page member is named, so both stay.
+    if (page && (isPage(text, page, []) || namesKept(text, [page]))) continue;
     const named = typeRecipient(text);
     if (
       named ? !kept.some((target) => target.type === named.type) : OTHER_RECIPIENT.test(text) || OTHER_WORDS.test(text)
@@ -242,6 +269,7 @@ export function keptTargetUse(
   return page && namesPage(message, kept, page) ? 'both' : 'kept';
 }
 
+/** The text starts with the name or the first name of one of the targets. */
 const namesKept = (text: string, kept: readonly IntroTurnTarget[]) =>
   kept.some((target) => startsWithName(text, target.name) || startsWithFirstName(text, target.name));
 
