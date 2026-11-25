@@ -53,7 +53,7 @@ import {
   PROFILE_READ_TOOLS,
   profileFacts,
 } from './labos-agent-drafts';
-import { chosenChip, keptTargetUse } from './labos-agent-intro-target';
+import { hasIntroRequest, introAsk, keptTargetUse } from './labos-agent-intro-target';
 import {
   asksAgainAfterFailure,
   asksForChange,
@@ -387,8 +387,8 @@ export class LabosAgentService {
 
   /**
    * LAB-3367 B3 (Oleg): the intro targets of the turn when the member chose a target, or undefined for the page and the
-   * chips. A chosen chip (`chosenChip`) is kept until a draft is made, the TTL ends, the member moves to another page or
-   * the message names another recipient (`keptTargetUse`). See the OpenSpec B3 rule.
+   * chips. `introAsk` reads an ask with a chip, `keptTargetUse` each later message. The kept targets stay until a draft
+   * is made, the TTL ends or the member asks for an intro to the page. See the OpenSpec B3 rule.
    */
   private async chosenIntroTarget(
     body: LabosAgentChatRequest,
@@ -399,51 +399,78 @@ export class LabosAgentService {
   ): Promise<{ targets: IntroTurnTarget[]; promptContext?: string; hints: string[]; keeps: boolean } | undefined> {
     const pageHints = page.introHints ?? [];
     const pageKey = JSON.stringify(body.context ?? null);
+    const save = (value: PendingIntroTarget) => this.threadCache(() => this.proposalStore.saveIntroTarget(key, value));
     const others = chips.filter((item) => !sameTarget(item, page.introTarget) && !sameTarget(item, cardTarget));
-    const chip = body.context?.page === 'intro' ? undefined : chosenChip(body.message, others, page.introTarget);
-    if (chip) {
-      const pending: PendingIntroTarget = { type: chip.type, uid: chip.uid, page: pageKey };
-      await this.threadCache(() => this.proposalStore.saveIntroTarget(key, pending));
-      const otherHints = others.filter((item) => item !== chip).map((item) => introHint(item.type, item.uid));
-      return { targets: [chip], hints: [...pageHints, ...otherHints], keeps: true };
+    const onIntroPage = body.context?.page === 'intro';
+    const ask = onIntroPage ? undefined : introAsk(body.message, others, page.introTarget);
+    const keepFor = (targets: IntroTurnTarget[]): PendingIntroTarget => ({
+      targets: targets.slice(0, MAX_KEPT_TARGETS).map(({ type, uid }) => ({ type, uid })),
+      page: pageKey,
+      ...(page.introTarget ? {} : { noPage: true }),
+    });
+    if (ask && ask !== 'unclear') {
+      await save(keepFor([ask]));
+      const otherHints = others.filter((item) => item !== ask).map((item) => introHint(item.type, item.uid));
+      return { targets: [ask], hints: [...pageHints, ...otherHints], keeps: true };
     }
-    const pending = await this.threadCache(() => this.proposalStore.loadIntroTarget(key));
-    if (!pending) return undefined;
+    // With a waiting card, "intro" mostly means the card, so only a request with a recipient is an ask.
+    const unclear = ask === 'unclear' && (!cardTarget || hasIntroRequest(body.message));
+    // D1: the next turn has the chip and the page. This turn has them too, with the hints of the page and the chips.
+    const keepUnclear = async () => {
+      if (!unclear) return undefined;
+      await save({ ...keepFor(others), ...(page.introTarget ? { both: true } : {}), unclear: true });
+      return { targets: [...(page.introTarget ? [page.introTarget] : []), ...others], hints: [], keeps: true };
+    };
+    const stored = await this.threadCache(() => this.proposalStore.loadIntroTarget(key));
+    if (!stored) return keepUnclear();
+    // R1: on another page only that page is the target. D1: back on the first page, the page and the kept targets are.
+    const moved = stored.page !== pageKey;
+    if (moved && (onIntroPage || !stored.noPage || !page.introTarget)) {
+      if (!unclear && !stored.both && !stored.noPage) await save({ ...stored, both: true });
+      return keepUnclear();
+    }
     const drop = () => this.threadCache(() => this.proposalStore.clearIntroTarget(key));
-    const moved = pending.page !== pageKey;
-    // A waiting card for the kept target: its draft is made.
-    const name =
-      moved || sameTarget(pending, cardTarget)
-        ? null
-        : await this.introRequests.findAgentTargetName(pending.type === 'member' ? 'MEMBER' : 'TEAM', pending.uid);
-    const target: IntroTurnTarget = { type: pending.type, uid: pending.uid, name: name ?? '' };
-    const use = name ? keptTargetUse(body.message, target, page.introTarget) : 'page';
+    // A waiting card for a kept target: its draft is made.
+    const done = stored.targets.some((target) => sameTarget(target, cardTarget));
+    const kept = done ? [] : await this.keptTargets(stored);
+    if (!kept.length) {
+      await drop();
+      return keepUnclear();
+    }
+    const use = keptTargetUse(body.message, kept, page.introTarget);
     if (use === 'page') {
       await drop();
       return undefined;
     }
-    if (use === 'drop') {
-      await drop();
-      return { targets: others, hints: pageHints, keeps: false };
-    }
-    const both = !!page.introTarget && (use === 'both' || !!pending.both);
-    if (both && !pending.both) {
-      await this.threadCache(() => this.proposalStore.saveIntroTarget(key, { ...pending, both: true }));
-    }
-    const promptContext =
-      `Earlier in this chat, the member asked for an intro to this ${target.type}: ${JSON.stringify(target)}. ` +
-      (both
-        ? 'The page is also an intro target. Use the one that the member means. If it is not clear, ask which one. '
-        : 'It is the intro target of this turn, not the page. ') +
-      `When the member gives the reason for this intro, call draft_intro with type "${target.type}" and ` +
-      `targetUid "${target.uid}". If the message is about something else, answer it and make no draft. ` +
-      `${INTRO_REASON_RULE} You never send the request.`;
-    return {
-      targets: [target, ...(both && page.introTarget ? [page.introTarget] : []), ...others],
-      promptContext,
-      hints: both ? [] : pageHints,
-      keeps: true,
+    // A new unclear ask adds its chips: the kept targets stay possible.
+    const added = unclear ? others.filter((item) => !kept.some((target) => sameTarget(target, item))) : [];
+    const paused = use === 'pause' && !added.length;
+    const pending: PendingIntroTarget = {
+      ...stored,
+      targets: uniqueTargets([...added, ...kept])
+        .slice(0, MAX_KEPT_TARGETS)
+        .map(({ type, uid }) => ({ type, uid })),
+      ...(use === 'both' || paused || moved ? { both: true } : {}),
+      ...(added.length ? { unclear: true } : {}),
     };
+    if (JSON.stringify(pending) !== JSON.stringify(stored)) await save(pending);
+    // D1: no target in the turn of a search or a cancel, but the next turn has the page and the kept targets.
+    if (paused) return { targets: others, hints: pageHints, keeps: true };
+    const both = !!page.introTarget && !!pending.both;
+    const targets = uniqueTargets([...kept, ...(both && page.introTarget ? [page.introTarget] : []), ...others]);
+    return { targets, promptContext: keptPrompt(kept, pending, both), hints: both ? [] : pageHints, keeps: true };
+  }
+
+  /** The kept targets with their names from the database. A deleted target has no name. */
+  private async keptTargets(stored: PendingIntroTarget): Promise<IntroTurnTarget[]> {
+    const named = await Promise.all(
+      stored.targets.map(async ({ type, uid }) => ({
+        type,
+        uid,
+        name: await this.introRequests.findAgentTargetName(type === 'member' ? 'MEMBER' : 'TEAM', uid),
+      }))
+    );
+    return named.flatMap(({ type, uid, name }) => (name ? [{ type, uid, name }] : []));
   }
 
   /**
@@ -819,6 +846,27 @@ function introHint(type: 'member' | 'team', uid: string): string {
     `call draft_intro with type "${type}" and targetUid "${uid}". ` +
     // LAB-3367 G8: the same reason rule on each page, as on the intro page.
     `${INTRO_REASON_RULE} You never send the request.`
+  );
+}
+
+/** LAB-3367 B3: at most this many kept targets. */
+const MAX_KEPT_TARGETS = 3;
+
+/** LAB-3367 B3: the prompt lines of the kept targets. Never says that the member chose a target that they did not. */
+function keptPrompt(kept: IntroTurnTarget[], { unclear }: PendingIntroTarget, both: boolean): string {
+  const calls = kept
+    .map(({ type, uid }) => `draft_intro with type "${type}" and targetUid "${uid}"`)
+    .join(kept.length > 1 ? ' or ' : '');
+  const ask = 'Use the one that the member means. If it is not clear, ask which one and make no draft. ';
+  const start = unclear
+    ? `Earlier in this chat, the member asked for an intro and added ${JSON.stringify(kept)}. ` +
+      `The recipient can be ${kept.length > 1 ? 'one of these' : 'this'}${both ? ', or the page' : ''}, ` +
+      `or that message only mentions it. ${ask}`
+    : `Earlier in this chat, the member asked for an intro to this ${kept[0].type}: ${JSON.stringify(kept[0])}. ` +
+      (both ? `The page is also an intro target. ${ask}` : 'It is the intro target of this turn, not the page. ');
+  return (
+    `${start}When the member gives the reason for this intro, call ${calls}. ` +
+    `If the message is about something else, answer it and make no draft. ${INTRO_REASON_RULE} You never send the request.`
   );
 }
 

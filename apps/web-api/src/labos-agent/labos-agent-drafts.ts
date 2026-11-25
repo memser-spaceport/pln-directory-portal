@@ -81,7 +81,7 @@ export function profileToolsLine(names: readonly string[]): string {
 }
 
 /** LAB-3367 B2 (Oleg): the fixed answer to a bare "add that" right after a draft turn. The card does not change. */
-export const ADD_THAT_LINE = 'I did not change the draft.';
+export const ADD_THAT_LINE = 'I did not change the draft. To add a new detail, write the detail in your message.';
 
 /** LAB-3367 B2: the whole message is only "add that", "add it to the draft", "put this in the intro" and the like. */
 export const isBareAddThat = (message: string) =>

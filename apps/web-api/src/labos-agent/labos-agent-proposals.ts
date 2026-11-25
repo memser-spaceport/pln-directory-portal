@@ -34,10 +34,17 @@ export const proposalRecordKey = (id: string) => `${keyPrefix()}:proposal:${id}`
 const openKey = (id: string) => `${keyPrefix()}:proposal-open:${id}`;
 
 /**
- * LAB-3367 B3: the kept intro target of one member and thread, for 10 minutes. `page` is the JSON of the C1 `context` of
- * the ask (uids only): another page drops the target. `both`: a later message also named the page.
+ * LAB-3367 B3: the kept intro targets of one member and thread, for 10 minutes. `page` is the JSON of the C1 `context` of
+ * the ask (uids only): on another page they are not used. `noPage`: that page was no intro target. `both`: the page can
+ * be the recipient too. `unclear`: the member did not choose a target (an ask with a chip that can be the recipient).
  */
-export type PendingIntroTarget = { type: 'member' | 'team'; uid: string; page: string; both?: true };
+export type PendingIntroTarget = {
+  targets: Array<{ type: 'member' | 'team'; uid: string }>;
+  page: string;
+  noPage?: true;
+  both?: true;
+  unclear?: true;
+};
 export const introTargetKey = (memberUid: string, threadId: string) =>
   `${keyPrefix()}:intro-target:${JSON.stringify([memberUid, threadId])}`;
 
@@ -75,7 +82,11 @@ export class LabosAgentProposalStore {
 
   async loadIntroTarget(key: string): Promise<PendingIntroTarget | undefined> {
     const value = await this.cache.get<PendingIntroTarget>(key);
-    const valid = (value?.type === 'member' || value?.type === 'team') && !!value.uid && typeof value.page === 'string';
+    const valid =
+      typeof value?.page === 'string' &&
+      Array.isArray(value.targets) &&
+      value.targets.length > 0 &&
+      value.targets.every((item) => (item?.type === 'member' || item?.type === 'team') && !!item.uid);
     return valid ? value : undefined;
   }
 
