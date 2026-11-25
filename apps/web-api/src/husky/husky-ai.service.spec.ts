@@ -1270,6 +1270,51 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
         expect(answerPrompt(1)).toContain('Previous reply: not available');
       });
 
+      it('F6: with no answer line, the stream removes the reserved line from the model text, also across chunks', async () => {
+        const half = Math.floor(LINE.length / 2);
+        streamTextMock.mockReturnValueOnce(
+          answerStream(['Shorter answer.\n\n', LINE.slice(0, half), LINE.slice(half), ' Done.'])
+        );
+        const body = await turn({ reservedReply: LINE });
+        const parsed = JSON.parse(body);
+        expect(body).not.toContain(LINE);
+        expect(parsed.content).toBe('Shorter answer.\n\n Done.');
+        expect(store.get(KEY)).toBe('Shorter answer.\n\n Done.');
+      });
+
+      it('F6: the reserved line split across a cut-off answer and its continuation is removed', async () => {
+        const half = Math.floor(LINE.length / 2);
+        streamTextMock
+          .mockReturnValueOnce(answerStream(['Shorter answer.\n\n', LINE.slice(0, half)], 'length'))
+          .mockReturnValueOnce(answerStream([LINE.slice(half), ' Done.']));
+        const body = await turn({ reservedReply: LINE });
+        expect(streamTextMock).toHaveBeenCalledTimes(2);
+        expect(body).not.toContain(LINE);
+        expect(JSON.parse(body).content).toBe('Shorter answer.\n\n Done.');
+      });
+
+      it('F6: a held start of the line streams before the stalled notice', async () => {
+        const start = LINE.slice(0, 8);
+        streamTextMock
+          .mockReturnValueOnce(answerStream([`A. ${start}`], 'length'))
+          .mockReturnValueOnce(answerStream([], 'length'));
+        const body = await turn({ reservedReply: LINE });
+        expect(JSON.parse(body).content).toBe(`A. ${start}${HUSKY_SEARCH_STALLED_NOTICE}`);
+      });
+
+      it('F6: text that only starts like the reserved line still streams', async () => {
+        const start = LINE.slice(0, 8);
+        streamTextMock.mockReturnValueOnce(answerStream([`A. ${start}`]));
+        const body = await turn({ reservedReply: LINE });
+        expect(JSON.parse(body).content).toBe(`A. ${start}`);
+      });
+
+      it('F6: with no reserved line, the model text does not change', async () => {
+        streamTextMock.mockReturnValueOnce(answerStream([LINE]));
+        const body = await turn();
+        expect(JSON.parse(body).content).toBe(LINE);
+      });
+
       it('the real answer line is still stored with a reserved line', async () => {
         streamTextMock.mockReturnValueOnce(answerStream(['Dropped.']));
         await turn({ reservedReply: LINE, answerLine: () => LINE });

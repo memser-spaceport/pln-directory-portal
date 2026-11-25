@@ -6,12 +6,19 @@
  * out only when the turn ends (`finish`) and `line` still gives it, so the answer has the line only when a draft card
  * goes out. When `line` gives nothing again (for example a refused second `draft_intro` call removed the draft), the
  * model text streams again, so the member sees the refusal and no line.
+ *
+ * LAB-3367 F6: with `reserved` (the same line), model text is never that line while the override is off. The filter
+ * removes the line from the model text, also when it comes in more than one chunk: it holds back the end of the text
+ * while that end can be the start of the line. The held text stays across an initial generation and its continuation. `flush` gives it once, when all generations end.
  */
 export class AnswerOverride {
   /** True after the override dropped text, until the next text that streams. */
   private dropped = false;
 
-  constructor(private readonly line?: () => string | undefined) {}
+  /** LAB-3367 F6: model text held back, because it can be the start of `reserved`. */
+  private held = '';
+
+  constructor(private readonly line?: () => string | undefined, private readonly reserved?: string) {}
 
   /** True while the override replaces the answer text. */
   isOn(): boolean {
@@ -21,14 +28,32 @@ export class AnswerOverride {
   /** The text to stream for `chunk`. `written` is the answer text of the turn so far. */
   filter(chunk: string, written: string): string {
     if (this.isOn()) {
-      if (chunk) this.dropped = true;
+      if (chunk || this.held) this.dropped = true;
+      this.held = '';
       return '';
     }
-    if (!this.dropped) return chunk;
+    if (!this.dropped) return this.withoutReserved(chunk);
     // The break before the text came with the dropped text. At the start of the answer the text needs none.
     const next = written.trim() ? chunk : chunk.replace(/^\s+/, '');
     if (next) this.dropped = false;
-    return next;
+    return this.withoutReserved(next);
+  }
+
+  /** LAB-3367 F6: the held text after all generations, or ''. While the override is on, the held text is dropped. */
+  flush(): string {
+    const out = this.isOn() ? '' : this.held;
+    this.held = '';
+    return out;
+  }
+
+  /** LAB-3367 F6: `chunk` after the held text, without `reserved`. The end that can start `reserved` is held back. */
+  private withoutReserved(chunk: string): string {
+    if (!this.reserved) return chunk;
+    const text = (this.held + chunk).split(this.reserved).join('');
+    let keep = Math.min(text.length, this.reserved.length - 1);
+    while (keep > 0 && !this.reserved.startsWith(text.slice(text.length - keep))) keep -= 1;
+    this.held = text.slice(text.length - keep);
+    return text.slice(0, text.length - keep);
   }
 
   /** The line to add when the turn ends with the override on, or ''. */

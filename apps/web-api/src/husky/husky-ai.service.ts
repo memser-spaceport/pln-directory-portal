@@ -314,7 +314,8 @@ export class HuskyAiService {
     const turn: ContextualToolsOptions & LatestReplyTurn = options.latestReplyTurn
       ? { ...options, ...options.latestReplyTurn(latestReply) }
       : options;
-    const override = new AnswerOverride(turn.answerLine);
+    // LAB-3367 F6: the model text never has the reserved line (the draft line) when the turn has no answer line.
+    const override = new AnswerOverride(turn.answerLine, options.reservedReply);
     const pageContext = turn.promptContext ? `  - pageContext: ${turn.promptContext}` : '';
     // LAB-3367 F3, F5: with a key, an empty value (a first turn, or a stopped, failed or cut-off turn, or a cache
     // failure) is the bare words `not available`. A stored reply is JSON text, so it is always in quotes.
@@ -357,6 +358,15 @@ export class HuskyAiService {
               enqueue('], "content": "');
             }
             enqueue(fragment);
+          };
+
+          // LAB-3367 F6: the model text that the override held back (a possible start of the reserved line). Called
+          // once after all generations, before the stalled notice and the answer line, so the text order stays.
+          const flushHeld = () => {
+            const held = override.flush();
+            if (!held) return;
+            content += held;
+            emitText(encodeJsonStringFragment(held));
           };
 
           enqueue('{ "steps": [');
@@ -406,6 +416,8 @@ export class HuskyAiService {
               override
             );
             content += continuation.text;
+            // LAB-3367 F6: flush after the continuation, not between the generations, so the line cannot form across them.
+            flushHeld();
             toolResults += continuation.toolResults;
             toolNames.push(...continuation.toolNames);
             if (!continuation.complete) {
@@ -418,6 +430,7 @@ export class HuskyAiService {
             }
           }
 
+          flushHeld();
           // LAB-3362 D4: the line goes out only now, when the turn still has the draft card.
           const lastLine = override.finish(content);
           if (lastLine) {
@@ -455,7 +468,11 @@ export class HuskyAiService {
           if (latestReplyKey && complete) {
             // LAB-3367: model text that is the same as `reservedReply` is not that line, so it is stored as not known.
             const reply = lastLine ? lastLine.trim() : content;
-            const reserved = !lastLine && Boolean(options.reservedReply) && content.trim() === options.reservedReply;
+            // F6: the stream removed the line from the model text, so text with nothing more is also not known.
+            const reserved =
+              !lastLine &&
+              Boolean(options.reservedReply) &&
+              (!content.trim() || content.trim() === options.reservedReply);
             await this.saveLatestReply(latestReplyKey, reserved ? '' : reply);
             // A cancel during the write: the client gets no end, so the reply is not latest. Clear it again and do not
             // close the cancelled stream. No await comes between this check and `controller.close()`.

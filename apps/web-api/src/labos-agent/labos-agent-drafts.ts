@@ -19,6 +19,16 @@ export const INTRO_NOT_ELIGIBLE_TEXT =
  */
 export const INTRO_DRAFT_LINE = 'Here is a draft intro. Edit it in the card, then send.';
 
+/**
+ * LAB-3367 Q1, s4 (Oleg, decided): the fact rule for the member in the draft text, for new drafts and revisions. The
+ * `draft_intro` description and the card prompt use this same text. Facts about the target from the page or a tool
+ * stay allowed.
+ */
+export const DRAFT_FACTS_RULE =
+  'In the draft text, facts about the member come only from the member’s message or their LabOS profile (a tool ' +
+  'result). When the member asks you to mention something about themselves, use their words. Do not add ' +
+  'experience, duration, results, roles or opinions from anywhere else.';
+
 /** The answer line while the turn has a draft, else undefined. For `ContextualToolsOptions.answerLine`. */
 export function introDraftLine(drafts: LabosAgentDraft[]): string | undefined {
   return drafts.length ? INTRO_DRAFT_LINE : undefined;
@@ -53,10 +63,8 @@ export function draftIntroTool(ctx: McpActorContext, deps: DraftDeps): CoreTool 
     description:
       'Write a draft intro request from the member to a member or team in the page context or the items of the message. ' +
       `The text is from ${MIN} to ${MAX} characters, in the voice of the member: who they are, what they ask, and why. ` +
-      // LAB-3367 Q1 (Oleg): the exact fact rule for new drafts and revisions. The card rules for a revision stay.
-      'Add only facts the member gave or a tool returned. ' +
-      'When the member asks you to mention something about themselves, use their words. ' +
-      'Do not add experience, duration, results, roles or opinions they did not give. ' +
+      // LAB-3367 Q1, s4 (Oleg): the exact fact rule for new drafts and revisions.
+      `${DRAFT_FACTS_RULE} ` +
       'The tool only makes a draft card. The member edits it and presses Send. Nothing is sent. ' +
       'Call it before you write the answer. Do not write the draft text in the answer: the card shows it. ' +
       'Use it only for an intro target of this turn. Make one draft for one target. When there is no target, ask the member to open ' +

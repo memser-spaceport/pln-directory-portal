@@ -36,7 +36,13 @@ import { TeamNewsQueryService } from '../team-news/team-news-query.service';
 import { TeamsService } from '../teams/teams.service';
 import { LabosAgentAccessService } from './labos-agent-access.service';
 import { answerCounts } from './labos-agent-answer-counts';
-import { draftIntroTool, INTRO_DRAFT_LINE, introDraftLine, IntroTurnTarget } from './labos-agent-drafts';
+import {
+  DRAFT_FACTS_RULE,
+  draftIntroTool,
+  INTRO_DRAFT_LINE,
+  introDraftLine,
+  IntroTurnTarget,
+} from './labos-agent-drafts';
 import { lastAnswerTurn, WHICH_REPLY_LINE, withoutIntroHints } from './labos-agent-last-answer';
 import { searchMentions } from './labos-agent-mentions';
 import { mcpToolsAsAgentTools, newsLinkFields } from './labos-agent-news.tools';
@@ -504,11 +510,9 @@ export class LabosAgentService {
       'This rule applies also when the page or the items added to the message point to another member or team. ' +
       'A member or team name in the revision, such as "mention that I know Acme Team", is part of the new text. ' +
       'It does not change the target. ' +
-      // LAB-3367 Q1 (h2): keep the facts of the current text, add no facts that the member did not give.
+      // LAB-3367 Q1 (h2), s4: keep the facts of the current text. The same fact rule as the draft_intro description.
       'In a revision, keep the facts of the current text: the member may have typed them. ' +
-      'Add only facts the member gave. ' +
-      'Do not add or strengthen a role, shared work, experience or that someone can vouch for the member, ' +
-      'when the member did not give it. ' +
+      `${DRAFT_FACTS_RULE} ` +
       // LAB-3367 F1, k1: the rules for your last answer (LAST_ANSWER_RULES, in the system message) win. Prompt guidance.
       'If the member asks to change your last answer, the rules for your last answer apply, and they win over this ' +
       'draft. ' +

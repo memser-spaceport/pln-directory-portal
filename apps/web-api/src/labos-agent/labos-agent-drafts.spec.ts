@@ -60,11 +60,11 @@ const SENDERS: Array<[string, Partial<Person>, boolean]> = [
 
 const VALID = { threadId: 'thread-1', chatId: 'chat-1', message: 'Help me write an intro request to Grace.' };
 const MEMBER_CONTEXT = { page: 'intro', introTarget: { type: 'member', uid: 'm-grace' } };
-/** LAB-3367 Q1 (Oleg): the exact fact rule, in the tool description that new drafts and revisions share. */
+/** LAB-3367 Q1, s4 (Oleg): the exact fact rule, in the tool description and the card prompt. A literal, not the export. */
 const DRAFT_FACTS_RULE =
-  'Add only facts the member gave or a tool returned. ' +
-  'When the member asks you to mention something about themselves, use their words. ' +
-  'Do not add experience, duration, results, roles or opinions they did not give.';
+  'In the draft text, facts about the member come only from the member’s message or their LabOS profile (a tool ' +
+  'result). When the member asks you to mention something about themselves, use their words. Do not add ' +
+  'experience, duration, results, roles or opinions from anywhere else.';
 const TEAM_CONTEXT = { page: 'intro', introTarget: { type: 'team', uid: 't-acme' } };
 
 /** `permissions` are the RBAC permissions of the sender, for example `member.search.read` for a member chip. */
@@ -554,10 +554,7 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
     'A member or team name in the revision, such as "mention that I know Acme Team", is part of the new text. ' +
     'It does not change the target.';
   const FACTS_ONLY =
-    'In a revision, keep the facts of the current text: the member may have typed them. ' +
-    'Add only facts the member gave. ' +
-    'Do not add or strengthen a role, shared work, experience or that someone can vouch for the member, ' +
-    'when the member did not give it.';
+    'In a revision, keep the facts of the current text: the member may have typed them. ' + DRAFT_FACTS_RULE;
   // LAB-3367 k1: the exact text from the review, in place of four card sentences that repeated LAST_ANSWER_RULES.
   const LAST_ANSWER_WINS =
     'If the member asks to change your last answer, the rules for your last answer apply, and they win over this draft.';
@@ -652,7 +649,7 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
     expect(options.extraResponseFields.drafts).toEqual([draftFor({ ...ACME, name: 'Acme Team' })]);
   });
 
-  it('LAB-3367 Q1: a revision keeps the facts of the current text and adds only facts the member gave', async () => {
+  it('LAB-3367 Q1: a revision keeps the facts of the current text and gets the fact rule (s4)', async () => {
     const h = setup();
     const options = await chat(h, {
       ...VALID,
@@ -894,10 +891,33 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
       expect(turn).toHaveProperty('answerLine', undefined);
     });
 
+    it.each([
+      ['a normal answer', NORMAL],
+      ['an unknown reply', ''],
+      ['the real draft line', INTRO_DRAFT_LINE],
+    ])('item 4: after %s, a pasted text gets no draft tool and no card text', async (_name, latestReply) => {
+      const { options, turn } = await turnFor(
+        'shorten this: We build open tools for research teams and we want to meet more labs.',
+        latestReply
+      );
+      expect(options.extraTools).toHaveProperty('draft_intro');
+      expect(turn.extraTools).not.toHaveProperty('draft_intro');
+      expect(turn.promptContext ?? '').not.toContain(CARD_TEXT);
+      expect(turn.promptContext ?? '').not.toContain('An intro draft card waits');
+      expect(turn).toHaveProperty('answerLine', undefined);
+      expect(turn).not.toHaveProperty('fixedAnswer');
+    });
+
+    it('item 4: "shorten this draft: ..." keeps the draft tool and the card', async () => {
+      const { options, turn } = await turnFor('shorten this draft: keep the part about Lit', INTRO_DRAFT_LINE);
+      expect(turn).toEqual({});
+      expect(options.extraTools).toHaveProperty('draft_intro');
+      expect(options.promptContext).toContain(CARD_TEXT);
+    });
+
     it('the fixed answer gives the full recovery request, not an open question', () => {
       expect(WHICH_REPLY_LINE).toBe(
-        'I cannot tell which reply to change, so I changed nothing. Send the full request again: say ' +
-          '"make the draft shorter" for the intro draft, or paste the text to change.'
+        'I cannot tell which reply to change, so I changed nothing. To change the intro draft, say “make the draft shorter”.'
       );
     });
 
