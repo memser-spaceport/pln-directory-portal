@@ -17,8 +17,33 @@ order, and the queries that prove no event, guest row or gathering was lost. How
 The frontend settings are read at build time, so a change needs a new frontend build. Turn on the frontend submit
 setting only where the API setting is on.
 
+### Where each setting is set
+
+| Setting                                                                                                                                  | Set in                                                                            | Dev     | Prod |
+| ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ------- | ---- |
+| `EVENTS_LOCAL_SUBMIT_ENABLED`, `GOOGLE_PLACES_API_KEY`                                                                                   | SSM `/dev/directory-service/` or `/prod/directory-service/`, then an API redeploy | Natalia | Vova |
+| `NEXT_PUBLIC_SHOW_EVENT_DRAWER`, `NEXT_PUBLIC_SHOW_EVENTS_PAGE_V2`, `NEXT_PUBLIC_EVENTS_LOCAL_SUBMIT`, `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | The frontend's Vercel project, for that environment, then a new build             | Natalia | Vova |
+
 The curation API (`/v1/integrations/events`) has no switch. It needs an integration key with the scope `events:read`
 or `events:write`, and no such key exists until step 8 of phase 4.
+
+## The cutover tool
+
+`yarn api:events-cutover` runs the checks and the sync calls of this page, the same way on dev and prod. It reads only
+the environment variables it is given, never a `.env` file:
+
+| Command                                | Needs                               | Does                                                                                                                                                      |
+| -------------------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `snapshot --env <env> [--out <file>]`  | `DATABASE_URL`                      | Runs the count queries in one read-only transaction and writes them to a JSON file. On a database without the migrations it is marked `pre-migration`.    |
+| `compare <before.json> <after.json>`   | the two files                       | Exits 1 when events, guest rows, gatherings, city mappings or member and team links changed, and prints each change. Other counts are shown, not checked. |
+| `service --env <env>`                  | `DATABASE_URL`, `EVENT_SERVICE_URL` | Compares the approved events of the events service with the synced events of LabOS, by id, and names the fields that hold a creator email.                |
+| `sync --details-only` or `sync --full` | `API_URL`, `INTERNAL_AUTH_TOKEN`    | Calls `POST /v1/irl/events/sync` (the details backfill or the full pull sync). Exits 1 when the API skips it because the API switch is on.                |
+| `--print-sql`                          | nothing                             | Prints the queries, to run them by hand.                                                                                                                  |
+
+`DATABASE_URL` is the `pln-pg` tunnel of the environment (`.claude/skills/pln-pg/pln-pg.sh <env> --url`); the tool
+reads `sslmode=require` as "encrypt, do not verify", as libpq does. `EVENT_SERVICE_URL` is the events service the
+laptop reaches: `https://dev-events.os.pl.xyz` on dev. Keep the snapshot files until the Goal is done, and put their
+counts (not their rows) in the ticket.
 
 ## Order of the rollout
 
@@ -38,7 +63,9 @@ Run every phase on dev before prod. Run the SQL read-only (the `pln-pg` skill fo
 1. Merge the backend goal PR, then the frontend goal PR.
 2. The API applies the migrations `pl_event_status_and_typed_fields` and `pl_event_private_details` when it starts.
    They add columns and indexes and fill the new columns from stored event details. Every event is `APPROVED`.
-3. Check with query 2 that the number of events did not change, and with query 6 that every event is `APPROVED`.
+3. Before the merge, take `snapshot --env <env> --out phase1-before.json` (it is `pre-migration`). After the API
+   started, take `phase1-after.json` and run `compare phase1-before.json phase1-after.json`. Query 6 in the second
+   snapshot shows every event `APPROVED`.
 
 After this phase the events service still owns events. The queue and the pull sync also write the new columns.
 
@@ -48,11 +75,11 @@ After this phase the events service still owns events. The queue and the pull sy
    access, tags, host, time zone, venue, links) on events that were synced before those columns existed:
 
    ```bash
-   curl -X POST "$API/v1/irl/events/sync" -H "Authorization: Bearer $INTERNAL_AUTH_TOKEN" \
-     -H "Content-Type: application/json" -d '{ "detailsOnly": true }'
+   yarn api:events-cutover sync --details-only
    ```
 
-   It answers `{ "updated": <n> }`. Query 3 counts the events it could not reach: events the events service no longer
+   It prints `{ "updated": <n> }`. `live_synced_events_without_details` of the next snapshot (query 3) counts the
+   events it could not reach: events the events service no longer
    returns. They keep empty details and read as before. On 2026-11-20 dev had details on 481 of 682 events and prod on
    15 of 701, so on prod this step fills almost every event.
 
@@ -66,20 +93,16 @@ After this phase the events service still owns events. The queue and the pull sy
    from the events service, so an event submitted in LabOS would not show there.
 6. Review the gathering mappings with query 7 and fix or delete each wrong row (see "How an event finds its
    gathering").
-7. Check whether the events service returns the creator of an event. From a pod that reaches it:
-
-   ```bash
-   curl -s "$EVENT_SERVICE_URL/events?status=APPROVED&conference=" | jq '.events[0] | keys'
-   ```
-
-   If a creator email is there (for example `requestorEmail` or `createdBy`), the final sync can set
-   `PLEvent.submitterUid` by matching the member email, and authors keep editing their events under "My events".
-   If not, events from the events service have no submitter in LabOS: a directory admin or the curator app edits them.
+7. Run `service --env <env>`. It lists the events missing on either side and the fields that hold a creator email.
+   On dev on 2026-11-25 the events service had 1393 approved events and LabOS 507: 912 were never synced to dev, and
+   26 LabOS events (the ones query 3 counts) are no longer in the events service. The final sync adds the first and
+   deletes the second. The events carry `created_by` and `submitted_by` emails, so the final sync can set
+   `PLEvent.submitterUid` by matching the member email, and authors keep editing their events under My Submissions.
 
 ## Phase 3: checks before the switch
 
-1. Record the counts of queries 1 and 2.
-2. Query 4 returns no rows.
+1. Take `snapshot --env <env> --out phase3.json` and put its counts in the ticket.
+2. Query 4 has no rows in it.
 3. Tell the curator the day and the hour. Submissions that wait in the old portal must be approved or rejected before
    the switch: drafts and rejected events are not moved.
 
@@ -87,26 +110,20 @@ After this phase the events service still owns events. The queue and the pull sy
 
 1. Approve or reject every submission that waits in the old portal.
 2. Put the old portal in maintenance (redirect `irl.os.pl.xyz/events/add` to the LabOS submit form).
-3. Run the final full pull sync, with the API switch still off:
-
-   ```bash
-   curl -X POST "$API/v1/irl/events/sync" -H "Authorization: Bearer $INTERNAL_AUTH_TOKEN" \
-     -H "Content-Type: application/json" -d '{}'
-   ```
-
-4. Compare: the number of events the events service returns for `GET /events?status=APPROVED&conference=` equals
-   `live_synced_events` of query 1. Query 4 returns no rows.
+3. Run the final full pull sync, with the API switch still off: `yarn api:events-cutover sync --full`.
+4. `service --env <env>` says "match": every approved event of the events service is in LabOS, and nothing else.
+   Then take `snapshot --env <env> --out phase4-before.json`. Query 4 has no rows in it.
 5. Set `EVENTS_LOCAL_SUBMIT_ENABLED=true` on the API and redeploy. Set `NEXT_PUBLIC_EVENTS_LOCAL_SUBMIT=true` on the
    frontend and rebuild it.
-6. Check with queries 1 and 2 that the counts did not change.
+6. Take `phase4-after.json` and run `compare phase4-before.json phase4-after.json`: it says "no loss".
 7. Submit one event as a member with forum access (published at once) and one as a member without it (waits).
 8. Issue the integration key for the curator app, with the scopes `events:read` and `events:write`
    ([INTEGRATION_KEYS.md](./INTEGRATION_KEYS.md)). Approve the waiting event through the API and see it in LabOS.
-9. Query 6 shows the two new events by status and by who created them.
+9. A new snapshot shows the two new events in query 6, by status and by who created them.
 
 ## Phase 5: watch, and roll back if needed
 
-Each day of the first week, check query 6 and the API log for errors on `/v1/irl/events` and
+Each day of the first week, take a snapshot (query 6) and check the API log for errors on `/v1/irl/events` and
 `/v1/integrations/events`.
 
 To roll back, set the API and frontend submit settings off, redeploy both, and bring the old portal back. The queue
@@ -151,79 +168,18 @@ gatherings with upcoming events and no priority: set one to move a city up the l
 
 ## Count queries
 
-```sql
--- 1. Events that came from the events service, by state.
-SELECT count(*) FILTER (WHERE NOT "isDeleted") AS live_synced_events,
-       count(*) FILTER (WHERE "isDeleted") AS deleted_synced_events,
-       count(DISTINCT "externalId") FILTER (WHERE NOT "isDeleted") AS distinct_live_external_ids
-FROM "PLEvent"
-WHERE "externalId" IS NOT NULL AND "sourceTeamUid" IS NULL;
+`yarn api:events-cutover --print-sql` prints them. `snapshot` runs them all.
 
--- 2. All events, guest rows and gatherings.
-SELECT (SELECT count(*) FROM "PLEvent" WHERE NOT "isDeleted") AS live_events,
-       (SELECT count(*) FROM "PLEvent") AS all_events,
-       (SELECT count(*) FROM "PLEventGuest") AS guest_rows,
-       (SELECT count(*) FROM "PLEventGuest" WHERE "eventUid" IS NOT NULL) AS event_guest_rows,
-       (SELECT count(*) FROM "PLEventLocation" WHERE NOT "isDeleted") AS live_gatherings,
-       (SELECT count(*) FROM "PLEventLocationAssociation" WHERE NOT "isDeleted") AS live_location_associations,
-       (SELECT count(*) FROM "PLEventAssociation") AS member_and_team_links;
+| Query                                                                                              | Read it as                                                                                        |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| 1. Events that came from the events service, by state                                              | `live_synced_events`, `deleted_synced_events`, `distinct_live_external_ids`                       |
+| 2. All events, guest rows and gatherings                                                           | The counts `compare` checks: events, guest rows, gatherings, city mappings, member and team links |
+| 3. Synced events with no stored details (the backfill did not reach them)                          | `live_synced_events_without_details`                                                              |
+| 4. External ids of the events service used by more than one live event (expected: no rows)         | Rows to fix before the switch                                                                     |
+| 5. Event logos by host, for the logo copy                                                          | Logos per host; the copy in phase 6 empties "events service bucket"                               |
+| 6. Events by status and by who created them                                                        | After the switch: members' and partner apps' events by status                                     |
+| 7. City mappings that point to a gathering in another country (review each row before the cutover) | Rows to review (see "How an event finds its gathering")                                           |
+| 8. Gatherings with upcoming events and no priority (listed last on IRL Gatherings)                 | Gatherings to give a `priority` to move them up                                                   |
 
--- 3. Synced events with no stored details (the backfill did not reach them).
-SELECT count(*) AS live_synced_events_without_details
-FROM "PLEvent"
-WHERE "externalId" IS NOT NULL AND "sourceTeamUid" IS NULL AND NOT "isDeleted"
-  AND NOT COALESCE("additionalInfo" ? 'details', false);
-
--- 4. External ids of the events service used by more than one live event (expected: no rows).
-SELECT "externalId", count(*) AS events
-FROM "PLEvent"
-WHERE "externalId" IS NOT NULL AND "sourceTeamUid" IS NULL AND NOT "isDeleted"
-GROUP BY "externalId"
-HAVING count(*) > 1;
-
--- 5. Event logos by host, for the logo copy.
-SELECT CASE
-         WHEN i.url LIKE '%pl-events-service%' THEN 'events service bucket'
-         WHEN i.url LIKE '%lumacdn.com%' THEN 'luma'
-         ELSE 'other'
-       END AS logo_host,
-       count(DISTINCT i.uid) AS logos
-FROM "PLEvent" e
-JOIN "Image" i ON i.uid = e."logoUid"
-GROUP BY 1
-ORDER BY 2 DESC;
-
--- 6. After the cutover: events by status and by who created them.
-SELECT status,
-       count(*) FILTER (WHERE "submitterUid" IS NOT NULL) AS by_members,
-       count(*) FILTER (WHERE "sourceTeamUid" IS NOT NULL) AS by_partner_apps,
-       count(*) AS events
-FROM "PLEvent"
-WHERE NOT "isDeleted"
-GROUP BY status
-ORDER BY status;
-
--- 7. City mappings that point to a gathering in another country (review each row before the cutover).
-SELECT a.city, a.state, a.country, l.location AS gathering, l.country AS gathering_country,
-       (SELECT count(*) FROM "PLEvent" e
-        WHERE e."pLEventLocationAssociationUid" = a.uid AND NOT e."isDeleted") AS events
-FROM "PLEventLocationAssociation" a
-JOIN "PLEventLocation" l ON l.uid = a."locationUid"
-WHERE NOT a."isDeleted" AND NOT l."isDeleted"
-  AND a.country IS NOT NULL AND a.country <> ''
-  AND l.country IS NOT NULL AND l.country <> ''
-  AND lower(a.country) <> lower(l.country);
-
--- 8. Gatherings with upcoming events and no priority (listed last on IRL Gatherings).
-SELECT l.uid, l.location, l.country,
-       count(*) AS upcoming_events
-FROM "PLEventLocation" l
-JOIN "PLEvent" e ON e."locationUid" = l.uid
-WHERE NOT l."isDeleted" AND l.priority IS NULL
-  AND NOT e."isDeleted" AND e."endDate" >= now()
-GROUP BY l.uid, l.location, l.country
-ORDER BY upcoming_events DESC;
-```
-
-Queries 1, 3, 4 and 6 read columns the migrations add (`sourceTeamUid`, `status`, `submitterUid`). Before the
-migrations are applied, run them without those conditions.
+Queries 1, 3, 4 and 6 read columns the migrations add (`sourceTeamUid`, `status`, `submitterUid`). On a database
+without them, `snapshot` runs 1, 3 and 4 without those conditions and leaves 6 out.
