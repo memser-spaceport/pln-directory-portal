@@ -1,4 +1,10 @@
-import { Injectable, ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
@@ -118,12 +124,21 @@ export class HuskyService {
     }
   }
 
-  async addHuskyFeedback(feedback: HuskyFeedbackDto) {
+  async addHuskyFeedback(feedback: HuskyFeedbackDto, userEmail?: string) {
     const collection = process.env.MONGO_FEEDBACK_COLLECTION || '';
     const doc = { ...feedback, createdAt: Date.now() };
     if (!feedback.questionId) {
       await this.huskyPersistentDbService.create(collection, doc);
       return;
+    }
+    if (!userEmail) throw new ForbiddenException('Feedback requires an authenticated email');
+    const existing = await this.huskyPersistentDbService.findOneByKeyValue(
+      collection,
+      'questionId',
+      feedback.questionId
+    );
+    if (existing && existing.email !== userEmail) {
+      throw new ForbiddenException('Feedback belongs to another user');
     }
     await this.huskyPersistentDbService.upsertByKeyValue(collection, 'questionId', feedback.questionId, {
       ...doc,
@@ -131,12 +146,11 @@ export class HuskyService {
     });
   }
 
-  async removeHuskyFeedback(questionId: string) {
-    await this.huskyPersistentDbService.deleteDocByKeyValue(
-      process.env.MONGO_FEEDBACK_COLLECTION || '',
-      'questionId',
-      questionId
-    );
+  async removeHuskyFeedback(questionId: string, userEmail?: string) {
+    const collection = process.env.MONGO_FEEDBACK_COLLECTION || '';
+    const existing = await this.huskyPersistentDbService.findOneByKeyValue(collection, 'questionId', questionId);
+    if (!existing || !userEmail || existing.email !== userEmail) throw new NotFoundException('Feedback not found');
+    await this.huskyPersistentDbService.deleteDocByKeyValue(collection, 'questionId', questionId);
   }
 
   private handleErrors(error, message?) {
