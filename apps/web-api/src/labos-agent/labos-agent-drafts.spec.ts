@@ -24,6 +24,10 @@ import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.const
 import { LabosAgentAccessService } from './labos-agent-access.service';
 import { LabosAgentController } from './labos-agent.controller';
 import {
+  ADD_THAT_LINE,
+  ADDED_CLAIM_TEXT,
+  addedClaims,
+  isBareAddThat,
   INTRO_DRAFT_FAILED_TEXT,
   INTRO_DRAFT_LINE,
   INTRO_NOT_ELIGIBLE_TEXT,
@@ -31,7 +35,7 @@ import {
   DRAFT_LIMITS_RULE,
   INTRO_REASON_RULE,
 } from './labos-agent-drafts';
-import { LabosAgentProposalStore } from './labos-agent-proposals';
+import { introTargetKey, LabosAgentProposalStore } from './labos-agent-proposals';
 import {
   ASK_AGAIN_RULE,
   CARD_OPEN_RULE,
@@ -1515,5 +1519,143 @@ describe('draft_intro invalid arguments (LAB-3362, Oleg 1795251083.950879)', () 
     expect(parsed.success).toBe(true);
     expect(parsed.data).not.toHaveProperty('note');
     expect(JSON.stringify(parsed.data)).not.toContain('Secret-draft-5e1f');
+  });
+});
+
+describe('LAB-3367 B2, B3, B4 (Oleg live QA on 8fcac6ca)', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  // Fake targets only: a member page (Grace Hopper) and a team chip (Acme Team).
+  const PAGE = { context: { page: 'member', memberUid: 'm-grace' } };
+  const ASK = { ...PAGE, message: 'Draft an intro to this team', mentions: [{ type: 'team', uid: 't-acme' }] };
+  const REASON = { ...PAGE, message: 'I want feedback on our roadmap.' };
+  const ACME = { type: 'team' as const, uid: 't-acme' };
+  const GRACE_REF = { type: 'member', uid: 'm-grace' };
+  const CARD =
+    'Hi, I lead fundraising at Acme. I mentored three teams last year. I want your advice on our seed round.';
+  const REFUSED = 'not the intro target of this turn';
+
+  /** A Map cache, so the kept target works across turns. */
+  function withCache() {
+    const h = setup(undefined, [MEMBER_PERMISSIONS.SEARCH_READ]);
+    const store = new Map<string, unknown>();
+    h.cache.get.mockImplementation(async (key: string) => store.get(key));
+    h.cache.set.mockImplementation(async (key: string, value: unknown) => void store.set(key, value));
+    h.cache.del.mockImplementation(async (key: string) => (store.delete(key) ? 1 : 0));
+    jest
+      .spyOn(pageContextModule, 'teamPageRow')
+      .mockResolvedValue({ ...ACME, name: 'Acme Team', shortDescription: null });
+    return { ...h, store };
+  }
+
+  async function chat(h: ReturnType<typeof setup>, body: Record<string, unknown>, latestReply = '') {
+    await h.controller.chat({ ...VALID, ...body } as any, h.req, h.res as any);
+    const options = h.husky.createContextualToolsResponse.mock.calls.at(-1)[3];
+    return { options, turn: options.latestReplyTurn(latestReply), prompt: options.promptContext as string };
+  }
+
+  const draft = (options: any, target: { type: string; uid: string }, text = CARD) =>
+    options.extraTools.draft_intro.execute({ type: target.type, targetUid: target.uid, text });
+
+  it('B3: the chip wins, and the reason in the next turn drafts to the team, not to the page member', async () => {
+    const h = withCache();
+    const first = await chat(h, ASK);
+    expect(first.prompt).toContain('call draft_intro with type "team" and targetUid "t-acme"');
+    expect(first.prompt).not.toContain('targetUid "m-grace"');
+    expect(await draft(first.options, GRACE_REF)).toContain(REFUSED);
+    expect(h.cache.set.mock.calls[0]).toEqual([introTargetKey('m-ada', 'thread-1'), ACME, { ttl: 600 }]);
+
+    const { options, prompt } = await chat(h, REASON);
+    expect(prompt).toContain('the member asked for an intro to this team');
+    expect(prompt).not.toContain('targetUid "m-grace"');
+    expect(await draft(options, GRACE_REF)).toContain(REFUSED);
+    expect(await draft(options, ACME)).toContain('is ready for Acme Team');
+    expect(h.store.size).toBe(0);
+  });
+
+  it.each([
+    ['an unrelated question', 'What is new in LabOS?'],
+    ['a bare try again', 'try again'],
+    ['the page member type', 'Draft an intro to this member'],
+    ['the page name', 'Draft an intro to Grace Hopper instead'],
+  ])('B3: %s does not use the kept target and clears it', async (_name, message) => {
+    const h = withCache();
+    await chat(h, ASK);
+    const { options, prompt } = await chat(h, { ...PAGE, message });
+    expect(prompt).toContain('targetUid "m-grace"');
+    expect(prompt).not.toContain('t-acme');
+    expect(await draft(options, ACME)).toContain(REFUSED);
+    expect(h.store.size).toBe(0);
+    expect((await chat(h, REASON)).prompt).not.toContain('t-acme');
+  });
+
+  it('B3: a repeated chip keeps both targets for an unrelated request, and a reason does not keep it again', async () => {
+    const h = withCache();
+    await chat(h, ASK);
+    const unrelated = await chat(h, { ...ASK, message: 'What does this team do?' });
+    expect(unrelated.prompt).toContain('targetUid "m-grace"');
+    expect(unrelated.prompt).toContain('targetUid "t-acme"');
+    expect(h.store.size).toBe(0);
+    await chat(h, ASK);
+    const reason = await chat(h, { ...ASK, message: REASON.message });
+    expect(reason.prompt).not.toContain('targetUid "m-grace"');
+    expect(h.store.size).toBe(0);
+  });
+
+  it('B3: another thread or member does not get the kept target', async () => {
+    const h = withCache();
+    await chat(h, ASK);
+    expect((await chat(h, { ...REASON, threadId: 'thread-2' })).prompt).not.toContain('t-acme');
+    expect(introTargetKey('m-ada', 'thread-1')).not.toBe(introTargetKey('m-grace', 'thread-1'));
+    expect([...h.store.keys()]).toEqual([introTargetKey('m-ada', 'thread-1')]);
+  });
+
+  it('B3: a cache failure keeps the chip target of this turn, and loses only the next turn', async () => {
+    const h = withCache();
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    h.cache.get.mockRejectedValue(new Error('redis down'));
+    h.cache.set.mockRejectedValue(new Error('redis down'));
+    expect(await draft((await chat(h, ASK)).options, GRACE_REF)).toContain(REFUSED);
+    expect((await chat(h, REASON)).prompt).toContain('targetUid "m-grace"');
+  });
+
+  it.each(['add that to the draft', 'Add that.', 'put it in the intro please'])(
+    'B2: "%s" right after the draft line keeps the card and quotes no rule',
+    async (message) => {
+      const { turn } = await chat(withCache(), { message, introDraft: { target: ACME, text: CARD } }, INTRO_DRAFT_LINE);
+      expect(turn.fixedAnswer).toBe(ADD_THAT_LINE);
+      expect(turn.extraTools).not.toHaveProperty('draft_intro');
+      expect(ADD_THAT_LINE).not.toMatch(/rule|prompt|draft_intro|tool|mentored/i);
+    }
+  );
+
+  it('B2: after a normal answer, it goes to the model with the earlier-message rule', async () => {
+    const body = { message: 'add that to the draft', introDraft: { target: ACME, text: CARD } };
+    const { turn, prompt } = await chat(withCache(), body, 'Do you want me to add it?');
+    expect(turn).toEqual({});
+    expect(prompt).toContain(
+      'A fact from an earlier message of the member in this chat is in the words of the member.'
+    );
+    expect(prompt).toContain('When the member says "add that", keep that fact in the draft.');
+    expect(isBareAddThat('add that answer to the draft')).toBe(false);
+    expect(isBareAddThat('add that I mentored three teams')).toBe(false);
+  });
+
+  const CLAIM = `${CARD} So I have some hands-on experience in the grants space.`;
+  it.each(['make it more convincing', 'I mentored three teams last year.'])(
+    'B4: "%s" with a new claim is refused, and the card does not change',
+    async (message) => {
+      const { options } = await chat(withCache(), { message, introDraft: { target: ACME, text: CARD } });
+      expect(await draft(options, ACME, CLAIM)).toBe(ADDED_CLAIM_TEXT);
+      expect(options.extraResponseFields.drafts).toEqual([]);
+      expect(await draft(options, ACME, `${CARD} It would mean a lot to us.`)).toContain('is ready');
+    }
+  );
+
+  it('B4: a claim in the card or in the message stays allowed, and a first draft does not change', () => {
+    expect(addedClaims(CLAIM, CLAIM, 'make it more convincing')).toEqual([]);
+    expect(addedClaims(CLAIM, CARD, 'mention my hands-on experience in grants')).toEqual([]);
+    expect(addedClaims(CLAIM, undefined, 'make it more convincing')).toEqual([]);
+    expect(addedClaims(CLAIM, CARD, 'make it more convincing')).toEqual(['hands-on', 'experience']);
   });
 });
