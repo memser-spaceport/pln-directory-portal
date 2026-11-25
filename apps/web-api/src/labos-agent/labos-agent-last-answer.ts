@@ -113,7 +113,7 @@ const F6_CHANGE_WORD =
 const ANSWER_FAILED = /\b(?:did\s*n[o']?t\s+load|didn’t\s+load|was\s+cut\s+off|got\s+cut\s+off|failed|stopped)\b/i;
 
 /** LAB-3367 o3, F6, t4: true when the message asks to change the reply. */
-function asksForChange(message: string): boolean {
+export function asksForChange(message: string): boolean {
   return CHANGE_WORD.test(message) || (F6_CHANGE_WORD.test(message) && !ANSWER_FAILED.test(message));
 }
 
@@ -132,11 +132,21 @@ const EDIT_START = /^\s*(?:add|remove|make|keep|mention|use|change|the\s+name\s+
  * small letter, and the message has no draft word. "fix this: the name is wrong, it is Grace", "rewrite this: more friendly" and "shorten
  * this draft: ..." are draft edits.
  */
-function isPastedText(message: string): boolean {
+export function isPastedText(message: string): boolean {
   const text = PASTED_TEXT.exec(message)?.[1];
   // u1: a text that starts with a small letter is an edit instruction: "edit this: please add my PS to the end".
   if (text === undefined || DRAFT_WORD.test(message) || EDIT_START.test(text) || /^\s*\p{Ll}/u.test(text)) return false;
   return (text.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? []).length >= 4;
+}
+
+/**
+ * LAB-3367 G7: the member tells that the previous reply failed ("your last answer was cut off, tell me about Lit
+ * again"), and the reply is not known. Then the turn answers the message as a new question with the tools.
+ */
+export function asksAgainAfterFailure(message: string, latestReply: string): boolean {
+  const reply = latestReply.trim();
+  if (reply && reply !== WHICH_REPLY_LINE) return false;
+  return namesOwnLastAnswer(message) && ANSWER_FAILED.test(message);
 }
 
 /** LAB-3367 p3: true when one "what you said" in `message` names the previous reply, not content for the draft. */
@@ -169,7 +179,7 @@ export function namesOwnLastAnswer(message: string): boolean {
  * - 'model': no change. No card waits, the message does not name the last answer, or the latest reply is the draft
  *   line (`INTRO_DRAFT_LINE`), so a revision of the card is correct. A message that keeps the draft ("keep the draft
  *   and shorten your last answer") or "don't make the draft now / yet" does not get this path after the draft line
- *   (Group A).
+ *   (Group A). With a change word, it gets 'which' there (v1).
  * - 'answer': the turn has no `draft_intro` tool, no card text and no intro hints. The message changes a pasted text
  *   (`isPastedText`, review item 4, t2), or the latest reply is a normal answer, or it is not known and the message has no
  *   change word.
@@ -182,9 +192,13 @@ export function lastAnswerTurn(message: string, hasCard: boolean, latestReply: s
   if (isPastedText(message)) return 'answer';
   if (!namesOwnLastAnswer(message)) return 'model';
   const reply = latestReply.trim();
-  // Group A: an explicit "keep the draft ..." or "don't make the draft now / yet" protects the draft also right after
-  // the draft line. Other negations ("not the intro draft") keep the draft path there.
-  if (reply === INTRO_DRAFT_LINE && !KEEPS_DRAFT.test(message) && !NO_DRAFT_NOW.test(message)) return 'model';
+  if (reply === INTRO_DRAFT_LINE) {
+    // Group A: an explicit "keep the draft ..." or "don't make the draft now / yet" protects the draft also right after
+    // the draft line. Other negations ("not the intro draft") keep the draft path there.
+    if (!KEEPS_DRAFT.test(message) && !NO_DRAFT_NOW.test(message)) return 'model';
+    // v1: then the previous reply is the draft card, so no other reply can change. A change gets the fixed answer.
+    return asksForChange(message) ? 'which' : 'answer';
+  }
   if ((!reply || reply === WHICH_REPLY_LINE) && asksForChange(message)) return 'which';
   return 'answer';
 }

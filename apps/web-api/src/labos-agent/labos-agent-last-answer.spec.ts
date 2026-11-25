@@ -2,7 +2,13 @@
 jest.mock('ai', () => ({ tool: (def: unknown) => def }));
 
 import { INTRO_DRAFT_LINE } from './labos-agent-drafts';
-import { lastAnswerTurn, WHICH_REPLY_LINE } from './labos-agent-last-answer';
+import {
+  asksAgainAfterFailure,
+  asksForChange,
+  isPastedText,
+  lastAnswerTurn,
+  WHICH_REPLY_LINE,
+} from './labos-agent-last-answer';
 
 /** LAB-3367 p1-p4 (Oleg, follow-up of #3780): the wordings from the review. A card waits in each case. */
 describe('LAB-3367 p1-p4: lastAnswerTurn wordings', () => {
@@ -244,8 +250,8 @@ describe('LAB-3367 p1-p4: lastAnswerTurn wordings', () => {
   ])('Group A: "%s" protects the draft after each latest reply', (message) => {
     expect(lastAnswerTurn(message, true, NORMAL)).toBe('answer');
     expect(lastAnswerTurn(message, true, '')).toBe('which');
-    // The member asks to keep the draft, so the draft tool is off also right after the draft line.
-    expect(lastAnswerTurn(message, true, INTRO_DRAFT_LINE)).toBe('answer');
+    // v1: right after the draft line, the previous reply is the card, so the fixed 'which' line answers.
+    expect(lastAnswerTurn(message, true, INTRO_DRAFT_LINE)).toBe('which');
   });
 
   it.each([
@@ -255,8 +261,8 @@ describe('LAB-3367 p1-p4: lastAnswerTurn wordings', () => {
   ])('Group A: "%s" names the previous reply', (message) => {
     expect(lastAnswerTurn(message, true, NORMAL)).toBe('answer');
     expect(lastAnswerTurn(message, true, '')).toBe('which');
-    // The member asks for no draft now, so the draft tool is off also right after the draft line.
-    expect(lastAnswerTurn(message, true, INTRO_DRAFT_LINE)).toBe('answer');
+    // v1: right after the draft line, the change gets the fixed 'which' line.
+    expect(lastAnswerTurn(message, true, INTRO_DRAFT_LINE)).toBe('which');
   });
 
   it.each([
@@ -309,5 +315,35 @@ describe('LAB-3367 p1-p4: lastAnswerTurn wordings', () => {
 
   it('the real draft line keeps the draft path', () => {
     expect(lastAnswerTurn('shorten your last answer, not the intro draft', true, INTRO_DRAFT_LINE)).toBe('model');
+  });
+
+  it('v1 (Oleg): straight after the draft, "keep the draft and shorten your last answer" gets the fixed line', () => {
+    expect(lastAnswerTurn('keep the draft and shorten your last answer', true, INTRO_DRAFT_LINE)).toBe('which');
+  });
+
+  it('v1: after the draft line, a keep clause with no change word still gets an answer turn', () => {
+    expect(lastAnswerTurn('keep the draft, what was your last answer about?', true, INTRO_DRAFT_LINE)).toBe('answer');
+  });
+
+  it.each([
+    ['your last answer was cut off, tell me about Lit again', ''],
+    ['your last answer failed, tell me about Lit again', WHICH_REPLY_LINE],
+    ['what you said did not load, tell me about Lit again', ''],
+  ])('G7: "%s" after an unknown reply asks again after a failure', (message, reply) => {
+    expect(asksAgainAfterFailure(message, reply)).toBe(true);
+  });
+
+  it('G7: a known reply, or no failure word, is not a request again after a failure', () => {
+    expect(asksAgainAfterFailure('your last answer was cut off, tell me about Lit again', NORMAL)).toBe(false);
+    expect(asksAgainAfterFailure('shorten your last answer', '')).toBe(false);
+    expect(asksAgainAfterFailure('tell me about Lit again, the answer was cut off', '')).toBe(false);
+    expect(asksAgainAfterFailure('add your last answer to the draft, it was cut off', '')).toBe(false);
+  });
+
+  it('G1: the exported helpers find a pasted text and a change request', () => {
+    expect(isPastedText('shorten this: We build open tools.')).toBe(true);
+    expect(isPastedText('shorten your last answer')).toBe(false);
+    expect(asksForChange('shorten your last answer')).toBe(true);
+    expect(asksForChange('what was your last answer about?')).toBe(false);
   });
 });

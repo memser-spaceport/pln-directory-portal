@@ -82,9 +82,13 @@ interface AnswerInput {
 }
 
 /** LAB-3367: the options that `ContextualToolsOptions.latestReplyTurn` can replace for one turn. */
-export type LatestReplyTurn = Partial<Pick<ContextualToolsOptions, 'promptContext' | 'extraTools' | 'answerLine'>> & {
+export type LatestReplyTurn = Partial<
+  Pick<ContextualToolsOptions, 'promptContext' | 'extraTools' | 'answerLine' | 'answerInstructions'>
+> & {
   /** A fixed answer for this turn. The turn then runs no model call and no tool, and the tail has no follow-ups. */
   fixedAnswer?: string;
+  /** LAB-3367 G7: true to send no `Previous reply` line in the answer prompt of this turn. */
+  omitLatestReply?: boolean;
 };
 
 /**
@@ -144,6 +148,11 @@ export interface ContextualToolsOptions {
    * when the stream removed the reserved line. The latest reply stays '' (not known). AI search passes nothing.
    */
   emptyReplyLine?: string;
+  /**
+   * LAB-3367 G3: with `reservedReply`, the bare words for the `Previous reply` line when the stored reply is that line
+   * (for example `an intro draft card`). The model then cannot quote the line. AI search passes nothing.
+   */
+  reservedReplyLabel?: string;
   /**
    * Extra fields for the end of the streamed JSON object that need the finished turn, for example the answer counts
    * of the LabOS agent (LAB-3297). Called once, after `extraResponseFields`. A field with the key of a tail field
@@ -333,11 +342,16 @@ export class HuskyAiService {
     const pageContext = turn.promptContext ? `  - pageContext: ${turn.promptContext}` : '';
     // LAB-3367 F3, F5: with a key, an empty value (a first turn, or a stopped, failed or cut-off turn, or a cache
     // failure) is the bare words `not available`. A stored reply is JSON text, so it is always in quotes.
-    const answerHistoryPrompt = latestReplyKey
-      ? `${historyPrompt}\n  - ${LATEST_REPLY_LABEL}: ${
-          latestReply ? JSON.stringify(latestReply) : LATEST_REPLY_UNKNOWN
-        }`
-      : historyPrompt;
+    // LAB-3367 G3: the stored reserved line is bare words, not the line in quotes. G7: the turn can omit the line.
+    const latestReplyValue = !latestReply
+      ? LATEST_REPLY_UNKNOWN
+      : options.reservedReplyLabel && latestReply === options.reservedReply
+      ? options.reservedReplyLabel
+      : JSON.stringify(latestReply);
+    const answerHistoryPrompt =
+      latestReplyKey && !turn.omitLatestReply
+        ? `${historyPrompt}\n  - ${LATEST_REPLY_LABEL}: ${latestReplyValue}`
+        : historyPrompt;
     const model = this.getSearchModel();
 
     const encoder = new TextEncoder();
@@ -391,7 +405,8 @@ export class HuskyAiService {
             question,
             currentDate,
             pageContext,
-            answerInstructions: options.answerInstructions ?? '',
+            // LAB-3367 G1, G4, G7: `latestReplyTurn` can give other rules for this turn.
+            answerInstructions: turn.answerInstructions ?? '',
             fixedAnswer: turn.fixedAnswer,
           };
           const answer = await this.streamAnswer(
@@ -454,8 +469,12 @@ export class HuskyAiService {
           }
           // LAB-3367 t1: with `reservedReply` only, a turn with no draft and no text (for example the model wrote only
           // the draft line, also after a refused draft tool) gets `emptyReplyLine`. The latest reply stays not known.
+          // G3: the stream holds a first text with no letter or digit, and drops it when the filter removed a line.
           const emptyAnswer =
-            !lastLine && Boolean(options.reservedReply) && turn.fixedAnswer === undefined && !content.trim();
+            !lastLine &&
+            Boolean(options.reservedReply) &&
+            turn.fixedAnswer === undefined &&
+            (!content.trim() || (override.removedLine() && !/[\p{L}\p{N}]/u.test(content)));
           if (emptyAnswer && options.emptyReplyLine) {
             content += options.emptyReplyLine;
             emitText(encodeJsonStringFragment(options.emptyReplyLine));

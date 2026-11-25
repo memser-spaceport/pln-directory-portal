@@ -38,6 +38,8 @@ import { LabosAgentAccessService } from './labos-agent-access.service';
 import { answerCounts } from './labos-agent-answer-counts';
 import {
   DRAFT_FACTS_RULE,
+  DRAFT_LIMITS_RULE,
+  INTRO_DRAFT_REPLY_LABEL,
   draftIntroTool,
   INTRO_DRAFT_LINE,
   INTRO_DRAFT_LINE_FORMS,
@@ -45,7 +47,14 @@ import {
   IntroTurnTarget,
   NO_CHANGE_LINE,
 } from './labos-agent-drafts';
-import { lastAnswerTurn, WHICH_REPLY_LINE, withoutIntroHints } from './labos-agent-last-answer';
+import {
+  asksAgainAfterFailure,
+  asksForChange,
+  isPastedText,
+  lastAnswerTurn,
+  WHICH_REPLY_LINE,
+  withoutIntroHints,
+} from './labos-agent-last-answer';
 import { searchMentions } from './labos-agent-mentions';
 import { mcpToolsAsAgentTools, newsLinkFields } from './labos-agent-news.tools';
 import {
@@ -92,13 +101,39 @@ export const LAST_ANSWER_RULES = [
   '- Such a request names your last, latest or previous answer, reply or response, "that answer" or what you just said.',
   '- "Add that answer to the draft" asks to put your answer into the intro draft. It does not change your reply.',
   '- The prompt gives your previous reply. Find the reply to change there, not in the older chat.',
-  '- If your previous reply is not known, ask which reply to change. Do not change an intro draft.',
-  `- If your previous reply is the line "${INTRO_DRAFT_LINE}", revise the intro draft that waits in this chat. ` +
+  '- If your previous reply is not known, ask which reply to change unless this turn asks you to answer as a new question. ' +
+    'Do not change an intro draft.',
+  // LAB-3367 G3: the prompt gives the draft line as bare words, so the rule does not quote the line.
+  `- If your previous reply is ${INTRO_DRAFT_REPLY_LABEL}, revise the intro draft that waits in this chat. ` +
     'If no intro draft waits, ask which reply to change.',
   '- Else change only that reply. Do not write, revise or show an intro draft.',
   '- A change that adds no new fact can skip the tools. A new fact must come from a tool result about it in this ' +
     'turn. For a team size, use a team lookup. If no tool result gives the fact, say that you do not have it.',
 ].join('\n');
+
+/** LAB-3367 G1: an explicit request about the page target. Only then the answer turn keeps the page context. */
+const NAMES_PAGE = /\bthis\s+(?:team|member|story|job|page)\b/i;
+
+/** LAB-3367 G1: the rule for an inline text after "shorten this:" (`isPastedText`). */
+export const PASTED_TEXT_RULE = 'Change only the text after the colon in the question. Write only the changed text.';
+
+/** LAB-3367 G1: the rule when the member asks to change a known previous reply. */
+export const PREVIOUS_REPLY_RULE = 'Change only the text in Previous reply.';
+
+/** LAB-3367 G4: the rule for each answer turn that omits the open card. */
+export const CARD_OPEN_RULE =
+  'An intro draft card is open in the chat. This request is not about it. Do not say that there is no draft.';
+
+/** LAB-3367 G7: the rule after a failed reply that is not known. The turn has no `Previous reply` line. */
+export const ASK_AGAIN_RULE =
+  'Your previous reply did not reach the member. Answer the message as a new question with the tools.';
+
+/**
+ * LAB-3367 G1, G4, G7: the fixed rules of one turn after `LAST_ANSWER_RULES`. They have no member or card text.
+ */
+export function lastAnswerTurnRules(lines: string[]): string {
+  return [LAST_ANSWER_RULES, ...lines].join('\n');
+}
 
 /**
  * LAB-3367 h3: the cache key of the latest agent reply for one member in one thread. The `<env>:labos-agent` prefix of
@@ -223,20 +258,47 @@ export class LabosAgentService {
         // LAB-3367 F1, F3, K3: a code gate for the agreed phrases when a card waits (labos-agent-last-answer.ts).
         latestReplyTurn: (latestReply) => {
           const kind = lastAnswerTurn(body.message, Boolean(card), latestReply);
-          if (kind === 'model') return {};
+          // LAB-3367 G7: after a failed reply that is not known, answer as a new question, with no Previous reply line.
+          const askAgain = kind !== 'which' && asksAgainAfterFailure(body.message, latestReply);
+          if (kind === 'model') {
+            return askAgain ? { omitLatestReply: true, answerInstructions: lastAnswerTurnRules([ASK_AGAIN_RULE]) } : {};
+          }
           // No draft tool and no card text, so this turn cannot change or show the draft.
           const noDraftTools = Object.fromEntries(
             Object.entries(extraTools).filter(([name]) => name !== 'draft_intro')
           );
           // LAB-3367 o1: also no intro hint of the page or the mentions, as no text may name the missing tool.
+          const hints = [...(page.introHints ?? []), ...(mentioned.introHints ?? [])];
+          if (kind === 'which') {
+            return {
+              promptContext: withoutIntroHints(basePromptContext, hints),
+              extraTools: noDraftTools,
+              answerLine: undefined,
+              fixedAnswer: WHICH_REPLY_LINE,
+            };
+          }
+          // G1: the page goes only when the message names it ("this team"), so an answer edit is not about the page.
+          const pagePart = NAMES_PAGE.test(body.message) ? page.promptContext : undefined;
+          const answerContext = [pagePart, mentioned.promptContext].filter(Boolean).join('\n') || undefined;
+          const reply = latestReply.trim();
+          const knownReply = Boolean(reply) && reply !== WHICH_REPLY_LINE && reply !== INTRO_DRAFT_LINE;
+          const pasted = isPastedText(body.message);
+          const rules = [
+            CARD_OPEN_RULE,
+            ...(pasted
+              ? [PASTED_TEXT_RULE]
+              : askAgain
+              ? [ASK_AGAIN_RULE]
+              : knownReply && asksForChange(body.message)
+              ? [PREVIOUS_REPLY_RULE]
+              : []),
+          ];
           return {
-            promptContext: withoutIntroHints(basePromptContext, [
-              ...(page.introHints ?? []),
-              ...(mentioned.introHints ?? []),
-            ]),
+            promptContext: withoutIntroHints(answerContext, hints),
             extraTools: noDraftTools,
             answerLine: undefined,
-            ...(kind === 'which' ? { fixedAnswer: WHICH_REPLY_LINE } : {}),
+            answerInstructions: lastAnswerTurnRules(rules),
+            ...(askAgain && !pasted ? { omitLatestReply: true } : {}),
           };
         },
         // LAB-3367: model text that is only the draft line is not a draft turn.
@@ -244,6 +306,8 @@ export class LabosAgentService {
         // LAB-3367 t7b, t1: the other forms of the draft line, and the answer when no text is left.
         reservedReplyForms: INTRO_DRAFT_LINE_FORMS,
         emptyReplyLine: NO_CHANGE_LINE,
+        // LAB-3367 G3: the stored draft line goes to the prompt as bare words.
+        reservedReplyLabel: INTRO_DRAFT_REPLY_LABEL,
       }
     );
   }
@@ -523,6 +587,8 @@ export class LabosAgentService {
       // LAB-3367 Q1 (h2), s4: keep the facts of the current text. The same fact rule as the draft_intro description.
       'In a revision, keep the facts of the current text: the member may have typed them. ' +
       `${DRAFT_FACTS_RULE} ` +
+      // LAB-3367 G8: the same draft limits as the draft_intro description.
+      `${DRAFT_LIMITS_RULE} ` +
       // LAB-3367 F1, k1: the rules for your last answer (LAST_ANSWER_RULES, in the system message) win. Prompt guidance.
       'If the member asks to change your last answer, the rules for your last answer apply, and they win over this ' +
       'draft. ' +

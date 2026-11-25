@@ -1262,6 +1262,54 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
         expect(store.get(KEY)).toBe('Which reply?');
       });
 
+      it('G1: the answer rules of latestReplyTurn win in the answer call and the continuation', async () => {
+        store.set(KEY, 'A normal answer.');
+        streamTextMock
+          .mockReturnValueOnce(answerStream(['Half'], 'length'))
+          .mockReturnValueOnce(answerStream([' and the rest.']));
+        await turn({
+          answerInstructions: 'Default rules.',
+          latestReplyTurn: () => ({ answerInstructions: 'Turn rules.' }),
+        });
+        expect(streamTextMock).toHaveBeenCalledTimes(2);
+        expect(streamTextMock.mock.calls[0][0].system).toBe(`${HUSKY_CONTEXTUAL_TOOLS_SYSTEM_PROMPT}\n\nTurn rules.`);
+        expect(streamTextMock.mock.calls[1][0].system).toBe(
+          `${HUSKY_CONTEXTUAL_TOOLS_CONTINUATION_PROMPT}\n\nTurn rules.`
+        );
+      });
+
+      it('G1: with no turn rules, the default rules stay', async () => {
+        streamTextMock.mockReturnValueOnce(answerStream(['Ok.']));
+        await turn({ answerInstructions: 'Default rules.', latestReplyTurn: () => ({}) });
+        expect(streamTextMock.mock.calls[0][0].system).toBe(
+          `${HUSKY_CONTEXTUAL_TOOLS_SYSTEM_PROMPT}\n\nDefault rules.`
+        );
+      });
+
+      it('G7: omitLatestReply sends no Previous reply line, and the turn still stores its reply', async () => {
+        streamTextMock.mockReturnValueOnce(answerStream(['New answer.']));
+        await turn({ latestReplyTurn: () => ({ omitLatestReply: true }) });
+        expect(answerPrompt(0)).not.toContain('Previous reply');
+        expect(store.get(KEY)).toBe('New answer.');
+      });
+
+      it('G3: the stored reserved line goes to the prompt as the bare label, other replies stay quoted', async () => {
+        store.set(KEY, LINE);
+        streamTextMock.mockReturnValueOnce(answerStream(['Ok.'])).mockReturnValueOnce(answerStream(['Ok 2.']));
+        await turn({ reservedReply: LINE, reservedReplyLabel: 'an intro draft card' });
+        expect(answerPrompt(0)).toContain('Previous reply: an intro draft card');
+        expect(answerPrompt(0)).not.toContain(LINE);
+        await turn({ reservedReply: LINE, reservedReplyLabel: 'an intro draft card' });
+        expect(answerPrompt(1)).toContain('Previous reply: "Ok."');
+      });
+
+      it('G3: with no label (AI search and older callers), the reserved line stays quoted', async () => {
+        store.set(KEY, LINE);
+        streamTextMock.mockReturnValueOnce(answerStream(['Ok.']));
+        await turn({ reservedReply: LINE });
+        expect(answerPrompt(0)).toContain(`Previous reply: ${JSON.stringify(LINE)}`);
+      });
+
       it('model text that is only the reserved line is stored as not known', async () => {
         streamTextMock.mockReturnValueOnce(answerStream([` ${LINE}\n`])).mockReturnValueOnce(answerStream(['Ok.']));
         await turn({ reservedReply: LINE });
@@ -1334,6 +1382,54 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
         expect(JSON.parse(await turn({ reservedReply: LINE, emptyReplyLine: EMPTY })).content).toBe('Ok. ');
       });
 
+      describe('LAB-3367 G3: no letter or digit after a removed line', () => {
+        it.each([[`**${LINE}**!`], [`. ${LINE}`], [`- ${LINE} :)`], [`*${LINE}*.`]])(
+          '%j gets the empty-reply line, stores not known and streams no mark',
+          async (text) => {
+            for (const at of [1, 2, text.length - 1]) {
+              store.delete(KEY);
+              streamTextMock.mockReturnValueOnce(answerStream([text.slice(0, at), text.slice(at)]));
+              const body = await turn({ reservedReply: LINE, emptyReplyLine: EMPTY });
+              // A streamed mark would stay in front of the line: "!I did not ..." or ". I did not ...".
+              expect(JSON.parse(body).content.trim()).toBe(EMPTY);
+              expect(body).not.toContain(LINE);
+              expect(store.get(KEY)).toBe('');
+            }
+          }
+        );
+
+        it('a text with no letter or digit and no removed line still streams', async () => {
+          for (const text of ['...', ':)', '**']) {
+            streamTextMock.mockReturnValueOnce(answerStream([text.slice(0, 1), text.slice(1)]));
+            const body = await turn({ reservedReply: LINE, emptyReplyLine: EMPTY });
+            expect(JSON.parse(body).content).toBe(text);
+            expect(store.get(KEY)).toBe(text);
+          }
+        });
+
+        it('a first mark goes out with the first letter, so substantive text is not held', async () => {
+          const deltas: string[] = [];
+          streamTextMock.mockReturnValueOnce(answerStream(['**', 'Lit', ' is a network.**']));
+          const response = await turn.stream({ reservedReply: LINE, emptyReplyLine: EMPTY });
+          const reader = response.getReader();
+          const decoder = new TextDecoder();
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            deltas.push(decoder.decode(value));
+          }
+          const joined = deltas.join('');
+          expect(JSON.parse(joined).content).toBe('**Lit is a network.**');
+          // "**" and "Lit" come out in the same chunk, before " is a network.".
+          expect(deltas.some((d) => d.includes('**Lit') && !d.includes('network'))).toBe(true);
+        });
+
+        it('AI search (no reserved line) streams a first mark at once', async () => {
+          streamTextMock.mockReturnValueOnce(answerStream(['**!**']));
+          expect(JSON.parse(await turn({ emptyReplyLine: EMPTY })).content).toBe('**!**');
+        });
+      });
+
       it('t7a: a held start of the line goes into the continuation once, not twice', async () => {
         streamTextMock
           .mockReturnValueOnce(answerStream(['Here is a'], 'length'))
@@ -1400,7 +1496,8 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
         it.each([
           [`${LINE}**Bold**`, '**Bold**'],
           [`**Note ${LINE}**`, '**Note **'],
-          [`**${LINE}*`, '***'],
+          // G3: only marks are left after the removed line, so the turn has no text.
+          [`**${LINE}*`, ''],
           ['**Here is a list** of _teams_.', '**Here is a list** of _teams_.'],
         ])('removes only the line and its balanced bold in %j', async (text, kept) => {
           for (const at of [0, 2, 7, text.length - 2, text.length - 1]) {
