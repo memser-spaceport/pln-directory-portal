@@ -60,6 +60,12 @@ const SENDERS: Array<[string, Partial<Person>, boolean]> = [
 
 const VALID = { threadId: 'thread-1', chatId: 'chat-1', message: 'Help me write an intro request to Grace.' };
 const MEMBER_CONTEXT = { page: 'intro', introTarget: { type: 'member', uid: 'm-grace' } };
+/** LAB-3367 Q1, s4, t3 (Oleg): the exact fact rule, in the tool description and the card prompt. A literal, not the export. */
+const DRAFT_FACTS_RULE =
+  'In the draft text, facts about the member come only from the member’s messages or their LabOS profile (a tool ' +
+  'result). When the member asks you to mention something about themselves, use their words. Do not add or ' +
+  'strengthen experience, duration, results, roles, opinions, shared work or a vouch about the member from anywhere ' +
+  'else. Facts about the target can come from the page or a tool.';
 const TEAM_CONTEXT = { page: 'intro', introTarget: { type: 'team', uid: 't-acme' } };
 
 /** `permissions` are the RBAC permissions of the sender, for example `member.search.read` for a member chip. */
@@ -421,6 +427,34 @@ describe('LabOS agent intro draft answer (LAB-3362 D4)', () => {
     expect(options.answerLine()).toBeUndefined();
   });
 
+  it('LAB-3367 Q1: a new intro draft gets the exact fact rule', async () => {
+    const h = setup();
+    const { options } = await h.turn(MEMBER_CONTEXT);
+    expect(options.extraTools.draft_intro.description).toContain(DRAFT_FACTS_RULE);
+  });
+
+  it.each([
+    [
+      ['get_my_profile', 'list_my_experiences'],
+      'To read the member’s own LabOS profile, you can call get_my_profile or list_my_experiences.',
+    ],
+    [['get_my_profile'], 'To read the member’s own LabOS profile, you can call get_my_profile.'],
+  ])('LAB-3367 t3: with the read tools %j, the description names them', async (names, line) => {
+    const defs = names.map((name) => ({ name, description: name, inputSchema: {}, execute: jest.fn() }));
+    jest.spyOn(LabosAgentService.prototype as any, 'tools').mockResolvedValue(defs);
+    const h = setup();
+    const { options } = await h.turn(MEMBER_CONTEXT);
+    expect(options.extraTools.draft_intro.description).toContain(line);
+    expect(options.extraTools.draft_intro.description).toContain(DRAFT_FACTS_RULE);
+  });
+
+  it('LAB-3367 t3: with no profile read tool, the description names none', async () => {
+    jest.spyOn(LabosAgentService.prototype as any, 'tools').mockResolvedValue([]);
+    const h = setup();
+    const { options } = await h.turn(MEMBER_CONTEXT);
+    expect(options.extraTools.draft_intro.description).not.toMatch(/get_my_profile|list_my_experiences/);
+  });
+
   it('tells the model not to repeat the draft text in the answer', async () => {
     const h = setup();
     const { texts, options } = await h.turn(MEMBER_CONTEXT, { type: 'member', targetUid: 'm-grace', text: TEXT });
@@ -543,10 +577,7 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
     'A member or team name in the revision, such as "mention that I know Acme Team", is part of the new text. ' +
     'It does not change the target.';
   const FACTS_ONLY =
-    'In a revision, keep the facts of the current text: the member may have typed them. ' +
-    'Add only facts the member gave. ' +
-    'Do not add or strengthen a role, shared work, experience or that someone can vouch for the member, ' +
-    'when the member did not give it.';
+    'In a revision, keep the facts of the current text: the member may have typed them. ' + DRAFT_FACTS_RULE;
   // LAB-3367 k1: the exact text from the review, in place of four card sentences that repeated LAST_ANSWER_RULES.
   const LAST_ANSWER_WINS =
     'If the member asks to change your last answer, the rules for your last answer apply, and they win over this draft.';
@@ -641,13 +672,25 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
     expect(options.extraResponseFields.drafts).toEqual([draftFor({ ...ACME, name: 'Acme Team' })]);
   });
 
-  it('LAB-3367 Q1: a revision keeps the facts of the current text and adds only facts the member gave', async () => {
+  it('LAB-3367 Q1: a revision keeps the facts of the current text and gets the fact rule (s4)', async () => {
     const h = setup();
     const options = await chat(h, {
       ...VALID,
       message: 'Make it warmer.',
       introDraft: { target: GRACE, text: CARD_TEXT },
     });
+    expect(options.promptContext).toContain(FACTS_ONLY);
+  });
+
+  it('LAB-3367 Q1: a draft revision gets the exact fact rule and keeps the card fact rules', async () => {
+    const h = setup();
+    const options = await chat(h, {
+      ...VALID,
+      // Oleg's repro (retest 2): a team draft and "mention that I know Lit Protocol".
+      message: 'mention that I know Lit Protocol',
+      introDraft: { target: ACME, text: CARD_TEXT },
+    });
+    expect(options.extraTools.draft_intro.description).toContain(DRAFT_FACTS_RULE);
     expect(options.promptContext).toContain(FACTS_ONLY);
   });
 
@@ -871,10 +914,46 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
       expect(turn).toHaveProperty('answerLine', undefined);
     });
 
+    it.each([
+      ['a normal answer', NORMAL],
+      ['an unknown reply', ''],
+      ['the real draft line', INTRO_DRAFT_LINE],
+    ])('item 4: after %s, a pasted text gets no draft tool and no card text', async (_name, latestReply) => {
+      const { options, turn } = await turnFor(
+        'shorten this: We build open tools for research teams and we want to meet more labs.',
+        latestReply
+      );
+      expect(options.extraTools).toHaveProperty('draft_intro');
+      expect(turn.extraTools).not.toHaveProperty('draft_intro');
+      expect(turn.promptContext ?? '').not.toContain(CARD_TEXT);
+      expect(turn.promptContext ?? '').not.toContain('An intro draft card waits');
+      expect(turn).toHaveProperty('answerLine', undefined);
+      expect(turn).not.toHaveProperty('fixedAnswer');
+    });
+
+    it.each([
+      ['edit this: add my PS to it'],
+      ['fix this: the name is wrong, it is Grace'],
+      ['rewrite this: more friendly'],
+    ])('t2: "%s" keeps the draft tool and the card', async (message) => {
+      for (const reply of [NORMAL, INTRO_DRAFT_LINE]) {
+        const { options, turn } = await turnFor(message, reply);
+        expect(turn).toEqual({});
+        expect(options.extraTools).toHaveProperty('draft_intro');
+        expect(options.promptContext).toContain(CARD_TEXT);
+      }
+    });
+
+    it('item 4: "shorten this draft: ..." keeps the draft tool and the card', async () => {
+      const { options, turn } = await turnFor('shorten this draft: keep the part about Lit', INTRO_DRAFT_LINE);
+      expect(turn).toEqual({});
+      expect(options.extraTools).toHaveProperty('draft_intro');
+      expect(options.promptContext).toContain(CARD_TEXT);
+    });
+
     it('the fixed answer gives the full recovery request, not an open question', () => {
       expect(WHICH_REPLY_LINE).toBe(
-        'I cannot tell which reply to change, so I changed nothing. Send the full request again: say ' +
-          '"make the draft shorter" for the intro draft, or paste the text to change.'
+        'I cannot tell which reply to change, so I changed nothing. To change the intro draft, say “make the draft shorter”.'
       );
     });
 
@@ -941,6 +1020,12 @@ describe('LabOS agent C1 introDraft (LAB-3362, contract change 4, section 11)', 
     it('model text that is only the draft line is not stored as a draft turn', async () => {
       const { options } = await turnFor('Shorten your last answer.', NORMAL);
       expect(options.reservedReply).toBe(INTRO_DRAFT_LINE);
+      // t7b, t1: the other forms of the line, and the answer when no text is left.
+      expect(options.reservedReplyForms).toEqual([
+        'Here’s a draft intro. Edit it in the card, then send.',
+        "Here's a draft intro. Edit it in the card, then send.",
+      ]);
+      expect(options.emptyReplyLine).toBe('I did not change anything. Please say it again in other words.');
     });
 
     it('the fixed question has no prompt field, rule or member text', () => {

@@ -36,7 +36,15 @@ import { TeamNewsQueryService } from '../team-news/team-news-query.service';
 import { TeamsService } from '../teams/teams.service';
 import { LabosAgentAccessService } from './labos-agent-access.service';
 import { answerCounts } from './labos-agent-answer-counts';
-import { draftIntroTool, INTRO_DRAFT_LINE, introDraftLine, IntroTurnTarget } from './labos-agent-drafts';
+import {
+  DRAFT_FACTS_RULE,
+  draftIntroTool,
+  INTRO_DRAFT_LINE,
+  INTRO_DRAFT_LINE_FORMS,
+  introDraftLine,
+  IntroTurnTarget,
+  NO_CHANGE_LINE,
+} from './labos-agent-drafts';
 import { lastAnswerTurn, WHICH_REPLY_LINE, withoutIntroHints } from './labos-agent-last-answer';
 import { searchMentions } from './labos-agent-mentions';
 import { mcpToolsAsAgentTools, newsLinkFields } from './labos-agent-news.tools';
@@ -178,7 +186,12 @@ export class LabosAgentService {
     );
     // S3 (LAB-3300): an agent-only tool, not in McpToolCatalog, so the admin MCP caps do not apply. It writes nothing.
     const drafts: LabosAgentDraft[] = [];
-    const draftIntro = draftIntroTool(ctx, { introRequests: this.introRequests, targets: introTargets, drafts });
+    const draftIntro = draftIntroTool(ctx, {
+      introRequests: this.introRequests,
+      targets: introTargets,
+      drafts,
+      readTools: reads.map((def) => def.name),
+    });
 
     const extraTools = { ...mcpToolsAsAgentTools(reads, ctx), ...proposeTools, draft_intro: draftIntro };
 
@@ -228,6 +241,9 @@ export class LabosAgentService {
         },
         // LAB-3367: model text that is only the draft line is not a draft turn.
         reservedReply: INTRO_DRAFT_LINE,
+        // LAB-3367 t7b, t1: the other forms of the draft line, and the answer when no text is left.
+        reservedReplyForms: INTRO_DRAFT_LINE_FORMS,
+        emptyReplyLine: NO_CHANGE_LINE,
       }
     );
   }
@@ -504,11 +520,9 @@ export class LabosAgentService {
       'This rule applies also when the page or the items added to the message point to another member or team. ' +
       'A member or team name in the revision, such as "mention that I know Acme Team", is part of the new text. ' +
       'It does not change the target. ' +
-      // LAB-3367 Q1 (h2): keep the facts of the current text, add no facts that the member did not give.
+      // LAB-3367 Q1 (h2), s4: keep the facts of the current text. The same fact rule as the draft_intro description.
       'In a revision, keep the facts of the current text: the member may have typed them. ' +
-      'Add only facts the member gave. ' +
-      'Do not add or strengthen a role, shared work, experience or that someone can vouch for the member, ' +
-      'when the member did not give it. ' +
+      `${DRAFT_FACTS_RULE} ` +
       // LAB-3367 F1, k1: the rules for your last answer (LAST_ANSWER_RULES, in the system message) win. Prompt guidance.
       'If the member asks to change your last answer, the rules for your last answer apply, and they win over this ' +
       'draft. ' +

@@ -19,6 +19,35 @@ export const INTRO_NOT_ELIGIBLE_TEXT =
  */
 export const INTRO_DRAFT_LINE = 'Here is a draft intro. Edit it in the card, then send.';
 
+/** LAB-3367 t7b: other forms of `INTRO_DRAFT_LINE` that the stream also removes from the model text of a turn with no draft. */
+export const INTRO_DRAFT_LINE_FORMS = [
+  'Here’s a draft intro. Edit it in the card, then send.',
+  "Here's a draft intro. Edit it in the card, then send.",
+];
+
+/** LAB-3367 t1: the answer of a turn with no draft and no text, for example after the stream removed the draft line. */
+export const NO_CHANGE_LINE = 'I did not change anything. Please say it again in other words.';
+
+/**
+ * LAB-3367 Q1, s4, t3 (Oleg, decided): the fact rule for the member in the draft text, for new drafts and revisions.
+ * The `draft_intro` description and the card prompt use this same text. Facts about the target can come from the page
+ * or a tool.
+ */
+export const DRAFT_FACTS_RULE =
+  'In the draft text, facts about the member come only from the member’s messages or their LabOS profile (a tool ' +
+  'result). When the member asks you to mention something about themselves, use their words. Do not add or ' +
+  'strengthen experience, duration, results, roles, opinions, shared work or a vouch about the member from anywhere ' +
+  'else. Facts about the target can come from the page or a tool.';
+
+/** LAB-3367 t3: the read tools for the member's own LabOS profile. */
+export const PROFILE_READ_TOOLS = ['get_my_profile', 'list_my_experiences'] as const;
+
+/** LAB-3367 t3: the sentence that names the profile read tools of this turn, or '' when the turn has none. */
+export function profileToolsLine(names: readonly string[]): string {
+  const tools = PROFILE_READ_TOOLS.filter((name) => names.includes(name));
+  return tools.length ? `To read the member’s own LabOS profile, you can call ${tools.join(' or ')}. ` : '';
+}
+
 /** The answer line while the turn has a draft, else undefined. For `ContextualToolsOptions.answerLine`. */
 export function introDraftLine(drafts: LabosAgentDraft[]): string | undefined {
   return drafts.length ? INTRO_DRAFT_LINE : undefined;
@@ -40,6 +69,8 @@ export type DraftDeps = {
   targets: IntroTurnTarget[];
   /** The stream body `drafts`. The stream reads it when it ends. */
   drafts: LabosAgentDraft[];
+  /** LAB-3367 t3: the names of the read tools of this turn, so the description names only the profile tools there. */
+  readTools?: readonly string[];
 };
 
 /**
@@ -53,6 +84,9 @@ export function draftIntroTool(ctx: McpActorContext, deps: DraftDeps): CoreTool 
     description:
       'Write a draft intro request from the member to a member or team in the page context or the items of the message. ' +
       `The text is from ${MIN} to ${MAX} characters, in the voice of the member: who they are, what they ask, and why. ` +
+      // LAB-3367 Q1, s4, t3 (Oleg): the exact fact rule for new drafts and revisions, and the profile tools of the turn.
+      `${DRAFT_FACTS_RULE} ` +
+      profileToolsLine(deps.readTools ?? []) +
       'The tool only makes a draft card. The member edits it and presses Send. Nothing is sent. ' +
       'Call it before you write the answer. Do not write the draft text in the answer: the card shows it. ' +
       'Use it only for an intro target of this turn. Make one draft for one target. When there is no target, ask the member to open ' +
