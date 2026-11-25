@@ -1105,6 +1105,7 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
       const keys = [...cache.get.mock.calls, ...cache.set.mock.calls].map((call) => call[0]);
       expect(keys.every((key) => key === 'thread-1:summary')).toBe(true);
       expect(answerPrompt(0)).not.toContain('latestReply');
+      expect(answerPrompt(0)).not.toContain('Previous reply');
     });
 
     it('writes the reply before the stream closes, so an immediate follow-up reads it before the summary', async () => {
@@ -1118,7 +1119,7 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
       await turn();
 
       expect(store.has('thread-1:summary')).toBe(false);
-      expect(answerPrompt(1)).toContain(`latestReply: ${JSON.stringify('First "answer".')}`);
+      expect(answerPrompt(1)).toContain(`Previous reply: ${JSON.stringify('First "answer".')}`);
       expect(answerPrompt(1)).not.toContain('chatHistory');
     });
 
@@ -1126,7 +1127,7 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
       store.set(KEY, 'unknown');
       streamTextMock.mockReturnValueOnce(answerStream(['Next.']));
       await turn();
-      expect(answerPrompt(0)).toContain('latestReply: "unknown"');
+      expect(answerPrompt(0)).toContain('Previous reply: "unknown"');
     });
 
     it('a follow-up after the summary gets the chat history and latestReply', async () => {
@@ -1137,9 +1138,11 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
       await turn();
 
       expect(answerPrompt(1)).toContain('chatHistory: summary text');
-      expect(answerPrompt(1)).toContain('latestReply: "First answer."');
+      expect(answerPrompt(1)).toContain('Previous reply: "First answer."');
       // The structured tail call does not get latestReply.
       expect(streamObjectMock.mock.calls[1][0].prompt).not.toContain('latestReply');
+      expect(streamObjectMock.mock.calls[1][0].prompt).not.toContain('Previous reply');
+      expect(streamObjectMock.mock.calls[1][0].prompt).not.toContain('First answer."');
     });
 
     it('a draft turn stores only the answer line, and the next normal turn replaces it', async () => {
@@ -1162,12 +1165,123 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
       expect(store.get(KEY)).toBe(LINE);
       on = false;
       await turn({ answerLine });
-      expect(answerPrompt(1)).toContain(`latestReply: ${JSON.stringify(LINE)}`);
+      expect(answerPrompt(1)).toContain(`Previous reply: ${JSON.stringify(LINE)}`);
       expect(store.get(KEY)).toBe('A normal answer.');
       await turn({ answerLine });
 
-      expect(answerPrompt(2)).toContain('latestReply: "A normal answer."');
+      expect(answerPrompt(2)).toContain('Previous reply: "A normal answer."');
       expect(JSON.stringify(cache.set.mock.calls)).not.toContain('Draft-text-91c2');
+    });
+
+    describe('LAB-3367 F1, F3, K3: latestReplyTurn and reservedReply', () => {
+      const tools = (names: string[]) => Object.fromEntries(names.map((name) => [name, { description: name }]));
+
+      it('gets the latest reply once and replaces the prompt context, the tools and the answer line for the turn', async () => {
+        store.set(KEY, 'A normal answer.');
+        streamTextMock.mockReturnValueOnce(answerStream(['Shorter.']));
+        const latestReplyTurn = jest.fn(() => ({
+          promptContext: 'Page only.',
+          extraTools: tools(['list_news']),
+          answerLine: undefined,
+        }));
+
+        const body = await turn({
+          promptContext: 'Page only.\nCard-text-7f3a',
+          extraTools: tools(['list_news', 'draft_intro']),
+          answerLine: () => LINE,
+          latestReplyTurn,
+        });
+
+        expect(latestReplyTurn).toHaveBeenCalledTimes(1);
+        expect(latestReplyTurn).toHaveBeenCalledWith('A normal answer.');
+        const call = streamTextMock.mock.calls[0][0];
+        expect(call.tools).toHaveProperty('list_news');
+        expect(call.tools).not.toHaveProperty('draft_intro');
+        expect(call.prompt).toContain('pageContext: Page only.');
+        expect(call.prompt).not.toContain('Card-text-7f3a');
+        expect(streamObjectMock.mock.calls[0][0].prompt).not.toContain('Card-text-7f3a');
+        // No answer line for the turn: the model text streams, and the store has that text.
+        expect(body).toContain('Shorter.');
+        expect(body).not.toContain(LINE);
+        expect(store.get(KEY)).toBe('Shorter.');
+      });
+
+      it('o1: the retry after an empty cut-off answer keeps the tools and the prompt context of the turn', async () => {
+        store.set(KEY, 'A normal answer.');
+        // Nothing streamed and no tool result: the stream starts the answer again, with tools.
+        streamTextMock.mockReturnValueOnce(answerStream([], 'length')).mockReturnValueOnce(answerStream(['Shorter.']));
+        await turn({
+          promptContext: 'Page only.\nCard-text-7f3a',
+          extraTools: tools(['list_news', 'draft_intro']),
+          latestReplyTurn: () => ({ promptContext: 'Page only.', extraTools: tools(['list_news']) }),
+        });
+
+        expect(streamTextMock).toHaveBeenCalledTimes(2);
+        for (const [call] of streamTextMock.mock.calls) {
+          expect(call.tools).toHaveProperty('list_news');
+          expect(call.tools).not.toHaveProperty('draft_intro');
+          expect(JSON.stringify(call)).not.toContain('Card-text-7f3a');
+        }
+      });
+
+      it('an empty result keeps the options of the caller', async () => {
+        streamTextMock.mockReturnValueOnce(answerStream(['Ok.']));
+        const latestReplyTurn = jest.fn(() => ({}));
+        await turn({ extraTools: tools(['draft_intro']), latestReplyTurn });
+        // No stored reply: the caller gets ''.
+        expect(latestReplyTurn).toHaveBeenCalledWith('');
+        expect(streamTextMock.mock.calls[0][0].tools).toHaveProperty('draft_intro');
+      });
+
+      it('a fixed answer runs no model call and no tool, keeps the C1 body fields and is stored', async () => {
+        const turnFields = jest.fn<Record<string, unknown>, [{ toolNames: string[] }]>(() => ({ toolCount: 0 }));
+        const body = await turn({
+          extraTools: tools(['draft_intro']),
+          extraResponseFields: { proposals: [], drafts: [] },
+          turnFields,
+          latestReplyTurn: () => ({ fixedAnswer: 'Which reply?' }),
+        });
+
+        await flushBackgroundWork();
+        expect(streamTextMock).not.toHaveBeenCalled();
+        expect(streamObjectMock).not.toHaveBeenCalled();
+        // No summary model call, and the earlier summary stays.
+        expect(generateTextMock).not.toHaveBeenCalled();
+        expect(cache.set.mock.calls.map((call) => call[0])).not.toContain('thread-1:summary');
+        const parsed = JSON.parse(body);
+        expect(parsed.content).toBe('Which reply?');
+        expect(parsed).toMatchObject({
+          followUpQuestions: [],
+          sources: [],
+          actions: [],
+          proposals: [],
+          drafts: [],
+          toolCount: 0,
+        });
+        expect(turnFields.mock.calls[0][0]).toMatchObject({ toolNames: [] });
+        expect(store.get(KEY)).toBe('Which reply?');
+      });
+
+      it('model text that is only the reserved line is stored as not known', async () => {
+        streamTextMock.mockReturnValueOnce(answerStream([` ${LINE}\n`])).mockReturnValueOnce(answerStream(['Ok.']));
+        await turn({ reservedReply: LINE });
+        expect(store.get(KEY)).toBe('');
+        await turn({ reservedReply: LINE });
+        expect(answerPrompt(1)).toContain('Previous reply: not available');
+      });
+
+      it('the real answer line is still stored with a reserved line', async () => {
+        streamTextMock.mockReturnValueOnce(answerStream(['Dropped.']));
+        await turn({ reservedReply: LINE, answerLine: () => LINE });
+        expect(store.get(KEY)).toBe(LINE);
+      });
+
+      it('the answer prompt has no latestReply field name', async () => {
+        streamTextMock.mockReturnValueOnce(answerStream(['Ok.']));
+        await turn();
+        expect(answerPrompt(0)).not.toContain('latestReply');
+        expect(answerPrompt(0)).not.toContain(': unknown');
+      });
     });
 
     it('clears the key before the stream starts, so the old reply is not latest during the turn', async () => {
@@ -1180,7 +1294,7 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
 
       await turn();
 
-      expect(answerPrompt(0)).toContain('latestReply: "Old reply."');
+      expect(answerPrompt(0)).toContain('Previous reply: "Old reply."');
       expect(during).toBe('');
       expect(store.get(KEY)).toBe('New reply.');
     });
@@ -1222,9 +1336,9 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
       // LAB-3367 F3: the next turn sees that the latest reply is unknown, as the bare word, not as JSON text.
       streamTextMock.mockReturnValueOnce(answerStream(['Next.']));
       await turn();
-      expect(answerPrompt(1)).toContain('latestReply: unknown');
+      expect(answerPrompt(1)).toContain('Previous reply: not available');
       expect(answerPrompt(1)).not.toContain('Old reply.');
-      expect(answerPrompt(1)).not.toContain('latestReply: "unknown"');
+      expect(answerPrompt(1)).not.toContain('Previous reply: "unknown"');
     });
 
     it('a cancel while the reply write is pending clears the key again and does not close the stream', async () => {
@@ -1325,7 +1439,7 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
         // The clear went out before the read timed out, as the next cache call of this turn.
         expect(clearOrder).toBe(readOrder + 1);
         // A timed-out read is not used, because it can be old.
-        expect(answerPrompt(0)).toContain('latestReply: unknown');
+        expect(answerPrompt(0)).toContain('Previous reply: not available');
         expect(logger.error).toHaveBeenCalledWith(`Timed out reading and clearing the ${KEY_LOG}`);
         expect(store.get(KEY)).toBe('New reply.');
 
@@ -1424,7 +1538,7 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
         const body = JSON.parse(await turn());
 
         expect(body.content).toContain(HUSKY_SEARCH_STALLED_NOTICE.trim());
-        expect(answerPrompt(1)).toContain('latestReply: "Old reply."');
+        expect(answerPrompt(1)).toContain('Previous reply: "Old reply."');
         expect(store.get(KEY)).toBe('');
       });
     });
@@ -1443,7 +1557,7 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
       await flushBackgroundWork();
 
       expect(body.content).toBe('Secret-reply-3d7e');
-      expect(answerPrompt(0)).toContain('latestReply: unknown');
+      expect(answerPrompt(0)).toContain('Previous reply: not available');
       const lines = logger.error.mock.calls.map((call) => call.join(' '));
       expect(lines).toEqual(
         expect.arrayContaining([

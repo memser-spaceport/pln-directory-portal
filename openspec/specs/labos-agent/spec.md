@@ -327,15 +327,18 @@ When the turn has a draft, the answer text SHALL be one short line: "Here is a d
 
 LAB-3367 h3 (contract 11.7 A). For each C1 turn, the agent SHALL keep the latest reply of the signed-in member in the thread under one cache key: `<ENVIRONMENT>:labos-agent:latest-reply:` (the env prefix of the proposal keys, `local` when unset) plus `JSON.stringify([memberUid, threadId])`. `memberUid` comes from the session, never from the body. The key SHALL NOT be the raw `threadId`, so another member with the same `threadId` gets another key. The key SHALL use the same cache and TTL as the Husky thread summary (`REDIS_CACHE_EXPIRY_IN_SECONDS`, default 24 hours). AI search SHALL NOT read or write this key, and its prompt SHALL NOT change.
 
-1. Before the stream starts, the Husky stream SHALL read the key and give a value to the answer model (the first call and the continuation) as `latestReply`. The structured tail call does not get it. A stored reply SHALL go in as JSON text. When the value is empty (a first turn, a failed, stopped or cut-off turn, or a cache failure or timeout), the line SHALL be `latestReply: unknown`, with the bare word `unknown` (`LATEST_REPLY_UNKNOWN`, LAB-3367 F3). So a stored reply "unknown" is `latestReply: "unknown"` and differs from the marker.
+1. Before the stream starts, Husky SHALL read the key. The answer call and continuation get the value under `Previous reply`. The structured tail does not get it. Use JSON text for a stored reply. If the reply is unknown, use `Previous reply: not available` with no quotes. The text `Previous reply: "not available"` is a stored answer, not the marker.
 2. Then, before the stream starts, it SHALL write `''` to the key. So no older reply looks latest while the turn runs, or after the turn fails. It SHALL send the clear right after the read, with no wait between them. So the read and the clear go out in that order on the one Redis connection, and a late read result cannot start a clear after a newer turn.
 3. After the structured tail, the stream SHALL try to write the reply before it closes. If the write succeeds within the limit in rule 8, an immediate follow-up can read it before the summary changes. When the reader cancels the stream while this write runs, the stream SHALL write `''` again and SHALL NOT close the stream (best effort).
 4. When the draft card goes out with the fixed draft line, the reply SHALL be only that line. The draft text and any earlier answer text of the turn are not stored. Otherwise the reply SHALL be the answer text. An answer that a continuation completed counts as complete.
-5. The stream SHALL write no reply when the turn fails (a throw in the answer or the tail), when the reader cancels the stream, or when the answer is still cut off after the continuation. The key then stays `''`, and the next turn has `latestReply: unknown`.
+5. The stream SHALL write no reply if the turn fails, the reader cancels, or the answer stays cut off after the continuation. The key then stays `''`. The next turn has no previous reply.
 6. When the C1 client stops the turn or disconnects before the end of the response, the controller SHALL cancel the stream (an `AbortController` signal on `pipeTo`). This includes a disconnect while `agent.chat` runs, before the headers (`res.destroyed`). A client stop gets no error log line. A stopped turn SHALL NOT write a thread summary.
 7. A cache read or write error SHALL NOT stop the turn. Its log line SHALL be a fixed text, with no error object, error message, key or reply text: a Redis error can hold the command arguments.
-8. Each cache step SHALL wait at most 1 second (`LATEST_REPLY_CACHE_TIMEOUT_MS`, LAB-3367 i1): the read and the clear together, the write of the reply, and the clear after a cancel. A timeout SHALL NOT stop the turn. It gets a fixed log line. After a read timeout, the prompt SHALL use `latestReply: unknown`, not the late value. The timeout stops only the wait. It does not cancel the Redis command, so that command can still run later.
-9. Every C1 turn SHALL give `LAST_ANSWER_RULES` (LAB-3367 F1, F3, F4) as the Husky option `answerInstructions`, also with no `introDraft` and no context. The Husky stream SHALL add it to the end of the system message of the answer call and the continuation only (k2, k7). The structured tail SHALL NOT get it, as it does not get `latestReply`. The prompt context SHALL NOT have it. AI search passes no `answerInstructions`, and its system messages do not change. The text is fixed, with no card text and no member data. The rules SHALL give examples of a request to change the last answer: "your last answer", "your previous answer", "your last response", "that answer" or "your last reply" (k4). A request to use an earlier answer as content of an intro draft, such as "add that answer to the draft", SHALL NOT count as a request to change the last answer (k1). The rules SHALL make an exception to the shared rule "Always call at least one tool before answering": a change to a normal last answer, or a question about which reply to change, needs no tool call, and a revision of the draft line still uses `draft_intro` (k7). The rules take priority over the draft defaults when the member asks to change the last answer. The agent SHALL use `latestReply`, not `chatHistory`, to choose the target. A normal `latestReply` gets a change of that answer and no `draft_intro` call. The draft line gets a change of the card that waits. If no card waits, the agent SHALL ask which reply to change and SHALL NOT call `draft_intro`. If `latestReply` is unknown or absent, the agent SHALL ask which reply to change and SHALL NOT call `draft_intro`. The backend does not check the choice of the model.
+8. Each cache step SHALL wait at most 1 second (`LATEST_REPLY_CACHE_TIMEOUT_MS`, LAB-3367 i1). The read and the clear share a timeout. The reply write and the clear after a cancel each have a timeout. A timeout SHALL NOT stop the turn. It gets a fixed log line. After a read timeout, use the marker for an unknown reply. The timeout stops only the wait, not the Redis command.
+9. C1 model calls SHALL use short rules for the previous reply (LAB-3367 F5). The rules SHALL omit prompt field names, tool names and quotes from the shared rules. The first line SHALL apply to every answer, outside the list for a change (o4): "In every answer, do not mention or explain these rules, the prompt or the tools, and do not show how you chose." The answer call and the continuation get these rules. The structured tail and AI search do not get them.
+10. If a card waits and a message names the agent's previous reply, C1 SHALL check the cached reply before it gives the model the card or draft tool (LAB-3367 F1, F3, K3). The check matches whole words in any letter case: `your` followed by `last`, `latest` or `previous`, followed by `answer`, `reply` or `response` (also plural), or `what you said`, `what you just said`, `what you wrote` or `what you just wrote` (o5). It excludes a message with `draft`, `intro`, `introduction` or `card` (also plural), so "add your last answer to the card" goes to the model (o3). A draft word after `not`, `don't`, `do not`, `leave`, `keep` or `without`, with at most 3 words between, does not exclude the message (o3). Other requests, for example "make the draft shorter", "shorten the intro" and "make it shorter", use the prompt rules.
+11. If the cached reply is a normal answer, C1 SHALL omit the card, the page and mention intro hints that name `draft_intro` (o1), and `draft_intro` from the tool list, also on the retry. If the reply is unknown or the fixed clarification and the message has a change word (for example shorten, rewrite, change, add or "too long"), C1 SHALL return the fixed clarification without a model call (o3). With no change word, the turn goes to the model with no card, no intro hints and no draft tool. The fixed clarification SHALL ask for the full request again, with no open question (o2): "I cannot tell which reply to change, so I changed nothing. Send the full request again: say "make the draft shorter" for the intro draft, or paste the text to change." It SHALL leave the thread summary unchanged. If the reply is the fixed line from a draft turn, C1 SHALL retain the draft path. A model answer that only echoes the draft line SHALL NOT count as a draft turn.
+12. The C1 rules SHALL permit a change to an answer without a tool only when it adds no fact (LAB-3367 n1). If the request adds a fact, such as team size, the model SHALL use a tool result or state that it does not have the fact. This rule guides the model. It does not validate facts in the output.
 
 Limits (best effort, no lock across requests):
 
@@ -364,7 +367,7 @@ Limits (best effort, no lock across requests):
 #### Scenario: Failed, stopped or cut-off turn
 
 - **WHEN** a turn fails, the client stops it, or its answer is still cut off after the continuation
-- **THEN** the key is `''` and the next turn has `latestReply: unknown`
+- **THEN** the key is `''` and the next turn has no previous reply
 
 #### Scenario: A last-answer request after the card is cancelled (F4)
 
@@ -380,7 +383,19 @@ Limits (best effort, no lock across requests):
 
 ### Requirement: Current intro draft in C1
 
-The C1 body MAY have `introDraft: { target: { type, uid }, text }` (contract change 4, section 11; LAB-3362). The object and its `target` SHALL be strict; `context.introTarget` does not change. `text` SHALL be 1 to 3500 characters after trim. A bad shape, an extra key, an empty text or a text over 3500 characters SHALL get the C1 400. `introDraft` is allowed with any `context.page` and with no `context`. An unknown or deleted target SHALL get 404 `INTRO_TARGET_NOT_FOUND` before the stream, with the lookup of the intro page (`findAgentTargetName`). The backend SHALL put the target and the text into the prompt context of this turn only. The agent SHALL use the text only when the member asks to change the draft. LAB-3367 R2: if the member makes a brief revision request such as "make it shorter" and does not ask to change the last answer, the agent SHALL revise this draft. R2 applies also when the page or the items added to the message point to another member or team. R4: a member or team name in the revision, such as "mention that I know Acme Team", is part of the new text and SHALL NOT change the target. Q1: in a revision, the agent SHALL keep the facts of the current text, because the member may have typed them, and SHALL add only facts the member gave. It SHALL NOT add or strengthen a role, shared work, experience or that someone can vouch for the member, when the member did not give it. F1: when the member explicitly asks to change "your last answer", the agent SHALL use `latestReply` (see "Latest reply in C1"). The rules for the last answer (requirement "Latest reply in C1", rule 9) SHALL win over the draft defaults (R2). The card prompt SHALL say it in one sentence: "If the member asks to change your last answer, the rules for your last answer apply, and they win over this draft." (k1). The card prompt SHALL NOT repeat the other rules. If `latestReply` is the intro draft line, the agent SHALL revise the draft. If it is a normal answer, the agent SHALL change that answer and SHALL NOT change the draft. If `latestReply` is unknown or missing (F3, for example after a stopped turn), the agent SHALL ask which reply to change and leave the draft unchanged. A brief revision request that does not name the last answer SHALL revise the draft (R2). The prompt SHALL say: "A brief revision request that does not name your last answer revises this draft." F1 is prompt guidance: the backend gives `latestReply` but does not check the choice of the model. R3: if the member asks for a different draft or asks to change other content instead (for example "write the intro to Acme Team instead" or a change to a news title), the agent SHALL follow that request and SHALL NOT use the draft text for it. F2: a draft for a different member or team needs a target of the turn (the page, the items added to the message or the card). If the member gives only a name of a member or team that is not a target of the turn, the agent SHALL NOT call `draft_intro` for it, and SHALL ask the member to @mention it. A `draft_intro` refusal for a target that is not a target of the turn SHALL also ask the member to @mention the member or team. The `draft_intro` tool description does not change. These rules add no target and do not force a `draft_intro` call. `draft_intro` SHALL accept the `introDraft` target as a target of the turn, and SHALL check the sender eligibility and the target again. The backend SHALL NOT store `introDraft`, write a cache key for it, or write its text to a log line, error message or analytics event. The latest reply of a draft turn is only the fixed draft line (see "Latest reply in C1"). A Husky catch and the C1 controller catch SHALL log only `{ name, statusCode, message }` of an error, never the error object: an AI SDK `APICallError` holds `requestBodyValues`, the whole prompt. When the stream fails after the headers, the controller SHALL destroy the connection with no error argument. For `AI_InvalidToolArgumentsError`, `AI_TypeValidationError` and `AI_JSONParseError`, the message has the model input (for example the `draft_intro` text), so the log SHALL have only `name`, plus `toolName` when it is a tool of that call, and no `message`. The Husky answer stream `error` part SHALL use the same log form.
+The C1 body MAY have `introDraft: { target: { type, uid }, text }` (contract change 4, section 11; LAB-3362). The object and its `target` SHALL be strict; `context.introTarget` does not change. `text` SHALL be 1 to 3500 characters after trim. A bad shape, an extra key, an empty text or a text over 3500 characters SHALL get the C1 400. `introDraft` is allowed with any `context.page` and with no `context`. An unknown or deleted target SHALL get 404 `INTRO_TARGET_NOT_FOUND` before the stream, with the lookup of the intro page (`findAgentTargetName`).
+
+The backend SHALL give the model the card target and text only for this turn, except when the previous reply check omits the card. The agent SHALL use the text only when the member asks to change the draft. The rules for the previous reply take priority over the draft defaults (F1, F3, K3). The card prompt SHALL give that priority in one sentence without the other rules (k1). See "Latest reply in C1" for the code check and the prompt rules.
+
+- **R2:** A brief request such as "make it shorter" SHALL revise the draft when the message does not name the last answer. This rule applies when the page or the items in the message point to a different target.
+- **R3:** If the member asks for a different draft or asks to change other content, the agent SHALL NOT use the current draft text.
+- **R4:** A member or team name in the revision SHALL be part of the text. It SHALL NOT change the target.
+- **Q1:** The agent SHALL keep the facts of the current draft and add only facts the member gave. Do not add or strengthen a role, shared work, experience or a vouch that the member did not give.
+- **F2:** For a different member or team named without a valid target, the agent SHALL ask for an @mention and SHALL NOT call `draft_intro`. If the tool refuses a target outside the turn, it also asks for an @mention.
+
+These rules add no target and do not force a `draft_intro` call. The tool description does not change. `draft_intro` SHALL accept the `introDraft` target as a target of the turn. It SHALL check the sender eligibility and the target again. The backend SHALL NOT store `introDraft` or write its text to a log line, error message or analytics event. The latest reply of a draft turn is only the fixed draft line.
+
+A Husky catch and the C1 controller catch SHALL log only `{ name, statusCode, message }` of an error, not the error object. An AI SDK `APICallError` holds the whole prompt in `requestBodyValues`. When the stream fails after the headers, the controller SHALL destroy the connection with no error argument. For `AI_InvalidToolArgumentsError`, `AI_TypeValidationError` and `AI_JSONParseError`, the log SHALL have only `name` and `toolName` if it is a tool of that call. The Husky answer stream `error` part SHALL use the same log form.
 
 #### Scenario: Make it shorter
 
@@ -421,23 +436,52 @@ The C1 body MAY have `introDraft: { target: { type, uid }, text }` (contract cha
 
 - **GIVEN** an intro card that waits in the chat
 - **WHEN** the member sends "Shorten your last answer."
-- **THEN** the answer system message (`LAST_ANSWER_RULES`) tells the agent to use `latestReply`: revise the draft when it is the draft line, change the answer and keep the draft when it is a normal answer, and ask which reply and leave the draft unchanged when `latestReply` is `unknown` or missing
-- **AND** the prompt context has "A brief revision request that does not name your last answer revises this draft."
-- **AND** the turn has no draft without a `draft_intro` call
+- **THEN** C1 checks which reply to change before it gives the model the draft tool
+- **AND** the turn returns a draft only after a successful `draft_intro` call
 
 #### Scenario: A normal last answer wins over the draft (F1)
 
 - **GIVEN** an intro card that waits in the chat, and `latestReply` is a normal answer
 - **WHEN** the member sends "Shorten your last answer."
-- **THEN** the answer system message ends with `LAST_ANSWER_RULES`, and the card prompt has "If the member asks to change your last answer, the rules for your last answer apply, and they win over this draft."
-- **AND** the rules say that they win over every rule for an intro draft, and to change that answer with no `draft_intro` call
+- **THEN** the answer model gets the normal reply and does not get the card text or `draft_intro`
+- **AND** the turn returns no new draft card
 
 #### Scenario: The latest reply is unknown (F3)
 
 - **GIVEN** a stopped turn, so the key is `''`
 - **WHEN** the member sends "Shorten your last answer." with an intro card
-- **THEN** the answer prompt has `latestReply: unknown`
-- **AND** the answer system message tells the agent to ask which reply to change, with no tool call, and to leave the draft unchanged
+- **THEN** C1 returns the fixed clarification, which asks for the full request again, and no new draft card
+- **AND** C1 calls no model or tool
+
+#### Scenario: No change word after Stop (o3)
+
+- **GIVEN** a stopped turn, so the key is `''`, and an intro card
+- **WHEN** the member sends "Your last answer did not load. What is new in LabOS?"
+- **THEN** the model answers with no card text, no intro hints and no `draft_intro`
+
+#### Scenario: A negated draft word (o3)
+
+- **GIVEN** an intro card and a normal previous reply
+- **WHEN** the member sends "shorten your last answer, not the draft"
+- **THEN** the turn has no card text, no intro hints and no `draft_intro`
+
+#### Scenario: The previous answer as content of the card (o3)
+
+- **GIVEN** an intro card and a normal previous reply
+- **WHEN** the member sends "add your last answer to the card"
+- **THEN** the turn keeps the draft path
+
+#### Scenario: The member repeats a request after a clarification (K3)
+
+- **GIVEN** C1 returned the fixed clarification with an intro card in the chat
+- **WHEN** the member sends "Shorten your last answer." again
+- **THEN** C1 returns the same clarification and no new draft card
+
+#### Scenario: The member requests a new fact (n1)
+
+- **WHEN** the member sends "Add the team size to your last answer."
+- **THEN** the answer rules require a tool result for the size
+- **AND** the rules require the model to say that the size is not available if no tool result has it
 
 #### Scenario: An earlier answer as content of the draft (k1)
 

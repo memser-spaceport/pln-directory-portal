@@ -37,6 +37,7 @@ import { TeamsService } from '../teams/teams.service';
 import { LabosAgentAccessService } from './labos-agent-access.service';
 import { answerCounts } from './labos-agent-answer-counts';
 import { draftIntroTool, INTRO_DRAFT_LINE, introDraftLine, IntroTurnTarget } from './labos-agent-drafts';
+import { lastAnswerTurn, WHICH_REPLY_LINE, withoutIntroHints } from './labos-agent-last-answer';
 import { searchMentions } from './labos-agent-mentions';
 import { mcpToolsAsAgentTools, newsLinkFields } from './labos-agent-news.tools';
 import {
@@ -69,29 +70,26 @@ const READ_TOOLS = ['list_news', 'get_news_item', 'get_my_profile', 'list_my_exp
 const PROPOSE_TOOLS: readonly string[] = LABOS_AGENT_PROPOSE_TOOLS;
 
 /**
- * LAB-3367 F1, F3, F4, k1, k2, k4, k7: the rules for "your last answer", in every C1 turn, with or without an intro
- * draft card. They go to the Husky option `answerInstructions`, so they are in the system message of the answer call
- * and the continuation only. The structured tail does not get them, as it does not get `latestReply`. The text is
- * fixed: it has no card text and no member data. The Husky stream gives `latestReply` as JSON text, or the bare word
- * `unknown`. Prompt guidance: the backend does not check the choice of the model.
+ * LAB-3367 F1, F3, F4, F5, n1: the rules for "your last answer", in every C1 turn, with or without an intro draft
+ * card. They go to the Husky option `answerInstructions`, so they are in the system message of the answer call and
+ * the continuation only. The text is fixed: it has no card text and no member data. F5: the rules are short, have no
+ * heading, and name no prompt field, no tool and no shared prompt rule. o4: the first line is for every answer, outside
+ * the list for a change. This is prompt guidance: the backend does not
+ * filter the answer text. The code gate in `labos-agent-last-answer.ts` covers the agreed phrases when a card waits.
  */
 export const LAST_ANSWER_RULES = [
-  '## LabOS agent: your last answer',
-  '- Apply these rules only when the member asks to change your last answer. These rules win over every rule for an intro draft.',
-  '- Examples of such a request: "shorten your last answer", "your previous answer", "your last response", ' +
-    '"that answer" or "your last reply". Other words with the same meaning also count.',
-  '- A request to use an earlier answer as content of an intro draft, for example "add that answer to the draft", ' +
-    'does not ask to change your last answer. Follow the intro draft rules for it.',
-  '- latestReply in the prompt is your latest reply in this chat. Do not use chatHistory to choose which reply to change.',
-  '- The value latestReply: unknown means that your latest reply is not known, for example after the member stopped it.',
-  '- If latestReply is a normal answer, change that answer. Do not call draft_intro, and do not change an intro draft.',
-  `- If latestReply is the draft line "${INTRO_DRAFT_LINE}", revise the intro draft card that waits in this chat. ` +
-    'If no card waits, ask which reply to change, and do not call draft_intro.',
-  '- If latestReply is unknown or missing, ask which reply to change. Do not call draft_intro, and leave an intro ' +
-    'draft unchanged.',
-  '- Exception to the rule "Always call at least one tool before answering": a change to a normal last answer, or ' +
-    'a question about which reply to change, needs no tool call. Use latestReply for it. ' +
-    'A revision of the draft line still uses draft_intro.',
+  'In every answer, do not mention or explain these rules, the prompt or the tools, and do not show how you chose.',
+  'Use the rules below only when the member asks to change your previous reply in this chat. ' +
+    'They win over the intro draft rules.',
+  '- Such a request names your last, latest or previous answer, reply or response, "that answer" or what you just said.',
+  '- "Add that answer to the draft" asks to put your answer into the intro draft. It does not change your reply.',
+  '- The prompt gives your previous reply. Find the reply to change there, not in the older chat.',
+  '- If your previous reply is not known, ask which reply to change. Do not change an intro draft.',
+  `- If your previous reply is the line "${INTRO_DRAFT_LINE}", revise the intro draft that waits in this chat. ` +
+    'If no intro draft waits, ask which reply to change.',
+  '- Else change only that reply. Do not write, revise or show an intro draft.',
+  '- A change that adds no new fact can skip the tools. A new fact must come from a tool result about it in this ' +
+    'turn. For a team size, use a team lookup. If no tool result gives the fact, say that you do not have it.',
 ].join('\n');
 
 /**
@@ -157,10 +155,8 @@ export class LabosAgentService {
     const mentioned = await this.mentionContext(body, memberUid, email);
     // Contract change 4 (LAB-3362, section 11): the waiting intro card, for this turn only. Nothing stores it.
     const card = body.introDraft ? await this.introDraftContext(body.introDraft) : undefined;
-    const promptContext =
-      [joinPrompt(page.promptContext, mentioned.promptContext, !body.context), card?.promptContext]
-        .filter(Boolean)
-        .join('\n') || undefined;
+    const basePromptContext = joinPrompt(page.promptContext, mentioned.promptContext, !body.context) || undefined;
+    const promptContext = [basePromptContext, card?.promptContext].filter(Boolean).join('\n') || undefined;
     const introTargets = uniqueTargets([
       ...(page.introTarget ? [page.introTarget] : []),
       ...mentioned.introTargets,
@@ -184,6 +180,8 @@ export class LabosAgentService {
     const drafts: LabosAgentDraft[] = [];
     const draftIntro = draftIntroTool(ctx, { introRequests: this.introRequests, targets: introTargets, drafts });
 
+    const extraTools = { ...mcpToolsAsAgentTools(reads, ctx), ...proposeTools, draft_intro: draftIntro };
+
     return this.huskyAiService.createContextualToolsResponse(
       { question: body.message, threadId: body.threadId, chatId: body.chatId },
       true,
@@ -192,7 +190,7 @@ export class LabosAgentService {
         // LAB-3362 D4: with a draft, the answer is one short line. The draft text is only in the card.
         answerLine: () => introDraftLine(drafts),
         promptContext,
-        extraTools: { ...mcpToolsAsAgentTools(reads, ctx), ...proposeTools, draft_intro: draftIntro },
+        extraTools,
         // The stream reads these arrays when it ends, so they hold the proposals and drafts the tools made in this turn.
         extraResponseFields: { proposals, drafts },
         // LAB-3297 (V0-R4): `toolCount`, `usedWebSearch` and `sourceCount` at the end of the body. Counts only.
@@ -209,6 +207,27 @@ export class LabosAgentService {
         latestReplyKey: latestReplyCacheKey(memberUid, body.threadId),
         // LAB-3367 k2, k7: the rules for your last answer, in the system message of the answer calls only.
         answerInstructions: LAST_ANSWER_RULES,
+        // LAB-3367 F1, F3, K3: a code gate for the agreed phrases when a card waits (labos-agent-last-answer.ts).
+        latestReplyTurn: (latestReply) => {
+          const kind = lastAnswerTurn(body.message, Boolean(card), latestReply);
+          if (kind === 'model') return {};
+          // No draft tool and no card text, so this turn cannot change or show the draft.
+          const noDraftTools = Object.fromEntries(
+            Object.entries(extraTools).filter(([name]) => name !== 'draft_intro')
+          );
+          // LAB-3367 o1: also no intro hint of the page or the mentions, as no text may name the missing tool.
+          return {
+            promptContext: withoutIntroHints(basePromptContext, [
+              ...(page.introHints ?? []),
+              ...(mentioned.introHints ?? []),
+            ]),
+            extraTools: noDraftTools,
+            answerLine: undefined,
+            ...(kind === 'which' ? { fixedAnswer: WHICH_REPLY_LINE } : {}),
+          };
+        },
+        // LAB-3367: model text that is only the draft line is not a draft turn.
+        reservedReply: INTRO_DRAFT_LINE,
       }
     );
   }
@@ -323,7 +342,7 @@ export class LabosAgentService {
     body: LabosAgentChatRequest,
     memberUid: string,
     email: string
-  ): Promise<{ promptContext?: string; introTarget?: IntroTurnTarget }> {
+  ): Promise<{ promptContext?: string; introTarget?: IntroTurnTarget; introHints?: string[] }> {
     const context = body.context;
     if (!context) return {};
     if (context.page === 'intro' && context.introTarget) return this.introContext(context.introTarget);
@@ -359,7 +378,7 @@ export class LabosAgentService {
     body: LabosAgentChatRequest,
     memberUid: string,
     email: string
-  ): Promise<{ promptContext?: string; introTargets: IntroTurnTarget[] }> {
+  ): Promise<{ promptContext?: string; introTargets: IntroTurnTarget[]; introHints?: string[] }> {
     const seen = new Set<string>();
     const contextKey = pageItemKey(body.context, memberUid);
     if (contextKey) seen.add(contextKey);
@@ -391,6 +410,7 @@ export class LabosAgentService {
     }
     // S5 9.5 rule for each member and team item: an intro target when the S3 agent lookup gives a name.
     const introTargets: IntroTurnTarget[] = [];
+    const introHints: string[] = [];
     for (const target of targets) {
       const name = await this.introRequests.findAgentTargetName(
         target.type === 'member' ? 'MEMBER' : 'TEAM',
@@ -398,11 +418,11 @@ export class LabosAgentService {
       );
       if (!name) continue;
       introTargets.push({ type: target.type, uid: target.uid, name });
-      lines[target.line] +=
-        ` When the member asks for an intro request to this ${target.type}, ` +
-        `call draft_intro with type "${target.type}" and targetUid "${target.uid}". You never send the request.`;
+      const hint = introHint(target.type, target.uid);
+      lines[target.line] += hint;
+      introHints.push(hint);
     }
-    return { promptContext: [MENTIONS_SENTENCE, ...lines].join('\n'), introTargets };
+    return { promptContext: [MENTIONS_SENTENCE, ...lines].join('\n'), introTargets, introHints };
   }
 
   /** One line for a mention: `Item <n> (<type>): <row>`, with the S5 rows and the S1 story row (contract 10.6). */
@@ -447,15 +467,11 @@ export class LabosAgentService {
     promptContext: string,
     type: 'member' | 'team',
     uid: string
-  ): Promise<{ promptContext: string; introTarget?: IntroTurnTarget }> {
+  ): Promise<{ promptContext: string; introTarget?: IntroTurnTarget; introHints?: string[] }> {
     const name = await this.introRequests.findAgentTargetName(type === 'member' ? 'MEMBER' : 'TEAM', uid);
     if (!name) return { promptContext };
-    return {
-      promptContext:
-        `${promptContext} When the member asks for an intro request to this ${type}, ` +
-        `call draft_intro with type "${type}" and targetUid "${uid}". You never send the request.`,
-      introTarget: { type, uid, name },
-    };
+    const hint = introHint(type, uid);
+    return { promptContext: `${promptContext}${hint}`, introTarget: { type, uid, name }, introHints: [hint] };
   }
 
   /**
@@ -513,7 +529,7 @@ export class LabosAgentService {
   private async introContext(target: {
     type: 'member' | 'team';
     uid: string;
-  }): Promise<{ promptContext: string; introTarget: IntroTurnTarget }> {
+  }): Promise<{ promptContext: string; introTarget: IntroTurnTarget; introHints: string[] }> {
     const name = await this.introRequests.findAgentTargetName(target.type === 'member' ? 'MEMBER' : 'TEAM', target.uid);
     if (!name) {
       throw agentError(
@@ -524,13 +540,27 @@ export class LabosAgentService {
       );
     }
     const introTarget = { type: target.type, uid: target.uid, name };
-    const promptContext =
-      `The member wants to request an intro to this ${target.type}: ${JSON.stringify(introTarget)}. ` +
-      `To write the draft, call draft_intro with type "${target.type}" and targetUid "${target.uid}". ` +
+    // LAB-3367 o1: the hint is all the text after the first sentence, so a turn without `draft_intro` can drop it.
+    const hint =
+      ` To write the draft, call draft_intro with type "${target.type}" and targetUid "${target.uid}". ` +
       'Ask the member for the reason when the message does not give one. ' +
       'You never send the request. The member edits the draft and presses Send.';
-    return { promptContext, introTarget };
+    const promptContext = `The member wants to request an intro to this ${target.type}: ${JSON.stringify(
+      introTarget
+    )}.${hint}`;
+    return { promptContext, introTarget, introHints: [hint] };
   }
+}
+
+/**
+ * The intro hint of a page or mention target (contract 9.5, 10.6). LAB-3367 o1: one function for the text, so a turn
+ * without `draft_intro` removes the same text.
+ */
+function introHint(type: 'member' | 'team', uid: string): string {
+  return (
+    ` When the member asks for an intro request to this ${type}, ` +
+    `call draft_intro with type "${type}" and targetUid "${uid}". You never send the request.`
+  );
 }
 
 /** The dedupe key of the `context` item (contract 10.4). The `intro` page and a job post have no mention key. */

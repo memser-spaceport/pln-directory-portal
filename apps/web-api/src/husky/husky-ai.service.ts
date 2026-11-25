@@ -54,7 +54,9 @@ export const DEFAULT_HUSKY_SEARCH_STALL_TIMEOUT_MS = 30_000;
 export const LATEST_REPLY_CACHE_TIMEOUT_MS = 1_000;
 
 /** LAB-3367 F3: the `latestReply` prompt value when the latest reply is not known. A stored reply is JSON text. */
-export const LATEST_REPLY_UNKNOWN = 'unknown';
+/** LAB-3367 F5: the plain label of the latest reply line in the C1 answer prompt. It is not a field name to quote. */
+export const LATEST_REPLY_LABEL = 'Previous reply';
+export const LATEST_REPLY_UNKNOWN = 'not available';
 
 /** Appended to an answer that stayed incomplete after the one continuation attempt. */
 export const HUSKY_SEARCH_STALLED_NOTICE =
@@ -75,7 +77,15 @@ interface AnswerInput {
   pageContext: string;
   /** ContextualToolsOptions.answerInstructions, or ''. It goes at the end of the system message (LAB-3367 k7). */
   answerInstructions: string;
+  /** LAB-3367 K3: a fixed answer from `latestReplyTurn`. The answer then runs no model call and no tool. */
+  fixedAnswer?: string;
 }
+
+/** LAB-3367: the options that `ContextualToolsOptions.latestReplyTurn` can replace for one turn. */
+export type LatestReplyTurn = Partial<Pick<ContextualToolsOptions, 'promptContext' | 'extraTools' | 'answerLine'>> & {
+  /** A fixed answer for this turn. The turn then runs no model call and no tool, and the tail has no follow-ups. */
+  fixedAnswer?: string;
+};
 
 /**
  * Optional extension point for callers other than AI search (the LabOS agent, LAB-3298).
@@ -98,8 +108,8 @@ export interface ContextualToolsOptions {
   persistHistory?: boolean;
   /**
    * LAB-3367 h3: the cache key of the latest reply, for the LabOS agent only. The caller scopes the key (member and
-   * thread). With a key, the stream reads the value into the answer prompt as `latestReply` (`unknown` when empty,
-   * LAB-3367 F3), then writes `''` before
+   * thread). With a key, the stream reads the value into the answer prompt as the line
+   * `Previous reply` (`LATEST_REPLY_LABEL`; `not available` when empty, LAB-3367 F3, F5), then writes `''` before
    * the stream starts. Before the stream closes, it writes the reply of this turn: only the answer line for a turn
    * with that line, else the answer text. A failed, cancelled or still cut-off turn writes nothing, so the key stays
    * `''`. A cache error does not stop the turn. AI search passes nothing.
@@ -111,6 +121,19 @@ export interface ContextualToolsOptions {
    * agent uses it for the rules for "your last answer". AI search passes nothing.
    */
   answerInstructions?: string;
+  /**
+   * LAB-3367 F1, F3, K3: for the LabOS agent only, with `latestReplyKey`. Called once with the latest reply ('' when
+   * not known), after the cache read and before the stream starts. The fields it gives replace `promptContext`,
+   * `extraTools` and `answerLine` for this turn. A field with the value `undefined` removes that option for the turn.
+   * Give no member text in log lines. AI search passes nothing.
+   */
+  latestReplyTurn?: (latestReply: string) => LatestReplyTurn;
+  /**
+   * LAB-3367: with `latestReplyKey`, a fixed line (the LabOS agent draft line). When the model text of a turn with no
+   * answer line is the same as this line, the stream stores '' (not known), so a model echo never looks like a draft
+   * turn. AI search passes nothing.
+   */
+  reservedReply?: string;
   /**
    * Extra fields for the end of the streamed JSON object that need the finished turn, for example the answer counts
    * of the LabOS agent (LAB-3297). Called once, after `extraResponseFields`. A field with the key of a tail field
@@ -264,8 +287,6 @@ export class HuskyAiService {
     const { question, threadId, chatId, chatSummary } = chatInfo;
     const persistHistory = options.persistHistory !== false;
     const { turnFields } = options;
-    const override = new AnswerOverride(options.answerLine);
-    const pageContext = options.promptContext ? `  - pageContext: ${options.promptContext}` : '';
     const currentDate = new Date().toISOString().split('T')[0];
     const auth = await this.resolveAuthContext(isLoggedIn, userEmail);
 
@@ -288,10 +309,19 @@ export class HuskyAiService {
     const historyPrompt = chatSummaryFromDb ? ` - chatHistory: ${chatSummaryFromDb}` : '';
     const { latestReplyKey } = options;
     const latestReply = latestReplyKey ? await this.takeLatestReply(latestReplyKey) : '';
-    // LAB-3367 F3: with a key, an empty value (a first turn, or a stopped, failed or cut-off turn, or a cache
-    // failure) is the bare word `unknown`. A stored reply is JSON text, so it is always in quotes.
+    // LAB-3367 F1, F3, K3: the caller can change the prompt context, the extra tools and the answer line of this turn
+    // from the latest reply. It runs once, before the stream starts. AI search passes nothing.
+    const turn: ContextualToolsOptions & LatestReplyTurn = options.latestReplyTurn
+      ? { ...options, ...options.latestReplyTurn(latestReply) }
+      : options;
+    const override = new AnswerOverride(turn.answerLine);
+    const pageContext = turn.promptContext ? `  - pageContext: ${turn.promptContext}` : '';
+    // LAB-3367 F3, F5: with a key, an empty value (a first turn, or a stopped, failed or cut-off turn, or a cache
+    // failure) is the bare words `not available`. A stored reply is JSON text, so it is always in quotes.
     const answerHistoryPrompt = latestReplyKey
-      ? `${historyPrompt}\n  - latestReply: ${latestReply ? JSON.stringify(latestReply) : LATEST_REPLY_UNKNOWN}`
+      ? `${historyPrompt}\n  - ${LATEST_REPLY_LABEL}: ${
+          latestReply ? JSON.stringify(latestReply) : LATEST_REPLY_UNKNOWN
+        }`
       : historyPrompt;
     const model = this.getSearchModel();
 
@@ -338,6 +368,7 @@ export class HuskyAiService {
             currentDate,
             pageContext,
             answerInstructions: options.answerInstructions ?? '',
+            fixedAnswer: turn.fixedAnswer,
           };
           const answer = await this.streamAnswer(
             model,
@@ -346,7 +377,7 @@ export class HuskyAiService {
             { kind: 'initial' },
             emitText,
             pushStep,
-            options.extraTools,
+            turn.extraTools,
             override
           );
           content = answer.text;
@@ -371,7 +402,7 @@ export class HuskyAiService {
               mode,
               emitText,
               pushStep,
-              options.extraTools,
+              turn.extraTools,
               override
             );
             content += continuation.text;
@@ -409,6 +440,7 @@ export class HuskyAiService {
               content,
               toolResults,
               pageContext,
+              fixed: turn.fixedAnswer !== undefined,
             },
             enqueue,
             options.extraResponseFields,
@@ -421,7 +453,10 @@ export class HuskyAiService {
           // A draft turn stores only the answer line, never the draft text. A cut-off or cancelled turn stores nothing.
           if (latestReplyKey && cancelled) return;
           if (latestReplyKey && complete) {
-            await this.saveLatestReply(latestReplyKey, lastLine ? lastLine.trim() : content);
+            // LAB-3367: model text that is the same as `reservedReply` is not that line, so it is stored as not known.
+            const reply = lastLine ? lastLine.trim() : content;
+            const reserved = !lastLine && Boolean(options.reservedReply) && content.trim() === options.reservedReply;
+            await this.saveLatestReply(latestReplyKey, reserved ? '' : reply);
             // A cancel during the write: the client gets no end, so the reply is not latest. Clear it again and do not
             // close the cancelled stream. No await comes between this check and `controller.close()`.
             if (cancelled) {
@@ -432,6 +467,8 @@ export class HuskyAiService {
 
           controller.close();
 
+          // LAB-3367 K3: a fixed answer runs no summary model call and keeps the earlier summary.
+          if (turn.fixedAnswer !== undefined) return;
           this.updateChatSummary(threadId, { user: question, system: content })
             .then((summary) => (persistHistory ? this.updateChatSummaryInMongo(threadId, summary) : undefined))
             .catch((error) =>
@@ -457,7 +494,7 @@ export class HuskyAiService {
           this.logger.error(
             `Husky search failed for thread ${threadId}, chat ${chatId}: ${logSafeError(
               error,
-              Object.keys(options.extraTools ?? {})
+              Object.keys(turn.extraTools ?? {})
             )}`
           );
           controller.error(error);
@@ -484,6 +521,10 @@ export class HuskyAiService {
     extraTools?: Record<string, CoreTool>,
     override?: AnswerOverride
   ): Promise<AnswerResult> {
+    if (input.fixedAnswer !== undefined) {
+      enqueue(encodeJsonStringFragment(input.fixedAnswer));
+      return { text: input.fixedAnswer, toolResults: '', complete: true, reason: 'fixed', toolNames: [] };
+    }
     const watchdog = new StallWatchdog(this.getStallTimeoutMs());
     let text = '';
     let toolResults = '';
@@ -671,12 +712,19 @@ export class HuskyAiService {
       content: string;
       toolResults: string;
       pageContext: string;
+      /** LAB-3367 K3: a fixed answer. The tail then runs no model call and has no follow-ups, sources or actions. */
+      fixed?: boolean;
     },
     enqueue: (text: string) => void,
     extraResponseFields?: Record<string, unknown>,
     turnFields?: (payload: HuskyStoredContext) => Record<string, unknown>,
     stopped?: () => boolean
   ): Promise<HuskyStoredContext> {
+    if (input.fixed) {
+      const payload = this.withSourceRefs(EMPTY_RESPONSE_CONTEXT, input);
+      enqueue(JSON.stringify({ ...payload, ...extraResponseFields, ...turnFields?.(payload) }).substring(1));
+      return payload;
+    }
     const watchdog = new StallWatchdog(this.getStallTimeoutMs());
     try {
       const objectStream = streamObject({
