@@ -566,12 +566,14 @@ export class DemoDaysController {
   }
 
   @Post(':demoDayUidOrSlug/investor-application')
+  @UseGuards(OptionalUserTokenCheckGuard)
   @UsePipes(ZodValidationPipe)
   @NoCache()
   async submitInvestorApplication(
     @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
+    @Req() req,
     @Body() body: CreateDemoDayInvestorApplicationDto
   ) {
-    return this.demoDaysService.submitInvestorApplication(body, demoDayUidOrSlug);
+    return this.demoDaysService.submitInvestorApplication(body, demoDayUidOrSlug, req.userEmail);
   }
 }
