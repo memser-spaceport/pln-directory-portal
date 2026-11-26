@@ -11,6 +11,8 @@ import {
   GUARDED_COUNTS,
   MAX_IDS,
   parseArgs,
+  SERVICE_STATUS_GROUPS,
+  syncBody,
   toCounts,
 } from './events-cutover.core';
 import { CUTOVER_QUERIES, printableSql, queryFor } from './events-cutover.queries';
@@ -44,12 +46,14 @@ describe('events cutover CLI arguments', () => {
     expect(parseArgs(['service', '--env', 'dev'])).toEqual({ command: 'service', env: 'dev' });
     expect(parseArgs(['sync', '--details-only'])).toEqual({ command: 'sync', mode: 'details-only' });
     expect(parseArgs(['sync', '--full'])).toEqual({ command: 'sync', mode: 'full' });
+    expect(parseArgs(['sync', '--non-approved'])).toEqual({ command: 'sync', mode: 'non-approved' });
     expect(parseArgs(['--print-sql'])).toEqual({ command: 'print-sql' });
   });
 
   it('refuses a sync with no mode or both, a snapshot without --env, and an unknown command', () => {
     expect(() => parseArgs(['sync'])).toThrow('exactly one');
     expect(() => parseArgs(['sync', '--full', '--details-only'])).toThrow('exactly one');
+    expect(() => parseArgs(['sync', '--full', '--non-approved'])).toThrow('exactly one');
     expect(() => parseArgs(['snapshot'])).toThrow('--env is required');
     expect(() => parseArgs(['snapshot', '--env'])).toThrow('--env needs a value');
     expect(() => parseArgs(['compare', 'a.json'])).toThrow('two snapshot files');
@@ -207,5 +211,27 @@ describe('cutover queries', () => {
   it('print with their numbers', () => {
     expect(printableSql()).toContain('-- 1. Events that came from the events service, by state.');
     expect(printableSql()).toContain('-- 8. Gatherings with upcoming events and no priority');
+  });
+});
+
+describe('waiting events and drafts in the cutover tool (LAB-3327)', () => {
+  it('sends the body of each sync mode', () => {
+    expect(syncBody('details-only')).toEqual({ detailsOnly: true });
+    expect(syncBody('full')).toEqual({});
+    expect(syncBody('non-approved')).toEqual({ nonApproved: true });
+  });
+
+  it('checks approved, waiting and draft events, each against its LabOS status, and not rejected ones', () => {
+    expect(SERVICE_STATUS_GROUPS.map((g) => [g.serviceStatus, g.labosStatus])).toEqual([
+      ['APPROVED', 'APPROVED'],
+      ['SUBMITTED', 'PENDING'],
+      ['PENDING', 'DRAFT'],
+    ]);
+  });
+
+  it('labels a status group in the report and prints the creator fields only when asked', () => {
+    const report = analyseServiceEvents([{ event_id: 'a' }], ['a']);
+    const lines = describeServiceReport('dev', report, 'draft', 'live synced DRAFT', false);
+    expect(lines).toEqual(['dev: events service 1 draft events, LabOS 1 live synced DRAFT events: match']);
   });
 });

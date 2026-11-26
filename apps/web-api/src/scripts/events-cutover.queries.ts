@@ -143,6 +143,10 @@ export const LIVE_SYNCED_EXTERNAL_IDS_SQL = (preMigration: boolean) =>
     preMigration ? SYNCED_PRE_MIGRATION : SYNCED
   } AND NOT "isDeleted"`;
 
+/** Live synced events with their status (a migrated database only), for `service` by status. */
+export const SYNCED_EXTERNAL_IDS_BY_STATUS_SQL = `SELECT DISTINCT "externalId", "status"::text AS status FROM "PLEvent"
+  WHERE ${SYNCED} AND NOT "isDeleted"`;
+
 /** True when the migration that adds `PLEvent.status` is applied. */
 export const STATUS_COLUMN_PROBE_SQL = `SELECT EXISTS (
   SELECT 1 FROM information_schema.columns

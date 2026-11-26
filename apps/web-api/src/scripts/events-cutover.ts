@@ -9,8 +9,8 @@
  *
  *   yarn api:events-cutover snapshot --env prod [--out before.json]   # read-only counts, to a JSON file
  *   yarn api:events-cutover compare before.json after.json            # exit 1 when an event, guest row or gathering is lost
- *   yarn api:events-cutover service --env prod                        # events service vs LabOS, creator email fields
- *   yarn api:events-cutover sync --details-only | --full              # POST /v1/irl/events/sync
+ *   yarn api:events-cutover service --env prod                        # events service vs LabOS by status, creator emails
+ *   yarn api:events-cutover sync --details-only | --full | --non-approved   # POST /v1/irl/events/sync
  *   yarn api:events-cutover --print-sql                               # the queries, to run by hand
  */
 import axios from 'axios';
@@ -27,6 +27,9 @@ import {
   describeSyncAnswer,
   parseArgs,
   Row,
+  SERVICE_STATUS_GROUPS,
+  syncBody,
+  SyncMode,
   toCounts,
   USAGE,
 } from './events-cutover.core';
@@ -36,6 +39,7 @@ import {
   printableSql,
   queryFor,
   STATUS_COLUMN_PROBE_SQL,
+  SYNCED_EXTERNAL_IDS_BY_STATUS_SQL,
 } from './events-cutover.queries';
 
 const SERVICE_TIMEOUT_MS = 30000;
@@ -111,30 +115,58 @@ function compare(before: string, after: string): number {
   return result.ok ? 0 : 1;
 }
 
-async function service(env: string): Promise<number> {
-  const base = requiredEnv('EVENT_SERVICE_URL').replace(/\/+$/, '');
-  const query = new URLSearchParams({ status: 'APPROVED', conference: '' });
-  console.error(`Events service: ${new URL(base).host}`);
+async function serviceEvents(base: string, status: string): Promise<unknown[]> {
+  const query = new URLSearchParams({ status, conference: '' });
   const response = await axios.get(`${base}/events?${query.toString()}`, {
     headers: process.env.IRL_DOMAIN ? { origin: process.env.IRL_DOMAIN } : {},
     timeout: SERVICE_TIMEOUT_MS,
   });
   const events = response.data?.events;
   if (!Array.isArray(events)) throw new Error('The events service answered without an `events` list');
-
-  const ids = await readOnly(async (client, preMigration) => {
-    const result = await client.query(LIVE_SYNCED_EXTERNAL_IDS_SQL(preMigration));
-    return result.rows.map((row) => String(row.externalId));
-  });
-  const report = analyseServiceEvents(events, ids);
-  describeServiceReport(env, report).forEach((line) => console.log(line));
-  return report.match ? 0 : 1;
+  return events;
 }
 
-async function sync(mode: 'details-only' | 'full'): Promise<number> {
+/**
+ * Before the migrations: approved events against every synced event (LabOS had no status). After: each status
+ * group against the LabOS events of the matching status. Exit 1 unless every group matches.
+ */
+async function service(env: string): Promise<number> {
+  const base = requiredEnv('EVENT_SERVICE_URL').replace(/\/+$/, '');
+  console.error(`Events service: ${new URL(base).host}`);
+
+  const labos = await readOnly(async (client, preMigration) => {
+    if (preMigration) {
+      const result = await client.query(LIVE_SYNCED_EXTERNAL_IDS_SQL(true));
+      return {
+        preMigration,
+        rows: result.rows.map((row) => ({ externalId: String(row.externalId), status: 'APPROVED' })),
+      };
+    }
+    const result = await client.query(SYNCED_EXTERNAL_IDS_BY_STATUS_SQL);
+    return {
+      preMigration,
+      rows: result.rows.map((row) => ({ externalId: String(row.externalId), status: String(row.status) })),
+    };
+  });
+
+  const groups = labos.preMigration ? SERVICE_STATUS_GROUPS.slice(0, 1) : SERVICE_STATUS_GROUPS;
+  let allMatch = true;
+  for (const [index, group] of groups.entries()) {
+    const events = await serviceEvents(base, group.serviceStatus);
+    const ids = labos.rows.filter((row) => row.status === group.labosStatus).map((row) => row.externalId);
+    const report = analyseServiceEvents(events, ids);
+    allMatch = allMatch && report.match;
+    const labosLabel = labos.preMigration ? 'live synced' : `live synced ${group.labosStatus}`;
+    describeServiceReport(env, report, group.label, labosLabel, index === 0).forEach((line) => console.log(line));
+  }
+  console.log(allMatch ? `${env}: every status matches` : `${env}: MISMATCH`);
+  return allMatch ? 0 : 1;
+}
+
+async function sync(mode: SyncMode): Promise<number> {
   const api = requiredEnv('API_URL').replace(/\/+$/, '');
   const token = requiredEnv('INTERNAL_AUTH_TOKEN');
-  const body = mode === 'details-only' ? { detailsOnly: true } : {};
+  const body = syncBody(mode);
   console.log(`POST ${new URL(api).host}/v1/irl/events/sync ${JSON.stringify(body)}`);
   const response = await axios.post(`${api}/v1/irl/events/sync`, body, {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },

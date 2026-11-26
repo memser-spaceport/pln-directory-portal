@@ -5,11 +5,38 @@ import { getFilenameFromUrl, getFileTypeFromUrl } from '../utils/helper/helper';
 import { CacheService } from '../utils/cache/cache.service';
 import { isEmpty } from 'lodash';
 import { EventsService } from '../events/events.service';
-import { PLEventType } from '@prisma/client';
+import { PLEventStatus, PLEventType } from '@prisma/client';
 import {IrlGatheringPushCandidatesService} from "./push/irl-gathering-push-candidates.service";
 import { mapEventDetails, withEventDetails } from './pl-event-details.mapper';
 import { mapEventColumns } from './pl-event-columns.mapper';
 import { isLocalEventSubmitEnabled } from './pl-event-submit.constants';
+
+/** Old events service status → LabOS status, for the events that wait or are drafts there. Rejected ones stay behind. */
+const NON_APPROVED_IMPORT: ReadonlyArray<{ serviceStatus: string; status: PLEventStatus; key: 'pending' | 'draft' }> = [
+  { serviceStatus: 'SUBMITTED', status: PLEventStatus.PENDING, key: 'pending' },
+  { serviceStatus: 'PENDING', status: PLEventStatus.DRAFT, key: 'draft' },
+];
+
+export type NonApprovedImportCounts = { fetched: number; created: number; updated: number; skippedApproved: number };
+
+export type NonApprovedImportResult =
+  | { skipped: true; reason: string }
+  | {
+      pending: NonApprovedImportCounts;
+      draft: NonApprovedImportCounts;
+      /** Imported events whose creator email matches no LabOS member: they have no submitter. */
+      withoutSubmitter: number;
+    };
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** The events service's creator email (`created_by`, else `submitted_by`), lower-cased, or null. */
+export function creatorEmailOf(event: { created_by?: unknown; submitted_by?: unknown }): string | null {
+  for (const value of [event?.created_by, event?.submitted_by]) {
+    if (typeof value === 'string' && EMAIL.test(value.trim())) return value.trim().toLowerCase();
+  }
+  return null;
+}
 
 @Injectable()
 export class PLEventSyncService {
@@ -38,11 +65,13 @@ export class PLEventSyncService {
       const events = await this.fetchEventsFromService(body);
       if (!events) return [];
 
-      // pl-event-visibility: the sync matches its own events by externalId, whatever their status.
+      // pl-event-visibility: the sync matches its own events by externalId, whatever their status. Events a partner
+      // app publishes (`sourceTeamUid`) carry the partner's own id, so they are never matched or deleted here.
       const existingEvents = await this.prisma.pLEvent.findMany({
         where: {
           AND:{
             externalId: { not: null },
+            sourceTeamUid: null,
             isDeleted: false
           }
         },
@@ -52,6 +81,7 @@ export class PLEventSyncService {
           externalId: true,
           syncedAt: true,
           additionalInfo: true,
+          status: true,
         },
       });
 
@@ -142,15 +172,101 @@ export class PLEventSyncService {
   }
 
   /**
+   * Brings the events that wait for review (old `SUBMITTED` → `PENDING`) and the drafts (old `PENDING` → `DRAFT`) over
+   * from the events service before the cutover, so nothing a member submitted is left behind. Rejected events are not
+   * moved. The submitter is the LabOS member whose email is the event's creator email; with no match the event has
+   * no submitter. Writes no guest rows and sends no notifications: these events are not approved. An event LabOS
+   * already has as approved is left as it is. Runs again safely: it updates what it brought over before.
+   */
+  async importNonApprovedEvents(): Promise<NonApprovedImportResult> {
+    if (isLocalEventSubmitEnabled()) {
+      this.logger.warn('Non-approved import skipped: EVENTS_LOCAL_SUBMIT_ENABLED is on.');
+      return { skipped: true, reason: 'EVENTS_LOCAL_SUBMIT_ENABLED is on: LabOS owns events' };
+    }
+    const empty = (): NonApprovedImportCounts => ({ fetched: 0, created: 0, updated: 0, skippedApproved: 0 });
+    const result = { pending: empty(), draft: empty(), withoutSubmitter: 0 };
+
+    for (const { serviceStatus, status, key } of NON_APPROVED_IMPORT) {
+      const events = ((await this.fetchEventsFromService({ status: serviceStatus })) ?? []).filter(
+        (event) => event?.event_id && event?.event_name && event?.start_date && event?.end_date
+      );
+      result[key].fetched = events.length;
+      if (!events.length) continue;
+
+      // pl-event-visibility: matched by externalId whatever their status, partner events excluded.
+      const existing = await this.prisma.pLEvent.findMany({
+        where: {
+          externalId: { in: events.map((event) => event.event_id) },
+          sourceTeamUid: null,
+          isDeleted: false,
+        },
+        select: { uid: true, externalId: true, additionalInfo: true, status: true },
+      });
+      const byExternalId = new Map(existing.map((event) => [event.externalId, event]));
+      const submitterByEmail = await this.membersByEmail(events.map(creatorEmailOf));
+
+      for (const event of events) {
+        const stored = byExternalId.get(event.event_id);
+        if (stored?.status === PLEventStatus.APPROVED) {
+          result[key].skippedApproved += 1;
+          continue;
+        }
+        if (event?.format != PLEventType.VIRTUAL) {
+          event.locationUid = await this.gatheringFor(event);
+        }
+        const email = creatorEmailOf(event);
+        const submitterUid = (email && submitterByEmail.get(email)) || null;
+        if (!submitterUid) result.withoutSubmitter += 1;
+        const data = { ...(await this.mapEventData(event, stored?.additionalInfo)), status, submitterUid };
+        if (stored) {
+          await this.prisma.pLEvent.update({ where: { uid: stored.uid }, data });
+          result[key].updated += 1;
+        } else {
+          await this.prisma.pLEvent.create({ data });
+          result[key].created += 1;
+        }
+      }
+    }
+
+    this.cacheService.reset({ service: 'PLEventGuest' });
+    this.logger.log(`Non-approved import completed: ${JSON.stringify(result)}`);
+    return result;
+  }
+
+  /** Lower-cased email → member uid, for the emails given. */
+  private async membersByEmail(emails: Array<string | null>): Promise<Map<string, string>> {
+    const wanted = Array.from(new Set(emails.filter((email): email is string => !!email)));
+    if (!wanted.length) return new Map();
+    const members = await this.prisma.member.findMany({
+      where: { OR: wanted.map((email) => ({ email: { equals: email, mode: 'insensitive' as const } })) },
+      select: { uid: true, email: true },
+    });
+    const pairs: Array<[string, string]> = [];
+    for (const member of members) if (member.email) pairs.push([member.email.toLowerCase(), member.uid]);
+    return new Map(pairs);
+  }
+
+  /** The event's gathering, as the pull sync finds it. A draft's address may be incomplete: then it has none. */
+  private async gatheringFor(event): Promise<string | null> {
+    try {
+      const location = await this.eventsService.createEventLocation(event);
+      return location?.uid ?? null;
+    } catch (error) {
+      this.logger.warn(`Event ${event?.event_id}: no gathering (${error?.message}).`);
+      return null;
+    }
+  }
+
+  /**
    * Fetches events from an external service.
    * @param params - Includes locationUid and clientSecret for authentication.
    * @returns List of events or null if no events are found.
    */
   private async fetchEventsFromService(params) {
     try {
-      const { selectedEventUids, timeoutMs } = params;
+      const { selectedEventUids, timeoutMs, status = 'APPROVED' } = params;
       const queryParams = new URLSearchParams({
-        status: 'APPROVED',
+        status,
         conference: ""
       });
 
@@ -231,8 +347,11 @@ export class PLEventSyncService {
    */
   private async deleteStaleEvents(existingEvents, events, touchedEventUids: string[]) {
     const eventIds = events.map(event => event.event_id);
-    // Identify events that are in the database but not in the fetched list
-    const eventsToDelete = existingEvents.filter(e => !eventIds.includes(e.externalId));
+    // Approved events that the events service no longer lists as approved. Waiting and draft events brought over by
+    // `importNonApprovedEvents` are not in that list by nature, so they are left alone.
+    const eventsToDelete = existingEvents.filter(
+      e => e.status === PLEventStatus.APPROVED && !eventIds.includes(e.externalId)
+    );
     if (eventsToDelete.length) {
       this.logger.log(`Events to be deleted: ${eventsToDelete.map(e => `${e.name} (ID: ${e.externalId})`).join(', ')}`);
       await this.prisma.pLEvent.updateMany({
@@ -295,6 +414,8 @@ export class PLEventSyncService {
       resources,
       additionalInfo: withEventDetails(existingAdditionalInfo, this.detailsOf(event)),
       ...mapEventColumns(event),
+      // The pull sync reads approved events only, so an event that waited or was a draft becomes approved here.
+      status: PLEventStatus.APPROVED,
       isDeleted: false,
     };
   }

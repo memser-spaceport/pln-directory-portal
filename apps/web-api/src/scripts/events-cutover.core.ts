@@ -10,13 +10,28 @@ export type CutoverArgs =
   | { command: 'snapshot'; env: string; out: string | null }
   | { command: 'compare'; before: string; after: string }
   | { command: 'service'; env: string }
-  | { command: 'sync'; mode: 'details-only' | 'full' };
+  | { command: 'sync'; mode: SyncMode };
+
+export type SyncMode = 'details-only' | 'full' | 'non-approved';
+
+const SYNC_FLAGS: Record<string, SyncMode> = {
+  '--details-only': 'details-only',
+  '--full': 'full',
+  '--non-approved': 'non-approved',
+};
+
+/** The body of `POST /v1/irl/events/sync` for each mode. */
+export function syncBody(mode: SyncMode): Record<string, boolean> {
+  if (mode === 'details-only') return { detailsOnly: true };
+  if (mode === 'non-approved') return { nonApproved: true };
+  return {};
+}
 
 export const USAGE = `Usage:
   yarn api:events-cutover snapshot --env <dev|prod|...> [--out <file>]
   yarn api:events-cutover compare <before.json> <after.json>
   yarn api:events-cutover service --env <dev|prod|...>
-  yarn api:events-cutover sync --details-only | --full
+  yarn api:events-cutover sync --details-only | --full | --non-approved
   yarn api:events-cutover --print-sql`;
 
 function flagValue(argv: string[], flag: string): string | null {
@@ -47,10 +62,9 @@ export function parseArgs(argv: string[]): CutoverArgs {
     case 'service':
       return { command, env: requireEnv(rest) };
     case 'sync': {
-      const detailsOnly = rest.includes('--details-only');
-      const full = rest.includes('--full');
-      if (detailsOnly === full) throw new Error('sync needs exactly one of --details-only or --full');
-      return { command, mode: detailsOnly ? 'details-only' : 'full' };
+      const modes = Object.keys(SYNC_FLAGS).filter((flag) => rest.includes(flag));
+      if (modes.length !== 1) throw new Error('sync needs exactly one of --details-only, --full or --non-approved');
+      return { command, mode: SYNC_FLAGS[modes[0]] };
     }
     default:
       throw new Error(command ? `Unknown command "${command}"` : 'No command given');
@@ -188,9 +202,25 @@ export function analyseServiceEvents(serviceEvents: unknown[], labosExternalIds:
   };
 }
 
-export function describeServiceReport(env: string, report: ServiceReport): string[] {
+/**
+ * Which events of the events service each LabOS status must hold, one by one: the approved ones, the waiting ones
+ * (old `SUBMITTED`) and the drafts (old `PENDING`, a name LabOS uses for "waiting"). Rejected events are not moved.
+ */
+export const SERVICE_STATUS_GROUPS = [
+  { serviceStatus: 'APPROVED', labosStatus: 'APPROVED', label: 'approved' },
+  { serviceStatus: 'SUBMITTED', labosStatus: 'PENDING', label: 'waiting (Submitted)' },
+  { serviceStatus: 'PENDING', labosStatus: 'DRAFT', label: 'draft' },
+] as const;
+
+export function describeServiceReport(
+  env: string,
+  report: ServiceReport,
+  label = 'approved',
+  labosLabel = 'live synced',
+  withCreatorFields = true
+): string[] {
   const lines = [
-    `${env}: events service ${report.serviceCount} approved events, LabOS ${report.labosCount} live synced events: ${
+    `${env}: events service ${report.serviceCount} ${label} events, LabOS ${report.labosCount} ${labosLabel} events: ${
       report.match ? 'match' : 'MISMATCH'
     }`,
   ];
@@ -210,6 +240,7 @@ export function describeServiceReport(env: string, report: ServiceReport): strin
       )}${more(report.missingInService.length, report.missingInServiceTotal)}`
     );
   }
+  if (!withCreatorFields) return lines;
   const fields = Object.entries(report.creatorEmailFields);
   lines.push(
     fields.length

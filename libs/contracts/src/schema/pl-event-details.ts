@@ -106,6 +106,8 @@ export function emptyPLEventDetails(): PLEventDetails {
 export const SyncPLEventsBodySchema = z.object({
   selectedEventUids: z.array(z.string()).optional(),
   detailsOnly: z.boolean().optional(),
+  /** Cutover only: bring the events service's waiting events and drafts over (`importNonApprovedEvents`). */
+  nonApproved: z.boolean().optional(),
 });
 
 export type SyncPLEventsBody = z.infer<typeof SyncPLEventsBodySchema>;
