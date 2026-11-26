@@ -6,7 +6,7 @@ jest.mock('../intro-requests/intro-requests.service', () => ({ IntroRequestsServ
 // labos-agent-proposals imports `tool` from the ESM `ai` package.
 jest.mock('ai', () => ({ tool: (def: unknown) => def }));
 
-import { ForbiddenException, Logger } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Logger } from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { LabosAgentThreadsController } from './labos-agent-threads.controller';
@@ -728,5 +728,145 @@ describe('C5 POST /v1/labos-agent/drafts/confirm (LAB-3457)', () => {
     await expect(h.controller.confirmDraft(SEND, h.req)).resolves.toEqual(expect.objectContaining({ status: 'sent' }));
     expect(log).toHaveBeenCalledWith('Failed to save the intro request of a sent LabOS agent draft');
     log.mockRestore();
+  });
+
+  describe('the C3 route gate: a saved draft is never sent by C3 and C5 both', () => {
+    const C3 = { type: 'TEAM' as const, targetId: 'team-1', text: 'Hello Acme, please introduce me to your founders.' };
+
+    /** The aggregate of `draftsTo` over the live doc: open or sent drafts to the target. */
+    function savedDrafts(h: ReturnType<typeof setup>, doc: ThreadDoc) {
+      h.mongo.aggregate.mockImplementation(async () =>
+        (doc.contextual ?? []).flatMap((turn) =>
+          (turn.drafts ?? [])
+            .filter((item) => item.target.uid === 'team-1' && item.target.type === 'team')
+            .filter((item) => item.status === 'open' || item.status === 'sent')
+            .map((item) => ({ threadId: doc.threadId, draft: item }))
+        )
+      );
+    }
+
+    it('registers itself as the C3 route gate', () => {
+      const h = setup();
+      const useRouteGate = jest.fn();
+      (h.introRequests as any).useRouteGate = useRouteGate;
+      h.service.onModuleInit();
+      expect(useRouteGate).toHaveBeenCalledWith(expect.any(Function));
+    });
+
+    it('outside the agent gate: plain C3, no MongoDB read', async () => {
+      const h = setup({ enabled: false });
+      const send = jest.fn().mockResolvedValue({ uid: 'ir_c3' });
+      await expect(h.service.throughSavedDraft(ME.email, C3, send)).resolves.toEqual({ uid: 'ir_c3' });
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(h.mongo.aggregate).not.toHaveBeenCalled();
+    });
+
+    it('reads only own, not deleted threads with an open or sent draft to that target', async () => {
+      const h = setup();
+      const send = jest.fn().mockResolvedValue({ uid: 'ir_c3' });
+      await expect(h.service.throughSavedDraft(ME.email, C3, send)).resolves.toEqual({ uid: 'ir_c3' });
+      const [collection, pipeline] = h.mongo.aggregate.mock.calls[0];
+      expect(collection).toBe('threads');
+      const wanted = { 'target.type': 'team', 'target.uid': 'team-1', status: { $in: ['open', 'sent'] } };
+      expect(pipeline[0]).toEqual({
+        $match: {
+          ...ownerFilter(ME.memberUid, ME.email),
+          isDeleted: { $ne: true },
+          contextual: { $elemMatch: { drafts: { $elemMatch: wanted } } },
+        },
+      });
+      expect(pipeline[3]).toEqual({
+        $match: {
+          'contextual.drafts.target.type': 'team',
+          'contextual.drafts.target.uid': 'team-1',
+          'contextual.drafts.status': { $in: ['open', 'sent'] },
+        },
+      });
+    });
+
+    it('an open saved draft goes through the C5 claim: C3 sends once, then C5 is 409 sent', async () => {
+      const doc = agentThread();
+      const h = setup({ doc });
+      const current = liveDraft(h, doc);
+      savedDrafts(h, doc);
+      const send = jest.fn().mockResolvedValue({ uid: 'ir_c3' });
+
+      await expect(h.service.throughSavedDraft(ME.email, C3, send)).resolves.toEqual({ uid: 'ir_c3' });
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(current()).toEqual(expect.objectContaining({ status: 'sent', text: C3.text, introRequestUid: 'ir_c3' }));
+
+      expect(body(await h.controller.confirmDraft(SEND, h.req).catch((e) => e))).toEqual(
+        expect.objectContaining({ statusCode: 409, code: 'DRAFT_CLOSED', status: 'sent' })
+      );
+      expect(h.introRequests.create).not.toHaveBeenCalled();
+    });
+
+    it('C3 after a C5 send of that draft with the same text is 409 sent and sends nothing', async () => {
+      const doc = agentThread();
+      const h = setup({ doc });
+      liveDraft(h, doc);
+      savedDrafts(h, doc);
+      await h.controller.confirmDraft(SEND, h.req);
+      const send = jest.fn().mockResolvedValue({ uid: 'ir_c3' });
+
+      const error = await h.service.throughSavedDraft(ME.email, C3, send).catch((e) => e);
+      expect(body(error)).toEqual(expect.objectContaining({ statusCode: 409, code: 'DRAFT_CLOSED', status: 'sent' }));
+      expect(send).not.toHaveBeenCalled();
+
+      // Another text to the same target is a new intro from the intro dialog: plain C3.
+      await expect(
+        h.service.throughSavedDraft(ME.email, { ...C3, text: 'A different intro about our roadmap.' }, send)
+      ).resolves.toEqual({ uid: 'ir_c3' });
+      expect(send).toHaveBeenCalledTimes(1);
+    });
+
+    it('C3 and C5 at the same time send once', async () => {
+      const doc = agentThread();
+      const h = setup({ doc });
+      liveDraft(h, doc);
+      savedDrafts(h, doc);
+      const send = jest.fn().mockResolvedValue({ uid: 'ir_c3' });
+
+      const [viaC3, viaC5] = await Promise.all([
+        h.service.throughSavedDraft(ME.email, C3, send).catch((e) => e),
+        h.controller.confirmDraft(SEND, h.req).catch((e) => e),
+      ]);
+      expect(send.mock.calls.length + h.introRequests.create.mock.calls.length).toBe(1);
+      const refused = [viaC3, viaC5].filter((result) => result instanceof ConflictException);
+      expect(refused).toHaveLength(1);
+    });
+
+    it('a failed C3 send puts the draft back to open with its saved text and passes the error', async () => {
+      const doc = agentThread();
+      const h = setup({ doc });
+      const current = liveDraft(h, doc);
+      savedDrafts(h, doc);
+      const refusal = new ForbiddenException('You cannot request intros');
+
+      await expect(h.service.throughSavedDraft(ME.email, C3, jest.fn().mockRejectedValue(refusal))).rejects.toBe(
+        refusal
+      );
+      expect(current()).toEqual(
+        expect.objectContaining({ status: 'open', text: 'Hello Acme, I would like an intro please.' })
+      );
+      expect(current()).not.toHaveProperty('sentAt');
+    });
+
+    it('a cancelled saved draft does not block C3', async () => {
+      const doc = agentThread({ drafts: [draft({ status: 'cancelled' })] });
+      const h = setup({ doc });
+      savedDrafts(h, doc);
+      const send = jest.fn().mockResolvedValue({ uid: 'ir_c3' });
+      await expect(h.service.throughSavedDraft(ME.email, C3, send)).resolves.toEqual({ uid: 'ir_c3' });
+      expect(h.mongo.updateOneWhere).not.toHaveBeenCalled();
+    });
+
+    it('fails closed when the saved drafts cannot be read', async () => {
+      const h = setup();
+      h.mongo.aggregate.mockRejectedValue(new Error('mongo down'));
+      const send = jest.fn();
+      await expect(h.service.throughSavedDraft(ME.email, C3, send)).rejects.toThrow('mongo down');
+      expect(send).not.toHaveBeenCalled();
+    });
   });
 });

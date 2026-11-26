@@ -267,6 +267,36 @@ export class LabosAgentThreadStore {
     return result.modifiedCount === 1;
   }
 
+  /**
+   * LAB-3457 C3 gate: the member's saved intro drafts to one target that are `open` or `sent`, newest turn first, from
+   * own threads that are not deleted.
+   */
+  async draftsTo(
+    memberUid: string,
+    email: string,
+    target: { type: 'member' | 'team'; uid: string }
+  ): Promise<Array<{ threadId: string; draft: StoredDraftDoc }>> {
+    const wanted = { 'target.type': target.type, 'target.uid': target.uid, status: { $in: ['open', 'sent'] } };
+    const prefixed = Object.fromEntries(
+      Object.entries(wanted).map(([key, value]) => [`contextual.drafts.${key}`, value])
+    );
+    const rows = await this.mongo.aggregate(threadsCollection(), [
+      {
+        $match: {
+          ...ownerFilter(memberUid, email),
+          isDeleted: { $ne: true },
+          contextual: { $elemMatch: { drafts: { $elemMatch: wanted } } },
+        },
+      },
+      { $unwind: '$contextual' },
+      { $unwind: '$contextual.drafts' },
+      { $match: prefixed },
+      { $sort: { 'contextual.createdAt': -1 } },
+      { $project: { _id: 0, threadId: 1, draft: '$contextual.drafts' } },
+    ]);
+    return rows as Array<{ threadId: string; draft: StoredDraftDoc }>;
+  }
+
   /** T1: one page of the member's threads with at least one turn, newest first, deleted threads left out. */
   async list(memberUid: string, email: string, page: number, limit: number) {
     const filter: Filter<Document> = {

@@ -395,3 +395,40 @@ async function waitFor(predicate: () => boolean): Promise<void> {
   }
   throw new Error('timed out');
 }
+
+describe('IntroRequestsService C3 route gate (LAB-3457)', () => {
+  const input = { type: 'TEAM' as const, targetId: 'team-1', text: 'Hello, please introduce me.' };
+
+  it('the route sends through the registered gate; `create` (the agent C5 path) never does', async () => {
+    const service = new IntroRequestsService({} as any, {} as any, {} as any);
+    const create = jest.spyOn(service, 'create').mockResolvedValue({ uid: 'ir_1' });
+
+    await expect(service.createFromRoute('ada@example.com', input)).resolves.toEqual({ uid: 'ir_1' });
+    expect(create).toHaveBeenCalledTimes(1);
+
+    const gate = jest.fn(async (_email: string, _input: unknown, send: () => Promise<{ uid: string }>) => send());
+    service.useRouteGate(gate);
+    await service.createFromRoute('ada@example.com', input);
+    expect(gate).toHaveBeenCalledWith('ada@example.com', input, expect.any(Function));
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(create).toHaveBeenLastCalledWith('ada@example.com', input);
+
+    gate.mockRejectedValueOnce(new Error('refused'));
+    await expect(service.createFromRoute('ada@example.com', input)).rejects.toThrow('refused');
+    expect(create).toHaveBeenCalledTimes(2);
+
+    // No session: plain C3 (it answers 401 itself).
+    await service.createFromRoute(undefined, input);
+    expect(gate).toHaveBeenCalledTimes(2);
+  });
+
+  it('the controller uses the route', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { IntroRequestsController } = require('./intro-requests.controller');
+    const service = { createFromRoute: jest.fn().mockResolvedValue({ uid: 'ir_1' }), create: jest.fn() };
+    const controller = new IntroRequestsController(service);
+    await controller.create({ userEmail: 'ada@example.com' }, input);
+    expect(service.createFromRoute).toHaveBeenCalledWith('ada@example.com', input);
+    expect(service.create).not.toHaveBeenCalled();
+  });
+});

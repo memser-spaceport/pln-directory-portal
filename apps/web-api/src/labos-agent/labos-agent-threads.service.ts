@@ -1,4 +1,11 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnModuleInit,
+} from '@nestjs/common';
 import {
   LABOS_AGENT_ERROR_CODES,
   LabosAgentDraftConfirmRequest,
@@ -13,6 +20,7 @@ import {
   LabosAgentThreadTurn,
   LabosAgentTurnFeedback,
 } from 'libs/contracts/src/schema/labos-agent';
+import { CreateIntroRequestDto } from 'libs/contracts/src/schema';
 import { IntroRequestsService } from '../intro-requests/intro-requests.service';
 import { LabosAgentProposalStore } from './labos-agent-proposals';
 import {
@@ -32,7 +40,7 @@ import { LabosAgentService } from './labos-agent.service';
  * saved intro draft (C5). Every route is behind the C1 gate. Old AI search threads of the member are in the same list.
  */
 @Injectable()
-export class LabosAgentThreadsService {
+export class LabosAgentThreadsService implements OnModuleInit {
   private readonly logger = new Logger(LabosAgentThreadsService.name);
 
   constructor(
@@ -41,6 +49,43 @@ export class LabosAgentThreadsService {
     private readonly proposals: LabosAgentProposalStore,
     private readonly introRequests: IntroRequestsService
   ) {}
+
+  /** LAB-3457: the C3 route checks saved drafts first, so a saved draft is never sent by C3 and C5 both. */
+  onModuleInit(): void {
+    this.introRequests.useRouteGate((email, input, send) => this.throughSavedDraft(email, input, send));
+  }
+
+  /**
+   * The C3 gate. A member outside the agent gate has no saved drafts: plain C3, no MongoDB read. For a member inside:
+   * - a saved draft to this target that was sent with this text: 409 DRAFT_CLOSED (`sent`), nothing is sent;
+   * - else an open saved draft to this target (the newest): C3 takes the same claim as C5 (open -> sent, at most once),
+   *   sends this text, and a failed send puts the draft back to open;
+   * - else plain C3.
+   * A failed read stops the send (fails closed), as C5 needs MongoDB too.
+   */
+  async throughSavedDraft(
+    email: string,
+    input: CreateIntroRequestDto,
+    send: () => Promise<{ uid: string }>,
+    claim = true
+  ): Promise<{ uid: string }> {
+    let memberUid: string;
+    try {
+      memberUid = await this.agent.enabledMember(email);
+    } catch (error) {
+      if (error instanceof ForbiddenException) return send();
+      throw error;
+    }
+    const target = { type: input.type === 'MEMBER' ? ('member' as const) : ('team' as const), uid: input.targetId };
+    const saved = await this.store.draftsTo(memberUid, email, target);
+    const text = input.text.trim();
+    if (saved.some(({ draft }) => draft.status === 'sent' && draft.text.trim() === text)) throw draftClosed('sent');
+    const open = claim ? saved.find(({ draft }) => draft.status === 'open') : undefined;
+    if (!open) return send();
+    const result = await this.sendClaimed(open.threadId, open.draft, text, send);
+    // Another request took that draft first: check again, without a claim.
+    return result ?? this.throughSavedDraft(email, input, send, false);
+  }
 
   /** T1. */
   async list(email: string, query: LabosAgentThreadsQuery): Promise<LabosAgentThreadListResponse> {
@@ -95,34 +140,51 @@ export class LabosAgentThreadsService {
     }
 
     const text = body.text ?? '';
-    // Read before the claim: the saved values are what a failed send puts back.
-    const savedText = draft.text;
     const target = { ...draft.target };
-    const claimed = await this.store.updateDraft(body.threadId, body.draftId, 'open', {
+    const sent = await this.sendClaimed(body.threadId, draft, text, () =>
+      this.introRequests.create(email, {
+        type: target.type === 'member' ? 'MEMBER' : 'TEAM',
+        targetId: target.uid,
+        text,
+      })
+    );
+    if (!sent) throw await this.lostDraft(body.threadId, body.draftId, memberUid, email);
+    return { draftId: body.draftId, status: 'sent', introRequestUid: sent.uid };
+  }
+
+  /**
+   * The one send of a saved draft (C5, and C3 through the gate): claim open -> sent with the text in one atomic update,
+   * then send. A failed send puts the draft back to open with its saved text and passes the error. Undefined when
+   * another request changed the draft first (nothing is sent).
+   */
+  private async sendClaimed(
+    threadId: string,
+    draft: StoredDraftDoc,
+    text: string,
+    send: () => Promise<{ uid: string }>
+  ): Promise<{ uid: string } | undefined> {
+    // Read before the claim: the saved text is what a failed send puts back.
+    const savedText = draft.text;
+    const claimed = await this.store.updateDraft(threadId, draft.draftId, 'open', {
       status: 'sent',
       text,
       sentAt: Date.now(),
     });
-    if (!claimed) throw await this.lostDraft(body.threadId, body.draftId, memberUid, email);
-
+    if (!claimed) return undefined;
     let uid: string;
     try {
-      ({ uid } = await this.introRequests.create(email, {
-        type: target.type === 'member' ? 'MEMBER' : 'TEAM',
-        targetId: target.uid,
-        text,
-      }));
+      ({ uid } = await send());
     } catch (error) {
       // Not sent: the card is open again with its saved text, so Retry works.
       await this.store
-        .updateDraft(body.threadId, body.draftId, 'sent', { status: 'open', text: savedText }, ['sentAt'])
+        .updateDraft(threadId, draft.draftId, 'sent', { status: 'open', text: savedText }, ['sentAt'])
         .catch(() => this.logger.error('Failed to reopen a LabOS agent draft after a failed send'));
       throw error;
     }
     await this.store
-      .updateDraft(body.threadId, body.draftId, 'sent', { introRequestUid: uid })
+      .updateDraft(threadId, draft.draftId, 'sent', { introRequestUid: uid })
       .catch(() => this.logger.error('Failed to save the intro request of a sent LabOS agent draft'));
-    return { draftId: body.draftId, status: 'sent', introRequestUid: uid };
+    return { uid };
   }
 
   /** Another request changed the draft first: 409 with its state, or 404 when it is gone. */
