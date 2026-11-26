@@ -11,10 +11,17 @@ export function withoutSubscriberMembers<T extends LocationWithSubscribers>(loca
   }));
 }
 
-export function presentAggregatedData<T extends { locations?: LocationWithSubscribers[] }>(
-  data: T,
+type AggregatedData = { locations?: LocationWithSubscribers[] | null };
+
+export function presentAggregatedData<T extends AggregatedData>(data: T, loggedInMember: unknown): T;
+export function presentAggregatedData<T extends AggregatedData>(
+  data: T | null | undefined,
   loggedInMember: unknown
-): T {
+): T | null | undefined;
+export function presentAggregatedData<T extends AggregatedData>(
+  data: T | null | undefined,
+  loggedInMember: unknown
+): T | null | undefined {
   if (loggedInMember || !data?.locations) {
     return data;
   }
