@@ -195,30 +195,98 @@ describe('LabOS agent thread store (LAB-3457)', () => {
     expect(seed.length).toBeLessThanOrEqual(1500);
   });
 
-  it('a new thread: one upsert on threadId with the agent header, the turn pushed and the owner set', async () => {
+  it('a new thread: an insert-only upsert on threadId, then the push under the owner rule', async () => {
     const h = setup();
     jest.spyOn(Date, 'now').mockReturnValue(NOW);
     const turn = { questionId: 'c-1', question: 'Hi', response: 'Hello', kind: 'agent' as const };
-    await h.store.appendTurn(
-      { threadId: 't-new', ...ME, isNew: true },
-      { title: 'Hi', context: { page: 'home' } },
-      turn
-    );
-    expect(h.mongo.updateOneWhere).toHaveBeenCalledWith(
-      'threads',
-      { threadId: 't-new' },
-      {
-        $set: { memberUid: 'member-1', updatedAt: NOW },
-        $push: { contextual: turn },
-        $setOnInsert: { source: 'agent', email: ME.email, title: 'Hi', createdAt: NOW, context: { page: 'home' } },
-      },
-      { upsert: true }
-    );
+    await expect(
+      h.store.appendTurn({ threadId: 't-new', ...ME, isNew: true }, { title: 'Hi', context: { page: 'home' } }, turn)
+    ).resolves.toBe(true);
+    expect(h.mongo.updateOneWhere.mock.calls).toEqual([
+      [
+        'threads',
+        { threadId: 't-new' },
+        {
+          $setOnInsert: {
+            source: 'agent',
+            memberUid: 'member-1',
+            email: ME.email,
+            title: 'Hi',
+            createdAt: NOW,
+            updatedAt: NOW,
+            contextual: [],
+            context: { page: 'home' },
+          },
+        },
+        { upsert: true },
+      ],
+      [
+        'threads',
+        { threadId: 't-new', isDeleted: { $ne: true }, ...ownerFilter(ME.memberUid, ME.email) },
+        { $set: { memberUid: 'member-1', updatedAt: NOW }, $push: { contextual: turn } },
+      ],
+    ]);
     jest.restoreAllMocks();
+  });
+
+  it('G2: a doc of that id that appeared during the stream and is not own gets no write and does not move', async () => {
+    // A tiny in-memory collection with the Mongo rules the store relies on: an upsert matches on threadId and only
+    // inserts with $setOnInsert; a filtered update with no match changes nothing.
+    const docs: Array<Record<string, any>> = [{ threadId: 't-race', memberUid: 'member-2', email: 'bob@example.com' }];
+    const matches = (doc: Record<string, any>, filter: Record<string, any>) =>
+      Object.entries(filter).every(([key, want]) => {
+        if (key === '$or') return (want as Array<Record<string, any>>).some((part) => matches(doc, part));
+        if (want && typeof want === 'object' && '$ne' in want) return doc[key] !== want.$ne;
+        return (doc[key] ?? null) === want;
+      });
+    const h = setup();
+    h.mongo.updateOneWhere.mockImplementation(async (_c: string, filter: any, update: any, options: any) => {
+      const doc = docs.find((item) => matches(item, filter));
+      if (!doc) {
+        if (!options?.upsert) return { matchedCount: 0, modifiedCount: 0, upsertedCount: 0 };
+        docs.push({ ...filter, ...update.$setOnInsert });
+        return { matchedCount: 0, modifiedCount: 0, upsertedCount: 1 };
+      }
+      Object.assign(doc, update.$set ?? {});
+      if (update.$push) doc.contextual = [...(doc.contextual ?? []), update.$push.contextual];
+      return { matchedCount: 1, modifiedCount: 1, upsertedCount: 0 };
+    });
+    const turn = { questionId: 'c-1', question: 'Hi', response: 'Hello', kind: 'agent' as const };
+
+    await expect(h.store.appendTurn({ threadId: 't-race', ...ME, isNew: true }, { title: 'Hi' }, turn)).resolves.toBe(
+      false
+    );
+    expect(docs).toEqual([{ threadId: 't-race', memberUid: 'member-2', email: 'bob@example.com' }]);
+
+    // A guest AI search doc (no owner) is not taken either.
+    docs.splice(0, 1, { threadId: 't-race', contextual: [{ questionId: 'g-1' }] });
+    await expect(h.store.appendTurn({ threadId: 't-race', ...ME, isNew: true }, { title: 'Hi' }, turn)).resolves.toBe(
+      false
+    );
+    expect(docs).toEqual([{ threadId: 't-race', contextual: [{ questionId: 'g-1' }] }]);
+
+    // No doc: the member's new thread with the turn.
+    docs.splice(0, 1);
+    await expect(h.store.appendTurn({ threadId: 't-race', ...ME, isNew: true }, { title: 'Hi' }, turn)).resolves.toBe(
+      true
+    );
+    expect(docs).toEqual([
+      expect.objectContaining({ threadId: 't-race', memberUid: 'member-1', source: 'agent', contextual: [turn] }),
+    ]);
   });
 
   it('an own thread: no upsert, the owner and not-deleted rule in the filter, source and title untouched', async () => {
     const h = setup();
+    h.mongo.updateOneWhere.mockResolvedValueOnce({ matchedCount: 0, modifiedCount: 0, upsertedCount: 0 });
+    // A thread deleted or taken during the stream: not saved.
+    await expect(
+      h.store.appendTurn(
+        { threadId: 'old-1', ...ME, isNew: false },
+        { title: 'ignored' },
+        { questionId: 'c-0', question: 'Q', response: 'A' }
+      )
+    ).resolves.toBe(false);
+    h.mongo.updateOneWhere.mockClear();
     await h.store.appendTurn(
       { threadId: 'old-1', ...ME, isNew: false },
       { title: 'ignored' },

@@ -35,7 +35,7 @@ function setup(doc: ThreadDoc | null = null) {
   const threads = {
     find: jest.fn().mockResolvedValue(doc),
     warmSummary: jest.fn().mockResolvedValue(undefined),
-    appendTurn: jest.fn().mockResolvedValue(undefined),
+    appendTurn: jest.fn().mockResolvedValue(true),
     replaceTitle: jest.fn().mockResolvedValue(undefined),
     removeTurn: jest.fn().mockResolvedValue(undefined),
   };
@@ -216,6 +216,18 @@ describe('C1 and the shared chat history (LAB-3457)', () => {
     await expect(h.options().persistTurn(finished())).resolves.toBeUndefined();
     expect(log).toHaveBeenCalledWith('Failed to save a LabOS agent turn');
     expect(h.husky.generateThreadTitle).not.toHaveBeenCalled();
+  });
+
+  it('G2: a turn the store did not save (the id is not own) gets no title and a fixed log line', async () => {
+    const h = setup();
+    const log = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    h.threads.appendTurn.mockResolvedValue(false);
+    await h.chat({ ...VALID, persist: true });
+    await h.options().persistTurn(finished());
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(log).toHaveBeenCalledWith('A LabOS agent turn was not saved: the thread is not owned by the member');
+    expect(h.husky.generateThreadTitle).not.toHaveBeenCalled();
+    expect(h.threads.replaceTitle).not.toHaveBeenCalled();
   });
 
   it('keeps the first-question title when the model gives none', async () => {

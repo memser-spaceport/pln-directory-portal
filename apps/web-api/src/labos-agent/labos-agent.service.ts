@@ -605,14 +605,20 @@ export class LabosAgentService {
       ...answerCountFields(fields),
     };
     const title = firstQuestionTitle(saved.question);
+    let appended: boolean;
     try {
-      await this.threads.appendTurn(
+      appended = await this.threads.appendTurn(
         { threadId: body.threadId, ...target },
         { title, ...(body.context ? { context: body.context } : {}) },
         turn
       );
     } catch {
       this.logger.error('Failed to save a LabOS agent turn');
+      return;
+    }
+    // G2: a doc of that id that is not the member's (it appeared during the stream) gets no turn and no title.
+    if (!appended) {
+      this.logger.error('A LabOS agent turn was not saved: the thread is not owned by the member');
       return;
     }
     if (!target.isNew) return;

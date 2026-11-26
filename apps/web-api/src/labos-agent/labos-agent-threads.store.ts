@@ -161,43 +161,54 @@ export class LabosAgentThreadStore {
   }
 
   /**
-   * Adds a turn to a new thread (`isNew`) or to the member's own thread. A new thread gets the agent header. An own
-   * thread gets `memberUid`, so a later email change keeps it; its source and title stay. The write is one atomic
-   * `$push`, so a C2 or C5 status write at the same time is not lost.
+   * Adds a turn to a new thread (`isNew`) or to the member's own thread, and says whether it was saved. A new thread
+   * gets the agent header. An own thread gets `memberUid`, so a later email change keeps it; its source and title stay.
+   * The turn is one atomic `$push`, so a C2 or C5 status write at the same time is not lost.
+   *
+   * G2: the push always has the owner and not-deleted rule. For a new id, a first upsert with `$setOnInsert` only makes
+   * the doc when no doc has the id, and changes nothing in a doc that exists. So a doc that appeared during the stream
+   * (another member's thread, a guest AI search turn) is never written to and never moves to the member: the push
+   * matches nothing and the turn is not saved. The threads collection has no unique index on `threadId` (AI search
+   * neither), so two new-id upserts at the same moment could still make two docs.
    */
   async appendTurn(
     target: { threadId: string; memberUid: string; email: string; isNew: boolean },
     header: { title: string; context?: LabosAgentContext },
     turn: ThreadTurnDoc
-  ): Promise<void> {
+  ): Promise<boolean> {
     const now = Date.now();
+    if (target.isNew) {
+      const create: UpdateFilter<ThreadDoc> = {
+        $setOnInsert: {
+          source: 'agent',
+          memberUid: target.memberUid,
+          email: target.email,
+          title: header.title,
+          createdAt: now,
+          updatedAt: now,
+          contextual: [],
+          ...(header.context ? { context: header.context } : {}),
+        },
+      };
+      await this.mongo.updateOneWhere<ThreadDoc>(threadsCollection(), { threadId: target.threadId }, create, {
+        upsert: true,
+      });
+    }
     const update: UpdateFilter<ThreadDoc> = {
       $set: { memberUid: target.memberUid, updatedAt: now },
       $push: { contextual: turn },
     };
-    if (target.isNew) {
-      await this.mongo.updateOneWhere<ThreadDoc>(
-        threadsCollection(),
-        { threadId: target.threadId },
-        {
-          ...update,
-          $setOnInsert: {
-            source: 'agent',
-            email: target.email,
-            title: header.title,
-            createdAt: now,
-            ...(header.context ? { context: header.context } : {}),
-          },
-        },
-        { upsert: true }
-      );
-      return;
-    }
-    await this.mongo.updateOneWhere<ThreadDoc>(
+    const result = await this.mongo.updateOneWhere<ThreadDoc>(
       threadsCollection(),
       { threadId: target.threadId, isDeleted: { $ne: true }, ...ownerFilter(target.memberUid, target.email) },
       update
     );
+    return result.matchedCount === 1;
+  }
+
+  /** Replaces the first-question title with the model title, unless the title changed in the meantime. */
+  async replaceTitle(threadId: string, from: string, title: string): Promise<void> {
+    await this.mongo.updateOneWhere(threadsCollection(), { threadId, title: from }, { $set: { title } });
   }
 
   /**
@@ -211,11 +222,6 @@ export class LabosAgentThreadStore {
       { threadId, ...ownerFilter(memberUid, email) },
       update
     );
-  }
-
-  /** Replaces the first-question title with the model title, unless the title changed in the meantime. */
-  async replaceTitle(threadId: string, from: string, title: string): Promise<void> {
-    await this.mongo.updateOneWhere(threadsCollection(), { threadId, title: from }, { $set: { title } });
   }
 
   /** C2 (best effort): the state of one saved proposal. */
