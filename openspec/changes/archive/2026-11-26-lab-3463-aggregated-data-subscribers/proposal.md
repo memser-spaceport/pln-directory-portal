@@ -4,7 +4,8 @@
 
 ## What Changes
 
-- A signed-out answer keeps one subscriber entry per follower and drops member uid, name and photo.
+- A signed-out answer sets `subscribers` to `[]` on `GET /v1/irl/aggregated-data` and `GET /v1/home/featured`.
+- The same answer sets `eventGuests` to `[]` on each gathering's events, past events and upcoming events.
 - A signed-in answer stays as the events cards use it today.
 
 ## Capabilities
@@ -15,5 +16,5 @@
 
 ## Impact
 
-- `GET /v1/irl/aggregated-data` only. Home featured data and the internal aggregated read are unchanged.
+- `GET /v1/irl/aggregated-data` and `GET /v1/home/featured`. The internal aggregated read is unchanged.
 - Events location cards still read `followers.length` for the count. They ignore a follower with no `memberUid`, so a blank entry cannot mark a signed-out viewer as following.
