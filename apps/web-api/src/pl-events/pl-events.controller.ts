@@ -53,6 +53,7 @@ import { InternalAuthGuard } from '../guards/auth.guard';
 import { OptionalUserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { sanitizeMemberContactsForViewer } from '../members/member-contact-sanitizer';
 import { TeamsService } from '../teams/teams.service';
+import { presentAggregatedData } from './pl-event-aggregated-data';
 import { RbacGuard } from '../rbac/rbac.guard';
 import { RequirePermissions } from '../rbac/rbac.decorator';
 import { RBAC_PERMISSION_CODES } from '../rbac/rbac.constants';
@@ -351,7 +352,8 @@ export class PLEventsController {
     const loggedInMember = request['userEmail']
       ? await this.memberService.findMemberByEmail(request['userEmail'])
       : null;
-    return await this.eventGuestService.getAllAggregatedData(loggedInMember, request.query);
+    const data = await this.eventGuestService.getAllAggregatedData(loggedInMember, request.query);
+    return presentAggregatedData(data, loggedInMember);
   }
 
   @Api(server.route.sendEventGuestPresenceRequest)
