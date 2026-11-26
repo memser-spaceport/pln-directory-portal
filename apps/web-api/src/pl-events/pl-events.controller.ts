@@ -297,7 +297,10 @@ export class PLEventsController {
     if (!parsed.success) {
       throw new BadRequestException(parsed.error.issues.map((issue) => issue.message).join('; '));
     }
-    const { selectedEventUids, detailsOnly } = parsed.data;
+    const { selectedEventUids, detailsOnly, nonApproved } = parsed.data;
+    if (nonApproved) {
+      return await this.eventSyncService.importNonApprovedEvents();
+    }
     if (detailsOnly) {
       return await this.eventSyncService.syncEventDetailsOnly({ selectedEventUids });
     }

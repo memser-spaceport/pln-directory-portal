@@ -32,13 +32,13 @@ or `events:write`, and no such key exists until step 8 of phase 4.
 `yarn api:events-cutover` runs the checks and the sync calls of this page, the same way on dev and prod. It reads only
 the environment variables it is given, never a `.env` file:
 
-| Command                                | Needs                               | Does                                                                                                                                                      |
-| -------------------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `snapshot --env <env> [--out <file>]`  | `DATABASE_URL`                      | Runs the count queries in one read-only transaction and writes them to a JSON file. On a database without the migrations it is marked `pre-migration`.    |
-| `compare <before.json> <after.json>`   | the two files                       | Exits 1 when events, guest rows, gatherings, city mappings or member and team links changed, and prints each change. Other counts are shown, not checked. |
-| `service --env <env>`                  | `DATABASE_URL`, `EVENT_SERVICE_URL` | Compares the approved events of the events service with the synced events of LabOS, by id, and names the fields that hold a creator email.                |
-| `sync --details-only` or `sync --full` | `API_URL`, `INTERNAL_AUTH_TOKEN`    | Calls `POST /v1/irl/events/sync` (the details backfill or the full pull sync). Exits 1 when the API skips it because the API switch is on.                |
-| `--print-sql`                          | nothing                             | Prints the queries, to run them by hand.                                                                                                                  |
+| Command                                             | Needs                               | Does                                                                                                                                                                                                                                           |
+| --------------------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `snapshot --env <env> [--out <file>]`               | `DATABASE_URL`                      | Runs the count queries in one read-only transaction and writes them to a JSON file. On a database without the migrations it is marked `pre-migration`.                                                                                         |
+| `compare <before.json> <after.json>`                | the two files                       | Exits 1 when events, guest rows, gatherings, city mappings or member and team links changed, and prints each change. Other counts are shown, not checked.                                                                                      |
+| `service --env <env>`                               | `DATABASE_URL`, `EVENT_SERVICE_URL` | Compares the events service with LabOS, by id and by status: approved with `APPROVED`, waiting (`SUBMITTED`) with `PENDING`, drafts (`PENDING`) with `DRAFT`. Names the fields that hold a creator email. Exits 1 unless every status matches. |
+| `sync --details-only`, `--full` or `--non-approved` | `API_URL`, `INTERNAL_AUTH_TOKEN`    | Calls `POST /v1/irl/events/sync`: the details backfill, the full pull sync, or the import of waiting events and drafts. Exits 1 when the API skips it because the API switch is on.                                                            |
+| `--print-sql`                                       | nothing                             | Prints the queries, to run them by hand.                                                                                                                                                                                                       |
 
 `DATABASE_URL` is the `pln-pg` tunnel of the environment (`.claude/skills/pln-pg/pln-pg.sh <env> --url`); the tool
 reads `sslmode=require` as "encrypt, do not verify", as libpq does. `EVENT_SERVICE_URL` is the events service the
@@ -93,7 +93,8 @@ After this phase the events service still owns events. The queue and the pull sy
    from the events service, so an event submitted in LabOS would not show there.
 6. Review the gathering mappings with query 7 and fix or delete each wrong row (see "How an event finds its
    gathering").
-7. Run `service --env <env>`. It lists the events missing on either side and the fields that hold a creator email.
+7. Run `service --env <env>`. It lists the events missing on either side, for each status, and the fields that hold
+   a creator email.
    On dev on 2026-11-25 the events service had 1393 approved events and LabOS 507: 912 were never synced to dev, and
    26 LabOS events (the ones query 3 counts) are no longer in the events service. The final sync adds the first and
    deletes the second. The events carry `created_by` and `submitted_by` emails, so the final sync can set
@@ -103,16 +104,23 @@ After this phase the events service still owns events. The queue and the pull sy
 
 1. Take `snapshot --env <env> --out phase3.json` and put its counts in the ticket.
 2. Query 4 has no rows in it.
-3. Tell the curator the day and the hour. Submissions that wait in the old portal must be approved or rejected before
-   the switch: drafts and rejected events are not moved.
+3. Tell the curator the day and the hour. Waiting submissions and drafts move to LabOS with their submitter, so the
+   curator can also decide on them after the switch (curation API). Rejected events are not moved.
 
 ## Phase 4: the switch
 
-1. Approve or reject every submission that waits in the old portal.
-2. Put the old portal in maintenance (redirect `irl.os.pl.xyz/events/add` to the LabOS submit form).
-3. Run the final full pull sync, with the API switch still off: `yarn api:events-cutover sync --full`.
-4. `service --env <env>` says "match": every approved event of the events service is in LabOS, and nothing else.
-   Then take `snapshot --env <env> --out phase4-before.json`. Query 4 has no rows in it.
+1. Put the old portal in maintenance (redirect `irl.os.pl.xyz/events/add` to the LabOS submit form), so nothing new
+   is submitted there.
+2. Run the final full pull sync, with the API switch still off: `yarn api:events-cutover sync --full`. It adds the
+   approved events LabOS is missing, removes the ones the events service no longer approves, and approves in LabOS
+   any event the old portal approved since the last import.
+3. Import the waiting events and the drafts: `yarn api:events-cutover sync --non-approved`. Old `SUBMITTED` becomes
+   `PENDING` ("Submitted"), old `PENDING` becomes `DRAFT`. The submitter is the member whose email is the event's
+   `created_by` (else `submitted_by`); `withoutSubmitter` counts the events with no matching member. They get no guest
+   rows and no notifications. Running it again updates what it brought over before.
+4. `service --env <env>` says "every status matches": approved, waiting and draft events are in LabOS with the
+   matching status, and nothing else. Then take `snapshot --env <env> --out phase4-before.json`. Query 4 has no rows
+   in it.
 5. Set `EVENTS_LOCAL_SUBMIT_ENABLED=true` on the API and redeploy. Set `NEXT_PUBLIC_EVENTS_LOCAL_SUBMIT=true` on the
    frontend and rebuild it.
 6. Take `phase4-after.json` and run `compare phase4-before.json phase4-after.json`: it says "no loss".
