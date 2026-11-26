@@ -39,6 +39,12 @@ type FetchAllOptions = {
 type SourceType = 'full' | 'autocomplete' | 'posts' | 'hydrate';
 const strictLabel = (v?: boolean) => String(!!v); // "true" | "false"
 
+/**
+ * Fields a query matches on but the results never show as a match. An event's `additionalInfo` (tags, host, agenda)
+ * is indexed as a JSON string, so its highlighted piece would read as raw JSON.
+ */
+export const SEARCH_ONLY_FIELDS = new Set(['additionalInfo']);
+
 @Injectable()
 export class SearchService {
   constructor(private readonly openSearchService: OpenSearchService, private readonly prisma: PrismaService) {}
@@ -330,6 +336,8 @@ export class SearchService {
     const short = new Set(['name', 'topicTitle', 'tagline', 'shortDescription', 'location']);
     const cfg: Record<string, any> = {};
     for (const f of fields) {
+      // Searched, never shown: its piece would be raw JSON in the result (LAB-3341).
+      if (SEARCH_ONLY_FIELDS.has(f)) continue;
       // For replies.content, allow multiple fragments to capture all matched comments
       if (f === 'replies.content') {
         cfg[f] = { fragment_size: 140, number_of_fragments: 10, no_match_size: 0 };

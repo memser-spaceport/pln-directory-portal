@@ -221,3 +221,25 @@ describe('SearchService.removeDeletedTeams (LAB-3192)', () => {
     expect(teamFindMany).not.toHaveBeenCalled();
   });
 });
+
+describe('SearchService: event matches show no raw JSON (LAB-3341)', () => {
+  const searchWithLimit = jest.fn();
+  const prismaMock = {
+    member: { findMany: jest.fn().mockResolvedValue([]) },
+    team: { findMany: jest.fn().mockResolvedValue([]) },
+  } as unknown as PrismaService;
+  const service = new SearchService({ searchWithLimit } as unknown as OpenSearchService, prismaMock);
+
+  it('still searches additionalInfo but never asks to highlight it', async () => {
+    searchWithLimit.mockResolvedValue({ body: { hits: { hits: [] } } });
+
+    await service.fetchAllIndices('talks', { canReadContacts: false, isAuthenticated: false });
+
+    const eventCall = searchWithLimit.mock.calls.find(([index]) => index === 'event');
+    expect(eventCall).toBeDefined();
+    const body = eventCall[2];
+    expect(JSON.stringify(body.query)).toContain('additionalInfo');
+    expect(Object.keys(body.highlight.fields)).not.toContain('additionalInfo');
+    expect(Object.keys(body.highlight.fields)).toEqual(expect.arrayContaining(['name', 'description', 'location']));
+  });
+});
