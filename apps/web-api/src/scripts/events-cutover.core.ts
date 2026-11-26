@@ -140,7 +140,76 @@ export function compareSnapshots(before: CutoverSnapshot, after: CutoverSnapshot
   const duplicates = after.rows['4']?.length ?? 0;
   if (duplicates)
     lines.push(`Query 4: ${duplicates} external ids are used by more than one live event (expected none)`);
-  return { ok: lost.length === 0, lines };
+
+  const perEvent = compareEvents(before.rows['9'], after.rows['9']);
+  lines.push(...perEvent.lines);
+  return { ok: lost.length === 0 && perEvent.ok, lines };
+}
+
+const MAX_LISTED = 20;
+const isTrue = (value: unknown) => value === true || value === 't' || value === 'true';
+
+/**
+ * Event by event (query 9). A loss, which fails the compare: an event that was live and is now deleted or gone
+ * while it had guests or was made in LabOS; an event moved to another gathering; fewer guests on an event; any
+ * change to an event made in LabOS. Shown, not failed: a synced event with no guests deleted (the events service
+ * deleted it), new events, name, date and slug changes, a gathering given to an event that had none.
+ */
+export function compareEvents(before: Row[] | undefined, after: Row[] | undefined): CompareResult {
+  if (!before || !after) return { ok: true, lines: ['Per-event compare: skipped (a snapshot has no query 9)'] };
+  const now = new Map(after.map((row) => [String(row.uid), row]));
+  const was = new Map(before.map((row) => [String(row.uid), row]));
+  const label = (row: Row) => `${String(row.name ?? '').slice(0, 40)} (${row.uid})`;
+  const losses: string[] = [];
+  const info: Record<string, string[]> = {
+    'synced event with no guests deleted': [],
+    'name, dates or slug changed': [],
+    'gathering given': [],
+  };
+
+  for (const old of before) {
+    if (isTrue(old.deleted)) continue;
+    const cur = now.get(String(old.uid));
+    const guests = Number(old.guests ?? 0);
+    const madeInLabos = isTrue(old.made_in_labos);
+    if (!cur || isTrue(cur.deleted)) {
+      if (guests > 0 || madeInLabos) {
+        losses.push(
+          `${label(old)}: ${cur ? 'deleted' : 'gone'} (${guests} guests${madeInLabos ? ', made in LabOS' : ''})`
+        );
+      } else info['synced event with no guests deleted'].push(label(old));
+      continue;
+    }
+    if (old.gathering_uid && cur.gathering_uid !== old.gathering_uid) {
+      losses.push(`${label(old)}: moved to another gathering`);
+    } else if (!old.gathering_uid && cur.gathering_uid) {
+      info['gathering given'].push(label(old));
+    }
+    if (Number(cur.guests ?? 0) < guests) losses.push(`${label(old)}: guests ${guests} → ${cur.guests}`);
+    const changed = ['name', 'start_date', 'end_date', 'slug'].filter((key) => String(old[key]) !== String(cur[key]));
+    if (madeInLabos && (changed.length || Number(cur.links ?? 0) !== Number(old.links ?? 0))) {
+      losses.push(`${label(old)}: made in LabOS but changed (${changed.join(', ') || 'links'})`);
+    } else if (changed.length) info['name, dates or slug changed'].push(`${label(old)}: ${changed.join(', ')}`);
+  }
+  const added = after.filter((row) => !was.has(String(row.uid))).length;
+
+  const lines = [
+    losses.length
+      ? `Per-event compare: ${losses.length} event(s) lost or moved:`
+      : 'Per-event compare: no event lost or moved',
+  ];
+  losses.slice(0, MAX_LISTED).forEach((line) => lines.push(`  ${line}`));
+  if (losses.length > MAX_LISTED) lines.push(`  and ${losses.length - MAX_LISTED} more`);
+  lines.push(`For information: ${added} new events`);
+  for (const [kind, list] of Object.entries(info)) {
+    if (!list.length) continue;
+    lines.push(
+      `  ${kind}: ${list.length}${
+        list.length > 5 ? ` (first 5: ${list.slice(0, 5).join('; ')})` : `: ${list.join('; ')}`
+      }`
+    );
+  }
+  return { ok: losses.length === 0, lines };
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
