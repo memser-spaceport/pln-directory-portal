@@ -30,7 +30,7 @@ import { MembersHooksService } from './members.hooks.service';
 import { toPreferencePatch } from './member-preferences';
 import { NewsTagVocabularyService } from '../team-news/news-tag-vocabulary.service';
 import { resolveNewsTags } from '../team-news/utils/news-tags';
-import { readNewsCategoryTags } from '../team-news/utils/news-category-tags';
+import { defaultCategoryTagsForTagSave, resolveNewsCategoryTags } from '../team-news/utils/news-category-tags';
 import { readNewsCategories } from '../team-news/utils/news-categories';
 import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
 import { OfficeHoursService } from '../office-hours/office-hours.service';
@@ -1095,7 +1095,11 @@ export class MembersService {
     }
   }
 
-  async createMemberFromSignUpData(memberData: any): Promise<Member> {
+  async createMemberFromSignUpData(signUpData: any): Promise<Member> {
+    // Every caller is a self-service sign-up (anonymous, or any logged-in user on the legacy
+    // POST /v1/participants-request); verification is an admin action, so never honour it here.
+    const memberData = { ...signUpData };
+    delete memberData.isVerified;
     let createdMember: any;
     await this.prisma.$transaction(async (tx) => {
       const { member } = await this.prepareMemberFromParticipantRequest(null, memberData, null, tx);
@@ -1838,9 +1842,22 @@ export class MembersService {
         : undefined;
     const patch = toPreferencePatch(preferences, vocabulary);
 
+    /* LAB-3284: a member's first saved news tags also store the default category tags,
+       when they have no saved news tags and no saved category tags. The check is on the
+       row being updated, so a category save landing at the same time is not overwritten. */
+    const firstTagSaveDefaults = defaultCategoryTagsForTagSave(patch) ?? {};
+
     const updated = await this.prisma.$executeRaw`
       UPDATE "Member"
       SET "preferences" = COALESCE("preferences", '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb
+        || CASE
+             WHEN (CASE WHEN jsonb_typeof("preferences"->'newsTags') = 'array'
+                        THEN jsonb_array_length("preferences"->'newsTags') ELSE 0 END) = 0
+              AND (CASE WHEN jsonb_typeof("preferences"->'newsCategoryTags') = 'array'
+                        THEN jsonb_array_length("preferences"->'newsCategoryTags') ELSE 0 END) = 0
+             THEN ${JSON.stringify(firstTagSaveDefaults)}::jsonb
+             ELSE '{}'::jsonb
+           END
       WHERE uid = ${id}
     `;
     if (updated === 0) {
@@ -1956,8 +1973,9 @@ export class MembersService {
     preferences.subscription = !!member.isSubscribedToNewsletter;
     // Always present (LAB-2940): the stored list, or every category by default.
     preferences.newsCategories = readNewsCategories(member.preferences);
-    // Always present (LAB-3140). Missing key is [], so an old newsCategories value stays off.
-    preferences.newsCategoryTags = readNewsCategoryTags(member.preferences);
+    /* Always present (LAB-3140, LAB-3284): the saved category tags, or every category tag for a
+       member with no saved news tags. An old newsCategories value never turns them on. */
+    preferences.newsCategoryTags = resolveNewsCategoryTags(member.preferences);
     return preferences;
   }
 
@@ -4039,7 +4057,7 @@ export class MembersService {
       project?: { projectUid?: string } | string;
     }
   ): Promise<{ uid: string }> {
-    // create a new member with accessLevel=L0 (existing flow)
+    // create a new member with accessLevel=L0 (existing flow; drops client-supplied isVerified)
     const member = await this.createMemberFromSignUpData(signUpDto);
 
     // in one txn — persist Member.role / Member.teamEmail (if provided) and
@@ -4081,10 +4099,10 @@ export class MembersService {
    * - If isTeamNew = true:
    *    - Create a new Team with accessLevel = 'L0'
    *    - Attach the given member to that team via TeamMemberRole
-   *      (even if the member is not "approved" yet).
+   *      as its lead (even if the member is not "approved" yet).
    * - Else:
    *    - Resolve an existing team by uid or name
-   *    - Attach the given member to that team via TeamMemberRole.
+   *    - Attach the given member to that team via TeamMemberRole, not as lead.
    *
    */
   private async attachTeamAndRoleTx(
@@ -4191,7 +4209,8 @@ export class MembersService {
         role: finalRole,
         roleTags,
         mainTeam: true,
-        teamLead: true,
+        // joining an existing team never grants lead; only the creator of a new team leads it
+        teamLead: !!isTeamNew,
       },
       update: {
         role: finalRole,

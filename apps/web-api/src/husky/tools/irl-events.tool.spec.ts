@@ -259,6 +259,33 @@ describe('IrlEventsTool', () => {
     expect(result).toContain('none of the listed attendees are from teams working on "storage"');
   });
 
+  it('pages attendees at the public limit until a short page', async () => {
+    const { tool, guestsService } = setup();
+    const page1 = withCount(
+      Array.from({ length: 100 }, (_, i) => attendee(`m-${i}`, `Person ${i}`, null)),
+      101
+    );
+    const page2 = withCount([attendee('m-last', 'Last Person', null)], 101);
+    guestsService.getPLEventGuestsByLocationAndType.mockResolvedValueOnce(page1).mockResolvedValueOnce(page2);
+
+    const result = (await execute(tool, { search: 'Climate Week', timeframe: 'upcoming' })) as string;
+
+    expect(guestsService.getPLEventGuestsByLocationAndType).toHaveBeenCalledTimes(2);
+    expect(guestsService.getPLEventGuestsByLocationAndType.mock.calls[0][1]).toEqual({
+      filteredEvents: ['event-nyc'],
+      limit: 100,
+      page: 1,
+    });
+    expect(guestsService.getPLEventGuestsByLocationAndType.mock.calls[1][1]).toEqual({
+      filteredEvents: ['event-nyc'],
+      limit: 100,
+      page: 2,
+    });
+    expect(result).toContain('Attendees (101)');
+    expect(result).toContain('... and 61 more');
+    expect(result).not.toContain('only the first');
+  });
+
   it('flags when the page service returned only the first page of attendees', async () => {
     const { tool, guestsService } = setup();
     guestsService.getPLEventGuestsByLocationAndType.mockResolvedValue(

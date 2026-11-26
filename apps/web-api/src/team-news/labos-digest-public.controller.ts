@@ -2,19 +2,20 @@ import {
   BadRequestException,
   Body,
   Controller,
+  GoneException,
   HttpCode,
   Post,
   Query,
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import { ApiGoneResponse, ApiOperation, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { ZodType, ZodTypeDef } from 'zod';
 import {
-  LabosDigestChoiceRequestSchema,
-  LabosDigestChoiceResponseSchema,
   LabosDigestEmailSettingsChangeSchema,
   LabosDigestEmailSettingsSchema,
+  LabosDigestExchangeRequestSchema,
+  LabosDigestExchangeResponseSchema,
   LabosDigestPageRequestSchema,
   LabosDigestPageSchema,
 } from 'libs/contracts/src/schema/team-news';
@@ -25,8 +26,10 @@ import { DigestLinkError } from './labos-digest-link-token.util';
 import { LabosDigestPageService } from './labos-digest-page.service';
 
 /**
- * The public digest page (LAB-3263). No sign-in: the signed link token in the body is the only credential, and
+ * The digest link's routes (LAB-3263). No sign-in: the signed link token in the body is the only credential, and
  * it names the member. POST keeps the token out of access logs and caches. The global throttler applies.
+ * LAB-3356: on the page the token only opens an issue (`exchange`); reading and choosing by issue id live in
+ * `LabosDigestReaderController`. The email settings routes keep the token (one-click unsubscribe, LAB-3309).
  */
 @ApiTags('LabOS Digest - Page')
 @Controller('v1/labos-digest')
@@ -36,9 +39,24 @@ export class LabosDigestPublicController {
     private readonly emailSettings: LabosDigestEmailSettingsService
   ) {}
 
+  /** LAB-3356: the link's issue id, for `/digest?issue=<id>`. Records the issue if the send didn't. */
+  @Post('exchange')
+  @HttpCode(200)
+  @NoCache()
+  @ApiOkResponseFromZod(LabosDigestExchangeResponseSchema)
+  @ApiUnauthorizedResponse({ description: 'The link is broken, expired or not signed by LabOS.' })
+  async exchange(@Body() body: unknown) {
+    const { token, issue } = parseInput(LabosDigestExchangeRequestSchema, body);
+    return withLinkErrors(() => this.page.exchange(token, issue));
+  }
+
   @Post('page')
   @HttpCode(200)
   @NoCache()
+  @ApiOperation({
+    deprecated: true,
+    summary: 'Deprecated (LAB-3356): use exchange, then issue-page. Removed once the frontend no longer calls it.',
+  })
   @ApiOkResponseFromZod(LabosDigestPageSchema)
   @ApiUnauthorizedResponse({ description: 'The link is broken, expired or not signed by LabOS.' })
   async read(@Body() body: unknown) {
@@ -46,14 +64,17 @@ export class LabosDigestPublicController {
     return withLinkErrors(() => this.page.read(token, issue));
   }
 
+  /**
+   * LAB-3356: gone. A link must not save for the member it names (a forwarded email would act for its sender), so
+   * More / Less save only for the signed-in member, through `issue-choices`.
+   */
   @Post('choices')
-  @HttpCode(200)
+  @HttpCode(410)
   @NoCache()
-  @ApiOkResponseFromZod(LabosDigestChoiceResponseSchema)
-  @ApiUnauthorizedResponse({ description: 'The link is broken, expired or not signed by LabOS.' })
-  async choose(@Body() body: unknown) {
-    const { token, newsItemUid, choice, issue } = parseInput(LabosDigestChoiceRequestSchema, body);
-    return withLinkErrors(() => this.page.choose(token, newsItemUid, choice, issue));
+  @ApiOperation({ deprecated: true, summary: 'Gone (LAB-3356): use issue-choices, signed in.' })
+  @ApiGoneResponse({ description: 'More / Less need sign-in now: POST issue-choices.' })
+  choose(): never {
+    throw new GoneException('More and Less need sign-in: use issue-choices');
   }
 
   /** LAB-3310: the link member's digest email, on or off and daily or weekly. Changes nothing. */
@@ -106,7 +127,7 @@ async function withLinkErrors<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
-function parseInput<T>(schema: ZodType<T, ZodTypeDef, unknown>, data: unknown): T {
+export function parseInput<T>(schema: ZodType<T, ZodTypeDef, unknown>, data: unknown): T {
   const parsed = schema.safeParse(data ?? {});
   if (!parsed.success) {
     throw new BadRequestException(parsed.error.flatten());

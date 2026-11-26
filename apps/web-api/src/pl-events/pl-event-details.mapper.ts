@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client';
 import {
   emptyPLEventDetails,
   isHttpUrl,
+  isTimeZoneName,
   PLEventDetails,
   PLEventDetailsAgenda,
   PLEventDetailsParty,
@@ -66,6 +67,17 @@ function readHttpUrl(value: unknown, field: keyof PLEventDetails, onInvalid: OnI
     return null;
   }
   return url;
+}
+
+/** LAB-3403: a time zone the runtime does not know reads as null, so a page never formats a date with it. */
+function readTimeZone(value: unknown, onInvalid: OnInvalidDetailsField): string | null {
+  const timezone = readString(value, 'timezone', onInvalid);
+  if (timezone === null) return null;
+  if (!isTimeZoneName(timezone)) {
+    onInvalid('timezone', 'expected an IANA time zone');
+    return null;
+  }
+  return timezone;
 }
 
 function readTag(item: unknown): PLEventDetailsTag | null {
@@ -152,6 +164,7 @@ export function mapEventDetails(raw: unknown, onInvalid: OnInvalidDetailsField =
     agenda: readAgenda(raw.agenda, onInvalid),
     // The events service names it `location_url`; `locationUrl` is a fallback for a camelCase source.
     locationUrl: readHttpUrl(isAbsent(raw.location_url) ? raw.locationUrl : raw.location_url, 'locationUrl', onInvalid),
+    timezone: readTimeZone(raw.timezone, onInvalid),
   };
 }
 
@@ -174,7 +187,26 @@ export function readEventDetails(additionalInfo: unknown): PLEventDetails {
     sponsors: readParties(stored.sponsors, 'sponsors', noop),
     agenda: readAgenda(stored.agenda, noop),
     locationUrl: readHttpUrl(stored.locationUrl, 'locationUrl', noop),
+    timezone: readTimeZone(stored.timezone, noop),
   };
+}
+
+/** Nothing to show: null, an empty list, or an agenda with no sessions. */
+function isEmptyDetail(value: unknown): boolean {
+  if (isAbsent(value)) return true;
+  if (Array.isArray(value)) return value.length === 0;
+  return isPlainObject(value) && Array.isArray(value.sessions) && value.sessions.length === 0;
+}
+
+/**
+ * LAB-3403: `incoming` with every empty field taken from the stored details. For the `events` queue, whose messages
+ * do not carry every field (on prod they carried `format` only): a field missing there says nothing about the event.
+ * The REST read that follows the message is what removes a value.
+ */
+export function keepStoredDetails(additionalInfo: unknown, incoming: PLEventDetails): PLEventDetails {
+  const stored = readEventDetails(additionalInfo);
+  const kept = Object.entries(stored).filter(([field]) => isEmptyDetail(incoming[field as keyof PLEventDetails]));
+  return { ...incoming, ...Object.fromEntries(kept) };
 }
 
 /**

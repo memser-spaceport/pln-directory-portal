@@ -1,6 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
 import { toPreferencePatch } from './member-preferences';
 import { buildNewsTagVocabulary } from '../team-news/news-tag-vocabulary.service';
+import { defaultCategoryTagsForTagSave, resolveNewsCategoryTags } from '../team-news/utils/news-category-tags';
+import { readChosenNewsTags } from '../team-news/utils/news-tags';
 
 /**
  * LAB-2998: `newsTags` is a validated preference key, like `newsCategories`.
@@ -64,5 +66,59 @@ describe('toPreferencePatch with newsCategoryTags', () => {
 
   it('rejects a category that is not offered, so nothing reaches the blob', () => {
     expect(() => toPreferencePatch({ newsCategoryTags: ['FUNDING', 'PARTNERSHIP'] })).toThrow(BadRequestException);
+  });
+});
+
+/**
+ * LAB-3284: the preferences save, with the first-tag-save rule of
+ * `MembersService.updatePreference`. The SQL condition on the stored row is
+ * stood in for by the same check in JS.
+ */
+const save = (stored: Record<string, unknown>, body: unknown) => {
+  const patch = toPreferencePatch(body, vocabulary);
+  const hasNoSavedChoice =
+    !readChosenNewsTags(stored) && resolveNewsCategoryTags({ ...stored, newsTags: ['x'] }).length === 0;
+  return { ...stored, ...patch, ...(hasNoSavedChoice ? defaultCategoryTagsForTagSave(patch) ?? {} : {}) };
+};
+
+describe('default category tags (LAB-3284)', () => {
+  const ALL = ['FUNDING', 'LAUNCH', 'ANNOUNCEMENT'];
+
+  it('reads every category for a member with no saved tags and no category tags', () => {
+    expect(resolveNewsCategoryTags({ showEmail: true })).toEqual(ALL);
+  });
+
+  it('reads no category for a member with saved tags and no category tags', () => {
+    expect(resolveNewsCategoryTags(merge({}, { newsCategoryTags: [] }))).toEqual(ALL);
+    expect(resolveNewsCategoryTags({ newsTags: ['ai'] })).toEqual([]);
+  });
+
+  it('stores every category with the first saved tags', () => {
+    expect(save({}, { newsTags: ['ai', 'desci'] })).toEqual({ newsTags: ['ai', 'desci'], newsCategoryTags: ALL });
+    expect(save({ newsTags: [], newsCategoryTags: [] }, { newsTags: ['ai'] })).toEqual({
+      newsTags: ['ai'],
+      newsCategoryTags: ALL,
+    });
+  });
+
+  it('does not replace categories the member picked', () => {
+    expect(save({ newsCategoryTags: ['FUNDING'] }, { newsTags: ['ai'] })).toEqual({
+      newsTags: ['ai'],
+      newsCategoryTags: ['FUNDING'],
+    });
+  });
+
+  it('stores no category for a member who already has saved tags', () => {
+    const stored = save({ newsTags: ['ai'] }, { newsTags: ['ai', 'desci'] });
+    expect(stored).toEqual({ newsTags: ['ai', 'desci'] });
+    expect(resolveNewsCategoryTags(stored)).toEqual([]);
+  });
+
+  it('stores the category tags the request carries', () => {
+    expect(save({}, { newsTags: ['ai'], newsCategoryTags: [] })).toEqual({ newsTags: ['ai'], newsCategoryTags: [] });
+  });
+
+  it('stores no category with an empty tag list', () => {
+    expect(save({}, { newsTags: [] })).toEqual({ newsTags: [] });
   });
 });

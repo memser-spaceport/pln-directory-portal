@@ -1,7 +1,7 @@
-import { Body, Controller, ForbiddenException, Get, Post, Query, Req, UseGuards, UsePipes } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Post, Req, UnauthorizedException, UseGuards, UsePipes } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '@abitia/zod-dto';
-import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { StrictOptionalUserTokenCheckGuard, UserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { SubscribeDemoDayDto, DemoDaySubscriptionStatusResponseDto } from 'libs/contracts/src/schema';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
@@ -18,7 +18,7 @@ export class DemoDaySubscriptionsController {
   ) {}
 
   @Post('subscribe')
-  @UseGuards(UserTokenCheckGuard)
+  @UseGuards(StrictOptionalUserTokenCheckGuard)
   @UsePipes(ZodValidationPipe)
   @NoCache()
   async subscribeToDemoDay(@Body() body: SubscribeDemoDayDto, @Req() req: Request) {
@@ -69,19 +69,10 @@ export class DemoDaySubscriptionsController {
   @Get('subscription-status')
   @UseGuards(UserTokenCheckGuard)
   @NoCache()
-  async getSubscriptionStatus(
-    @Query('email') email: string,
-    @Req() req: Request
-  ): Promise<DemoDaySubscriptionStatusResponseDto> {
-    const token = extractTokenFromRequest(req);
-    let checkEmail = email;
-
-    if (token && req['userEmail']) {
-      checkEmail = req['userEmail'];
-    }
-
+  async getSubscriptionStatus(@Req() req: Request): Promise<DemoDaySubscriptionStatusResponseDto> {
+    const checkEmail = req['userEmail'];
     if (!checkEmail) {
-      return { subscribed: false };
+      throw new UnauthorizedException('Invalid Session. Please login and try again');
     }
 
     try {
