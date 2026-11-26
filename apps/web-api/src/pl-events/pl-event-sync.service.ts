@@ -17,7 +17,14 @@ const NON_APPROVED_IMPORT: ReadonlyArray<{ serviceStatus: string; status: PLEven
   { serviceStatus: 'PENDING', status: PLEventStatus.DRAFT, key: 'draft' },
 ];
 
-export type NonApprovedImportCounts = { fetched: number; created: number; updated: number; skippedApproved: number };
+export type NonApprovedImportCounts = {
+  fetched: number;
+  created: number;
+  updated: number;
+  skippedApproved: number;
+  /** A LabOS event (no `syncedAt`) has the same id: it is left as it is. */
+  skippedLabosEvent: number;
+};
 
 export type NonApprovedImportResult =
   | { skipped: true; reason: string }
@@ -67,7 +74,7 @@ export class PLEventSyncService {
 
       // pl-event-visibility: the sync matches its own events by externalId, whatever their status. Events a partner
       // app publishes (`sourceTeamUid`) carry the partner's own id, so they are never matched or deleted here.
-      const existingEvents = await this.prisma.pLEvent.findMany({
+      const storedEvents = await this.prisma.pLEvent.findMany({
         where: {
           AND:{
             externalId: { not: null },
@@ -82,14 +89,21 @@ export class PLEventSyncService {
           syncedAt: true,
           additionalInfo: true,
           status: true,
+          locationUid: true,
         },
       });
 
+      // An event with an externalId but no `syncedAt` was made in LabOS (IRL gatherings before the events service):
+      // the sync never updates or deletes it, and skips a service event that has the same id.
+      const existingEvents = storedEvents.filter((event) => event.syncedAt);
+      const labosEventIds = new Set(
+        storedEvents.filter((event) => !event.syncedAt).map((event) => String(event.externalId))
+      );
       const eventMap = new Map(existingEvents.map(event => [event.externalId, event]));
 
       const touchedEventUids: string[] = [];
 
-      await this.createOrUpdateEvents(events, eventMap, touchedEventUids);
+      await this.createOrUpdateEvents(events, eventMap, labosEventIds, touchedEventUids);
 
       if (isEmpty(selectedEventUids)) {
         await this.deleteStaleEvents(existingEvents, events, touchedEventUids);
@@ -131,10 +145,12 @@ export class PLEventSyncService {
         ? fetched
         : fetched.filter((event) => selectedEventUids.includes(event.event_id));
 
-      // pl-event-visibility: the backfill matches its own events by externalId, whatever their status.
+      // pl-event-visibility: the backfill matches its own events by externalId, whatever their status. A LabOS event
+      // (no `syncedAt`) is never written.
       const existingEvents = await this.prisma.pLEvent.findMany({
         where: {
           externalId: { in: events.map((event) => event.event_id).filter(Boolean) },
+          syncedAt: { not: null },
           isDeleted: false,
         },
         select: { uid: true, externalId: true, additionalInfo: true },
@@ -183,7 +199,13 @@ export class PLEventSyncService {
       this.logger.warn('Non-approved import skipped: EVENTS_LOCAL_SUBMIT_ENABLED is on.');
       return { skipped: true, reason: 'EVENTS_LOCAL_SUBMIT_ENABLED is on: LabOS owns events' };
     }
-    const empty = (): NonApprovedImportCounts => ({ fetched: 0, created: 0, updated: 0, skippedApproved: 0 });
+    const empty = (): NonApprovedImportCounts => ({
+      fetched: 0,
+      created: 0,
+      updated: 0,
+      skippedApproved: 0,
+      skippedLabosEvent: 0,
+    });
     const result = { pending: empty(), draft: empty(), withoutSubmitter: 0 };
 
     for (const { serviceStatus, status, key } of NON_APPROVED_IMPORT) {
@@ -200,24 +222,32 @@ export class PLEventSyncService {
           sourceTeamUid: null,
           isDeleted: false,
         },
-        select: { uid: true, externalId: true, additionalInfo: true, status: true },
+        select: { uid: true, externalId: true, additionalInfo: true, status: true, syncedAt: true, locationUid: true },
       });
       const byExternalId = new Map(existing.map((event) => [event.externalId, event]));
       const submitterByEmail = await this.membersByEmail(events.map(creatorEmailOf));
 
       for (const event of events) {
         const stored = byExternalId.get(event.event_id);
+        if (stored && !stored.syncedAt) {
+          result[key].skippedLabosEvent += 1;
+          continue;
+        }
         if (stored?.status === PLEventStatus.APPROVED) {
           result[key].skippedApproved += 1;
           continue;
         }
-        if (event?.format != PLEventType.VIRTUAL) {
-          event.locationUid = await this.gatheringFor(event);
-        }
         const email = creatorEmailOf(event);
         const submitterUid = (email && submitterByEmail.get(email)) || null;
         if (!submitterUid) result.withoutSubmitter += 1;
-        const data = { ...(await this.mapEventData(event, stored?.additionalInfo)), status, submitterUid };
+        let fields;
+        if (stored) {
+          fields = await this.updateData(event, stored);
+        } else {
+          if (event?.format != PLEventType.VIRTUAL) event.locationUid = await this.gatheringFor(event);
+          fields = await this.mapEventData(event);
+        }
+        const data = { ...fields, status, submitterUid };
         if (stored) {
           await this.prisma.pLEvent.update({ where: { uid: stored.uid }, data });
           result[key].updated += 1;
@@ -300,21 +330,21 @@ export class PLEventSyncService {
    * @param eventMap - Map of existing events stored in the database.
    * @param locationUid - Unique identifier for the location.
    */
-  private async createOrUpdateEvents(events, eventMap, touchedEventUids: string[]) {
+  private async createOrUpdateEvents(events, eventMap, labosEventIds: Set<string>, touchedEventUids: string[]) {
     for (const event of events) {
+      if (labosEventIds.has(event.event_id)) {
+        this.logger.warn(`Skipped event ${event.event_id}: a LabOS event has this id.`);
+        continue;
+      }
       const existingEvent = eventMap.get(event.event_id);
       if (existingEvent) {
         // Compare update timestamps to determine if an update is needed
         const updatedAt = new Date(event.updatedAt);
         const existingEventUpdatedAt = new Date(existingEvent.syncedAt);
         if (updatedAt > existingEventUpdatedAt) {
-          if (event?.format != PLEventType.VIRTUAL) {
-            const location = await this.eventsService.createEventLocation(event);
-            event.locationUid = location?.uid;
-          }
           await this.prisma.pLEvent.update({
             where: { uid: existingEvent.uid },
-            data: await this.mapEventData(event, existingEvent.additionalInfo),
+            data: await this.updateData(event, existingEvent),
           });
 
           touchedEventUids.push(existingEvent.uid);
@@ -338,6 +368,21 @@ export class PLEventSyncService {
         this.logger.log(`Created new event: "${createdEvent.name}" (ID: ${createdEvent.externalId}).`);
       }
     }
+  }
+
+  /**
+   * The fields an update writes. The event keeps its gathering and its slug: the gathering decides the IRL page it
+   * is on and holds its guests, and the slug is in links people already have. An event with no gathering gets one.
+   */
+  private async updateData(event, existing: { additionalInfo?: unknown; locationUid?: string | null }) {
+    if (existing.locationUid) {
+      event.locationUid = existing.locationUid;
+    } else if (event?.format != PLEventType.VIRTUAL) {
+      event.locationUid = await this.gatheringFor(event);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { slugURL, ...data } = await this.mapEventData(event, existing.additionalInfo);
+    return data;
   }
 
   /**
