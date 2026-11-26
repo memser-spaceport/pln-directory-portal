@@ -38,7 +38,7 @@ import {
   IntroTurnTarget,
 } from './labos-agent-drafts';
 import { introTargetKey, LabosAgentProposalStore, ownClaimsKey } from './labos-agent-proposals';
-import { introAsk } from './labos-agent-intro-target';
+import { introAsk, namesOtherRecipient } from './labos-agent-intro-target';
 import {
   ASK_AGAIN_RULE,
   CARD_OPEN_RULE,
@@ -2207,6 +2207,76 @@ describe('LAB-3367 B2, B3, B4 (Oleg live QA on 8fcac6ca)', () => {
     ])('X2 strict: with no page, the chip %s is not chosen by "%s"', (name, message) => {
       const chip: IntroTurnTarget = { type: name === 'Acme Team' ? 'team' : 'member', uid: 'u-1', name };
       expect(introAsk(message, [chip], undefined)).toBe('unclear');
+    });
+
+    /** Retest 7, chat 15: the chip of an unclear ask is not kept on Home, or when the ask names another recipient. */
+    it('B7: on Home, "Draft an intro to Dana. @Kyle Weiss knows her" keeps nothing, so the reason has no target', async () => {
+      const h = h2();
+      const home = { context: { page: 'home' } };
+      const ask = await chat(h, {
+        ...home,
+        message: 'Draft an intro to Dana. @Kyle Weiss knows her',
+        mentions: [KYLE],
+      });
+      expect(await targets(ask.options)).toEqual(['m-kyle']);
+      expect(h.store.size).toBe(0);
+      const reason = await chat(h, { ...home, message: 'I want feedback on our roadmap.' });
+      expect(await targets(reason.options)).toEqual([]);
+      expect(reason.prompt).not.toContain('m-kyle');
+      // An unclear ask on Home with no other name keeps nothing either.
+      await chat(h, { ...home, message: 'Draft an intro for @Kyle Weiss', mentions: [KYLE] });
+      expect(h.store.size).toBe(0);
+      // A chosen chip on Home is kept, but a later unclear chip on Home is not added to it.
+      await chat(h, { ...home, message: 'Draft an intro to @Acme Team', mentions: [ACME] });
+      await chat(h, { ...home, message: 'Draft an intro for @Kyle Weiss', mentions: [KYLE] });
+      expect(await targets((await chat(h, { ...home, message: 'I want feedback on our roadmap.' })).options)).toEqual([
+        't-acme',
+      ]);
+    });
+
+    it('B7: on a team page, "Draft an intro to Dana. @Kyle Weiss knows her" does not keep Kyle', async () => {
+      const h = h2();
+      const ask = await chat(h, { ...TEAM_PAGE, message: 'Draft an intro to Dana. @Kyle Weiss knows her' });
+      expect(await targets(ask.options)).toEqual(['m-kyle', 't-acme']);
+      expect(h.store.size).toBe(0);
+      const reason = await chat(h, R_TEAM);
+      expect(await targets(reason.options)).toEqual(['t-acme']);
+      expect(reason.prompt).not.toContain('m-kyle');
+    });
+
+    it('B7: with a kept team, the ask for Dana keeps the team and the page, not the mentioned chip', async () => {
+      const h = h2();
+      await chat(h, ASK);
+      const dana = await chat(h, {
+        ...PAGE,
+        message: 'Draft an intro to Dana, @Kyle Weiss knows her',
+        mentions: [KYLE],
+      });
+      expect(await targets(dana.options)).toEqual(['m-grace', 'm-kyle', 't-acme']);
+      // This turn is as before: the chip is not clear.
+      expect(dana.prompt).toContain('the member asked for an intro and added');
+      const reason = await chat(h, REASON);
+      expect(await targets(reason.options)).toEqual(['m-grace', 't-acme']);
+      expect(reason.prompt).not.toContain('m-kyle');
+      // The kept team was chosen by the strict rule, and the page is a target too.
+      expect(reason.prompt).toContain('asked for an intro to this team');
+      expect(reason.prompt).toContain('The page is also an intro target.');
+    });
+
+    it('B7: namesOtherRecipient reads only the recipient of a request', () => {
+      const grace: IntroTurnTarget = { type: 'member', uid: 'm-grace', name: 'Grace Hopper' };
+      const kyle: IntroTurnTarget = { type: 'member', uid: 'm-kyle', name: 'Kyle Weiss' };
+      const acme: IntroTurnTarget = { type: 'team', uid: 't-acme', name: 'Acme Team' };
+      expect(namesOtherRecipient('Draft an intro to Dana. @Kyle Weiss knows her', [kyle], undefined)).toBe(true);
+      expect(namesOtherRecipient('Draft an intro to someone else, @Kyle Weiss knows them', [kyle], grace)).toBe(true);
+      expect(namesOtherRecipient('Draft an intro to this team, @Kyle Weiss sent me', [kyle], grace)).toBe(true);
+      expect(namesOtherRecipient('Draft an intro for @Kyle Weiss', [kyle], grace)).toBe(false);
+      expect(namesOtherRecipient('Draft an intro to Grace, I know @Kyle Weiss', [kyle], grace)).toBe(false);
+      expect(namesOtherRecipient("Draft an intro to this member's team", [acme], grace)).toBe(false);
+      expect(namesOtherRecipient('Draft an intro to this company', [acme], grace)).toBe(false);
+      expect(namesOtherRecipient('Draft an intro to @Kyle Weiss, as short as my intro to Dana', [kyle], grace)).toBe(
+        false
+      );
     });
 
     it('X2: a correction in the same message keeps both, and the reason turn too', async () => {
