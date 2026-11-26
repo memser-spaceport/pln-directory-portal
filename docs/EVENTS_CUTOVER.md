@@ -32,18 +32,23 @@ or `events:write`, and no such key exists until step 8 of phase 4.
 `yarn api:events-cutover` runs the checks and the sync calls of this page, the same way on dev and prod. It reads only
 the environment variables it is given, never a `.env` file:
 
-| Command                                             | Needs                               | Does                                                                                                                                                                                                                                           |
-| --------------------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `snapshot --env <env> [--out <file>]`               | `DATABASE_URL`                      | Runs the count queries in one read-only transaction and writes them to a JSON file. On a database without the migrations it is marked `pre-migration`.                                                                                         |
-| `compare <before.json> <after.json>`                | the two files                       | Exits 1 when events, guest rows, gatherings, city mappings or member and team links changed, and prints each change. Other counts are shown, not checked.                                                                                      |
-| `service --env <env>`                               | `DATABASE_URL`, `EVENT_SERVICE_URL` | Compares the events service with LabOS, by id and by status: approved with `APPROVED`, waiting (`SUBMITTED`) with `PENDING`, drafts (`PENDING`) with `DRAFT`. Names the fields that hold a creator email. Exits 1 unless every status matches. |
-| `sync --details-only`, `--full` or `--non-approved` | `API_URL`, `INTERNAL_AUTH_TOKEN`    | Calls `POST /v1/irl/events/sync`: the details backfill, the full pull sync, or the import of waiting events and drafts. Exits 1 when the API skips it because the API switch is on.                                                            |
-| `--print-sql`                                       | nothing                             | Prints the queries, to run them by hand.                                                                                                                                                                                                       |
+| Command                                             | Needs                                             | Does                                                                                                                                                                                                                                           |
+| --------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `snapshot --env <env> [--out <file>]`               | `DATABASE_URL`                                    | Runs the count queries in one read-only transaction and writes them to a JSON file. On a database without the migrations it is marked `pre-migration`.                                                                                         |
+| `compare <before.json> <after.json>`                | the two files                                     | Exits 1 when events, guest rows, gatherings, city mappings or member and team links changed, and prints each change. Other counts are shown, not checked.                                                                                      |
+| `service --env <env>`                               | `DATABASE_URL`, `EVENT_SERVICE_URL`, `IRL_DOMAIN` | Compares the events service with LabOS, by id and by status: approved with `APPROVED`, waiting (`SUBMITTED`) with `PENDING`, drafts (`PENDING`) with `DRAFT`. Names the fields that hold a creator email. Exits 1 unless every status matches. |
+| `sync --details-only`, `--full` or `--non-approved` | `API_URL`, `INTERNAL_AUTH_TOKEN`                  | Calls `POST /v1/irl/events/sync`: the details backfill, the full pull sync, or the import of waiting events and drafts. Exits 1 when the API skips it because the API switch is on.                                                            |
+| `--print-sql`                                       | nothing                                           | Prints the queries, to run them by hand.                                                                                                                                                                                                       |
 
 `DATABASE_URL` is the `pln-pg` tunnel of the environment (`.claude/skills/pln-pg/pln-pg.sh <env> --url`); the tool
 reads `sslmode=require` as "encrypt, do not verify", as libpq does. `EVENT_SERVICE_URL` is the events service the
-laptop reaches: `https://dev-events.os.pl.xyz` on dev. Keep the snapshot files until the Goal is done, and put their
-counts (not their rows) in the ticket.
+laptop reaches: `https://dev-events.os.pl.xyz` on dev. `IRL_DOMAIN` is the env API's own `IRL_DOMAIN`
+(`submitv2.events.dev.os.pl.xyz` on dev; read prod's from the prod API): the tool sends it as `origin`, as the sync
+does. The events service answers only that client's events with it and every client's without it (on dev 593
+approved instead of 1393), so a count without it is wrong.
+
+`EVENTS_LOCAL_SUBMIT_ENABLED` is read without case: the deploy's config step writes an SSM `true` as `True`. Keep the
+snapshot files until the Goal is done, and put their counts (not their rows) in the ticket.
 
 ## Order of the rollout
 

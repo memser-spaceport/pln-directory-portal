@@ -28,9 +28,11 @@ describe('event submission routes: guards and limits', () => {
     }
   });
 
-  it('the flag is on only for the exact value "true"', () => {
-    expect(isLocalEventSubmitEnabled({ EVENTS_LOCAL_SUBMIT_ENABLED: 'true' })).toBe(true);
-    for (const value of [undefined, '', 'false', '1', 'TRUE']) {
+  it('the flag is on only for "true", in any case (the deploy writes it as "True")', () => {
+    for (const value of ['true', 'True', 'TRUE', ' true ']) {
+      expect(isLocalEventSubmitEnabled({ EVENTS_LOCAL_SUBMIT_ENABLED: value })).toBe(true);
+    }
+    for (const value of [undefined, '', 'false', 'False', '1', 'yes']) {
       expect(isLocalEventSubmitEnabled({ EVENTS_LOCAL_SUBMIT_ENABLED: value })).toBe(false);
     }
   });

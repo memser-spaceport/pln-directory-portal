@@ -3,7 +3,9 @@
  * dev and prod. Reads only what it is given in the environment, never a `.env` file:
  *
  *   DATABASE_URL         snapshot, service: the env's database (the `pln-pg` tunnel: `pln-pg.sh <env> --url`)
- *   EVENT_SERVICE_URL    service: an events service the laptop reaches; IRL_DOMAIN is sent as `origin`, like the sync
+ *   EVENT_SERVICE_URL    service: an events service the laptop reaches
+ *   IRL_DOMAIN           service: the env API's own IRL_DOMAIN, sent as `origin` like the sync. The events service
+ *                        answers only this client's events with it, and every client's without it
  *   API_URL              sync: the env's directory API, e.g. https://dev-directory.os.pl.xyz
  *   INTERNAL_AUTH_TOKEN  sync: the API's internal token
  *
@@ -115,10 +117,10 @@ function compare(before: string, after: string): number {
   return result.ok ? 0 : 1;
 }
 
-async function serviceEvents(base: string, status: string): Promise<unknown[]> {
+async function serviceEvents(base: string, origin: string, status: string): Promise<unknown[]> {
   const query = new URLSearchParams({ status, conference: '' });
   const response = await axios.get(`${base}/events?${query.toString()}`, {
-    headers: process.env.IRL_DOMAIN ? { origin: process.env.IRL_DOMAIN } : {},
+    headers: { origin },
     timeout: SERVICE_TIMEOUT_MS,
   });
   const events = response.data?.events;
@@ -132,7 +134,8 @@ async function serviceEvents(base: string, status: string): Promise<unknown[]> {
  */
 async function service(env: string): Promise<number> {
   const base = requiredEnv('EVENT_SERVICE_URL').replace(/\/+$/, '');
-  console.error(`Events service: ${new URL(base).host}`);
+  const origin = requiredEnv('IRL_DOMAIN');
+  console.error(`Events service: ${new URL(base).host}, as client ${origin}`);
 
   const labos = await readOnly(async (client, preMigration) => {
     if (preMigration) {
@@ -152,7 +155,7 @@ async function service(env: string): Promise<number> {
   const groups = labos.preMigration ? SERVICE_STATUS_GROUPS.slice(0, 1) : SERVICE_STATUS_GROUPS;
   let allMatch = true;
   for (const [index, group] of groups.entries()) {
-    const events = await serviceEvents(base, group.serviceStatus);
+    const events = await serviceEvents(base, origin, group.serviceStatus);
     const ids = labos.rows.filter((row) => row.status === group.labosStatus).map((row) => row.externalId);
     const report = analyseServiceEvents(events, ids);
     allMatch = allMatch && report.match;
