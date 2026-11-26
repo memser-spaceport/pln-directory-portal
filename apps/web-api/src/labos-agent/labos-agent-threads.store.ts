@@ -200,6 +200,19 @@ export class LabosAgentThreadStore {
     );
   }
 
+  /**
+   * LAB-3457 G1: removes the agent turn of `questionId` (a turn stopped during the save wait). Owner filter as the
+   * append. A new thread left with no turn is not listed (T1 needs a turn).
+   */
+  async removeTurn(threadId: string, questionId: string, memberUid: string, email: string): Promise<void> {
+    const update: UpdateFilter<ThreadDoc> = { $pull: { contextual: { questionId, kind: 'agent' } } };
+    await this.mongo.updateOneWhere<ThreadDoc>(
+      threadsCollection(),
+      { threadId, ...ownerFilter(memberUid, email) },
+      update
+    );
+  }
+
   /** Replaces the first-question title with the model title, unless the title changed in the meantime. */
   async replaceTitle(threadId: string, from: string, title: string): Promise<void> {
     await this.mongo.updateOneWhere(threadsCollection(), { threadId, title: from }, { $set: { title } });

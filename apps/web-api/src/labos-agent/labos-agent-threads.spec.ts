@@ -235,6 +235,16 @@ describe('LabOS agent thread store (LAB-3457)', () => {
     expect(options).toBeUndefined();
   });
 
+  it('G1: removes only the agent turn of that chat id, under the owner rule', async () => {
+    const h = setup();
+    await h.store.removeTurn('agent-1', 'c-1', ME.memberUid, ME.email);
+    expect(h.mongo.updateOneWhere).toHaveBeenCalledWith(
+      'threads',
+      { threadId: 'agent-1', ...ownerFilter(ME.memberUid, ME.email) },
+      { $pull: { contextual: { questionId: 'c-1', kind: 'agent' } } }
+    );
+  });
+
   it('a draft change matches only that draft in the given state, with array filters', async () => {
     const h = setup();
     h.mongo.updateOneWhere.mockResolvedValueOnce({ matchedCount: 0, modifiedCount: 0, upsertedCount: 0 });

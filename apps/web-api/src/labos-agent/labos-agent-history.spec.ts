@@ -37,6 +37,7 @@ function setup(doc: ThreadDoc | null = null) {
     warmSummary: jest.fn().mockResolvedValue(undefined),
     appendTurn: jest.fn().mockResolvedValue(undefined),
     replaceTitle: jest.fn().mockResolvedValue(undefined),
+    removeTurn: jest.fn().mockResolvedValue(undefined),
   };
   const service = new LabosAgentService(
     prisma as any,
@@ -224,6 +225,24 @@ describe('C1 and the shared chat history (LAB-3457)', () => {
     await h.options().persistTurn(finished());
     await new Promise((resolve) => setImmediate(resolve));
     expect(h.threads.replaceTitle).not.toHaveBeenCalled();
+  });
+
+  it('G1: a stopped turn is removed from the own thread by its chat id, and a failed removal is logged', async () => {
+    const h = setup();
+    await h.chat({ ...VALID, persist: true });
+    await h.options().discardTurn();
+    expect(h.threads.removeTurn).toHaveBeenCalledWith('thread-1', 'chat-1', 'member-1', 'ada@example.com');
+
+    const log = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    h.threads.removeTurn.mockRejectedValueOnce(new Error('mongo down'));
+    await expect(h.options().discardTurn()).resolves.toBeUndefined();
+    expect(log).toHaveBeenCalledWith('Failed to remove a stopped LabOS agent turn');
+  });
+
+  it('G1: no discardTurn without persist', async () => {
+    const h = setup();
+    await h.chat(VALID);
+    expect(h.options()).not.toHaveProperty('discardTurn');
   });
 
   it('accepts only a boolean persist', async () => {

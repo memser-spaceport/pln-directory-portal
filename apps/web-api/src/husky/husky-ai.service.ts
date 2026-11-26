@@ -178,6 +178,12 @@ export interface ContextualToolsOptions {
    * its own errors. AI search passes nothing.
    */
   persistTurn?: (turn: PersistedTurn) => Promise<void>;
+  /**
+   * LAB-3457 G1: removes the turn that `persistTurn` saved, when the reader stopped the stream during the save wait. The
+   * client got no end, so the turn counts as stopped. Called after the save settles, only when it saved. The callback
+   * handles its own errors. AI search passes nothing.
+   */
+  discardTurn?: () => Promise<void>;
 }
 
 /** LAB-3457: the finished turn for `ContextualToolsOptions.persistTurn`: what the member saw. */
@@ -565,25 +571,38 @@ export class HuskyAiService {
 
           // LAB-3457: the caller saves the turn before the stream closes, so a thread read right after the end has it.
           if (persistHistory && options.persistTurn && !cancelled) {
-            const saved = await this.withinTimeout(
-              options
-                .persistTurn({
-                  question,
-                  content,
-                  steps,
-                  tail: responseContext,
-                  summary: turnSummary(toolNames, responseContext),
-                })
-                .then(
-                  () => 'saved' as const,
-                  () => 'failed' as const
-                ),
-              this.persistTurnTimeoutMs
-            );
+            const saving = options
+              .persistTurn({
+                question,
+                content,
+                steps,
+                tail: responseContext,
+                summary: turnSummary(toolNames, responseContext),
+              })
+              .then(
+                () => 'saved' as const,
+                () => 'failed' as const
+              );
+            const saved = await this.withinTimeout(saving, this.persistTurnTimeoutMs);
             if (saved !== 'saved') {
               this.logger.error(
                 `${saved ? 'Failed' : 'Timed out'} saving the turn of thread ${threadId}, chat ${chatId}`
               );
+            }
+            // LAB-3457 G1: a stop during the save wait. The client gets no end, so the turn is a stopped turn: the
+            // reply is not latest (as h3), the saved turn is removed once the save settles, and the cancelled stream is
+            // not closed (close() would throw). No summary update. No await comes between this check and close().
+            if (cancelled) {
+              if (latestReplyKey) await this.saveLatestReply(latestReplyKey, '', 'clear');
+              const { discardTurn } = options;
+              if (discardTurn) {
+                void saving
+                  .then((result) => (result === 'saved' ? discardTurn() : undefined))
+                  .catch(() =>
+                    this.logger.error(`Failed removing the stopped turn of thread ${threadId}, chat ${chatId}`)
+                  );
+              }
+              return;
             }
           }
 

@@ -223,6 +223,71 @@ describe('HuskyAiService persistTurn (LAB-3457)', () => {
     expect(cache.set).toHaveBeenCalledWith('thread-1:summary', 'summary text');
   });
 
+  it('G1: a stop during the save wait clears the latest reply, removes the saved turn and does not close', async () => {
+    const discardTurn = jest.fn().mockResolvedValue(undefined);
+    const client: { reader?: ReadableStreamDefaultReader<Uint8Array> } = {};
+    const stream = await service.createContextualToolsResponse(chatInfo, true, 'ada@example.com', {
+      persistHistory: true,
+      latestReplyKey: 'lr-key',
+      // The client stops while the stream waits for the save: the whole answer was sent, the end was not.
+      persistTurn: async () => {
+        await client.reader?.cancel();
+      },
+      discardTurn,
+    });
+    client.reader = stream.getReader();
+    await flush();
+    await flush();
+
+    expect(discardTurn).toHaveBeenCalledTimes(1);
+    const latest = cache.set.mock.calls.filter(([key]) => key === 'lr-key').map(([, value]) => value);
+    expect(latest).toContain('Hello world');
+    expect(latest.at(-1)).toBe('');
+    const lines = logger.error.mock.calls.map(([line]) => String(line)).join('\n');
+    expect(lines).not.toMatch(/Husky search failed|already closed/);
+    // A stopped turn gets no summary update.
+    expect(persistent.upsertByKeyValue).not.toHaveBeenCalled();
+  });
+
+  it('G1: a failed save is not removed, and a stop after a timed-out save removes it once it lands', async () => {
+    (service as any).persistTurnTimeoutMs = 20;
+    const discardTurn = jest.fn().mockResolvedValue(undefined);
+    let land: () => void = () => undefined;
+    const client: { reader?: ReadableStreamDefaultReader<Uint8Array> } = {};
+    const stream = await service.createContextualToolsResponse(chatInfo, true, 'ada@example.com', {
+      persistHistory: true,
+      latestReplyKey: 'lr-key',
+      persistTurn: () =>
+        new Promise<void>((resolve) => {
+          land = resolve;
+          void client.reader?.cancel();
+        }),
+      discardTurn,
+    });
+    client.reader = stream.getReader();
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    expect(discardTurn).not.toHaveBeenCalled();
+    land();
+    await flush();
+    expect(discardTurn).toHaveBeenCalledTimes(1);
+
+    const failed = jest.fn().mockResolvedValue(undefined);
+    const secondClient: { reader?: ReadableStreamDefaultReader<Uint8Array> } = {};
+    const other = await service.createContextualToolsResponse(chatInfo, true, 'ada@example.com', {
+      persistHistory: true,
+      latestReplyKey: 'lr-key',
+      persistTurn: async () => {
+        await secondClient.reader?.cancel();
+        throw new Error('mongo down');
+      },
+      discardTurn: failed,
+    });
+    secondClient.reader = other.getReader();
+    await flush();
+    await flush();
+    expect(failed).not.toHaveBeenCalled();
+  });
+
   it('gives no turn when the answer fails', async () => {
     streamTextMock.mockImplementation(() => {
       throw new Error('provider down');

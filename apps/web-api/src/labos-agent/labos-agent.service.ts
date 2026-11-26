@@ -327,6 +327,11 @@ export class LabosAgentService {
                   proposals,
                   drafts,
                 }),
+              // LAB-3457 G1: a stop during the save wait removes the saved turn again.
+              discardTurn: () =>
+                this.threads
+                  .removeTurn(body.threadId, body.chatId, memberUid, email)
+                  .catch(() => this.logger.error('Failed to remove a stopped LabOS agent turn')),
             }
           : {}),
         // LAB-3367 h3: the latest reply, scoped to the signed-in member and the thread. Never the raw thread ID.
