@@ -138,3 +138,23 @@ The answer stream SHALL join the text before a tool call and the text after it w
 - **GIVEN** the model writes "Checking.", calls two tools, then writes "Done."
 - **WHEN** the answer finishes
 - **THEN** `content` is "Checking.\n\nDone."
+
+### Requirement: Only the owner writes to a member's thread
+
+`POST /v1/husky/chat/contextual-tools` writes the turn, the Redis and Mongo summary and a handed-over `chatSummary` to the thread that the body names (LAB-3459). When the thread doc has an `email` that is not the caller's email, the request SHALL fail with 403 before any read or write: no turn, no summary, no hand-over, and the thread's summary SHALL NOT reach the answer. The owner, a thread with no `email` (a guest thread) and a thread with no doc yet SHALL work as before. Duplicate (`POST /v1/husky/threads/:id`) SHALL work as before, and the copy belongs to the caller.
+
+#### Scenario: Another member names a member's thread
+
+- **WHEN** a member or a guest sends a question with the `threadId` of a thread whose doc has another member's email
+- **THEN** the response is 403 "You are not authorized to add to this thread. Start a new thread or duplicate this one."
+- **AND** nothing is written to the thread, the summary or Redis, and no answer is generated
+
+#### Scenario: The owner continues the thread
+
+- **WHEN** the member whose email is on the thread doc sends a question
+- **THEN** the turn and the summary are written as before
+
+#### Scenario: A guest thread
+
+- **WHEN** a member or a guest sends a question with the `threadId` of a thread doc that has no `email`
+- **THEN** the turn and the summary are written as before
