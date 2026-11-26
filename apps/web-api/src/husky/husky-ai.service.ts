@@ -125,6 +125,13 @@ export interface ContextualToolsOptions {
    */
   latestReplyKey?: string;
   /**
+   * LAB-3459 / LAB-3457: the cache key of the thread summary (the `chatHistory` line). Without it the key is
+   * `<threadId>:summary`, which any caller that knows the thread id shares. The LabOS agent passes a key of the member
+   * and the thread, so a summary written by one member is never read by another. The MongoDB `chats_summary` row stays
+   * keyed by `threadId` (written only with `persistHistory`). AI search passes nothing.
+   */
+  summaryKey?: string;
+  /**
    * LAB-3367 k2, k7: extra text for the system message of the answer call and of the continuation, after the shared
    * prompt. The structured tail call does not get it. Give only fixed rules, never member or card text. The LabOS
    * agent uses it for the rules for "your last answer". AI search passes nothing.
@@ -334,13 +341,14 @@ export class HuskyAiService {
     const { question, threadId, chatId, chatSummary } = chatInfo;
     const persistHistory = options.persistHistory !== false;
     const { turnFields } = options;
+    const summaryKey = options.summaryKey ?? `${threadId}:summary`;
     const currentDate = new Date().toISOString().split('T')[0];
     const auth = await this.resolveAuthContext(isLoggedIn, userEmail);
 
     // A conversation started elsewhere (e.g. a blog embed) is handed over with its
     // first exchange so the thread keeps that context.
     if (chatSummary && persistHistory) {
-      await this.updateChatSummary(threadId, chatSummary);
+      await this.updateChatSummary(threadId, chatSummary, summaryKey);
       await this.persistContextualHistory(
         threadId,
         chatSummary.chatId,
@@ -352,7 +360,7 @@ export class HuskyAiService {
       );
     }
 
-    const chatSummaryFromDb = await this.huskyCacheDbService.get(`${threadId}:summary`);
+    const chatSummaryFromDb = await this.huskyCacheDbService.get(summaryKey);
     const threadHistoryPrompt = chatSummaryFromDb ? ` - chatHistory: ${chatSummaryFromDb}` : '';
     const { latestReplyKey } = options;
     const latestReply = latestReplyKey ? await this.takeLatestReply(latestReplyKey) : '';
@@ -583,7 +591,7 @@ export class HuskyAiService {
 
           // LAB-3367 K3: a fixed answer runs no summary model call and keeps the earlier summary.
           if (turn.fixedAnswer !== undefined) return;
-          this.updateChatSummary(threadId, { user: question, system: content })
+          this.updateChatSummary(threadId, { user: question, system: content }, summaryKey)
             .then((summary) => (persistHistory ? this.updateChatSummaryInMongo(threadId, summary) : undefined))
             .catch((error) =>
               this.logger.error(`Failed to update chat summary for thread ${threadId}: ${logSafeError(error)}`)
@@ -1143,8 +1151,8 @@ export class HuskyAiService {
     }
   }
 
-  async updateChatSummary(chatId: string, rawChatHistory: any) {
-    const previousSummary = await this.huskyCacheDbService.get(`${chatId}:summary`);
+  async updateChatSummary(chatId: string, rawChatHistory: any, summaryKey = `${chatId}:summary`) {
+    const previousSummary = await this.huskyCacheDbService.get(summaryKey);
 
     // Define a maximum length for the summary
     const maxLength = 500; // Adjust this value as needed
@@ -1160,7 +1168,7 @@ export class HuskyAiService {
       model: this.getModel(),
       prompt: aiPrompt,
     });
-    await this.huskyCacheDbService.set(`${chatId}:summary`, text);
+    await this.huskyCacheDbService.set(summaryKey, text);
     return text;
   }
 

@@ -13,6 +13,7 @@ import { LabosAgentThreadsController } from './labos-agent-threads.controller';
 import { LabosAgentThreadsService } from './labos-agent-threads.service';
 import {
   firstQuestionTitle,
+  summaryCacheKey,
   LabosAgentThreadStore,
   ownerFilter,
   ownsThread,
@@ -165,6 +166,19 @@ describe('LabOS agent thread store (LAB-3457)', () => {
     expect(ownerFilter('member-1', '')).toEqual({ $or: [{ memberUid: 'member-1' }] });
   });
 
+  it('the memory key is per member and thread, per env, and free of collisions', () => {
+    const env = process.env.ENVIRONMENT;
+    process.env.ENVIRONMENT = 'dev';
+    const key = summaryCacheKey('member-1', 'thread-1');
+    expect(key).toBe('dev:labos-agent:summary:["member-1","thread-1"]');
+    expect(key).not.toBe(summaryCacheKey('member-2', 'thread-1'));
+    expect(key).not.toBe('thread-1:summary');
+    expect(summaryCacheKey('a:b', 'c')).not.toBe(summaryCacheKey('a', 'b:c'));
+    process.env.ENVIRONMENT = 'lab-3272';
+    expect(summaryCacheKey('member-1', 'thread-1')).not.toBe(key);
+    process.env.ENVIRONMENT = env;
+  });
+
   it('title: one line of the first question, at most 80 characters, never empty', () => {
     expect(firstQuestionTitle('  Who works\n on storage? ')).toBe('Who works on storage?');
     expect(firstQuestionTitle('x'.repeat(200))).toHaveLength(80);
@@ -260,22 +274,36 @@ describe('LabOS agent thread store (LAB-3457)', () => {
 
   it('memory: keeps a cached summary, else loads the saved one, else seeds from the turns', async () => {
     const h = setup();
-    h.cache.get.mockResolvedValueOnce('cached');
-    await h.store.warmSummary(legacyThread());
+    // A summary under the shared AI search key is never used: only the member's own key counts.
+    h.cache.get.mockImplementation(async (key: string) => (key === 'old-1:summary' ? 'shared' : null));
+    h.mongo.findOneWhere.mockResolvedValue(null);
+    await h.store.warmSummary(legacyThread(), ME.memberUid);
+    expect(h.cache.set).toHaveBeenCalledWith(summaryCacheKey(ME.memberUid, 'old-1'), expect.stringContaining('Who'));
+    expect(h.cache.set.mock.calls.map(([key]) => key)).not.toContain('old-1:summary');
+    h.cache.set.mockClear();
+
+    h.cache.get.mockImplementation(async (key: string) =>
+      key === summaryCacheKey(ME.memberUid, 'old-1') ? 'cached' : null
+    );
+    await h.store.warmSummary(legacyThread(), ME.memberUid);
     expect(h.cache.set).not.toHaveBeenCalled();
+    h.cache.get.mockResolvedValue(null);
 
     h.mongo.findOneWhere.mockImplementation(async (collection: string) =>
       collection === 'chats_summary' ? { threadId: 'old-1', summary: 'saved summary' } : null
     );
-    await h.store.warmSummary(legacyThread());
-    expect(h.cache.set).toHaveBeenLastCalledWith('old-1:summary', 'saved summary');
+    await h.store.warmSummary(legacyThread(), ME.memberUid);
+    expect(h.cache.set).toHaveBeenLastCalledWith(summaryCacheKey(ME.memberUid, 'old-1'), 'saved summary');
 
     h.mongo.findOneWhere.mockResolvedValue(null);
-    await h.store.warmSummary(legacyThread());
-    expect(h.cache.set).toHaveBeenLastCalledWith('old-1:summary', expect.stringContaining('Who works on storage?'));
+    await h.store.warmSummary(legacyThread(), ME.memberUid);
+    expect(h.cache.set).toHaveBeenLastCalledWith(
+      summaryCacheKey(ME.memberUid, 'old-1'),
+      expect.stringContaining('Who works on storage?')
+    );
 
     h.cache.set.mockClear();
-    await h.store.warmSummary({ threadId: 'empty', contextual: [] });
+    await h.store.warmSummary({ threadId: 'empty', contextual: [] }, ME.memberUid);
     expect(h.cache.set).not.toHaveBeenCalled();
   });
 });
@@ -407,7 +435,7 @@ describe('T2 GET /v1/labos-agent/threads/:threadId (LAB-3457)', () => {
       ],
     });
     expect(h.mongo.findByKeyValue).toHaveBeenCalledWith('feedback', 'threadId', 'old-1');
-    expect(h.cache.set).toHaveBeenCalledWith('old-1:summary', expect.stringContaining('Who'));
+    expect(h.cache.set).toHaveBeenCalledWith(summaryCacheKey(ME.memberUid, 'old-1'), expect.stringContaining('Who'));
   });
 
   it('shows agent cards in their final state: expired after expiresAt, closed from the C2 record, sent drafts', async () => {

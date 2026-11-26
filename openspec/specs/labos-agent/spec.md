@@ -815,7 +815,7 @@ The owner of a thread SHALL be its `memberUid`; a thread with no `memberUid` SHA
 
 ### Requirement: Saving a C1 turn
 
-C1 SHALL save the turn only when the body has `persist: true`. A new `threadId` SHALL create an agent thread; an own thread (an old AI search thread too) SHALL get the turn appended with one atomic `$push`, and `memberUid` set. Before the stream, C1 SHALL load the thread memory into the cache when it is not there: the saved `chats_summary`, else a short seed from the last three turns. The stream SHALL write the turn before it closes, waiting at most 3 seconds, and the summary also to MongoDB. A stopped, failed or cancelled turn SHALL NOT be saved. A new thread SHALL get the first question as its title, then the AI search title from the model when it gives one. A failed save SHALL be logged with a fixed text and SHALL NOT stop the turn.
+C1 SHALL save the turn only when the body has `persist: true`. A new `threadId` SHALL create an agent thread; an own thread (an old AI search thread too) SHALL get the turn appended with one atomic `$push`, and `memberUid` set. Before the stream, C1 SHALL load the thread memory into the member's cache key (see "Thread memory per member") when it is not there: the saved `chats_summary`, else a short seed from the last three turns. The stream SHALL write the turn before it closes, waiting at most 3 seconds, and the summary also to MongoDB. A stopped, failed or cancelled turn SHALL NOT be saved. A new thread SHALL get the first question as its title, then the AI search title from the model when it gives one. A failed save SHALL be logged with a fixed text and SHALL NOT stop the turn.
 
 #### Scenario: Continue an old thread
 
@@ -828,6 +828,17 @@ C1 SHALL save the turn only when the body has `persist: true`. A new `threadId` 
 
 - **WHEN** a C1 turn has no `persist`
 - **THEN** no thread document is written, as before LAB-3457
+
+### Requirement: Thread memory per member
+
+C1 SHALL keep the thread summary (the `chatHistory` line of the prompt) in the cache under a key of the signed-in member and the thread (`<env>:labos-agent:summary:["<memberUid>","<threadId>"]`, LAB-3459 follow-up), with or without `persist`. It SHALL NOT read or write the shared AI search key `<threadId>:summary`. The memory load before the stream SHALL fill that member key. The MongoDB `chats_summary` row SHALL stay keyed by `threadId`. AI search keeps `<threadId>:summary`.
+
+#### Scenario: A summary under a guessed thread id
+
+- **GIVEN** `<threadId>:summary` holds text written by another caller
+- **WHEN** the member sends C1 on that `threadId`
+- **THEN** the prompt does not have that text
+- **AND** the new summary is written under the member key only
 
 ### Requirement: Final card states in the history
 

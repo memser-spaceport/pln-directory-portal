@@ -187,6 +187,42 @@ describe('HuskyAiService persistTurn (LAB-3457)', () => {
     expect(logger.error).toHaveBeenCalledWith('Timed out saving the turn of thread thread-1, chat chat-1');
   });
 
+  it('summaryKey: reads and writes the thread memory only under the given key (LAB-3459 follow-up)', async () => {
+    cache.get.mockImplementation(async (key: string) =>
+      key === 'member-key' ? 'member memory' : key === 'thread-1:summary' ? 'memory written by someone else' : null
+    );
+    await readAll(
+      await service.createContextualToolsResponse(chatInfo, true, 'ada@example.com', {
+        persistHistory: true,
+        persistTurn: jest.fn().mockResolvedValue(undefined),
+        summaryKey: 'member-key',
+      })
+    );
+    await flush();
+
+    const prompts = JSON.stringify(streamTextMock.mock.calls);
+    expect(prompts).toContain('member memory');
+    expect(prompts).not.toContain('memory written by someone else');
+    expect(cache.get.mock.calls.map(([key]) => key)).not.toContain('thread-1:summary');
+    expect(cache.set).toHaveBeenCalledWith('member-key', 'summary text');
+    expect(cache.set.mock.calls.map(([key]) => key)).not.toContain('thread-1:summary');
+    // The saved summary row stays keyed by the thread, so AI search and the agent share it.
+    expect(persistent.upsertByKeyValue).toHaveBeenCalledWith(
+      'chats_summary',
+      'threadId',
+      'thread-1',
+      expect.objectContaining({ summary: 'summary text' })
+    );
+  });
+
+  it('no summaryKey: AI search keeps the <threadId>:summary key (old-turn probe)', async () => {
+    cache.get.mockImplementation(async (key: string) => (key === 'thread-1:summary' ? 'thread memory' : null));
+    await readAll(await service.createContextualToolsResponse(chatInfo, true, 'ada@example.com'));
+    await flush();
+    expect(JSON.stringify(streamTextMock.mock.calls)).toContain('thread memory');
+    expect(cache.set).toHaveBeenCalledWith('thread-1:summary', 'summary text');
+  });
+
   it('gives no turn when the answer fails', async () => {
     streamTextMock.mockImplementation(() => {
       throw new Error('provider down');

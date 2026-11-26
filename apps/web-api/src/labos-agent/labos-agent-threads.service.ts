@@ -59,7 +59,9 @@ export class LabosAgentThreadsService {
         this.logger.error('Failed to read the feedback of a LabOS agent thread');
         return new Map<string, LabosAgentTurnFeedback>();
       }),
-      this.store.warmSummary(doc).catch(() => this.logger.error('Failed to load the memory of a LabOS agent thread')),
+      this.store
+        .warmSummary(doc, memberUid)
+        .catch(() => this.logger.error('Failed to load the memory of a LabOS agent thread')),
     ]);
     const turns = [...(doc.contextual ?? [])].sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
     const mapped = await Promise.all(turns.map((turn) => this.turn(turn, feedback.get(turn.questionId))));

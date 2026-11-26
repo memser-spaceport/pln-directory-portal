@@ -14,7 +14,7 @@ import { APP_ENV } from '../utils/constants';
 import { LabosAgentAccessService } from './labos-agent-access.service';
 import { LabosAgentController } from './labos-agent.controller';
 import { LabosAgentService } from './labos-agent.service';
-import { ThreadDoc } from './labos-agent-threads.store';
+import { summaryCacheKey, ThreadDoc } from './labos-agent-threads.store';
 
 if (!(globalThis as any).WritableStream) {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -106,6 +106,15 @@ describe('C1 and the shared chat history (LAB-3457)', () => {
     expect(h.threads.warmSummary).not.toHaveBeenCalled();
   });
 
+  it('scopes the thread memory to the member and the thread, with or without persist (LAB-3459 follow-up)', async () => {
+    for (const persist of [undefined, true]) {
+      const h = setup();
+      await h.chat({ ...VALID, persist });
+      expect(h.options().summaryKey).toBe(summaryCacheKey('member-1', 'thread-1'));
+      expect(h.options().summaryKey).not.toBe('thread-1:summary');
+    }
+  });
+
   it.each([
     ['another member', { threadId: 'thread-1', memberUid: 'member-2', email: 'ada@example.com' }],
     ['an AI search thread of another email', { threadId: 'thread-1', email: 'bob@example.com' }],
@@ -128,7 +137,7 @@ describe('C1 and the shared chat history (LAB-3457)', () => {
       expect(h.husky.createContextualToolsResponse).not.toHaveBeenCalled();
     });
     await h.chat({ ...VALID, persist: true });
-    expect(h.threads.warmSummary).toHaveBeenCalledWith(doc);
+    expect(h.threads.warmSummary).toHaveBeenCalledWith(doc, 'member-1');
     expect(h.options().persistHistory).toBe(true);
     expect(typeof h.options().persistTurn).toBe('function');
   });

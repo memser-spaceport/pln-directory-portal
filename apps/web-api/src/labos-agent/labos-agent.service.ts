@@ -104,6 +104,7 @@ import {
   firstQuestionTitle,
   LabosAgentThreadStore,
   ownsThread,
+  summaryCacheKey,
   ThreadDoc,
   threadNotFound,
   ThreadTurnDoc,
@@ -176,7 +177,7 @@ export function lastAnswerTurnRules(lines: string[]): string {
 /**
  * LAB-3367 h3: the cache key of the latest agent reply for one member in one thread. The `<env>:labos-agent` prefix of
  * the proposal keys keeps environments that share a Redis apart. JSON keeps the key free of collisions for any C1
- * `threadId` string, and the namespace keeps it apart from the Husky `<threadId>:summary` key.
+ * `threadId` string, and the namespace keeps it apart from the Husky `<threadId>:summary` key and the agent `summaryCacheKey`.
  */
 export function latestReplyCacheKey(memberUid: string, threadId: string): string {
   return `${keyPrefix()}:latest-reply:${JSON.stringify([memberUid, threadId])}`;
@@ -330,6 +331,8 @@ export class LabosAgentService {
           : {}),
         // LAB-3367 h3: the latest reply, scoped to the signed-in member and the thread. Never the raw thread ID.
         latestReplyKey: latestReplyCacheKey(memberUid, body.threadId),
+        // LAB-3459 follow-up: the thread memory, scoped to the member and the thread too (not `<threadId>:summary`).
+        summaryKey: summaryCacheKey(memberUid, body.threadId),
         // LAB-3367 k2, k7: the rules for your last answer, in the system message of the answer calls only.
         answerInstructions: LAST_ANSWER_RULES,
         // LAB-3367 F1, F3, K3: a code gate for the agreed phrases when a card waits (labos-agent-last-answer.ts).
@@ -560,7 +563,7 @@ export class LabosAgentService {
     const doc = await this.threads.find(threadId);
     if (!doc) return undefined;
     if (doc.isDeleted || !ownsThread(doc, memberUid, email)) throw threadNotFound();
-    await this.threads.warmSummary(doc).catch(() => {
+    await this.threads.warmSummary(doc, memberUid).catch(() => {
       this.logger.error('Failed to load the memory of a saved LabOS agent thread');
     });
     return doc;

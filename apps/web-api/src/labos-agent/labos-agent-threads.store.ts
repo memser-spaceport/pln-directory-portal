@@ -12,17 +12,23 @@ import {
 import { MongoPersistantDbService } from '../husky/db/mongo-persistant-db.service';
 import { RedisCacheDbService } from '../husky/db/redis-cache-db.service';
 import { HuskySourceRef } from 'libs/contracts/src/schema/husky-chat';
+import { keyPrefix } from './labos-agent-proposals';
 
 /*
- * LAB-3457 (Option A in place): agent turns go into the AI search MongoDB collections. The collection names and the
- * `<threadId>:summary` cache key are the ones of `husky-ai.service.ts`; this file only reads and adds fields. No field
+ * LAB-3457 (Option A in place): agent turns go into the AI search MongoDB collections. The collection names are the ones of
+ * `husky-ai.service.ts`; this file only reads and adds fields. No field
  * is renamed or removed, and nothing is hard deleted.
  */
 const threadsCollection = () => process.env.MONGO_THREADS_COLLECTION || 'threads';
 const summaryCollection = () => process.env.MONGO_CHATS_SUMMARY_COLLECTION || 'chats_summary';
 const feedbackCollection = () => process.env.MONGO_FEEDBACK_COLLECTION || '';
-/** The AI search thread memory key (husky-ai.service.ts). The agent stream reads it on every turn. */
-export const threadSummaryKey = (threadId: string) => `${threadId}:summary`;
+/**
+ * LAB-3459 follow-up: the agent thread memory key (the C1 `summaryKey`), scoped to the member and the thread like
+ * `latestReplyCacheKey`. The agent never reads or writes the shared AI search `<threadId>:summary` key, so a summary that
+ * another caller wrote under a guessed thread id never reaches the member's prompt. JSON keeps it free of collisions.
+ */
+export const summaryCacheKey = (memberUid: string, threadId: string) =>
+  `${keyPrefix()}:summary:${JSON.stringify([memberUid, threadId])}`;
 
 /** A saved proposal: the C1 card and its state. `open` past `expiresAt` is shown as expired. */
 export type StoredProposalDoc = LabosAgentProposal & {
@@ -294,10 +300,11 @@ export class LabosAgentThreadStore {
 
   /**
    * Loads the thread memory into the cache when it is not there (it expires after a day), so the agent continues an
-   * old thread with its context: the saved summary, else a seed from the last turns.
+   * old thread with its context: the saved summary, else a seed from the last turns. The key is the member's own
+   * (`summaryCacheKey`); call it only for a thread the member owns.
    */
-  async warmSummary(doc: ThreadDoc): Promise<void> {
-    const key = threadSummaryKey(doc.threadId);
+  async warmSummary(doc: ThreadDoc, memberUid: string): Promise<void> {
+    const key = summaryCacheKey(memberUid, doc.threadId);
     if (await this.cache.get(key)) return;
     const saved = await this.mongo.findOneWhere(summaryCollection(), { threadId: doc.threadId });
     const summary = typeof saved?.summary === 'string' && saved.summary.trim() ? saved.summary : '';
