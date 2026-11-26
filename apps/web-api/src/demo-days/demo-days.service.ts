@@ -1412,7 +1412,11 @@ export class DemoDaysService {
     return feedback;
   }
 
-  async submitInvestorApplication(applicationData: CreateDemoDayInvestorApplicationDto, demoDayUidOrSlug: string) {
+  async submitInvestorApplication(
+    applicationData: CreateDemoDayInvestorApplicationDto,
+    demoDayUidOrSlug: string,
+    actorEmail?: string
+  ) {
     const demoDay = await this.getDemoDayByUidOrSlug(demoDayUidOrSlug);
 
     // Check if demo day is accepting applications
@@ -1454,6 +1458,11 @@ export class DemoDaysService {
         },
       },
     });
+
+    // An existing account may only be modified by its own authenticated owner.
+    if (member && actorEmail?.toLowerCase().trim() !== normalizedEmail) {
+      throw new ForbiddenException('An account with this email already exists. Sign in with it to apply.');
+    }
 
     let isNewMember = false;
 

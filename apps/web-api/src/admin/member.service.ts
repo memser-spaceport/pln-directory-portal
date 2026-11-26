@@ -790,12 +790,15 @@ export class MemberService {
 
       await this.syncMemberApprovalFromPayload(tx, memberUid, memberData as any, memberUid, null, 'Updated by admin');
 
-      await this.replaceAccessControl(tx, memberUid, {
-        roleCodes: (memberData as any).roleCodes ?? [],
-        policyCodes: (memberData as any).policyCodes ?? [],
-        permissionCodes: (memberData as any).permissionCodes ?? [],
-        actorUid: null,
-      });
+      // Only directory admins may change access; for other admins the member keeps its current codes.
+      if (isDirectoryAdmin) {
+        await this.replaceAccessControl(tx, memberUid, {
+          roleCodes: (memberData as any).roleCodes ?? [],
+          policyCodes: (memberData as any).policyCodes ?? [],
+          permissionCodes: (memberData as any).permissionCodes ?? [],
+          actorUid: null,
+        });
+      }
 
       const canManageInvestorProfile = await this.memberHasPermissionCode(
         tx,
