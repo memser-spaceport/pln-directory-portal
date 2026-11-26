@@ -15,6 +15,6 @@ export class IntroRequestsController {
     @Req() request: { userEmail?: string },
     @Body() body: CreateIntroRequestDto
   ): Promise<CreateIntroRequestResponseDto> {
-    return this.introRequestsService.create(request.userEmail, body);
+    return this.introRequestsService.createFromRoute(request.userEmail, body);
   }
 }

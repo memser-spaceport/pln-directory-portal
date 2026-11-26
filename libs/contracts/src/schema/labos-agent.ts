@@ -110,6 +110,13 @@ export const LabosAgentChatRequestSchema = z.object({
     .optional(),
   /** Contract change 4 (section 11): allowed with any `context.page` and with no `context`. */
   introDraft: LabosAgentIntroDraftSchema.optional(),
+  /**
+   * LAB-3457: true saves this turn in the shared chat history (`GET /v1/labos-agent/threads`) under `threadId`. The
+   * thread is new, or one of the member's own threads (an old AI search thread too). Absent or false: the turn is not
+   * saved, as before LAB-3457. Either way, a `threadId` that belongs to another member or is deleted gives 404
+   * THREAD_NOT_FOUND before the stream.
+   */
+  persist: z.boolean().optional(),
 });
 
 export type LabosAgentContext = z.infer<typeof LabosAgentContextSchema>;
@@ -219,6 +226,12 @@ export const LABOS_AGENT_ERROR_CODES = {
   PROPOSAL_CLOSED: 'PROPOSAL_CLOSED',
   PROPOSAL_EXPIRED: 'PROPOSAL_EXPIRED',
   ACTION_FAILED: 'ACTION_FAILED',
+  /** LAB-3457: no thread with this id for this member (missing, another member's, or deleted). */
+  THREAD_NOT_FOUND: 'THREAD_NOT_FOUND',
+  /** LAB-3457 C5: no intro draft with this id in this member's thread. */
+  DRAFT_NOT_FOUND: 'DRAFT_NOT_FOUND',
+  /** LAB-3457 C5: the draft is already sent or cancelled. The body has `status`. */
+  DRAFT_CLOSED: 'DRAFT_CLOSED',
 } as const;
 
 /** The propose-only tools (contract section 3, S2). Only C2 runs them. */
@@ -320,3 +333,190 @@ export const LabosAgentChatResponseSchema = z
   .merge(LabosAgentAnswerCountsSchema)
   .passthrough();
 export type LabosAgentChatResponse = z.infer<typeof LabosAgentChatResponseSchema>;
+
+/*
+ * LAB-3457: one shared chat history for the agent panel and the full page (/ai-search). Agent turns go into the same
+ * MongoDB `threads` collection as AI search, so a member's old AI search threads are in the same list and continue on
+ * the agent backend (C1 with that `threadId` and `persist: true`). Nothing is migrated or hard deleted.
+ *
+ *   T1 GET    /v1/labos-agent/threads?page&limit   -> LabosAgentThreadListResponse
+ *   T2 GET    /v1/labos-agent/threads/:threadId    -> LabosAgentThread
+ *   T3 DELETE /v1/labos-agent/threads/:threadId    -> LabosAgentThreadDeleteResponse (soft delete)
+ *   C5 POST   /v1/labos-agent/drafts/confirm       -> LabosAgentDraftConfirmResponse (send or cancel a saved draft)
+ *
+ * All four use the C1 guard and gate: 401 with no member token, 403 AGENT_NOT_ENABLED outside the gate. A thread of
+ * another member, or a deleted one, is 404 THREAD_NOT_FOUND (it never says that the thread exists).
+ */
+
+/** Where a thread started. An old thread with no source is `ai-search`. */
+export const LABOS_AGENT_THREAD_SOURCES = ['ai-search', 'agent'] as const;
+export type LabosAgentThreadSource = typeof LABOS_AGENT_THREAD_SOURCES[number];
+
+/** T1 paging limits. */
+export const LABOS_AGENT_THREADS_QUERY_LIMITS = {
+  minLimit: 1,
+  maxLimit: 50,
+  defaultLimit: 20,
+  maxPage: 10000,
+} as const;
+
+const pageInt = (name: string, min: number, max: number, fallback: number) =>
+  z
+    .string()
+    .optional()
+    .refine(
+      (value) => value === undefined || (/^\d{1,5}$/.test(value) && Number(value) >= min && Number(value) <= max),
+      {
+        message: `${name} must be an integer from ${min} to ${max}`,
+      }
+    )
+    .transform((value) => (value === undefined ? fallback : Number(value)));
+
+/** Query of T1. Query values are strings. `page` starts at 1. */
+export const LabosAgentThreadsQuerySchema = z.object({
+  page: pageInt('page', 1, LABOS_AGENT_THREADS_QUERY_LIMITS.maxPage, 1),
+  limit: pageInt(
+    'limit',
+    LABOS_AGENT_THREADS_QUERY_LIMITS.minLimit,
+    LABOS_AGENT_THREADS_QUERY_LIMITS.maxLimit,
+    LABOS_AGENT_THREADS_QUERY_LIMITS.defaultLimit
+  ),
+});
+export type LabosAgentThreadsQuery = z.infer<typeof LabosAgentThreadsQuerySchema>;
+
+/** Path param of T2, T3 (the same limits as the C1 `threadId`). */
+export const LabosAgentThreadIdSchema = z.string().min(1).max(64);
+
+/**
+ * One row of T1. `title` is never empty: a thread with no title gets its first question (cut to 80 characters).
+ * `context` is the C1 context of the first saved agent turn, absent for AI search threads. Times are ISO.
+ */
+export type LabosAgentThreadListItem = {
+  threadId: string;
+  title: string;
+  source: LabosAgentThreadSource;
+  context?: LabosAgentContext;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/**
+ * Response 200 of T1: the member's threads with at least one turn, newest `updatedAt` first. Old AI search threads of
+ * the member's email and agent threads of the member are in one list. Deleted threads are not.
+ */
+export type LabosAgentThreadListResponse = {
+  page: number;
+  limit: number;
+  total: number;
+  items: LabosAgentThreadListItem[];
+};
+
+/**
+ * The state of a saved action card. `open` is past `expiresAt` reads as `expired`. Only `open` (before `expiresAt`)
+ * can still go to C2.
+ */
+export type LabosAgentStoredProposalStatus = 'open' | 'done' | 'cancelled' | 'failed' | 'expired';
+
+/** A saved action card: the C1 proposal plus its state. `summary` is the C2 summary after `done` or `cancelled`. */
+export type LabosAgentStoredProposal = LabosAgentProposal & {
+  status: LabosAgentStoredProposalStatus;
+  summary?: string;
+};
+
+/** The state of a saved intro draft card. Only `open` can go to C5. */
+export type LabosAgentStoredDraftStatus = 'open' | 'sent' | 'cancelled';
+
+/**
+ * A saved intro draft card: the C1 draft plus its state. After `sent`, `text` is the sent text and `introRequestUid` is
+ * the intro request. The frontend still decides "Replaced by a newer draft" for an older open card.
+ */
+export type LabosAgentStoredDraft = LabosAgentDraft & {
+  status: LabosAgentStoredDraftStatus;
+  introRequestUid?: string;
+  sentAt?: string;
+};
+
+/** The thumbs rating of a turn (AI search feedback, `/v1/husky/chat/feedback`), when the member gave one. */
+export type LabosAgentTurnFeedback = { rating: unknown; reasons?: unknown };
+
+/** Fields of every turn. `chatId` is the C1 `chatId` (the AI search `questionId`). `content` is the answer text. */
+type LabosAgentTurnBase = {
+  chatId: string;
+  question: string;
+  content: string;
+  sources: string[];
+  sourceRefs?: Array<{ type: string; title: string; [key: string]: unknown }>;
+  followUpQuestions: string[];
+  /** AI search directory result cards. Agent turns save what the tail gave (often empty). */
+  actions: unknown[];
+  /** ISO, or null for an old turn with no time. */
+  createdAt: string | null;
+  feedback?: LabosAgentTurnFeedback;
+};
+
+/** An old AI search turn: shown as saved, no steps and no cards. */
+export type LabosAgentLegacyTurn = LabosAgentTurnBase & { kind: 'ai-search' };
+
+/** A saved agent turn: what the member saw when it finished. A stopped or failed turn is not saved. */
+export type LabosAgentSavedTurn = LabosAgentTurnBase &
+  LabosAgentAnswerCounts & {
+    kind: 'agent';
+    /** The step lines of the stream, in order ("Worked for … · N steps" opens them). */
+    steps: string[];
+    context?: LabosAgentContext;
+    mentions?: LabosAgentMention[];
+    proposals: LabosAgentStoredProposal[];
+    drafts: LabosAgentStoredDraft[];
+  };
+
+export type LabosAgentThreadTurn = LabosAgentLegacyTurn | LabosAgentSavedTurn;
+
+/** Response 200 of T2: the thread with its turns, oldest first. It also loads the thread memory for the next C1 turn. */
+export type LabosAgentThread = LabosAgentThreadListItem & { turns: LabosAgentThreadTurn[] };
+
+/** Response 200 of T3. The thread leaves both histories (agent and AI search); the data is kept. */
+export type LabosAgentThreadDeleteResponse = { threadId: string; deleted: true };
+
+/**
+ * Body of C5 `POST /v1/labos-agent/drafts/confirm`: send or cancel one saved intro draft card. `send` needs `text`
+ * (the card text with the member's edits, 20 to 3500 characters after trim) and sends it with the intro API (C3) to
+ * the saved draft target. The target always comes from the saved draft, never from the body. A draft is sent at most
+ * once.
+ */
+export const LabosAgentDraftConfirmRequestSchema = z
+  .object({
+    threadId: z.string().min(1).max(64),
+    draftId: z.string().min(1).max(64),
+    decision: z.enum(['send', 'cancel']),
+    text: z
+      .string()
+      .transform((value) => value.trim())
+      .refine(
+        (value) =>
+          value.length >= LABOS_AGENT_INTRO_DRAFT_LIMITS.minLength &&
+          value.length <= LABOS_AGENT_INTRO_DRAFT_LIMITS.maxLength,
+        { message: 'text must be 20 to 3500 characters after trim' }
+      )
+      .optional(),
+  })
+  .strict()
+  .refine((body) => body.decision !== 'send' || body.text !== undefined, {
+    message: 'text is required when decision is "send"',
+    path: ['text'],
+  });
+export type LabosAgentDraftConfirmRequest = z.infer<typeof LabosAgentDraftConfirmRequestSchema>;
+
+/** Response 200 of C5. */
+export type LabosAgentDraftConfirmResponse = {
+  draftId: string;
+  status: 'sent' | 'cancelled';
+  introRequestUid?: string;
+};
+
+/** Body of a C5 409 DRAFT_CLOSED error: how the draft closed. */
+export type LabosAgentDraftClosedError = {
+  statusCode: 409;
+  code: typeof LABOS_AGENT_ERROR_CODES.DRAFT_CLOSED;
+  message: string;
+  status: 'sent' | 'cancelled';
+};

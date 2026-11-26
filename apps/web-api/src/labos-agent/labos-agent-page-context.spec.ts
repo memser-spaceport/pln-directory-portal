@@ -371,7 +371,9 @@ function setup(viewer: Viewer = {}, env: string = APP_ENV.DEV) {
     { adminCaps: jest.fn(async () => Object.fromEntries(MCP_SCOPE_KEYS.map((key) => [key, 'write']))) } as any,
     introRequests,
     teamsService,
-    jobsService
+    jobsService,
+    // LAB-3457: every thread id here is new (no saved thread).
+    { find: jest.fn().mockResolvedValue(null) } as any
   );
   const controller = new LabosAgentController(service);
   const req = { userEmail: 'm-ada@example.com' };

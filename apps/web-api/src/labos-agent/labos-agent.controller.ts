@@ -1,20 +1,6 @@
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  Get,
-  Logger,
-  Post,
-  Query,
-  Req,
-  Res,
-  UseFilters,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Logger, Post, Query, Req, Res, UseFilters, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
-import { ZodType, ZodTypeDef } from 'zod';
 import {
-  LABOS_AGENT_ERROR_CODES,
   LabosAgentAccessResponse,
   LabosAgentChatRequestSchema,
   LabosAgentConfirmRequestSchema,
@@ -27,6 +13,7 @@ import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { logSafeError } from '../husky/log-safe-error.util';
 import { LabosAgentExceptionFilter } from './labos-agent-exception.filter';
 import { LabosAgentService } from './labos-agent.service';
+import { validBody } from './labos-agent-validation';
 
 /** LabOS in-app agent, contracts C1, C2 and C4 (LAB-3272; slices S1 LAB-3298, S2 LAB-3299, S6 LAB-3318). */
 @Controller('v1/labos-agent')
@@ -103,18 +90,4 @@ export class LabosAgentController {
   async confirm(@Body() body: unknown, @Req() req: { userEmail?: string }): Promise<LabosAgentConfirmResponse> {
     return this.agent.confirm(req.userEmail ?? '', validBody(LabosAgentConfirmRequestSchema, body));
   }
-}
-
-/** The parsed body (or query), or 400 VALIDATION_ERROR. */
-function validBody<T>(schema: ZodType<T, ZodTypeDef, unknown>, body: unknown, message = 'Invalid request body'): T {
-  const parsed = schema.safeParse(body);
-  if (!parsed.success) {
-    throw new BadRequestException({
-      statusCode: 400,
-      code: LABOS_AGENT_ERROR_CODES.VALIDATION_ERROR,
-      message,
-      errors: parsed.error.issues.map((issue) => ({ path: issue.path.join('.'), message: issue.message })),
-    });
-  }
-  return parsed.data;
 }

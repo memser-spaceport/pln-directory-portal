@@ -96,3 +96,13 @@ When the Telegram post fails, the system SHALL keep the request, return `{ uid }
 - **WHEN** the retry runs and the post succeeds
 - **THEN** the request is posted once and the message id is stored
 - **AND** a further retry does not post it again
+
+### Requirement: Route gate for saved agent drafts
+
+`POST /v1/intro-requests` SHALL call the route gate that the LabOS agent registers (`IntroRequestsService.useRouteGate`), when one is set and the request has a session, before the plain send (LAB-3457). The gate decides whether the request is refused, sent through the saved-draft claim, or sent as before (see the LabOS agent spec, "The C3 route never sends a saved draft twice"). Other callers of `IntroRequestsService.create` (the agent C5) SHALL NOT pass the gate. Without a gate, the route SHALL send as before.
+
+#### Scenario: No gate
+
+- **GIVEN** no gate is registered
+- **WHEN** a member sends an intro request
+- **THEN** it is created as before

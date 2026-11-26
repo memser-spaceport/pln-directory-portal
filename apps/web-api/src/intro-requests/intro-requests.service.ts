@@ -21,6 +21,16 @@ const NOT_ELIGIBLE = 'Only members of portfolio teams and PL Infra can send an i
 const CLAIM_STALE_MS = 10 * 60 * 1000;
 const RETRY_BATCH = 20;
 
+/**
+ * LAB-3457: a check that the C3 route (`POST /v1/intro-requests`) runs before it sends. `send` is the plain C3 send. The
+ * LabOS agent registers one so an intro draft that is saved in a chat thread is never sent twice (C3 and C5).
+ */
+export type IntroRequestRouteGate = (
+  email: string,
+  input: CreateIntroRequestDto,
+  send: () => Promise<{ uid: string }>
+) => Promise<{ uid: string }>;
+
 export type RequesterRow = {
   uid: string;
   name: string;
@@ -37,6 +47,23 @@ export class IntroRequestsService {
     private readonly telegram: IntroRequestTelegram,
     @Inject(forwardRef(() => MembersService)) private readonly membersService: MembersService
   ) {}
+
+  private routeGate?: IntroRequestRouteGate;
+
+  /** LAB-3457: set by the LabOS agent at start (`LabosAgentThreadsService`). Only the C3 route uses it. */
+  useRouteGate(gate: IntroRequestRouteGate): void {
+    this.routeGate = gate;
+  }
+
+  /**
+   * C3, the HTTP route. With a gate, the gate decides and calls the plain send. Other callers (the LabOS agent C5) call
+   * `create` and do not pass the gate.
+   */
+  async createFromRoute(email: string | undefined, input: CreateIntroRequestDto): Promise<{ uid: string }> {
+    const send = () => this.create(email, input);
+    if (!this.routeGate || !email?.trim()) return send();
+    return this.routeGate(email, input, send);
+  }
 
   async create(email: string | undefined, input: CreateIntroRequestDto): Promise<{ uid: string }> {
     if (!email?.trim()) {

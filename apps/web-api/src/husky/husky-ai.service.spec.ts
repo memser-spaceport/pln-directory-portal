@@ -138,6 +138,7 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
     updateDocByKeyValue: jest.Mock;
     upsertByKeyValue: jest.Mock;
     findOneByKeyValue: jest.Mock;
+    findOneLiveByKeyValue: jest.Mock;
     updateByKeyValue: jest.Mock;
   };
   let aiProvider: { getResponsesModel: jest.Mock };
@@ -157,6 +158,11 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
       updateDocByKeyValue: jest.fn().mockResolvedValue(undefined),
       upsertByKeyValue: jest.fn().mockResolvedValue(undefined),
       findOneByKeyValue: jest.fn().mockResolvedValue({ threadId: 'thread-1' }),
+      // LAB-3457: the same doc as `findOneByKeyValue`, without a soft-deleted one.
+      findOneLiveByKeyValue: jest.fn(async (...args: [string, string, string]) => {
+        const doc = await persistent.findOneByKeyValue(...args);
+        return doc?.isDeleted ? null : doc;
+      }),
       updateByKeyValue: jest.fn().mockResolvedValue(undefined),
     };
     aiProvider = { getResponsesModel: jest.fn().mockReturnValue('model-handle') };
@@ -2130,6 +2136,7 @@ describe('HuskyAiService.getThreadById', () => {
   const createService = () => {
     const persistent = {
       findOneByKeyValue: jest.fn((collection: string) => Promise.resolve(collection === 'threads' ? thread : null)),
+      findOneLiveByKeyValue: jest.fn((collection: string) => Promise.resolve(collection === 'threads' ? thread : null)),
       findByKeyValue: jest.fn().mockResolvedValue([{ questionId: 'q-2', rating: 1, reasons: ['Out of date'] }]),
     };
     const service = new HuskyAiService(

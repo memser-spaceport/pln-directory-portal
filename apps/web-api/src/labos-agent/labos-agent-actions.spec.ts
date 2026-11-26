@@ -27,6 +27,7 @@ jest.mock('../job-alerts/job-alerts.service', () => ({ JobAlertsService: jest.fn
 jest.mock('../intro-requests/intro-requests.service', () => ({ IntroRequestsService: jest.fn() }));
 jest.mock('ai', () => ({ tool: (def: unknown) => def }));
 
+import { Logger } from '@nestjs/common';
 import { APP_ENV } from '../utils/constants';
 import { experienceTools } from '../mcp/mcp-member-action-tools';
 import { MCP_SCOPE_KEYS } from 'libs/contracts/src/schema/mcp-scopes';
@@ -144,6 +145,7 @@ function setup() {
   const accessControl = { getMemberAccess: jest.fn().mockResolvedValue({ effectivePermissions: [] }) };
   const cache = fakeCache();
   const husky = { createContextualToolsResponse: jest.fn().mockResolvedValue({}) };
+  const threads = { find: jest.fn().mockResolvedValue(null), markProposal: jest.fn().mockResolvedValue(undefined) };
   const service = new LabosAgentService(
     prisma as any,
     new LabosAgentAccessService({ hasPermission: jest.fn().mockResolvedValue({ allowed: false }) } as any),
@@ -155,22 +157,26 @@ function setup() {
     scopes as any,
     { findAgentTargetName: jest.fn(), findEligibleRequester: jest.fn() } as any,
     {} as any,
-    {} as any
+    {} as any,
+    // LAB-3457: every thread id here is new (no saved thread).
+    threads as any
   );
   const controller = new LabosAgentController(service);
   const req = { userEmail: 'ada@example.com' };
 
   /** One chat turn: the agent tools as the model gets them, and the `proposals` the stream body ends with. */
-  const chat = async () => {
-    await controller.chat(VALID, req, { setHeader: jest.fn(), flushHeaders: jest.fn() } as any).catch(() => undefined);
+  const chat = async (chatBody: Record<string, unknown> = VALID) => {
+    await controller
+      .chat(chatBody, req, { setHeader: jest.fn(), flushHeaders: jest.fn() } as any)
+      .catch(() => undefined);
     const options = husky.createContextualToolsResponse.mock.calls.at(-1)[3];
     return {
       tools: options.extraTools as Record<string, { execute: (args: unknown) => Promise<string> }>,
       proposals: options.extraResponseFields.proposals as Array<Record<string, any>>,
     };
   };
-  const propose = async (name: string, args: Record<string, unknown>) => {
-    const turn = await chat();
+  const propose = async (name: string, args: Record<string, unknown>, chatBody?: Record<string, unknown>) => {
+    const turn = await chat(chatBody);
     const text = await turn.tools[name].execute(args);
     return { text, proposal: turn.proposals[0] };
   };
@@ -195,6 +201,7 @@ function setup() {
     runs,
     chat,
     stored,
+    threads,
     setCaps: (next: Record<string, string> | Error) => (caps = next),
     setCaller: (uid: string) => (callerUid = uid),
   };
@@ -517,5 +524,63 @@ describe('Admin MCP caps in the LabOS agent (LAB-3299)', () => {
       `development:labos-agent:proposal-open:${proposal.proposalId}`,
       `development:labos-agent:proposal:${proposal.proposalId}`,
     ]);
+  });
+});
+
+describe('C2 writes the card state into the saved thread (LAB-3457)', () => {
+  beforeEach(() => jest.spyOn(Date, 'now').mockReturnValue(NOW));
+  afterEach(() => jest.restoreAllMocks());
+  const SAVED = { ...VALID, persist: true };
+
+  it('keeps the thread of a saved turn with the proposal, and C2 writes done with its summary', async () => {
+    const h = setup();
+    const { proposal } = await h.propose('update_my_profile', { bio: 'New bio' }, SAVED);
+    expect(h.stored(proposal.proposalId).threadId).toBe('thread-1');
+    await expect(h.confirm(proposal.proposalId)).resolves.toEqual(expect.objectContaining({ status: 'done' }));
+    expect(h.threads.markProposal).toHaveBeenCalledWith(
+      'thread-1',
+      proposal.proposalId,
+      'done',
+      'Your profile is updated: Bio.'
+    );
+  });
+
+  it('writes cancelled with the cancel summary', async () => {
+    const h = setup();
+    const { proposal } = await h.propose(
+      'add_experience',
+      { title: 'CTO', company: 'Beta', startDate: '2025-01-01' },
+      SAVED
+    );
+    await h.confirm(proposal.proposalId, 'cancel');
+    expect(h.threads.markProposal).toHaveBeenCalledWith(
+      'thread-1',
+      proposal.proposalId,
+      'cancelled',
+      'Cancelled. Nothing changed.'
+    );
+  });
+
+  it('writes failed when the tool refuses the values', async () => {
+    const h = setup();
+    const { proposal } = await h.propose('update_my_profile', { skills: ['Nope'] }, SAVED);
+    await h.confirm(proposal.proposalId);
+    expect(h.threads.markProposal).toHaveBeenCalledWith('thread-1', proposal.proposalId, 'failed', undefined);
+  });
+
+  it('keeps no thread and writes nothing for a turn that is not saved (as before LAB-3457)', async () => {
+    const h = setup();
+    const { proposal } = await h.propose('update_my_profile', { bio: 'New bio' });
+    expect(h.stored(proposal.proposalId)).not.toHaveProperty('threadId');
+    await h.confirm(proposal.proposalId);
+    expect(h.threads.markProposal).not.toHaveBeenCalled();
+  });
+
+  it('still returns the C2 result when the thread write fails', async () => {
+    const h = setup();
+    h.threads.markProposal.mockRejectedValue(new Error('mongo down'));
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    const { proposal } = await h.propose('update_my_profile', { bio: 'New bio' }, SAVED);
+    await expect(h.confirm(proposal.proposalId)).resolves.toEqual(expect.objectContaining({ status: 'done' }));
   });
 });

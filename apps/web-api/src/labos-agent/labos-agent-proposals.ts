@@ -23,6 +23,8 @@ export type StoredProposal = {
   tool: LabosAgentProposeTool;
   args: Record<string, unknown>;
   status: 'open' | 'cancelled' | 'done' | 'failed';
+  /** LAB-3457: the saved thread of the turn (C1 `persist: true`), so C2 can write the card state there. */
+  threadId?: string;
 };
 
 /**
@@ -216,7 +218,7 @@ async function draft(
 export function proposeTool(
   def: McpToolDef,
   ctx: McpActorContext,
-  deps: ProposalDeps & { store: LabosAgentProposalStore; proposals: LabosAgentProposal[] }
+  deps: ProposalDeps & { store: LabosAgentProposalStore; proposals: LabosAgentProposal[]; threadId?: string }
 ): CoreTool {
   const schema = z.object(def.inputSchema ?? {}).strict();
   return tool({
@@ -240,7 +242,14 @@ export function proposeTool(
           ...result,
           expiresAt: new Date(Date.now() + PROPOSAL_TTL_SECONDS * 1000).toISOString(),
         };
-        await deps.store.save({ proposal, memberUid: ctx.memberUid, tool: proposal.tool, args, status: 'open' });
+        await deps.store.save({
+          proposal,
+          memberUid: ctx.memberUid,
+          tool: proposal.tool,
+          args,
+          status: 'open',
+          ...(deps.threadId ? { threadId: deps.threadId } : {}),
+        });
         deps.proposals.push(proposal);
         return (
           `Proposal ${proposal.proposalId} is ready: ${proposal.title}. Nothing is saved yet. ` +

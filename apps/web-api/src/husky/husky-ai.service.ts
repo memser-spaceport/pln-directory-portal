@@ -125,6 +125,19 @@ export interface ContextualToolsOptions {
    */
   latestReplyKey?: string;
   /**
+   * LAB-3459 / LAB-3457: the cache key of the thread summary (the `chatHistory` line). Without it the key is
+   * `<threadId>:summary`, which any caller that knows the thread id shares. The LabOS agent passes a key of the member
+   * and the thread, so a summary written by one member is never read by another. The MongoDB `chats_summary` row stays
+   * keyed by `threadId` (written only with `persistHistory`). AI search passes nothing.
+   */
+  summaryKey?: string;
+  /**
+   * LAB-3457: the member uid of a caller that already checked the thread owner itself (the LabOS agent: memberUid
+   * first, then email). A thread whose `memberUid` is this uid passes the LAB-3459 writer check even when its stored
+   * `email` is an older email of that member. Any other thread gets the email rule as before. AI search passes nothing.
+   */
+  threadOwnerUid?: string;
+  /**
    * LAB-3367 k2, k7: extra text for the system message of the answer call and of the continuation, after the shared
    * prompt. The structured tail call does not get it. Give only fixed rules, never member or card text. The LabOS
    * agent uses it for the rules for "your last answer". AI search passes nothing.
@@ -164,7 +177,36 @@ export interface ContextualToolsOptions {
    * replaces it in the body, for example the agent `sources` (LAB-3362 D2). AI search passes nothing.
    */
   turnFields?: (turn: ContextualTurnSummary) => Record<string, unknown>;
+  /**
+   * LAB-3457: with `persistHistory`, the caller saves the finished turn itself, instead of the AI search turn write
+   * (`persistContextualHistory`). The stream waits for it before it closes, at most `PERSIST_TURN_TIMEOUT_MS`, so a
+   * read right after the end finds the turn. A stopped, failed or cancelled turn is not given. The callback handles
+   * its own errors. AI search passes nothing.
+   */
+  persistTurn?: (turn: PersistedTurn) => Promise<void>;
+  /**
+   * LAB-3457 G1: removes the turn that `persistTurn` saved, when the reader stopped the stream during the save wait. The
+   * client got no end, so the turn counts as stopped. Called after the save settles, only when it saved. The callback
+   * handles its own errors. AI search passes nothing.
+   */
+  discardTurn?: () => Promise<void>;
 }
+
+/** LAB-3457: the finished turn for `ContextualToolsOptions.persistTurn`: what the member saw. */
+export interface PersistedTurn {
+  question: string;
+  /** The answer text, as streamed. */
+  content: string;
+  /** The step lines of the stream, in order. */
+  steps: string[];
+  /** The tail, before `turnFields`. */
+  tail: HuskyStoredContext;
+  /** The same input that `turnFields` gets. */
+  summary: ContextualTurnSummary;
+}
+
+/** LAB-3457: the longest wait for `ContextualToolsOptions.persistTurn` before the stream closes. */
+export const PERSIST_TURN_TIMEOUT_MS = 3000;
 
 /** What the finished turn did, for `ContextualToolsOptions.turnFields`. */
 export interface ContextualTurnSummary {
@@ -187,7 +229,7 @@ interface AnswerResult {
 }
 
 type HuskyResponseContext = z.infer<typeof HuskyResponseContextSchema>;
-type HuskyStoredContext = HuskyResponseContext & { sourceRefs?: HuskySourceRef[] };
+export type HuskyStoredContext = HuskyResponseContext & { sourceRefs?: HuskySourceRef[] };
 
 const EMPTY_RESPONSE_CONTEXT: HuskyResponseContext = { followUpQuestions: [], sources: [], actions: [] };
 
@@ -311,14 +353,15 @@ export class HuskyAiService {
     const { question, threadId, chatId, chatSummary } = chatInfo;
     const persistHistory = options.persistHistory !== false;
     const { turnFields } = options;
+    const summaryKey = options.summaryKey ?? `${threadId}:summary`;
     const currentDate = new Date().toISOString().split('T')[0];
-    await this.assertThreadWriter(threadId, userEmail);
+    await this.assertThreadWriter(threadId, userEmail, options.threadOwnerUid);
     const auth = await this.resolveAuthContext(isLoggedIn, userEmail);
 
     // A conversation started elsewhere (e.g. a blog embed) is handed over with its
     // first exchange so the thread keeps that context.
     if (chatSummary && persistHistory) {
-      await this.updateChatSummary(threadId, chatSummary);
+      await this.updateChatSummary(threadId, chatSummary, summaryKey);
       await this.persistContextualHistory(
         threadId,
         chatSummary.chatId,
@@ -330,7 +373,7 @@ export class HuskyAiService {
       );
     }
 
-    const chatSummaryFromDb = await this.huskyCacheDbService.get(`${threadId}:summary`);
+    const chatSummaryFromDb = await this.huskyCacheDbService.get(summaryKey);
     const threadHistoryPrompt = chatSummaryFromDb ? ` - chatHistory: ${chatSummaryFromDb}` : '';
     const { latestReplyKey } = options;
     const latestReply = latestReplyKey ? await this.takeLatestReply(latestReplyKey) : '';
@@ -381,9 +424,12 @@ export class HuskyAiService {
           // answer character; a late tool finish must not write into that string.
           let stepsOpen = true;
           let stepCount = 0;
+          // LAB-3457: the step lines as streamed, for `persistTurn`.
+          const steps: string[] = [];
           const pushStep = (label: string) => {
             if (!stepsOpen) return;
             enqueue(`${stepCount ? ', ' : ''}${JSON.stringify(label)}`);
+            steps.push(label);
             stepCount += 1;
           };
           const emitText = (fragment: string) => {
@@ -530,16 +576,54 @@ export class HuskyAiService {
             }
           }
 
+          // LAB-3457: the caller saves the turn before the stream closes, so a thread read right after the end has it.
+          if (persistHistory && options.persistTurn && !cancelled) {
+            const saving = options
+              .persistTurn({
+                question,
+                content,
+                steps,
+                tail: responseContext,
+                summary: turnSummary(toolNames, responseContext),
+              })
+              .then(
+                () => 'saved' as const,
+                () => 'failed' as const
+              );
+            const saved = await this.withinTimeout(saving, this.persistTurnTimeoutMs);
+            if (saved !== 'saved') {
+              this.logger.error(
+                `${saved ? 'Failed' : 'Timed out'} saving the turn of thread ${threadId}, chat ${chatId}`
+              );
+            }
+            // LAB-3457 G1: a stop during the save wait. The client gets no end, so the turn is a stopped turn: the
+            // reply is not latest (as h3), the saved turn is removed once the save settles, and the cancelled stream is
+            // not closed (close() would throw). No summary update. No await comes between this check and close().
+            if (cancelled) {
+              if (latestReplyKey) await this.saveLatestReply(latestReplyKey, '', 'clear');
+              const { discardTurn } = options;
+              if (discardTurn) {
+                void saving
+                  .then((result) => (result === 'saved' ? discardTurn() : undefined))
+                  .catch(() =>
+                    this.logger.error(`Failed removing the stopped turn of thread ${threadId}, chat ${chatId}`)
+                  );
+              }
+              return;
+            }
+          }
+
           controller.close();
 
           // LAB-3367 K3: a fixed answer runs no summary model call and keeps the earlier summary.
           if (turn.fixedAnswer !== undefined) return;
-          this.updateChatSummary(threadId, { user: question, system: content })
+          this.updateChatSummary(threadId, { user: question, system: content }, summaryKey)
             .then((summary) => (persistHistory ? this.updateChatSummaryInMongo(threadId, summary) : undefined))
             .catch((error) =>
               this.logger.error(`Failed to update chat summary for thread ${threadId}: ${logSafeError(error)}`)
             );
-          if (!persistHistory) return;
+          // LAB-3457: a caller that saves its own turn (`persistTurn`) gets no AI search turn write.
+          if (!persistHistory || options.persistTurn) return;
           this.persistContextualHistory(
             threadId,
             chatId,
@@ -575,12 +659,13 @@ export class HuskyAiService {
    * `email` takes them only from that member. A guest thread (no `email`) and a new thread stay open, as before. It
    * runs before any read or write, so a refused call changes nothing and does not read the thread's summary.
    */
-  private async assertThreadWriter(threadId: string, email?: string) {
+  private async assertThreadWriter(threadId: string, email?: string, ownerUid?: string) {
     const thread = await this.huskyPersistentDbService.findOneByKeyValue(
       process.env.MONGO_THREADS_COLLECTION || 'threads',
       'threadId',
       threadId
     );
+    if (ownerUid && thread?.memberUid === ownerUid) return;
     if (thread?.email && thread.email !== email) {
       throw new ForbiddenException(
         'You are not authorized to add to this thread. Start a new thread or duplicate this one.'
@@ -940,7 +1025,7 @@ export class HuskyAiService {
     if (email && guestUserId) {
       throw new BadRequestException('You cannot duplicate a thread with both email and guestUserId');
     }
-    const threadPromise = this.huskyPersistentDbService.findOneByKeyValue(
+    const threadPromise = this.huskyPersistentDbService.findOneLiveByKeyValue(
       process.env.MONGO_THREADS_COLLECTION || 'threads',
       'threadId',
       threadId
@@ -1009,7 +1094,7 @@ export class HuskyAiService {
   }
 
   async deleteThreadEmail(threadId: string, email: string) {
-    const thread = await this.huskyPersistentDbService.findOneByKeyValue(
+    const thread = await this.huskyPersistentDbService.findOneLiveByKeyValue(
       process.env.MONGO_THREADS_COLLECTION || 'threads',
       'threadId',
       threadId
@@ -1080,6 +1165,23 @@ export class HuskyAiService {
     );
   }
 
+  /** LAB-3457: the wait for `persistTurn`. A field, so a test can make it short. */
+  private persistTurnTimeoutMs = PERSIST_TURN_TIMEOUT_MS;
+
+  /** LAB-3457: the result of `work`, or undefined after `ms`. The timer does not keep the process alive. */
+  private async withinTimeout<T>(work: Promise<T>, ms: number): Promise<T | undefined> {
+    let timer: NodeJS.Timeout | undefined;
+    const timeout = new Promise<undefined>((resolve) => {
+      timer = setTimeout(() => resolve(undefined), ms);
+      timer.unref?.();
+    });
+    try {
+      return await Promise.race([work, timeout]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
   /** The result of `work`, or undefined after `latestReplyTimeoutMs`. The timer does not keep the process alive. */
   private async withinLatestReplyTimeout<T>(work: Promise<T>): Promise<T | undefined> {
     let timer: NodeJS.Timeout | undefined;
@@ -1094,8 +1196,8 @@ export class HuskyAiService {
     }
   }
 
-  async updateChatSummary(chatId: string, rawChatHistory: any) {
-    const previousSummary = await this.huskyCacheDbService.get(`${chatId}:summary`);
+  async updateChatSummary(chatId: string, rawChatHistory: any, summaryKey = `${chatId}:summary`) {
+    const previousSummary = await this.huskyCacheDbService.get(summaryKey);
 
     // Define a maximum length for the summary
     const maxLength = 500; // Adjust this value as needed
@@ -1111,7 +1213,7 @@ export class HuskyAiService {
       model: this.getModel(),
       prompt: aiPrompt,
     });
-    await this.huskyCacheDbService.set(`${chatId}:summary`, text);
+    await this.huskyCacheDbService.set(summaryKey, text);
     return text;
   }
 
@@ -1127,7 +1229,7 @@ export class HuskyAiService {
   }
 
   async createThreadBasicInfo(threadId: string, question: string, email = '') {
-    const thread = await this.huskyPersistentDbService.findOneByKeyValue(
+    const thread = await this.huskyPersistentDbService.findOneLiveByKeyValue(
       process.env.MONGO_THREADS_COLLECTION || 'threads',
       'threadId',
       threadId
@@ -1154,14 +1256,7 @@ export class HuskyAiService {
       throw new NotFoundException('Member not found');
     }
 
-    const prompt = Handlebars.compile(PROMPT_FOR_GENERATE_TITLE)({
-      question: question,
-    });
-    const { text } = await generateText({
-      model: this.getModel(),
-      prompt: prompt,
-    });
-    const createdTitle = text || '';
+    const createdTitle = await this.generateThreadTitle(question);
     await this.huskyPersistentDbService.updateByKeyValue(
       process.env.MONGO_THREADS_COLLECTION || 'threads',
       'threadId',
@@ -1173,6 +1268,18 @@ export class HuskyAiService {
     );
   }
 
+  /** The thread title from the first question: the AI search title prompt on `getModel()`. '' when the model gives none. */
+  async generateThreadTitle(question: string): Promise<string> {
+    const prompt = Handlebars.compile(PROMPT_FOR_GENERATE_TITLE)({
+      question: question,
+    });
+    const { text } = await generateText({
+      model: this.getModel(),
+      prompt: prompt,
+    });
+    return text || '';
+  }
+
   async getThreadsByEmail(email: string) {
     try {
       const threads = await this.huskyPersistentDbService.findByKeyValue(
@@ -1180,8 +1287,9 @@ export class HuskyAiService {
         'email',
         email
       );
+      // LAB-3457: agent threads are listed by `GET /v1/labos-agent/threads` only. A thread with no `source` stays.
       return threads
-        .filter((thread) => thread?.title?.length > 0)
+        .filter((thread) => thread?.title?.length > 0 && thread?.source !== 'agent')
         .sort((a, b) => b.updatedAt - a.updatedAt)
         .map((thread) => ({
           threadId: thread?.threadId,
@@ -1195,8 +1303,10 @@ export class HuskyAiService {
     }
   }
 
+  // LAB-3457: the thread reads by id (read, duplicate, delete, title) leave soft-deleted threads out, so a deleted chat
+  // never comes back. The LAB-3459 writer check still sees them, so a deleted thread is never taken as a new one.
   async getThreadById(threadId: string, email = '') {
-    const threadPromise = this.huskyPersistentDbService.findOneByKeyValue(
+    const threadPromise = this.huskyPersistentDbService.findOneLiveByKeyValue(
       process.env.MONGO_THREADS_COLLECTION || 'threads',
       'threadId',
       threadId
