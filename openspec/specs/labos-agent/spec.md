@@ -107,7 +107,7 @@ Each news item of `sourceRefs` SHALL have `directoryLink` `/?news=<uid>` (LAB-33
 
 ### Requirement: No writes in chat
 
-The chat SHALL write nothing to the directory. Only C2 runs a write tool. The chat SHALL keep the thread summary and the latest reply (LAB-3367 h3) in the AI search cache only and SHALL NOT write thread history or summaries to MongoDB.
+The chat SHALL write nothing to the directory. Only C2 runs a write tool. The chat SHALL keep the thread summary, the latest reply (LAB-3367 h3), the kept intro target (B3) and the own claims (B4) in the AI search cache only and SHALL NOT write thread history or summaries to MongoDB.
 
 #### Scenario: A finished turn
 
@@ -414,12 +414,75 @@ The backend SHALL give the model the card target and text only for this turn, ex
 - **R2:** A brief request such as "make it shorter" SHALL revise the draft when the message does not name the last answer. This rule applies when the page or the items in the message point to a different target.
 - **R3:** If the member asks for a different draft or asks to change other content, the agent SHALL NOT use the current draft text.
 - **R4:** A member or team name in the revision SHALL be part of the text. It SHALL NOT change the target.
-- **Q1:** The agent SHALL keep the facts of the current draft. The `draft_intro` description and the card prompt SHALL have this same rule for new drafts and revisions (Oleg, Q1 and s4): "In the draft text, facts about the member come only from the member’s messages or their LabOS profile (a tool result). When the member asks you to mention something about themselves, use their words. Do not add or strengthen experience, duration, results, roles, opinions, shared work or a vouch about the member from anywhere else. Facts about the target can come from the page or a tool." (t3). When `get_my_profile` or `list_my_experiences` is in the tool list of the turn, the `draft_intro` description SHALL name only those available tools as the way to read the member's own LabOS profile. When `get_my_profile` is there, the description SHALL also say "Call get_my_profile before the first draft." (G8). After the fact rule, the description and the card prompt SHALL have the same limits (`DRAFT_LIMITS_RULE`, G8): "When a fact is not given, leave it out. A short draft is correct." The draft SHALL use only the words of the member and the facts of their LabOS profile. It SHALL NOT add experience, work, skills, an intent or a reason that the member did not give. Knowing a member, a team or a project is not experience with it. It SHALL keep each concrete detail in the words of the member and SHALL NOT make it more general. For a new draft with no reason, the model SHALL make no draft and ask for the reason. For "make it more convincing", the model SHALL only reorder or reword the facts of the current text and add no new fact. Each intro hint (the intro page, a member or team page and a mention) SHALL have the same reason rule (`INTRO_REASON_RULE`): "If the member gave no reason for the intro, make no draft and ask the member for the reason." These are prompt rules, not an output check.
+- **Q1:** The agent SHALL keep the facts of the current draft. The `draft_intro` description and the card prompt SHALL have this same rule for new drafts and revisions (Oleg, Q1 and s4): "In the draft text, facts about the member come only from the member’s messages or their LabOS profile (a tool result). When the member asks you to mention something about themselves, use their words. Do not add or strengthen experience, duration, results, roles, opinions, shared work or a vouch about the member from anywhere else. Facts about the target can come from the page or a tool." (t3). When `get_my_profile` or `list_my_experiences` is in the tool list of the turn, the `draft_intro` description SHALL name only those available tools as the way to read the member's own LabOS profile. When `get_my_profile` is there, the description SHALL also say "Call get_my_profile before the first draft." (G8). After the fact rule, the description and the card prompt SHALL have the same limits (`DRAFT_LIMITS_RULE`, G8): "When a fact is not given, leave it out. A short draft is correct." The draft SHALL use only the words of the member and the facts of their LabOS profile. It SHALL NOT add experience, work, skills, an intent or a reason that the member did not give. Knowing a member, a team or a project is not experience with it. It SHALL keep each concrete detail in the words of the member and SHALL NOT make it more general. For a new draft with no reason, the model SHALL make no draft and ask for the reason. For "make it more convincing", the model SHALL only reorder or reword the facts of the current text and add no new fact. Each intro hint (the intro page, a member or team page and a mention) SHALL have the same reason rule (`INTRO_REASON_RULE`): "If the member gave no reason for the intro, make no draft and ask the member for the reason." These are prompt rules, not an output check, except the B4 claim check below.
 - **F2:** For a different member or team named without a valid target, the agent SHALL ask for an @mention and SHALL NOT call `draft_intro`. If the tool refuses a target outside the turn, it also asks for an @mention.
+- **B2 (Oleg, 8fcac6ca QA):** A fact from an earlier message of the member SHALL count as the words of the member. The card prompt SHALL say: "A fact from an earlier message of the member in this chat is in the words of the member. When the member says "add that", keep that fact in the draft." When the whole message is a bare "add that" form (for example "add that to the draft" or "put it in the intro") and the latest reply is the draft line, C1 SHALL return this fixed line with no model call and no `draft_intro`, so the card does not change: "I did not change the draft. To add a new detail, write the detail in your message." The line SHALL NOT say what the draft has, because the draft can be without the fact (R2). "add that answer to the draft" keeps the draft path.
+- **B4 (Oleg):** In a revision of the waiting card (the same target), `draft_intro` SHALL refuse a text with an experience claim (experience, expertise, hands-on, track record, seasoned, veteran, proven, well-versed, background in) that is not in the card text, the message or an own fact of the member. The refusal asks the model to write the draft again. An own fact is a claim sentence of an earlier message of the member in this thread, or a fact of their LabOS profile (`get_my_profile`, `list_my_experiences`, only when the turn has the tool). A draft part with a claim is allowed only when all its words, except filler words, are in ONE own fact. So "I have hands-on experience with IPFS" does not allow "experience in the grants space" or "ten years of experience with IPFS". C1 SHALL keep the claim sentences of the member's own messages (`ownClaims`: no question, no negation, not about another person; at most 20) under `<ENVIRONMENT>:labos-agent:own-claims:` plus `JSON.stringify([memberUid, threadId])`, for 24 hours. It SHALL NOT keep the agent text or the draft text there. Only a message with such a sentence writes the key. The check SHALL read the own facts only when the draft has a new claim. A failed read gives no facts, so the check refuses. A first draft and mild phrases do not change (post-v0).
+- **B3 (Oleg), the strict choice (X2):** An intro request with a chip SHALL use only the chip as the intro target, with no intro hint of the page or of another chip, only when ALL of these are true (not on the `intro` page). (1) The message STARTS with the request, after at most "hi", "ok", "yes" or "please": "[Can you / Help me / I want to] draft (write, make, prepare, create, request) an intro to" or "introduce me / us to", and with a type word also "I want / need / would like an intro to". (2) The recipient comes right after "to": the @name of exactly one chip, or "this team" ("this company", "this member" and similar, also with the @name of the chip after it) that fits exactly one chip and not the page. (3) After the recipient comes only the end of the message (also "please"), or ONE sentence with the reason that starts with "because" or "about", or after a punctuation mark, a line break or a dash with "I / we want, need, would like". The reason names no chip, has no "@", and has no "both", "instead", "rather", "else", "other" or "another". (4) The message does not name the page: its name or first name, "this / that / the page", "this / that / the <page type>" ("the member", "the person", also "the other member"), and on a member page "she", "her", "hers", "he", "him" or "his". (5) The message has no negation and no second "intro to". Everything else is not clear. The rule SHALL NOT grow by wordings: a miss keeps the chip and the page, a wrong choice sends the intro to the wrong person. A chip that the message only mentions SHALL NOT replace the page target.
+- **B3, an ask that is not clear (D1):** When the message asks for an intro with a chip, no chip is chosen and the page is not the recipient ("Draft an intro for @Acme", "an intro with @Acme", "Draft an intro" with a chip, "to someone at @Acme", "to the team", "I want an intro to @Acme", "Ask Grace to make an intro to @Kyle", "Draft an intro to @Acme. Actually the member", "Draft an intro to this team. I work at @Acme", "Connect me with this team"), the page and the chips SHALL be the targets of this turn and of the next turns, until a draft. The prompt SHALL NOT say that the member asked for an intro to that chip. It says that the chip or the page can be the recipient, and that the agent asks when it is not clear. Nothing is kept when the recipient is the page ("an intro to this company, @Kyle told me about it"), when the chip is the own team of the member by its name or "this" ("I work at @Acme", "I lead this team"), when the message has only a past form, and, with a waiting card, when the message has no request with a recipient.
+- **B3, the kept targets (X1):** C1 SHALL keep the chosen chip, or the chips of an unclear ask (at most 3), for the same member and thread under `introTargetKey`: the types and uids, the page of the request (the `context` uids) and the `noPage`, `both` and `unclear` marks, no text and no name, with a 10-minute TTL (a write starts it again). Each later turn on that page SHALL use them, whatever the words of the message. A chosen chip is the only target, so `draft_intro` refuses the page target. The prompt SHALL say that the model makes no draft when the message is about something else. The chips of the message stay targets, and a new unclear ask adds its chips and the page. A question, "ok", "try again", a stopped turn, a failed turn and a turn with a refused draft SHALL keep them. They go when a turn ends with a draft, when a waiting card has one of them as its target, when the teams and members are not found, and after the TTL. With a card for another target, the kept targets and the card target are the targets, and a revision of that card keeps the kept targets.
+- **B3, another recipient (R1):** The kept targets SHALL go when the recipient of a request is the page ("an intro to Grace instead", "to this member", "for her"): then the page is the target, as with no kept target. When the recipient is another name or "another team", when the message is a directory search ("find storage teams") or a cancel ("forget it", "no intro"), there SHALL be no kept or page target in this turn, so the agent makes no draft. In the next turns the kept targets and the page are the targets (D1). When the message names the page in another way ("Grace told me about them", "the member instead", "Not the team, the person", "Grace's team"), the page and the kept targets SHALL all be targets until a draft is made. On another page the kept targets SHALL NOT be used. Back on the page of the request, the page and the kept targets are the targets. When the page of the request was no intro target (Home, no page), they are also used with the page on a member or team page, but not on the `intro` page. While a target is kept, the page is never the only target unless a request names it or the member is on another page.
+- **B3, B4 cache:** Each Redis step of the kept target and the own claims SHALL wait at most 1 second, the limit of the latest reply steps (`LATEST_REPLY_CACHE_TIMEOUT_MS`). A failure or a timeout SHALL NOT stop the turn and gets a fixed log line. A failure loses only the next turn; the chip still wins in its own turn. The steps are not atomic.
 
 These rules add no target and do not force a `draft_intro` call. If a draft needs a reason and the member gave none, the model SHALL ask for the reason before it makes the draft. Only the Q1 rules are in the tool description. `draft_intro` SHALL accept the `introDraft` target as a target of the turn. It SHALL check the sender eligibility and the target again. The backend SHALL NOT store `introDraft` or write its text to a log line, error message or analytics event. The latest reply of a draft turn is only the fixed draft line.
 
 A Husky catch and the C1 controller catch SHALL log only `{ name, statusCode, message }` of an error, not the error object. An AI SDK `APICallError` holds the whole prompt in `requestBodyValues`. When the stream fails after the headers, the controller SHALL destroy the connection with no error argument. For `AI_InvalidToolArgumentsError`, `AI_TypeValidationError` and `AI_JSONParseError`, the log SHALL have only `name` and `toolName` if it is a tool of that call. The Husky answer stream `error` part SHALL use the same log form.
+
+#### Scenario: The chosen team stays the target (X1)
+
+- **GIVEN** a member on the page of Grace who sent "Draft an intro to this team" with a chip for Acme Team, and the agent asked for the reason
+- **WHEN** the member sends "ok" and then "I'm interested in their SDK" with no chip
+- **THEN** only Acme Team is an intro target in both turns
+- **AND** after a turn that ends with the draft for Acme Team, Grace is the target of the page again
+
+#### Scenario: A chip that is only mentioned (X2)
+
+- **GIVEN** a member on a team page
+- **WHEN** the member sends "Draft an intro to this company, @Kyle Weiss told me about it" with a chip for Kyle Weiss
+- **THEN** the page team is an intro target
+- **AND** no target is kept
+
+#### Scenario: A past intro is not a request (X2)
+
+- **GIVEN** a member on a team page
+- **WHEN** the member sends "Thanks for the intro to @Kyle Weiss. Now draft an intro to this team" with a chip for Kyle Weiss, and then the reason
+- **THEN** only the page team is the intro target in the turn of the reason
+
+#### Scenario: The recipient does not end its clause (X2)
+
+- **GIVEN** a member on a team page
+- **WHEN** the member sends "Draft an intro to the person in charge of grants, @Kyle Weiss sent me" with a chip for Kyle Weiss, and then the reason
+- **THEN** the page team and Kyle Weiss are the intro targets in both turns
+- **AND** the prompt does not say that the member asked for an intro to Kyle Weiss
+
+#### Scenario: A correction in the same message (X2)
+
+- **GIVEN** a member on a member page
+- **WHEN** the member sends "Draft an intro to @Acme. Actually the member" with a chip for Acme, and then the reason
+- **THEN** the page member and Acme are the intro targets in both turns
+- **AND** the prompt does not say that the member asked for an intro to Acme
+
+#### Scenario: An ask that is not clear (D1)
+
+- **GIVEN** a member on the page of Grace
+- **WHEN** the member sends "Draft an intro for @Acme Team" with a chip for Acme Team, and then the reason with no chip
+- **THEN** Acme Team and Grace are the intro targets in both turns
+- **AND** the prompt does not say that the member asked for an intro to Acme Team
+
+#### Scenario: Another recipient (R1)
+
+- **GIVEN** a kept Acme Team on the page of Grace
+- **WHEN** the member sends "an intro to Grace instead"
+- **THEN** only Grace is the intro target, and the kept target is gone
+- **AND** for "the member instead", Acme Team and Grace are the intro targets
+- **AND** for "find storage teams" there is no intro target in the turn, and the next turn has Acme Team and Grace
+
+#### Scenario: An own fact in a revision (B4)
+
+- **GIVEN** a waiting card, and an earlier message "I have hands-on experience with IPFS." in the thread
+- **WHEN** the member sends "add that to the draft" after a normal answer
+- **THEN** `draft_intro` accepts the text with that sentence
+- **AND** it refuses "I have hands-on experience in the grants space."
 
 #### Scenario: Make it shorter
 

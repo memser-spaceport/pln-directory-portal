@@ -24,7 +24,7 @@ import {
 } from 'libs/contracts/src/schema/labos-agent';
 import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
-import { HuskyAiService } from '../husky/husky-ai.service';
+import { HuskyAiService, LATEST_REPLY_CACHE_TIMEOUT_MS } from '../husky/husky-ai.service';
 import { IntroRequestsService } from '../intro-requests/intro-requests.service';
 import { JobOpeningsQueryService } from '../job-openings/job-openings-query.service';
 import { McpToolCatalog } from '../mcp/mcp-tool-catalog';
@@ -37,6 +37,7 @@ import { TeamsService } from '../teams/teams.service';
 import { LabosAgentAccessService } from './labos-agent-access.service';
 import { answerCounts } from './labos-agent-answer-counts';
 import {
+  ADD_THAT_LINE,
   DRAFT_FACTS_RULE,
   DRAFT_LIMITS_RULE,
   INTRO_DRAFT_REPLY_LABEL,
@@ -46,8 +47,13 @@ import {
   INTRO_DRAFT_LINE_FORMS,
   introDraftLine,
   IntroTurnTarget,
+  isBareAddThat,
   NO_CHANGE_LINE,
+  ownClaims,
+  PROFILE_READ_TOOLS,
+  profileFacts,
 } from './labos-agent-drafts';
+import { hasIntroRequest, introAsk, keptTargetUse } from './labos-agent-intro-target';
 import {
   asksAgainAfterFailure,
   asksForChange,
@@ -80,8 +86,11 @@ import {
 } from './labos-agent-page-context';
 import {
   canChangeTeam,
+  introTargetKey,
   keyPrefix,
   LabosAgentProposalStore,
+  ownClaimsKey,
+  PendingIntroTarget,
   proposeTool,
   StoredProposal,
 } from './labos-agent-proposals';
@@ -214,11 +223,26 @@ export class LabosAgentService {
     const mentioned = await this.mentionContext(body, memberUid, email);
     // Contract change 4 (LAB-3362, section 11): the waiting intro card, for this turn only. Nothing stores it.
     const card = body.introDraft ? await this.introDraftContext(body.introDraft) : undefined;
-    const basePromptContext = joinPrompt(page.promptContext, mentioned.promptContext, !body.context) || undefined;
-    const promptContext = [basePromptContext, card?.promptContext].filter(Boolean).join('\n') || undefined;
+    // LAB-3367 B3: the intro target that the member chose wins over the page target until a draft is made.
+    const targetKey = introTargetKey(memberUid, body.threadId);
+    const claimsKey = ownClaimsKey(memberUid, body.threadId);
+    const claims = ownClaims(body.message);
+    const [chosen] = await Promise.all([
+      this.chosenIntroTarget(body, page, mentioned.introTargets, card?.introTarget, targetKey),
+      // LAB-3367 B4: the member's own claims, so a later revision can use them. Only a message with a claim writes.
+      claims.length ? this.threadCache(() => this.proposalStore.addOwnClaims(claimsKey, claims)) : undefined,
+    ]);
+    const dropped = chosen?.hints ?? [];
+    const basePromptContext =
+      joinPrompt(
+        withoutIntroHints(page.promptContext, dropped),
+        withoutIntroHints(mentioned.promptContext, dropped),
+        !body.context
+      ) || undefined;
+    const promptContext =
+      [basePromptContext, chosen?.promptContext, card?.promptContext].filter(Boolean).join('\n') || undefined;
     const introTargets = uniqueTargets([
-      ...(page.introTarget ? [page.introTarget] : []),
-      ...mentioned.introTargets,
+      ...(chosen ? chosen.targets : [...(page.introTarget ? [page.introTarget] : []), ...mentioned.introTargets]),
       ...(card ? [card.introTarget] : []),
     ]);
     const ctx = await this.actor(memberUid, email);
@@ -242,11 +266,17 @@ export class LabosAgentService {
       targets: introTargets,
       drafts,
       readTools: reads.map((def) => def.name),
+      // LAB-3367 B4: the claim check.
+      card: body.introDraft
+        ? { type: body.introDraft.target.type, uid: body.introDraft.target.uid, text: body.introDraft.text }
+        : undefined,
+      message: body.message,
+      ownFacts: () => this.ownFacts(claimsKey, reads, ctx),
     });
 
     const extraTools = { ...mcpToolsAsAgentTools(reads, ctx), ...proposeTools, draft_intro: draftIntro };
 
-    return this.huskyAiService.createContextualToolsResponse(
+    const stream = await this.huskyAiService.createContextualToolsResponse(
       { question: body.message, threadId: body.threadId, chatId: body.chatId },
       true,
       email,
@@ -273,6 +303,14 @@ export class LabosAgentService {
         answerInstructions: LAST_ANSWER_RULES,
         // LAB-3367 F1, F3, K3: a code gate for the agreed phrases when a card waits (labos-agent-last-answer.ts).
         latestReplyTurn: (latestReply) => {
+          // LAB-3367 B2 (Oleg): a bare "add that" right after a draft turn keeps the card, with a fixed answer.
+          if (card && isBareAddThat(body.message) && latestReply.trim() === INTRO_DRAFT_LINE) {
+            return {
+              extraTools: Object.fromEntries(Object.entries(extraTools).filter(([name]) => name !== 'draft_intro')),
+              answerLine: undefined,
+              fixedAnswer: ADD_THAT_LINE,
+            };
+          }
           const kind = lastAnswerTurn(body.message, Boolean(card), latestReply);
           const pasted = isPastedText(body.message);
           // LAB-3367 G7, w1: after a failed reply that is not known, answer as a new question, with no Previous reply
@@ -333,7 +371,148 @@ export class LabosAgentService {
         reservedReplyLabel: INTRO_DRAFT_REPLY_LABEL,
       }
     );
+    if (!chosen?.keeps) return stream;
+    // LAB-3367 X1: the kept target goes when the turn ends with a draft. A stopped or failed turn keeps it, because the
+    // member got no card. A revision of the waiting card is not a draft for the kept target.
+    return stream.pipeThrough(
+      new TransformStream({
+        flush: async () => {
+          if (drafts.some((draft) => !sameTarget(draft.target, card?.introTarget))) {
+            await this.threadCache(() => this.proposalStore.clearIntroTarget(targetKey));
+          }
+        },
+      })
+    );
   }
+
+  /**
+   * LAB-3367 B3 (Oleg): the intro targets of the turn when the member chose a target, or undefined for the page and the
+   * chips. `introAsk` reads an ask with a chip, `keptTargetUse` each later message. The kept targets stay until a draft
+   * is made, the TTL ends or the member asks for an intro to the page. See the OpenSpec B3 rule.
+   */
+  private async chosenIntroTarget(
+    body: LabosAgentChatRequest,
+    page: { introTarget?: IntroTurnTarget; introHints?: string[] },
+    chips: IntroTurnTarget[],
+    cardTarget: IntroTurnTarget | undefined,
+    key: string
+  ): Promise<{ targets: IntroTurnTarget[]; promptContext?: string; hints: string[]; keeps: boolean } | undefined> {
+    const pageHints = page.introHints ?? [];
+    const pageKey = JSON.stringify(body.context ?? null);
+    const save = (value: PendingIntroTarget) => this.threadCache(() => this.proposalStore.saveIntroTarget(key, value));
+    const others = chips.filter((item) => !sameTarget(item, page.introTarget) && !sameTarget(item, cardTarget));
+    const onIntroPage = body.context?.page === 'intro';
+    const ask = onIntroPage ? undefined : introAsk(body.message, others, page.introTarget);
+    const keepFor = (targets: IntroTurnTarget[]): PendingIntroTarget => ({
+      targets: targets.slice(0, MAX_KEPT_TARGETS).map(({ type, uid }) => ({ type, uid })),
+      page: pageKey,
+      ...(page.introTarget ? {} : { noPage: true }),
+    });
+    if (ask && ask !== 'unclear') {
+      await save(keepFor([ask]));
+      const otherHints = others.filter((item) => item !== ask).map((item) => introHint(item.type, item.uid));
+      return { targets: [ask], hints: [...pageHints, ...otherHints], keeps: true };
+    }
+    // With a waiting card, "intro" mostly means the card, so only a request with a recipient is an ask.
+    const unclear = ask === 'unclear' && (!cardTarget || hasIntroRequest(body.message));
+    // D1: the next turn has the chip and the page. This turn has them too, with the hints of the page and the chips.
+    const keepUnclear = async () => {
+      if (!unclear) return undefined;
+      await save({ ...keepFor(others), ...(page.introTarget ? { both: true } : {}), unclear: true });
+      return { targets: [...(page.introTarget ? [page.introTarget] : []), ...others], hints: [], keeps: true };
+    };
+    const stored = await this.threadCache(() => this.proposalStore.loadIntroTarget(key));
+    if (!stored) return keepUnclear();
+    // R1: on another page only that page is the target. D1: back on the first page, the page and the kept targets are.
+    const moved = stored.page !== pageKey;
+    if (moved && (onIntroPage || !stored.noPage || !page.introTarget)) {
+      if (!unclear && !stored.both && !stored.noPage) await save({ ...stored, both: true });
+      return keepUnclear();
+    }
+    const drop = () => this.threadCache(() => this.proposalStore.clearIntroTarget(key));
+    // A waiting card for a kept target: its draft is made.
+    const done = stored.targets.some((target) => sameTarget(target, cardTarget));
+    const kept = done ? [] : await this.keptTargets(stored);
+    if (!kept.length) {
+      await drop();
+      return keepUnclear();
+    }
+    const use = keptTargetUse(body.message, kept, page.introTarget);
+    if (use === 'page') {
+      await drop();
+      return undefined;
+    }
+    // A new unclear ask adds its chips and the page: the kept targets stay possible.
+    const added = unclear ? others.filter((item) => !kept.some((target) => sameTarget(target, item))) : [];
+    const paused = use === 'pause' && !added.length;
+    const pending: PendingIntroTarget = {
+      ...stored,
+      targets: uniqueTargets([...added, ...kept])
+        .slice(0, MAX_KEPT_TARGETS)
+        .map(({ type, uid }) => ({ type, uid })),
+      ...(use === 'both' || paused || moved || added.length ? { both: true } : {}),
+      ...(added.length ? { unclear: true } : {}),
+    };
+    if (JSON.stringify(pending) !== JSON.stringify(stored)) await save(pending);
+    // D1: no target in the turn of a search or a cancel, but the next turn has the page and the kept targets.
+    if (paused) return { targets: others, hints: pageHints, keeps: true };
+    const both = !!page.introTarget && !!pending.both;
+    const targets = uniqueTargets([...kept, ...(both && page.introTarget ? [page.introTarget] : []), ...others]);
+    return { targets, promptContext: keptPrompt(kept, pending, both), hints: both ? [] : pageHints, keeps: true };
+  }
+
+  /** The kept targets with their names from the database. A deleted target has no name. */
+  private async keptTargets(stored: PendingIntroTarget): Promise<IntroTurnTarget[]> {
+    const named = await Promise.all(
+      stored.targets.map(async ({ type, uid }) => ({
+        type,
+        uid,
+        name: await this.introRequests.findAgentTargetName(type === 'member' ? 'MEMBER' : 'TEAM', uid),
+      }))
+    );
+    return named.flatMap(({ type, uid, name }) => (name ? [{ type, uid, name }] : []));
+  }
+
+  /**
+   * LAB-3367 B4: the own facts of the member for the claim check: the claims of their earlier messages in the thread,
+   * and their LabOS profile through the read tools of the turn. A part that fails gives no facts, so the check refuses.
+   */
+  private async ownFacts(claimsKey: string, reads: McpToolDef[], ctx: McpActorContext): Promise<string[]> {
+    const profile = reads.filter((def) => (PROFILE_READ_TOOLS as readonly string[]).includes(def.name));
+    const parts = await Promise.all([
+      this.threadCache(() => this.proposalStore.loadOwnClaims(claimsKey)),
+      ...profile.map((def) =>
+        def.execute(ctx, {}).then(profileFacts, () => {
+          this.logger.error(`Failed to read ${def.name} for the claim check of a LabOS agent draft`);
+          return undefined;
+        })
+      ),
+    ]);
+    return parts.flatMap((part) => part ?? []);
+  }
+
+  /**
+   * LAB-3367 B3, B4: one cache step of the kept target or the own claims. It waits at most 1 second, as the latest
+   * reply steps. A failure or a timeout logs a fixed text (a Redis error can hold the arguments) and gives undefined.
+   */
+  private async threadCache<T>(step: () => Promise<T>): Promise<T | undefined> {
+    let timer: NodeJS.Timeout | undefined;
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => reject(new Error('timeout')), this.threadCacheTimeoutMs);
+      timer.unref?.();
+    });
+    try {
+      return await Promise.race([step(), timeout]);
+    } catch {
+      this.logger.error('Failed to read or write the intro state of the LabOS agent thread');
+      return undefined;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  /** A field, so a test can make it short. */
+  private threadCacheTimeoutMs = LATEST_REPLY_CACHE_TIMEOUT_MS;
 
   /**
    * C2: closes a proposal. Cancel writes nothing. Confirm checks the member's current permissions again, then runs
@@ -612,6 +791,8 @@ export class LabosAgentService {
       `${DRAFT_FACTS_RULE} ` +
       // LAB-3367 G8: the same draft limits as the draft_intro description.
       `${DRAFT_LIMITS_RULE} ` +
+      'A fact from an earlier message of the member in this chat is in the words of the member. ' +
+      'When the member says "add that", keep that fact in the draft. ' +
       // LAB-3367 F1, k1: the rules for your last answer (LAST_ANSWER_RULES, in the system message) win. Prompt guidance.
       'If the member asks to change your last answer, the rules for your last answer apply, and they win over this ' +
       'draft. ' +
@@ -668,6 +849,27 @@ function introHint(type: 'member' | 'team', uid: string): string {
   );
 }
 
+/** LAB-3367 B3: at most this many kept targets. */
+const MAX_KEPT_TARGETS = 3;
+
+/** LAB-3367 B3: the prompt lines of the kept targets. Never says that the member chose a target that they did not. */
+function keptPrompt(kept: IntroTurnTarget[], { unclear }: PendingIntroTarget, both: boolean): string {
+  const calls = kept
+    .map(({ type, uid }) => `draft_intro with type "${type}" and targetUid "${uid}"`)
+    .join(kept.length > 1 ? ' or ' : '');
+  const ask = 'Use the one that the member means. If it is not clear, ask which one and make no draft. ';
+  const start = unclear
+    ? `Earlier in this chat, the member asked for an intro and added ${JSON.stringify(kept)}. ` +
+      `The recipient can be ${kept.length > 1 ? 'one of these' : 'this'}${both ? ', or the page' : ''}, ` +
+      `or that message only mentions it. ${ask}`
+    : `Earlier in this chat, the member asked for an intro to this ${kept[0].type}: ${JSON.stringify(kept[0])}. ` +
+      (both ? `The page is also an intro target. ${ask}` : 'It is the intro target of this turn, not the page. ');
+  return (
+    `${start}When the member gives the reason for this intro, call ${calls}. ` +
+    `If the message is about something else, answer it and make no draft. ${INTRO_REASON_RULE} You never send the request.`
+  );
+}
+
 /** The dedupe key of the `context` item (contract 10.4). The `intro` page and a job post have no mention key. */
 function pageItemKey(context: LabosAgentChatRequest['context'], memberUid: string): string | undefined {
   if (!context) return undefined;
@@ -702,6 +904,10 @@ function withMentionIndex(error: unknown, index: number): unknown {
 function joinPrompt(page: string | undefined, mentioned: string | undefined, noContext: boolean): string | undefined {
   if (!page && !mentioned) return noContext ? NO_PAGE_SENTENCE : undefined;
   return [page, mentioned].filter(Boolean).join('\n');
+}
+
+function sameTarget(a: { type: string; uid: string }, b: { type: string; uid: string } | undefined): boolean {
+  return !!b && a.type === b.type && a.uid === b.uid;
 }
 
 /** One target for each type and uid, in order. */

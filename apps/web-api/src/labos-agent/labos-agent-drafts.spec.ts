@@ -2,7 +2,7 @@
 // agent and C3 share one sender rule in these tests. Same light mocks as labos-agent.spec.ts.
 jest.mock('axios', () => ({ __esModule: true, default: { post: jest.fn(), isAxiosError: () => false } }));
 jest.mock('../guards/user-token-validation.guard', () => ({ UserTokenValidation: class UserTokenValidation {} }));
-jest.mock('../husky/husky-ai.service', () => ({ HuskyAiService: jest.fn() }));
+jest.mock('../husky/husky-ai.service', () => ({ HuskyAiService: jest.fn(), LATEST_REPLY_CACHE_TIMEOUT_MS: 1_000 }));
 jest.mock('../team-news/team-news-query.service', () => ({ TeamNewsQueryService: jest.fn() }));
 jest.mock('../team-news/team-news-suggestions.service', () => ({ TeamNewsSuggestionsService: jest.fn() }));
 jest.mock('../mcp/mcp-tool-catalog', () => ({ McpToolCatalog: jest.fn() }));
@@ -24,14 +24,21 @@ import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.const
 import { LabosAgentAccessService } from './labos-agent-access.service';
 import { LabosAgentController } from './labos-agent.controller';
 import {
+  ADD_THAT_LINE,
+  ADDED_CLAIM_TEXT,
+  addedClaims,
+  isBareAddThat,
   INTRO_DRAFT_FAILED_TEXT,
   INTRO_DRAFT_LINE,
   INTRO_NOT_ELIGIBLE_TEXT,
   profileToolsLine,
   DRAFT_LIMITS_RULE,
   INTRO_REASON_RULE,
+  ownClaims,
+  IntroTurnTarget,
 } from './labos-agent-drafts';
-import { LabosAgentProposalStore } from './labos-agent-proposals';
+import { introTargetKey, LabosAgentProposalStore, ownClaimsKey } from './labos-agent-proposals';
+import { introAsk } from './labos-agent-intro-target';
 import {
   ASK_AGAIN_RULE,
   CARD_OPEN_RULE,
@@ -44,6 +51,12 @@ import {
 } from './labos-agent.service';
 import { ASK_WHAT_LINE, DRAFT_CARD_REPLY_LINE, WHICH_REPLY_LINE } from './labos-agent-last-answer';
 import * as pageContextModule from './labos-agent-page-context';
+
+// Jest's node environment (Jest 27) has no web streams. Node 22 has them.
+for (const name of ['ReadableStream', 'TransformStream', 'WritableStream'] as const) {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  if (!(globalThis as any)[name]) (globalThis as any)[name] = require('stream/web')[name];
+}
 
 /** Far from today, so the role end-date checks do not depend on the clock. */
 const PAST = new Date('2000-01-01T00:00:00.000Z');
@@ -85,7 +98,11 @@ const DRAFT_FACTS_RULE =
 const TEAM_CONTEXT = { page: 'intro', introTarget: { type: 'team', uid: 't-acme' } };
 
 /** `permissions` are the RBAC permissions of the sender, for example `member.search.read` for a member chip. */
-function setup(sender: Partial<Person> = { roles: [portfolio()] }, permissions: string[] = []) {
+function setup(
+  sender: Partial<Person> = { roles: [portfolio()] },
+  permissions: string[] = [],
+  tools: Array<Record<string, unknown>> = []
+) {
   process.env.ENVIRONMENT = APP_ENV.DEV;
   const people: Person[] = [
     { uid: 'm-ada', name: 'Ada', email: 'ada@example.com', deletedAt: null, roles: [], policies: [], ...sender },
@@ -154,18 +171,19 @@ function setup(sender: Partial<Person> = { roles: [portfolio()] }, permissions: 
   const introMembers = { findMemberByEmail: jest.fn(async () => null) };
   const introRequests = new IntroRequestsService(prisma as any, telegram as any, introMembers as any);
   const cache = { get: jest.fn(), set: jest.fn(), del: jest.fn() };
-  const husky = { createContextualToolsResponse: jest.fn().mockResolvedValue({ pipeTo: jest.fn() }) };
+  const stream = { pipeTo: jest.fn(), pipeThrough: jest.fn().mockReturnThis() };
+  const husky = { createContextualToolsResponse: jest.fn().mockResolvedValue(stream) };
   const service = new LabosAgentService(
     prisma as any,
     new LabosAgentAccessService({ hasPermission: jest.fn().mockResolvedValue({ allowed: false }) } as any),
     husky as any,
     { getTeamNewsItemDto: jest.fn() } as any,
-    { forApp: jest.fn(() => []) } as any,
+    { forApp: jest.fn(() => tools) } as any,
     { getMemberAccess: jest.fn().mockResolvedValue({ effectivePermissions: permissions }) } as any,
     new LabosAgentProposalStore(cache as any),
     { adminCaps: jest.fn(async () => Object.fromEntries(MCP_SCOPE_KEYS.map((key) => [key, 'write']))) } as any,
     introRequests,
-    {} as any,
+    { assertTeamVisibleToViewer: jest.fn() } as any,
     {} as any
   );
   const controller = new LabosAgentController(service);
@@ -188,7 +206,7 @@ function setup(sender: Partial<Person> = { roles: [portfolio()] }, permissions: 
     for (const args of calls) texts.push(await options.extraTools.draft_intro.execute(args));
     return { texts, drafts: options.extraResponseFields.drafts as Array<Record<string, any>>, options };
   };
-  return { prisma, telegram, cache, husky, controller, req, res, introRequests, turn, teams };
+  return { prisma, telegram, cache, husky, service, controller, req, res, introRequests, turn, teams, people };
 }
 
 describe('LabOS agent intro drafts (LAB-3300)', () => {
@@ -1515,5 +1533,905 @@ describe('draft_intro invalid arguments (LAB-3362, Oleg 1795251083.950879)', () 
     expect(parsed.success).toBe(true);
     expect(parsed.data).not.toHaveProperty('note');
     expect(JSON.stringify(parsed.data)).not.toContain('Secret-draft-5e1f');
+  });
+});
+
+describe('LAB-3367 B2, B3, B4 (Oleg live QA on 8fcac6ca)', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  // Fake targets only: a member page (Grace Hopper) and a team chip (Acme Team).
+  const PAGE = { context: { page: 'member', memberUid: 'm-grace' } };
+  const ASK = { ...PAGE, message: 'Draft an intro to this team', mentions: [{ type: 'team', uid: 't-acme' }] };
+  const REASON = { ...PAGE, message: 'I want feedback on our roadmap.' };
+  const ACME = { type: 'team' as const, uid: 't-acme' };
+  const GRACE_REF = { type: 'member', uid: 'm-grace' };
+  const CARD =
+    'Hi, I lead fundraising at Acme. I mentored three teams last year. I want your advice on our seed round.';
+  const REFUSED = 'not the intro target of this turn';
+
+  const KYLE = { type: 'member', uid: 'm-kyle' };
+  const draftArgs = (target: { type: string; uid: string }, text = CARD) => ({
+    type: target.type,
+    targetUid: target.uid,
+    text,
+  });
+
+  /** A Map cache, so the kept target works across turns. `reads` are the MCP read tools of the member. */
+  function withCache(reads: Array<Record<string, unknown>> = []) {
+    const h = setup(undefined, [MEMBER_PERMISSIONS.SEARCH_READ], reads);
+    const store = new Map<string, unknown>();
+    h.cache.get.mockImplementation(async (key: string) => store.get(key));
+    h.cache.set.mockImplementation(async (key: string, value: unknown) => void store.set(key, value));
+    h.cache.del.mockImplementation(async (key: string) => (store.delete(key) ? 1 : 0));
+    h.teams.set('t-beta', { name: 'Beta', status: 'ACTIVE' });
+    jest
+      .spyOn(pageContextModule, 'teamPageRow')
+      .mockImplementation(async (_teams, _prisma, uid) => ({ uid, name: 'Team', shortDescription: null }));
+    return { ...h, store };
+  }
+  type Harness = ReturnType<typeof withCache>;
+
+  /** One C1 turn. The model calls `draft_intro` with each item of `drafts`. `stop` cancels the turn before its end. */
+  async function chat(
+    h: Harness,
+    body: Record<string, unknown>,
+    opts: { latestReply?: string; drafts?: Array<Record<string, unknown>>; stop?: boolean } = {}
+  ) {
+    const texts: string[] = [];
+    let turn: any;
+    h.husky.createContextualToolsResponse.mockImplementationOnce(async (...args: any[]) => {
+      const options = args[3];
+      turn = options.latestReplyTurn(opts.latestReply ?? '');
+      return new ReadableStream({
+        async start(controller) {
+          for (const args of opts.drafts ?? []) texts.push(await options.extraTools.draft_intro.execute(args));
+          if (!opts.stop) return controller.close();
+          const onClose = h.res.on.mock.calls.filter(([name]: any[]) => name === 'close').at(-1)[1];
+          onClose();
+        },
+      });
+    });
+    await h.controller.chat({ ...VALID, ...body } as any, h.req, h.res as any);
+    const options = h.husky.createContextualToolsResponse.mock.calls.at(-1)[3];
+    return { options, turn, texts, prompt: options.promptContext as string };
+  }
+
+  const draft = (options: any, target: { type: string; uid: string }, text = CARD) =>
+    options.extraTools.draft_intro.execute(draftArgs(target, text));
+  /** The targets that `draft_intro` takes in the turn. */
+  const targets = async (options: any) => {
+    const out: string[] = [];
+    for (const target of [GRACE_REF, KYLE, ACME, { type: 'team', uid: 't-beta' }]) {
+      if (!(await draft(options, target)).includes(REFUSED)) out.push(target.uid);
+    }
+    return out;
+  };
+  const pending = (h: Harness) => h.store.get(introTargetKey('m-ada', 'thread-1'));
+  /** The kept Acme Team of an ask on the page of Grace, and the same after a message that is not clear. */
+  const KEPT = { targets: [ACME], page: JSON.stringify(PAGE.context) };
+  const KEPT_BOTH = { ...KEPT, both: true };
+  const NOT_PAGE = 'It is the intro target of this turn, not the page.';
+
+  it('B3: the chip wins, and the reason in the next turn drafts to the team, not to the page member', async () => {
+    const h = withCache();
+    const first = await chat(h, ASK);
+    expect(first.prompt).toContain('call draft_intro with type "team" and targetUid "t-acme"');
+    expect(first.prompt).not.toContain('targetUid "m-grace"');
+    expect(await targets(first.options)).toEqual(['t-acme']);
+    // Uids only: no name and no message text.
+    expect(h.cache.set.mock.calls[0]).toEqual([
+      introTargetKey('m-ada', 'thread-1'),
+      { targets: [ACME], page: JSON.stringify(PAGE.context) },
+      { ttl: 600 },
+    ]);
+
+    const { options, prompt, texts } = await chat(h, REASON, { drafts: [draftArgs(GRACE_REF), draftArgs(ACME)] });
+    expect(prompt).toContain('the member asked for an intro to this team');
+    expect(prompt).not.toContain('targetUid "m-grace"');
+    expect(texts[0]).toContain(REFUSED);
+    expect(texts[1]).toContain('is ready for Acme Team');
+    expect(options.extraResponseFields.drafts[0].target.uid).toBe('t-acme');
+    // The draft went out, so the kept target is gone and the page is the target again.
+    expect(h.store.size).toBe(0);
+    expect(await targets((await chat(h, REASON)).options)).toEqual(['m-grace']);
+  });
+
+  it.each([
+    'Feedback on our roadmap',
+    'Yes, I want feedback on our roadmap',
+    "I'm interested in their SDK",
+    'I mentored three teams last year and want feedback on our roadmap.',
+    'I build an open-source grants dashboard and want to ask how teams integrate it.',
+    'Partnership',
+    'Reason: co-funding a grants round',
+    'I want to know how they find their grantees',
+    'We would like to see if our SDK fits their stack',
+    "I'm looking for people to pilot it",
+    'Хочу обсудить грант',
+    'I want an intro to them because we build the same thing',
+    'I want an intro to Acme because we build the same thing',
+    'I want an intro to their CTO about storage',
+  ])('X1: the reason "%s" keeps the team as the only target', async (message) => {
+    const h = withCache();
+    await chat(h, ASK);
+    expect(await targets((await chat(h, { ...PAGE, message })).options)).toEqual(['t-acme']);
+    expect(pending(h)).toEqual(KEPT);
+  });
+
+  it.each(['ok', 'What does this team do?', 'try again', 'Make it short please', 'What is new in LabOS?'])(
+    'X1: after "%s" in between, the reason still has only the team',
+    async (message) => {
+      const h = withCache();
+      await chat(h, ASK);
+      const between = await chat(h, { ...PAGE, message });
+      expect(between.prompt).toContain('If the message is about something else, answer it and make no draft.');
+      expect(await targets((await chat(h, REASON)).options)).toEqual(['t-acme']);
+    }
+  );
+
+  it('X1: a Stop in the reason turn keeps the target, also when the model had made the draft', async () => {
+    const h = withCache();
+    await chat(h, ASK);
+    const stopped = await chat(h, REASON, { drafts: [draftArgs(ACME)], stop: true });
+    expect(stopped.texts[0]).toContain('is ready for Acme Team');
+    expect(h.res.destroy).toHaveBeenCalled();
+    expect(await targets((await chat(h, REASON)).options)).toEqual(['t-acme']);
+  });
+
+  it('X1: a draft that a second call removed keeps the target', async () => {
+    const h = withCache();
+    await chat(h, ASK);
+    await chat(h, REASON, { drafts: [draftArgs(ACME), draftArgs(GRACE_REF)] });
+    expect(pending(h)).toEqual(KEPT);
+  });
+
+  it('X1: a draft in the turn of the ask leaves no kept target', async () => {
+    const h = withCache();
+    await chat(h, { ...ASK, message: 'Draft an intro to this team. I want feedback.' }, { drafts: [draftArgs(ACME)] });
+    expect(h.store.size).toBe(0);
+  });
+
+  it('X1: the same chip again, and a chip that the reason only mentions, keep the team and never the page', async () => {
+    const h = withCache();
+    h.people.push({
+      uid: 'm-kyle',
+      name: 'Kyle Weiss',
+      email: 'k@example.com',
+      deletedAt: null,
+      roles: [],
+      policies: [],
+    });
+    await chat(h, ASK);
+    expect(await targets((await chat(h, { ...ASK, message: 'Feedback on our roadmap' })).options)).toEqual(['t-acme']);
+    const mentioned = await chat(h, { ...PAGE, message: '@Kyle Weiss told me about them', mentions: [KYLE] });
+    expect(await targets(mentioned.options)).toEqual(['m-kyle', 't-acme']);
+    expect(pending(h)).toEqual(KEPT);
+  });
+
+  it('X1: with a card for the page member, the reason has the team and the card, and the card keeps its revision', async () => {
+    const h = withCache();
+    const introDraft = { target: GRACE_REF, text: CARD };
+    await chat(h, { ...ASK, introDraft });
+    const shorter = await chat(
+      h,
+      { ...PAGE, introDraft, message: 'make it shorter' },
+      { drafts: [draftArgs(GRACE_REF)] }
+    );
+    expect(shorter.texts[0]).toContain('is ready for Grace Hopper');
+    const reason = await chat(h, { ...REASON, introDraft }, { drafts: [draftArgs(ACME)] });
+    expect(reason.texts[0]).toContain('is ready for Acme Team');
+    expect(h.store.size).toBe(0);
+  });
+
+  it('X1: a card for the kept target ends the request, also when the clear failed', async () => {
+    const h = withCache();
+    await chat(h, ASK);
+    h.cache.del.mockRejectedValueOnce(new Error('redis down'));
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    await chat(h, REASON, { drafts: [draftArgs(ACME)] });
+    expect(pending(h)).toBeDefined();
+    const card = await chat(h, { ...PAGE, message: 'make it shorter', introDraft: { target: ACME, text: CARD } });
+    expect(card.prompt).not.toContain('Earlier in this chat');
+    expect(await targets(card.options)).toEqual(['m-grace', 't-acme']);
+    expect(pending(h)).toBeUndefined();
+  });
+
+  it.each([
+    'Draft an intro to this member',
+    'Draft an intro to Grace Hopper instead',
+    'an intro to Grace instead',
+    'I want an intro to her too',
+    'I would like an intro to the member on this page',
+  ])('R1: "%s" makes the page the target and drops the team', async (message) => {
+    const h = withCache();
+    await chat(h, ASK);
+    const { options, prompt } = await chat(h, { ...PAGE, message });
+    expect(prompt).toContain('targetUid "m-grace"');
+    expect(prompt).not.toContain('t-acme');
+    expect(await targets(options)).toEqual(['m-grace']);
+    expect(h.store.size).toBe(0);
+    expect((await chat(h, REASON)).prompt).not.toContain('t-acme');
+  });
+
+  it.each([
+    'find storage teams',
+    'I want to find storage teams',
+    'I want to find teams to pilot our SDK',
+    'an intro to Dana instead',
+    'I want an intro to Grace Kim',
+    'Draft an intro for Gitcoin',
+    'I want an intro to another team',
+    'I want to stop, no intro',
+    'forget it',
+    'never mind',
+  ])('R1, D1: "%s" has no target in this turn, then the team and the page', async (message) => {
+    const h = withCache();
+    await chat(h, ASK);
+    const { options, prompt } = await chat(h, { ...PAGE, message });
+    expect(prompt).not.toContain('draft_intro');
+    expect(await targets(options)).toEqual([]);
+    expect(pending(h)).toEqual(KEPT_BOTH);
+    const reason = await chat(h, REASON);
+    expect(reason.prompt).toContain('The page is also an intro target.');
+    expect(reason.prompt).not.toContain(NOT_PAGE);
+    expect(await targets(reason.options)).toEqual(['m-grace', 't-acme']);
+  });
+
+  it.each([
+    "Don't forget that I mentored three teams",
+    'I have no intro deck, but I want feedback',
+    'I was introduced to Dana last year and want feedback',
+    'Never mind the length, I want feedback on our roadmap',
+  ])('X1: "%s" is no cancel and no other recipient', async (message) => {
+    const h = withCache();
+    await chat(h, ASK);
+    expect(await targets((await chat(h, { ...PAGE, message })).options)).toEqual(['t-acme']);
+  });
+
+  it.each([
+    'I want to ask Grace about our roadmap',
+    'Grace told me about them',
+    'To Grace, not the team',
+    "I don't want an intro to Grace, I want feedback",
+    'I want this member instead',
+    'She told me about them',
+    'the member instead',
+    'Not the team, the person. I want feedback',
+    'Actually, the page member',
+    'no, for the member',
+    'that person, please',
+    'the other person',
+    'I was introduced to Grace last year and want feedback',
+    'the page instead',
+    'Switch it to an intro to Grace',
+    "an intro to Grace's team",
+    "Draft an intro to Grace Hopper's team",
+  ])('R1: "%s" names the page in another way, so both stay until a draft', async (message) => {
+    const h = withCache();
+    await chat(h, ASK);
+    const { options, prompt } = await chat(h, { ...PAGE, message });
+    expect(prompt).toContain('The page is also an intro target.');
+    expect(prompt).toContain('targetUid "m-grace"');
+    expect(await targets(options)).toEqual(['m-grace', 't-acme']);
+    expect(await targets((await chat(h, REASON)).options)).toEqual(['m-grace', 't-acme']);
+    await chat(h, REASON, { drafts: [draftArgs(GRACE_REF)] });
+    expect(h.store.size).toBe(0);
+  });
+
+  it.each([
+    ['another team page', { page: 'team', teamUid: 't-beta' }, ['t-beta']],
+    ['Home', { page: 'home' }, []],
+    ['no page', undefined, []],
+    ['the intro page', MEMBER_CONTEXT, ['m-grace']],
+  ])(
+    'R1, D1: on %s the kept team is not used, and back on the page both are targets',
+    async (_name, context, expected) => {
+      const h = withCache();
+      await chat(h, ASK);
+      const { options, prompt } = await chat(h, { context, message: 'I want an intro to this company' });
+      expect(prompt).not.toContain('t-acme');
+      expect(await targets(options)).toEqual(expected);
+      expect(pending(h)).toEqual(KEPT_BOTH);
+      expect(await targets((await chat(h, REASON)).options)).toEqual(['m-grace', 't-acme']);
+    }
+  );
+
+  it.each([{ context: { page: 'home' } }, {}])(
+    'D1: an ask with %j and the reason on a member page has both targets, but not on the intro page',
+    async (start) => {
+      const h = withCache();
+      const first = await chat(h, { ...start, message: 'Draft an intro to this team', mentions: [ACME] });
+      expect(await targets(first.options)).toEqual(['t-acme']);
+      expect(await targets((await chat(h, { ...REASON, context: MEMBER_CONTEXT })).options)).toEqual(['m-grace']);
+      const reason = await chat(h, REASON);
+      expect(reason.prompt).not.toContain(NOT_PAGE);
+      expect(await targets(reason.options)).toEqual(['m-grace', 't-acme']);
+      // A request for the page ends it.
+      expect(await targets((await chat(h, { ...PAGE, message: 'Draft an intro to this member' })).options)).toEqual([
+        'm-grace',
+      ]);
+      expect(h.store.size).toBe(0);
+    }
+  );
+
+  it('B3: another thread or member does not get the kept target', async () => {
+    const h = withCache();
+    await chat(h, ASK);
+    expect((await chat(h, { ...REASON, threadId: 'thread-2' })).prompt).not.toContain('t-acme');
+    expect(introTargetKey('m-ada', 'thread-1')).not.toBe(introTargetKey('m-grace', 'thread-1'));
+    expect([...h.store.keys()]).toEqual([introTargetKey('m-ada', 'thread-1')]);
+  });
+
+  it('B3: a deleted team and a bad stored value are not used', async () => {
+    const h = withCache();
+    await chat(h, ASK);
+    h.teams.set('t-acme', { name: 'Acme Team', status: 'INACTIVE' });
+    expect(await targets((await chat(h, REASON)).options)).toEqual(['m-grace']);
+    h.teams.set('t-acme', { name: 'Acme Team', status: 'ACTIVE' });
+    const page = JSON.stringify(PAGE.context);
+    for (const bad of [{ ...ACME, page }, { targets: [{ type: 'other', uid: 't-acme' }], page }, { targets: [ACME] }]) {
+      h.store.set(introTargetKey('m-ada', 'thread-1'), bad);
+      expect(await targets((await chat(h, REASON)).options)).toEqual(['m-grace']);
+    }
+  });
+
+  it('B3: a cache failure keeps the chip target of this turn, and loses only the next turn', async () => {
+    const h = withCache();
+    const log = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    h.cache.get.mockRejectedValue(new Error('redis down SECRET'));
+    h.cache.set.mockRejectedValue(new Error('redis down SECRET'));
+    expect(await targets((await chat(h, ASK)).options)).toEqual(['t-acme']);
+    expect(await targets((await chat(h, REASON)).options)).toEqual(['m-grace']);
+    expect(JSON.stringify(log.mock.calls)).not.toContain('SECRET');
+  });
+
+  it('B3, B4: a hung Redis does not hold a turn: each step waits at most the 1 second limit', async () => {
+    const h = withCache();
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    expect((h.service as any).threadCacheTimeoutMs).toBe(1_000);
+    (h.service as any).threadCacheTimeoutMs = 20;
+    const hang = () => new Promise<never>(() => undefined);
+    h.cache.get.mockImplementation(hang);
+    h.cache.set.mockImplementation(hang);
+    h.cache.del.mockImplementation(hang);
+    expect(await targets((await chat(h, ASK, { drafts: [draftArgs(ACME)] })).options)).toEqual(['t-acme']);
+    const introDraft = { target: ACME, text: CARD };
+    const claim = `${CARD} I have hands-on experience with IPFS.`;
+    const own = { ...PAGE, introDraft, message: 'I have experience with IPFS.' };
+    expect((await chat(h, own, { drafts: [draftArgs(ACME, claim)] })).texts).toEqual([ADDED_CLAIM_TEXT]);
+    // The read works, but the clear hangs.
+    h.cache.get.mockImplementation(async (key: string) =>
+      key === introTargetKey('m-ada', 'thread-1') ? KEPT : undefined
+    );
+    const page = { ...PAGE, message: 'Draft an intro to this member' };
+    expect(await targets((await chat(h, page)).options)).toEqual(['m-grace']);
+  });
+
+  describe('X2: only a chip right after "intro to", or a type word, is the recipient', () => {
+    const MEMBER_PAGE = { context: { page: 'member', memberUid: 'm-grace' }, mentions: [ACME] };
+    const TEAM_PAGE = { context: { page: 'team', teamUid: 't-acme' }, mentions: [KYLE] };
+    const h2 = () => {
+      const h = withCache();
+      h.people.push({
+        uid: 'm-kyle',
+        name: 'Kyle Weiss',
+        email: 'k@example.com',
+        deletedAt: null,
+        roles: [],
+        policies: [],
+      });
+      return h;
+    };
+
+    const R_TEAM = { context: TEAM_PAGE.context, message: 'I want feedback on our roadmap.' };
+    const WRONG = 'the member asked for an intro to this';
+
+    /** The page is the recipient: both are targets now (as with no rule), nothing is kept, and the reason has the page. */
+    it.each([
+      'Draft an intro to this team, @Kyle Weiss told me about it',
+      'Draft an intro to this company, @Kyle Weiss told me about it',
+      'Draft an intro to this org and mention that @Kyle Weiss suggested it',
+      'Draft an intro to the team. I met @Kyle Weiss at the summit',
+      'Thanks for the intro to @Kyle Weiss. Now draft an intro to this team',
+      'I was introduced to @Kyle Weiss last week. Draft an intro to this team.',
+      'I already have an intro to @Kyle Weiss, now draft one to this team',
+      'Someone introduced me to @Kyle Weiss, so draft an intro request for Acme Team',
+      "@Kyle Weiss gave me an intro to this team's founder. Draft an intro to this team",
+      'Thanks for the intro to @Kyle Weiss',
+      'mention that I was introduced to @Kyle Weiss at the summit',
+      'I got an intro to @Kyle Weiss',
+      'Did you send the intro to @Kyle Weiss?',
+    ])('team page, "%s": the chip is not chosen and not kept', async (message) => {
+      const h = h2();
+      const { options, prompt } = await chat(h, { ...TEAM_PAGE, message });
+      expect(prompt).toContain('targetUid "t-acme"');
+      expect(await targets(options)).toEqual(['m-kyle', 't-acme']);
+      expect(h.store.size).toBe(0);
+      expect(await targets((await chat(h, R_TEAM)).options)).toEqual(['t-acme']);
+    });
+
+    it.each([
+      'Draft an intro to her, I work at @Acme Team',
+      'Draft an intro to Grace, mention that I work at @Acme Team',
+      'Draft an intro to this profile, I work at @Acme Team',
+      'Draft an intro to Grace. I work at this team, @Acme Team',
+      'Draft an intro. I work at @Acme Team and want feedback on our roadmap',
+      'Draft an intro. I lead this team and want feedback',
+      'Draft an intro for her, I built this team',
+      'Draft an intro, this team is mine: @Acme Team',
+      'Draft an intro for Grace. I love this team',
+      'I got an intro to @Acme Team, now draft an intro to this member',
+      'I was introduced to @Acme Team. Draft an intro to Grace about it',
+    ])('member page, "%s": the chip is not chosen and not kept', async (message) => {
+      const h = h2();
+      const { options, prompt } = await chat(h, { ...MEMBER_PAGE, message });
+      expect(prompt).toContain('targetUid "m-grace"');
+      expect(await targets(options)).toEqual(['m-grace', 't-acme']);
+      expect(h.store.size).toBe(0);
+      expect(await targets((await chat(h, REASON)).options)).toEqual(['m-grace']);
+    });
+
+    /** D1: not clear, so this turn and the reason turn have both, and no line says that the member chose the chip. */
+    it.each([
+      'Draft an intro to them, mention that I know @Kyle Weiss',
+      'Draft an intro. I want feedback on our roadmap and @Kyle Weiss sent me',
+      'Help me write an intro request here. I know @Kyle Weiss.',
+      'Draft an intro, this person sent me: @Kyle Weiss',
+      'Draft an intro for me, this member told me to ask: @Kyle Weiss',
+      'Draft an intro to @Kyle Weiss and this team',
+      "Draft an intro to @Kyle Weiss's team",
+      'Draft an intro to @Kyle Weiss. The intro to this team can wait',
+      'Draft an intro to @Kyle Weiss, I like the intro to this org',
+      'Draft an intro to @Kyle Weiss, as short as my intro to Dana',
+      'He can give me an intro to @Kyle Weiss',
+      'Kyle offered to introduce me to @Kyle Weiss',
+      'An intro to @Kyle Weiss went well, so write an intro',
+    ])('D1, team page, "%s": both, also in the reason turn', async (message) => {
+      const h = h2();
+      const ask = await chat(h, { ...TEAM_PAGE, message });
+      expect(await targets(ask.options)).toEqual(['m-kyle', 't-acme']);
+      expect(ask.prompt).not.toContain('Earlier in this chat');
+      const reason = await chat(h, R_TEAM);
+      expect(await targets(reason.options)).toEqual(['m-kyle', 't-acme']);
+      expect(reason.prompt).not.toContain(WRONG);
+      expect(reason.prompt).toContain('or that message only mentions it');
+      expect(reason.prompt).toContain('targetUid "t-acme"');
+      await chat(h, R_TEAM, { drafts: [draftArgs(ACME)] });
+      expect(h.store.size).toBe(0);
+    });
+
+    it.each([
+      'Draft an intro for @Acme Team',
+      'Draft an intro with @Acme Team',
+      'I want an intro with @Acme Team',
+      'Draft an intro',
+      'Draft an intro to someone at @Acme Team',
+      'Draft an intro to the founders of @Acme Team',
+      'Draft an intro to this startup',
+      'Draft an intro for @Acme Team and this member',
+      'Draft an intro to @Acme Team, this member told me about it',
+      'Connect me with this team',
+      'I want to be introduced to @Acme Team',
+      'Can I have an intro for @Acme Team?',
+      'Draft an intro, I work with this team',
+      'Introduce this team to Grace',
+      'Draft an intro request for this team',
+      'I want an intro with this team',
+      'Intro to @Acme Team please',
+      'Draft an intro to the team',
+      'Draft an intro to @Acme Team, Grace Hopper told me about it',
+      'Draft an intro to @Acme Team. Grace sent me',
+      'Draft an intro to @Acme Team. She sent me',
+      'Draft an intro to this team and say hi',
+      'Draft an intro to @Acme Team, or someone else',
+      'Draft an intro to this team. I do not want a long text',
+      "Draft an intro to this team. I can't find a contact",
+      "I don't want an intro to Grace, draft an intro to @Acme Team",
+      'Sure, I want an intro to @Acme Team',
+      'I want an intro to @Acme Team',
+      "Draft an intro to this member's team",
+      "Draft an intro to Grace's team @Acme Team",
+      'I want an intro with @Acme Team, I built the project they fund',
+      'Draft an intro for @Acme Team. I lead my team and want feedback',
+    ])('D1, member page, "%s": both, also in the reason turn', async (message) => {
+      const h = h2();
+      expect(await targets((await chat(h, { ...MEMBER_PAGE, message })).options)).toEqual(['m-grace', 't-acme']);
+      const reason = await chat(h, REASON);
+      expect(await targets(reason.options)).toEqual(['m-grace', 't-acme']);
+      expect(reason.prompt).not.toContain(WRONG);
+    });
+
+    it('R1: with a kept team on another team page, "the team" is not clear and "this team" is the page', async () => {
+      const context = { page: 'team', teamUid: 't-beta' };
+      const ask = { context, message: 'Draft an intro to @Acme Team', mentions: [ACME] };
+      const h = h2();
+      await chat(h, ask);
+      const the = await chat(h, { context, message: 'I want an intro to the team' });
+      expect(await targets(the.options)).toEqual(['t-acme', 't-beta']);
+      const page = await chat(h, { context, message: 'I want an intro to this team' });
+      expect(await targets(page.options)).toEqual(['t-beta']);
+      expect(h.store.size).toBe(0);
+    });
+
+    it.each(['Draft an intro for @Kyle Weiss', 'Draft an intro here instead. @Kyle Weiss sent me'])(
+      'D1: with a kept team, the unclear ask "%s" adds its chip and the page',
+      async (message) => {
+        const h = h2();
+        await chat(h, ASK);
+        const all = ['m-grace', 'm-kyle', 't-acme'];
+        expect(await targets((await chat(h, { ...PAGE, message, mentions: [KYLE] })).options)).toEqual(all);
+        const reason = await chat(h, REASON);
+        expect(await targets(reason.options)).toEqual(all);
+        expect(reason.prompt).toContain('or the page');
+        expect(reason.prompt).not.toContain(WRONG);
+      }
+    );
+
+    it('D1: an unclear ask on another page replaces the kept target, and a draft there ends it', async () => {
+      const h = h2();
+      await chat(h, ASK);
+      const context = { page: 'team', teamUid: 't-beta' };
+      await chat(h, { context, message: 'Draft an intro for @Kyle Weiss', mentions: [KYLE] });
+      const reason = { context, message: 'I want feedback on our roadmap.' };
+      expect(await targets((await chat(h, reason)).options)).toEqual(['m-kyle', 't-beta']);
+    });
+
+    /** Round 23: the chip is only mentioned, or the recipient is not clear. Each of these chose the chip before. */
+    it.each([
+      ['Grace', 'Kyle Weiss', 'Ask Grace to make an intro to @Kyle Weiss'],
+      ['Grace', 'Kyle Weiss', 'Write her a message to ask for an intro to @Kyle Weiss'],
+      ['Grace', 'Kyle Weiss', 'Draft an intro that asks her to make an intro to @Kyle Weiss'],
+      ['Grace', 'Kyle Weiss', 'Help me ask Grace to give me an intro to @Kyle Weiss'],
+      ['Grace', 'Kyle Weiss', 'I want her to give me an intro to @Kyle Weiss'],
+      ['Grace', 'Kyle Weiss', 'I want Grace to make an intro to @Kyle Weiss'],
+      ['Grace', 'Kyle Weiss', 'Draft an intro. I want an intro to @Kyle Weiss from her'],
+      ['Grace', 'Kyle Weiss', 'Write to Grace, I want an intro to @Kyle Weiss'],
+      ['Grace', 'Kyle Weiss', 'Could Grace make an intro to @Kyle Weiss? Draft a message to her'],
+      ['Grace', 'Kyle Weiss', 'Draft a message to Grace: please introduce me to @Kyle Weiss'],
+      ['Grace', 'Acme Team', 'Draft an intro for this team to Grace'],
+      ['Grace', 'Acme Team', 'Write an intro for this team to her'],
+      ['Grace', 'Acme Team', 'Draft an intro for this company to Grace Hopper'],
+      ['Grace', 'Acme Team', 'Draft an intro for this project to share with Grace'],
+      ['Grace', 'Acme Team', 'Draft an intro for the team I run'],
+      ['Grace', 'Acme Team', 'Draft an intro for the company I work at, @Acme Team'],
+      ['Grace', 'Acme Team', 'Introduce this team, @Acme Team, to Grace'],
+      ['Grace', 'Acme Team', 'Draft an intro with the project details'],
+      ['Grace', 'Acme Team', 'Draft an intro with this project as the topic'],
+      ['Grace', 'Acme Team', 'Write an intro with the company name in it'],
+      ['Grace', 'Acme Team', 'Write an intro message with this team as the reason'],
+      ['Grace', 'Acme Team', 'Draft an intro with the team name'],
+      ['Grace', 'Acme Team', 'Draft an intro for the project'],
+      ['Grace', 'Acme Team', 'Draft an intro with this team in mind'],
+      ['Gitcoin', 'Kyle Weiss', 'Ask Gitcoin to make an intro to @Kyle Weiss'],
+      ['Gitcoin', 'Kyle Weiss', 'Ask them to make an intro to @Kyle Weiss'],
+      ['Gitcoin', 'Kyle Weiss', 'Write to the team to ask for an intro to @Kyle Weiss'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro with this person in cc'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro with the profile of @Kyle Weiss'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro with this person as a reference'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro for the person in charge, @Kyle Weiss sent me'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to the person in charge of grants, @Kyle Weiss sent me'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to the person who runs grants. I know @Kyle Weiss'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to the person @Kyle Weiss told me about'],
+      ['Gitcoin', 'Kyle Weiss', 'I need an intro to the person leading partnerships; @Kyle Weiss suggested it'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to that person at Gitcoin, @Kyle Weiss knows them'],
+      ['Gitcoin', 'Kyle Weiss', "I don't want to send an intro to @Kyle Weiss"],
+      ['Gitcoin', 'Kyle Weiss', 'I do not want you to draft an intro to @Kyle Weiss'],
+      ['Gitcoin', 'Kyle Weiss', 'No need to draft an intro to @Kyle Weiss, I know them'],
+      ['Gitcoin', 'Kyle Weiss', 'Rather than draft an intro to @Kyle Weiss, write to Gitcoin'],
+      ['Gitcoin', 'Kyle Weiss', 'Should I send an intro to @Kyle Weiss or to Gitcoin?'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss or Gitcoin'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss. No wait, to Gitcoin'],
+      ['Gitcoin', 'Kyle Weiss', 'I asked you to draft an intro to @Kyle Weiss, now do Gitcoin'],
+      ['Gitcoin', 'Kyle Weiss', 'Intro to @Kyle Weiss is done, now Gitcoin'],
+      ['Gitcoin', 'Kyle Weiss', 'My plan was to send an intro to @Kyle Weiss. Now I prefer Gitcoin'],
+      ['Grace', 'Kyle Weiss', 'mention that I would like an intro to @Kyle Weiss'],
+      ['Grace', 'Kyle Weiss', 'add that I want an intro to @Kyle Weiss'],
+      ['Grace', 'Kyle Weiss', 'I want an intro to @Kyle Weiss'],
+      ['Grace', 'Kyle Weiss', 'To get an intro to @Kyle Weiss'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss at Gitcoin'],
+      // Round 24: a correction in the same message, or the chip only as the source.
+      ['Grace', 'Acme Team', 'Draft an intro to this team. I work at @Acme Team'],
+      ['Grace', 'Acme Team', 'Draft an intro to this company. I lead @Acme Team'],
+      ['Grace', 'Acme Team', 'Draft an intro to this company. @Acme Team told me about it'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team; @Acme Team sent me'],
+      ['Grace', 'Acme Team', 'Draft an intro to this org because @Acme Team works with them'],
+      ['Grace', 'Acme Team', 'Draft an intro to this project. We at @Acme Team want feedback'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team about a pilot with @Acme Team'],
+      ['Grace', 'Acme Team', 'Introduce me to this team. My team is @Acme Team'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team - I run @Acme Team'],
+      ['Grace', 'Acme Team', 'Draft an intro to this company, I work at @Acme Team'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to this person. @Kyle Weiss sent me'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to this member. @Kyle Weiss told me about them'],
+      ['Gitcoin', 'Kyle Weiss', 'Introduce me to this person because @Kyle Weiss knows them'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to this person about what @Kyle Weiss told me'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team. Wait, to Dana'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team. I mean the member'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team. Sorry, the person on the page'],
+      ['Grace', 'Acme Team', 'Draft an intro to @Acme Team. Actually the member'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team; rather the profile owner'],
+      ['Grace', 'Acme Team', 'Draft an intro to @Acme Team? Or the person?'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team. Oops, I meant the page'],
+      ['Grace', 'Acme Team', 'Draft an intro to @Acme Team, then one for the member'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss. Wait, to Dana'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss. I mean the team'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss? Or the team?'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss, through the team'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss. They can introduce me'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss. Wait, the company'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss. Wait, them'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss; first ask the team'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team. I want the member instead'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team. I want the person, rather'],
+      ['Grace', 'Acme Team', 'Draft an intro to @Acme Team. I would like the member too'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team please, or the person'],
+      ['Grace', 'Acme Team', 'Draft an intro to @Acme Team. I want to write to the person first'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team. I want both'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team because the member told me about it'],
+      ['Grace', 'Acme Team', 'Draft an intro to @Acme Team. The member told me about it'],
+      ['Grace', 'Acme Team', 'Draft an intro to @Acme Team. I met the person at a summit'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss. I want the team instead'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss. I would like the team too'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss. Sorry, the team'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to this member. I meant the company'],
+      ['Gitcoin', 'Kyle Weiss', 'Draft an intro to @Kyle Weiss because the team told me to'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team. I want feedback. Wait, to Dana'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team. I want feedback; or write to Dana'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team because I want feedback\nWait, to Dana'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team. I want Dana instead'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team. I need the other one'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team. I want feedback for @Zeta'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team because I work at Acme Team'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team I want to meet'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team please, or to Dana'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team, thanks to that person'],
+      ['Grace', 'Acme Team', 'Draft an intro to this team about the other member'],
+      ['Grace', 'Acme Team', 'Draft an intro to @Acme Team. I have experience with IPFS'],
+      ['Grace', 'Acme Team', 'Draft an intro to @Acme Team. I lead my team'],
+      ['Grace', 'Acme Team', "Draft an intro to this team's founder"],
+    ])('X2 strict: on the page of %s, the chip %s is not chosen by "%s"', (pageName, chipName, message) => {
+      const page: IntroTurnTarget =
+        pageName === 'Grace'
+          ? { type: 'member', uid: 'm-grace', name: 'Grace Hopper' }
+          : { type: 'team', uid: 't-gitcoin', name: 'Gitcoin' };
+      const chip: IntroTurnTarget =
+        chipName === 'Acme Team'
+          ? { type: 'team', uid: 't-acme', name: chipName }
+          : { type: 'member', uid: 'm-kyle', name: chipName };
+      expect(introAsk(message, [chip], page)).toBe('unclear');
+    });
+
+    it.each([
+      ['Kyle Weiss', 'Draft an intro to this person. @Kyle Weiss sent me'],
+      ['Acme Team', 'Draft an intro to this team. I work at @Acme Team'],
+      ['Acme Team', 'Draft an intro to this company. I lead @Acme Team'],
+    ])('X2 strict: with no page, the chip %s is not chosen by "%s"', (name, message) => {
+      const chip: IntroTurnTarget = { type: name === 'Acme Team' ? 'team' : 'member', uid: 'u-1', name };
+      expect(introAsk(message, [chip], undefined)).toBe('unclear');
+    });
+
+    it('X2: a correction in the same message keeps both, and the reason turn too', async () => {
+      const h = h2();
+      const ask = { ...PAGE, message: 'Draft an intro to @Acme Team. Actually the member', mentions: [ACME] };
+      const first = await chat(h, ask);
+      expect(await targets(first.options)).toEqual(['m-grace', 't-acme']);
+      expect(first.prompt).not.toContain(WRONG);
+      const reason = await chat(h, REASON);
+      expect(await targets(reason.options)).toEqual(['m-grace', 't-acme']);
+      expect(reason.prompt).not.toContain(WRONG);
+    });
+
+    it('X2 strict: a name that shares words with the page, and two chips', () => {
+      const member = (uid: string, name: string): IntroTurnTarget => ({ type: 'member', uid, name });
+      const team = (uid: string, name: string): IntroTurnTarget => ({ type: 'team', uid, name });
+      const kim = member('m-kim', 'Grace Kim');
+      const grace = member('m-grace', 'Grace Hopper');
+      expect(introAsk('Draft an intro to @Grace Kim', [kim], grace)).toBe(kim);
+      expect(introAsk('Draft an intro to @Grace Kim. Grace sent me', [kim], grace)).toBe('unclear');
+      const acme = team('t-1', 'Acme');
+      const acmeTeam = team('t-2', 'Acme Team');
+      expect(introAsk('Draft an intro to @Acme Team', [acme, acmeTeam], grace)).toBe(acmeTeam);
+      expect(introAsk('Draft an intro to @Acme Team', [acmeTeam], acme)).toBe(acmeTeam);
+      expect(introAsk('Draft an intro to @Acme, not the page', [acme], team('t-3', 'Acme Labs'))).toBe('unclear');
+      expect(introAsk('Draft an intro to @Acme. Acme Labs sent me', [acme], team('t-3', 'Acme Labs'))).toBe('unclear');
+      // Two chips of the type, the same name, or two recipients.
+      expect(introAsk('Draft an intro to this team', [acme, acmeTeam], grace)).toBe('unclear');
+      expect(introAsk('Draft an intro to @Acme', [acme, team('t-4', 'Acme')], grace)).toBe('unclear');
+      expect(introAsk('Draft an intro to @Acme, @Grace Kim and me', [acme, kim], undefined)).toBe('unclear');
+      expect(introAsk('Draft an intro to @Acme', [acme], undefined)).toBe(acme);
+    });
+
+    it('D1: with a waiting card, only a request with a recipient is an ask', async () => {
+      const h = h2();
+      const introDraft = { target: GRACE_REF, text: CARD };
+      await chat(h, { ...MEMBER_PAGE, introDraft, message: 'make the intro mention @Acme Team' });
+      expect(h.store.size).toBe(0);
+      await chat(h, { ...MEMBER_PAGE, introDraft, message: 'Draft an intro for @Acme Team' });
+      expect(pending(h)).toEqual({ ...KEPT_BOTH, unclear: true });
+    });
+
+    it('a card for one of the kept targets ends the request', async () => {
+      const h = h2();
+      await chat(h, { ...PAGE, message: 'Draft an intro', mentions: [ACME, KYLE] });
+      expect(pending(h)).toMatchObject({ targets: [ACME, KYLE], unclear: true });
+      await chat(h, { ...PAGE, message: 'make it shorter', introDraft: { target: KYLE, text: CARD } });
+      expect(h.store.size).toBe(0);
+    });
+
+    it.each([
+      'Draft an intro to this team',
+      'Draft an intro to this team. I want feedback on our roadmap.',
+      'Draft an intro to this team because we build the same thing',
+      'Draft an intro to this team @Acme Team . I want feedback',
+      'Draft an intro to this company',
+      'Draft an intro to this team, about our roadmap',
+      'Draft an intro to this team - I need help with v1.2 of our SDK!',
+      "Draft an intro to this team please. We'd like feedback, docs and a pilot",
+      'Draft an intro to this team\nI want feedback',
+      'Draft an intro to @Acme Team ?',
+      'Draft an intro to @Acme Team',
+      'Draft an intro to the @Acme Team',
+      'Draft an intro to acme team please',
+      'Draft an intro request to @Acme Team. I want feedback.',
+      'Hi, please write me a short intro to @Acme Team, I want feedback',
+      'Can you draft an intro to this team?',
+      'Help me write an intro to this team',
+      'I want to request an intro to @Acme Team',
+      "I'd like an intro to this team",
+      'Make an intro to this team about our roadmap',
+      'Introduce me to this team',
+      'Can you introduce us to @Acme Team?',
+    ])('member page, "%s": only the team chip', async (message) => {
+      const h = h2();
+      expect(await targets((await chat(h, { ...MEMBER_PAGE, message })).options)).toEqual(['t-acme']);
+      expect(pending(h)).toEqual(KEPT);
+    });
+
+    it('"this team" on a team page is the page, and the intro page keeps its own target', async () => {
+      const samePage = { context: { page: 'team', teamUid: 't-beta' }, mentions: [ACME] };
+      const same = await chat(h2(), { ...samePage, message: 'Draft an intro to this team, I work at @Acme Team' });
+      expect(await targets(same.options)).toEqual(['t-acme', 't-beta']);
+      const named = await chat(h2(), { ...samePage, message: 'Draft an intro to @Acme Team' });
+      expect(await targets(named.options)).toEqual(['t-acme']);
+      const h = h2();
+      const intro = await chat(h, {
+        context: MEMBER_CONTEXT,
+        mentions: [ACME],
+        message: 'Draft an intro to @Acme Team',
+      });
+      expect(await targets(intro.options)).toEqual(['m-grace', 't-acme']);
+      expect(h.store.size).toBe(0);
+    });
+
+    it('two chips: the one after "intro to" is the recipient, also without the hint of the other; two named chips stay', async () => {
+      const body = { ...PAGE, mentions: [ACME, KYLE] };
+      const one = await chat(h2(), { ...body, message: 'Draft an intro to @Acme Team. I want feedback' });
+      expect(await targets(one.options)).toEqual(['t-acme']);
+      expect(one.prompt).not.toContain('targetUid "m-kyle"');
+      const known = await chat(h2(), { ...body, message: 'Draft an intro to @Acme Team, I know @Kyle Weiss' });
+      expect(await targets(known.options)).toEqual(['m-grace', 'm-kyle', 't-acme']);
+      const two = await chat(h2(), { ...body, message: 'Draft an intro to @Acme Team and @Kyle Weiss' });
+      expect(await targets(two.options)).toEqual(['m-grace', 'm-kyle', 't-acme']);
+    });
+  });
+
+  it.each(['add that to the draft', 'Add that.', 'put it in the intro please'])(
+    'B2: "%s" right after the draft line keeps the card and quotes no rule',
+    async (message) => {
+      const introDraft = { target: ACME, text: CARD };
+      const { turn } = await chat(withCache(), { message, introDraft }, { latestReply: INTRO_DRAFT_LINE });
+      expect(turn.fixedAnswer).toBe(ADD_THAT_LINE);
+      expect(turn.extraTools).not.toHaveProperty('draft_intro');
+      // R2: true also when the draft never had the fact.
+      expect(ADD_THAT_LINE).toBe('I did not change the draft. To add a new detail, write the detail in your message.');
+    }
+  );
+
+  it('B2: after a normal answer, it goes to the model with the earlier-message rule', async () => {
+    const body = { message: 'add that to the draft', introDraft: { target: ACME, text: CARD } };
+    const { turn, prompt } = await chat(withCache(), body, { latestReply: 'Do you want me to add it?' });
+    expect(turn).toEqual({});
+    expect(prompt).toContain(
+      'A fact from an earlier message of the member in this chat is in the words of the member.'
+    );
+    expect(prompt).toContain('When the member says "add that", keep that fact in the draft.');
+    expect(isBareAddThat('add that answer to the draft')).toBe(false);
+    expect(isBareAddThat('add that I mentored three teams')).toBe(false);
+  });
+
+  const CLAIM = `${CARD} So I have some hands-on experience in the grants space.`;
+  it.each(['make it more convincing', 'I mentored three teams last year.'])(
+    'B4: "%s" with a new claim is refused, and the card does not change',
+    async (message) => {
+      const { options } = await chat(withCache(), { message, introDraft: { target: ACME, text: CARD } });
+      expect(await draft(options, ACME, CLAIM)).toBe(ADDED_CLAIM_TEXT);
+      expect(options.extraResponseFields.drafts).toEqual([]);
+      expect(await draft(options, ACME, `${CARD} It would mean a lot to us.`)).toContain('is ready');
+    }
+  );
+
+  const CARD_TURN = { introDraft: { target: ACME, text: CARD } };
+  const FACT = 'I have hands-on experience with IPFS.';
+  const revise = (text: string) => ({ drafts: [draftArgs(ACME, `${CARD} ${text}`)] });
+
+  it('B4: an own fact from an earlier message goes in with "add that", also told before the first draft', async () => {
+    const h = withCache();
+    await chat(h, { ...PAGE, message: `Hi. ${FACT} What is new?` });
+    expect([...h.store.entries()]).toEqual([[ownClaimsKey('m-ada', 'thread-1'), [FACT]]]);
+    const added = await chat(h, { ...CARD_TURN, message: 'add that to the draft' }, revise(FACT));
+    expect(added.texts[0]).toContain('is ready for Acme Team');
+    // Only this fact: not another claim, not a stronger one, not another topic.
+    for (const text of [
+      'I have hands-on experience in the grants space.',
+      'I have ten years of hands-on experience with IPFS.',
+      'I am an expert in IPFS.',
+      'I have hands-on experience with IPFS and grants.',
+    ]) {
+      expect((await chat(h, { ...CARD_TURN, message: 'make it more convincing' }, revise(text))).texts).toEqual([
+        ADDED_CLAIM_TEXT,
+      ]);
+    }
+    // Another thread has no such fact.
+    const other = { ...CARD_TURN, threadId: 'thread-2', message: 'add that to the draft' };
+    expect((await chat(h, other, revise(FACT))).texts).toEqual([ADDED_CLAIM_TEXT]);
+  });
+
+  it('B4: a fact of the LabOS profile is allowed, and a claim that the profile does not have is refused', async () => {
+    const bio = '<p>Grants expert with ten years of experience in fundraising.</p><p>Based in Lisbon.</p>';
+    const profile = { name: 'get_my_profile', execute: jest.fn(async () => ({ uid: 'm-ada', bio, skills: ['Rust'] })) };
+    const jobs = {
+      name: 'list_my_experiences',
+      execute: jest.fn(async () => ({
+        experiences: [{ title: 'Seasoned Operator', company: 'Beta Labs', endDate: null }],
+      })),
+    };
+    const h = withCache([profile, jobs]);
+    const use = (text: string) => chat(h, { ...CARD_TURN, message: 'use my profile' }, revise(text));
+    expect((await use('I have ten years of experience in fundraising.')).texts[0]).toContain('is ready');
+    expect((await use('I was a seasoned operator at Beta Labs.')).texts[0]).toContain('is ready');
+    expect((await use('I have twenty years of experience in fundraising.')).texts).toEqual([ADDED_CLAIM_TEXT]);
+    expect((await use('I have experience in Lisbon.')).texts).toEqual([ADDED_CLAIM_TEXT]);
+    // The check reads the profile of the session member, and only for a new claim.
+    expect(profile.execute.mock.calls[0]).toEqual([expect.objectContaining({ memberUid: 'm-ada' }), {}]);
+    profile.execute.mockClear();
+    expect((await use('Thanks a lot.')).texts[0]).toContain('is ready');
+    expect(profile.execute).not.toHaveBeenCalled();
+    // A failed read gives no facts.
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    profile.execute.mockRejectedValueOnce(new Error('db down'));
+    expect((await use('I have ten years of experience in fundraising.')).texts).toEqual([ADDED_CLAIM_TEXT]);
+  });
+
+  it.each([
+    ['I have hands on experience with IPFS', true],
+    ["I'm experienced with IPFS.", true],
+    ['My background in grants is long.', true],
+    ['10 years of experience in fundraising', true],
+    ['I have experience with your SDK.', true],
+    ['Do I have experience with IPFS?', false],
+    ['I have no experience with IPFS.', false],
+    ["I don't have experience with IPFS.", false],
+    ['Remove that I have experience with IPFS.', false],
+    ['I want to talk to a grants expert.', false],
+    ['They have hands-on experience with IPFS.', false],
+    ['I have a question for your experts.', false],
+    ['Make me sound like I have experience.', false],
+    ['I mentored three teams last year.', false],
+  ])('B4: "%s" is an own claim: %s', (message, own) => {
+    expect(ownClaims(message)).toEqual(own ? [message] : []);
+  });
+
+  it('B4: a message with no own claim writes nothing, and an agent text is never an own fact', async () => {
+    const h = withCache();
+    await chat(h, { message: 'What is new?' }, { latestReply: FACT });
+    expect(h.cache.set).not.toHaveBeenCalled();
+    const { texts } = await chat(h, { ...CARD_TURN, message: 'add that to the draft' }, revise(FACT));
+    expect(texts).toEqual([ADDED_CLAIM_TEXT]);
+  });
+
+  it('B4: a claim in the card or in the message stays allowed, and a first draft does not change', () => {
+    expect(addedClaims(CLAIM, CLAIM, 'make it more convincing')).toEqual([]);
+    expect(addedClaims(CLAIM, CARD, 'mention my hands-on experience in grants')).toEqual([]);
+    expect(addedClaims(CLAIM, undefined, 'make it more convincing')).toEqual([]);
+    expect(addedClaims(CLAIM, CARD, 'make it more convincing')).toEqual(['hands-on', 'experience']);
   });
 });

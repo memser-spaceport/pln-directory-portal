@@ -33,6 +33,29 @@ export const keyPrefix = () => `${process.env.ENVIRONMENT ?? 'local'}:labos-agen
 export const proposalRecordKey = (id: string) => `${keyPrefix()}:proposal:${id}`;
 const openKey = (id: string) => `${keyPrefix()}:proposal-open:${id}`;
 
+/**
+ * LAB-3367 B3: the kept intro targets of one member and thread, for 10 minutes. `page` is the JSON of the C1 `context` of
+ * the ask (uids only): on another page they are not used. `noPage`: that page was no intro target. `both`: the page can
+ * be the recipient too. `unclear`: the member did not choose a target (an ask with a chip that can be the recipient).
+ */
+export type PendingIntroTarget = {
+  targets: Array<{ type: 'member' | 'team'; uid: string }>;
+  page: string;
+  noPage?: true;
+  both?: true;
+  unclear?: true;
+};
+export const introTargetKey = (memberUid: string, threadId: string) =>
+  `${keyPrefix()}:intro-target:${JSON.stringify([memberUid, threadId])}`;
+
+/**
+ * LAB-3367 B4: the experience claims in the member's own messages of one thread, for the claim check of a later draft.
+ * Only the claim sentences (`ownClaims`), never the draft text. The TTL is the one of the proposal records.
+ */
+export const ownClaimsKey = (memberUid: string, threadId: string) =>
+  `${keyPrefix()}:own-claims:${JSON.stringify([memberUid, threadId])}`;
+const MAX_OWN_CLAIMS = 20;
+
 /** Proposals in the shared cache (Redis). No database table (contract assumption 5). */
 @Injectable()
 export class LabosAgentProposalStore {
@@ -51,6 +74,36 @@ export class LabosAgentProposalStore {
   /** Redis DEL answers 1 to exactly one caller, so only one confirm or cancel closes a proposal (as member proofs). */
   async claim(id: string): Promise<boolean> {
     return (await (this.cache.del as (key: string) => Promise<unknown>)(openKey(id))) === 1;
+  }
+
+  async saveIntroTarget(key: string, target: PendingIntroTarget): Promise<void> {
+    await this.cache.set(key, target, { ttl: 10 * 60 });
+  }
+
+  async loadIntroTarget(key: string): Promise<PendingIntroTarget | undefined> {
+    const value = await this.cache.get<PendingIntroTarget>(key);
+    const valid =
+      typeof value?.page === 'string' &&
+      Array.isArray(value.targets) &&
+      value.targets.length > 0 &&
+      value.targets.every((item) => (item?.type === 'member' || item?.type === 'team') && !!item.uid);
+    return valid ? value : undefined;
+  }
+
+  async clearIntroTarget(key: string): Promise<void> {
+    await this.cache.del(key);
+  }
+
+  /** Adds the sentences and keeps the newest ones. Not atomic: two quick messages can lose one sentence. */
+  async addOwnClaims(key: string, sentences: string[]): Promise<void> {
+    const known = await this.loadOwnClaims(key);
+    const claims = [...new Set([...known, ...sentences])].slice(-MAX_OWN_CLAIMS);
+    await this.cache.set(key, claims, { ttl: RECORD_TTL_SECONDS });
+  }
+
+  async loadOwnClaims(key: string): Promise<string[]> {
+    const value = await this.cache.get<string[]>(key);
+    return Array.isArray(value) ? value.filter((item) => typeof item === 'string') : [];
   }
 
   async close(stored: StoredProposal, status: StoredProposal['status']): Promise<void> {
