@@ -1,11 +1,4 @@
-import {
-  ConflictException,
-  ForbiddenException,
-  Injectable,
-  Logger,
-  NotFoundException,
-  OnModuleInit,
-} from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import {
   LABOS_AGENT_ERROR_CODES,
   LabosAgentDraftConfirmRequest,
@@ -56,7 +49,8 @@ export class LabosAgentThreadsService implements OnModuleInit {
   }
 
   /**
-   * The C3 gate. A member outside the agent gate has no saved drafts: plain C3, no MongoDB read. For a member inside:
+   * The C3 gate. A member outside the agent gate has no saved drafts: plain C3, no MongoDB read. A failed gate lookup is
+   * 503, nothing is sent. For a member inside:
    * - a saved draft to this target that was sent with this text: 409 DRAFT_CLOSED (`sent`), nothing is sent;
    * - else an open saved draft to this target (the newest): C3 takes the same claim as C5 (open -> sent, at most once),
    *   sends this text, and a failed send puts the draft back to open;
@@ -69,13 +63,9 @@ export class LabosAgentThreadsService implements OnModuleInit {
     send: () => Promise<{ uid: string }>,
     claim = true
   ): Promise<{ uid: string }> {
-    let memberUid: string;
-    try {
-      memberUid = await this.agent.enabledMember(email);
-    } catch (error) {
-      if (error instanceof ForbiddenException) return send();
-      throw error;
-    }
+    // G3: a failed permission lookup throws here (503), it never falls to plain C3.
+    const memberUid = await this.agent.gatedMember(email);
+    if (!memberUid) return send();
     const target = { type: input.type === 'MEMBER' ? ('member' as const) : ('team' as const), uid: input.targetId };
     const saved = await this.store.draftsTo(memberUid, email, target);
     const text = input.text.trim();

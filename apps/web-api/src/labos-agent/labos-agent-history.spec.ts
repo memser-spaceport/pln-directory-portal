@@ -263,3 +263,44 @@ describe('C1 and the shared chat history (LAB-3457)', () => {
     expect(body(error)).toEqual(expect.objectContaining({ statusCode: 400, code: 'VALIDATION_ERROR' }));
   });
 });
+
+describe('G3: the C3 gate lookup (LAB-3457)', () => {
+  const originalEnv = process.env.ENVIRONMENT;
+  afterEach(() => {
+    process.env.ENVIRONMENT = originalEnv;
+    jest.restoreAllMocks();
+  });
+
+  function service(
+    hasPermission: jest.Mock,
+    member: { uid: string; deletedAt: null } | null = { uid: 'member-1', deletedAt: null }
+  ) {
+    process.env.ENVIRONMENT = APP_ENV.PRODUCTION;
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const prisma = { member: { findUnique: jest.fn().mockResolvedValue(member) } };
+    const args: unknown[] = Array.from({ length: 12 }, () => ({}));
+    args[0] = prisma;
+    args[1] = new LabosAgentAccessService({ hasPermission } as any);
+    return new (LabosAgentService as any)(...args) as LabosAgentService;
+  }
+
+  it('is the member when the agent is on, undefined when it is off or there is no live member', async () => {
+    await expect(service(jest.fn().mockResolvedValue({ allowed: true })).gatedMember('ada@example.com')).resolves.toBe(
+      'member-1'
+    );
+    await expect(
+      service(jest.fn().mockResolvedValue({ allowed: false })).gatedMember('ada@example.com')
+    ).resolves.toBeUndefined();
+    await expect(service(jest.fn(), null).gatedMember('ghost@example.com')).resolves.toBeUndefined();
+  });
+
+  it('a failed permission lookup is 503, while the chat gate (isEnabled) still answers off', async () => {
+    const failing = jest.fn().mockRejectedValue(new Error('rbac down'));
+    const agent = service(failing);
+    const error = await agent.gatedMember('ada@example.com').catch((e) => e);
+    expect(error.getStatus()).toBe(503);
+    await expect(new LabosAgentAccessService({ hasPermission: failing } as any).isEnabled('member-1')).resolves.toBe(
+      false
+    );
+  });
+});

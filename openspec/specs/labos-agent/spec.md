@@ -875,7 +875,7 @@ A saved proposal SHALL have a `status`: `open` when saved, then `done`, `cancell
 
 ### Requirement: The C3 route never sends a saved draft twice
 
-`POST /v1/intro-requests` (C3) SHALL check the saved intro drafts of a member inside the agent gate before it sends. The LabOS agent registers this check; the C5 send does not pass it. A saved draft (own thread, not deleted) to the same target that is `sent` with the same text SHALL give 409 `DRAFT_CLOSED` with `status: 'sent'` and SHALL send nothing. Else the newest `open` saved draft to that target SHALL be claimed as C5 does (open to sent in one atomic update, then the send; a failed send puts it back to `open`), so C3 and C5 together send it once. Else C3 SHALL send as before. A member outside the gate SHALL get C3 as before, with no MongoDB read. A failed read of the saved drafts SHALL stop the send.
+`POST /v1/intro-requests` (C3) SHALL check the saved intro drafts of a member inside the agent gate before it sends. The LabOS agent registers this check; the C5 send does not pass it. A saved draft (own thread, not deleted) to the same target that is `sent` with the same text SHALL give 409 `DRAFT_CLOSED` with `status: 'sent'` and SHALL send nothing. Else the newest `open` saved draft to that target SHALL be claimed as C5 does (open to sent in one atomic update, then the send; a failed send puts it back to `open`), so C3 and C5 together send it once. Else C3 SHALL send as before. A member outside the gate SHALL get C3 as before, with no MongoDB read. A failed read of the saved drafts SHALL stop the send. A failed agent permission lookup SHALL be 503 and SHALL stop the send: it SHALL NOT count as outside the gate (G3).
 
 #### Scenario: A saved draft sent by C5, then by C3
 

@@ -6,7 +6,7 @@ jest.mock('../intro-requests/intro-requests.service', () => ({ IntroRequestsServ
 // labos-agent-proposals imports `tool` from the ESM `ai` package.
 jest.mock('ai', () => ({ tool: (def: unknown) => def }));
 
-import { ConflictException, ForbiddenException, Logger } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { LabosAgentThreadsController } from './labos-agent-threads.controller';
@@ -121,7 +121,7 @@ const agentThread = (turnExtra: Record<string, unknown> = {}): ThreadDoc => ({
   ],
 });
 
-function setup(opts: { doc?: ThreadDoc | null; enabled?: boolean } = {}) {
+function setup(opts: { doc?: ThreadDoc | null; enabled?: boolean; rbacFails?: boolean } = {}) {
   const mongo = fakeMongo();
   let doc = opts.doc === undefined ? null : opts.doc;
   mongo.findOneWhere.mockImplementation(async (collection: string) => (collection === 'threads' ? doc : null));
@@ -132,6 +132,10 @@ function setup(opts: { doc?: ThreadDoc | null; enabled?: boolean } = {}) {
       if (opts.enabled === false) throw new ForbiddenException({ statusCode: 403, code: 'AGENT_NOT_ENABLED' });
       if (email !== ME.email) throw new Error('unexpected email');
       return ME.memberUid;
+    }),
+    gatedMember: jest.fn(async () => {
+      if (opts.rbacFails) throw new ServiceUnavailableException('Intro requests are not available right now.');
+      return opts.enabled === false ? undefined : ME.memberUid;
     }),
   };
   const proposals = { load: jest.fn().mockResolvedValue(undefined) };
@@ -758,6 +762,15 @@ describe('C5 POST /v1/labos-agent/drafts/confirm (LAB-3457)', () => {
       const send = jest.fn().mockResolvedValue({ uid: 'ir_c3' });
       await expect(h.service.throughSavedDraft(ME.email, C3, send)).resolves.toEqual({ uid: 'ir_c3' });
       expect(send).toHaveBeenCalledTimes(1);
+      expect(h.mongo.aggregate).not.toHaveBeenCalled();
+    });
+
+    it('G3: a failed permission lookup is 503 and sends nothing (a gated member never falls to plain C3)', async () => {
+      const h = setup({ doc: agentThread(), rbacFails: true });
+      const send = jest.fn();
+      const error = await h.service.throughSavedDraft(ME.email, C3, send).catch((e) => e);
+      expect(error).toBeInstanceOf(ServiceUnavailableException);
+      expect(send).not.toHaveBeenCalled();
       expect(h.mongo.aggregate).not.toHaveBeenCalled();
     });
 

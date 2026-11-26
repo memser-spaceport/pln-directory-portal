@@ -6,6 +6,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import {
@@ -725,6 +726,20 @@ export class LabosAgentService {
   }
 
   /** The live member behind the email, inside the pilot gate (403 AGENT_NOT_ENABLED otherwise). */
+  /**
+   * LAB-3457 G3, for the C3 saved-draft gate: the member uid when the agent is on for them, undefined when they are not a
+   * live member or the agent is off. A failed permission lookup is 503 (fails closed), so a gated member never gets
+   * the plain C3 path because RBAC failed.
+   */
+  async gatedMember(email: string): Promise<string | undefined> {
+    const memberUid = await resolveLiveMemberUidByEmail(this.prisma, email);
+    const state = await this.access.enabledState(memberUid);
+    if (state === 'unknown') {
+      throw new ServiceUnavailableException('Intro requests are not available right now. Please try again.');
+    }
+    return state === 'enabled' ? memberUid : undefined;
+  }
+
   async enabledMember(email: string): Promise<string> {
     const memberUid = await resolveLiveMemberUidByEmail(this.prisma, email);
     if (!memberUid || !(await this.access.isEnabled(memberUid))) {

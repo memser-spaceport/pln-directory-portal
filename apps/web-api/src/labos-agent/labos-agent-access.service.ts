@@ -19,14 +19,22 @@ export class LabosAgentAccessService {
    * A failed permission lookup gives false, so the caller gets the same "agent off" response.
    */
   async isEnabled(memberUid: string | undefined): Promise<boolean> {
-    if (!memberUid) return false;
-    if (process.env.ENVIRONMENT !== APP_ENV.PRODUCTION) return true;
+    return (await this.enabledState(memberUid)) === 'enabled';
+  }
+
+  /**
+   * LAB-3457 G3: the same rule with the lookup failure kept apart (`unknown`), for a caller that must fail closed (the
+   * C3 saved-draft gate). `isEnabled` maps `unknown` to false.
+   */
+  async enabledState(memberUid: string | undefined): Promise<'enabled' | 'disabled' | 'unknown'> {
+    if (!memberUid) return 'disabled';
+    if (process.env.ENVIRONMENT !== APP_ENV.PRODUCTION) return 'enabled';
     try {
       const { allowed } = await this.accessControl.hasPermission(memberUid, LABOS_AGENT_PERMISSIONS.USE);
-      return allowed === true;
+      return allowed === true ? 'enabled' : 'disabled';
     } catch (error) {
       this.logger.warn(`labos_agent.use lookup failed for ${memberUid}: ${(error as Error)?.message ?? error}`);
-      return false;
+      return 'unknown';
     }
   }
 }
