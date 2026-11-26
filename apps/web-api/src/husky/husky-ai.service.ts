@@ -349,6 +349,7 @@ export class HuskyAiService {
     const { turnFields } = options;
     const summaryKey = options.summaryKey ?? `${threadId}:summary`;
     const currentDate = new Date().toISOString().split('T')[0];
+    await this.assertThreadWriter(threadId, userEmail);
     const auth = await this.resolveAuthContext(isLoggedIn, userEmail);
 
     // A conversation started elsewhere (e.g. a blog embed) is handed over with its
@@ -645,6 +646,24 @@ export class HuskyAiService {
     });
 
     return stream;
+  }
+
+  /**
+   * LAB-3459: this request writes the turn and the summary of the `threadId` that the body names. A thread with an
+   * `email` takes them only from that member. A guest thread (no `email`) and a new thread stay open, as before. It
+   * runs before any read or write, so a refused call changes nothing and does not read the thread's summary.
+   */
+  private async assertThreadWriter(threadId: string, email?: string) {
+    const thread = await this.huskyPersistentDbService.findOneByKeyValue(
+      process.env.MONGO_THREADS_COLLECTION || 'threads',
+      'threadId',
+      threadId
+    );
+    if (thread?.email && thread.email !== email) {
+      throw new ForbiddenException(
+        'You are not authorized to add to this thread. Start a new thread or duplicate this one.'
+      );
+    }
   }
 
   /**
