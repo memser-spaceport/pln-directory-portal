@@ -107,12 +107,12 @@ Each news item of `sourceRefs` SHALL have `directoryLink` `/?news=<uid>` (LAB-33
 
 ### Requirement: No writes in chat
 
-The chat SHALL write nothing to the directory. Only C2 runs a write tool. The chat SHALL keep the thread summary, the latest reply (LAB-3367 h3), the kept intro target (B3) and the own claims (B4) in the AI search cache only and SHALL NOT write thread history or summaries to MongoDB.
+The chat SHALL write nothing to the directory. Only C2 runs a write tool. Without `persist: true`, the chat SHALL keep the thread summary, the latest reply (LAB-3367 h3), the kept intro target (B3) and the own claims (B4) in the AI search cache only and SHALL NOT write thread history or summaries to MongoDB. With `persist: true` the turn is saved in the shared chat history (LAB-3457, see "Shared chat history"); that is the only MongoDB write of C1.
 
 #### Scenario: A finished turn
 
 - **GIVEN** an enabled member
-- **WHEN** a chat turn finishes
+- **WHEN** a chat turn with no `persist` finishes
 - **THEN** the cache has the thread summary
 - **AND** MongoDB has no new thread document
 
@@ -777,3 +777,88 @@ The C1 `sources` SHALL hold only web pages that are not pages of the app itself 
 - **AND** the model `sources` are `https://plnetwork.io/blog/post` and `https://lab-3272.os.pl.xyz/teams/t-1`
 - **WHEN** the stream ends
 - **THEN** `sources` is only `https://plnetwork.io/blog/post`
+
+### Requirement: Shared chat history
+
+The agent panel and the full page (`/ai-search`) SHALL share one chat history in the AI search MongoDB `threads` collection (LAB-3457, Option A in place). Nothing SHALL be migrated: an old AI search thread is listed, read and continued as it is. No route SHALL hard delete a thread, rename or remove a stored field. An agent thread SHALL have `source: 'agent'`, `memberUid` (the owner), `email` and the `context` of its first saved turn. An agent turn SHALL keep the AI search turn fields (`questionId` = `chatId`, `question`, `response`, `sources`, `sourceRefs`, `actions`, `followUpQuestions`, `createdAt`) and add `kind: 'agent'`, `steps`, `context`, `mentions`, `proposals`, `drafts` and the answer counts. It SHALL store only what the member saw: no prompt and no latest reply.
+
+The owner of a thread SHALL be its `memberUid`; a thread with no `memberUid` SHALL belong to the member whose email is its `email`. A guest thread (neither) belongs to no member. Every history route (T1, T2, T3, C5) SHALL use the C1 guard and gate, and SHALL answer 404 `THREAD_NOT_FOUND` for a thread that is missing, deleted or not the member's own.
+
+#### Scenario: Old AI search threads in the list
+
+- **GIVEN** a member with two old AI search threads (by email) and one agent thread
+- **WHEN** they call `GET /v1/labos-agent/threads`
+- **THEN** the body is `{ page, limit, total: 3, items }`, newest `updatedAt` first
+- **AND** each item has `source` `ai-search` or `agent` and a non-empty `title` (the first question when the thread has none)
+- **AND** a deleted thread or a thread with no turn is not listed
+
+#### Scenario: Reading an old thread
+
+- **GIVEN** an old AI search thread of the member
+- **WHEN** they call `GET /v1/labos-agent/threads/:threadId`
+- **THEN** each turn has `kind: 'ai-search'` and its saved question, answer (`content`), sources, follow-ups, actions and the member's feedback, oldest first
+- **AND** the thread summary is loaded into the cache for the next C1 turn
+
+#### Scenario: Another member's thread
+
+- **GIVEN** a thread of another member, a guest thread or a deleted thread
+- **WHEN** the member reads, deletes or continues it
+- **THEN** the response is 404 `THREAD_NOT_FOUND`
+- **AND** C1 starts no stream and reads no summary of that thread
+
+#### Scenario: Soft delete
+
+- **WHEN** the member calls `DELETE /v1/labos-agent/threads/:threadId` on an own thread
+- **THEN** the thread gets `isDeleted: true` and `deletedAt`, and its data stays
+- **AND** it leaves this list and the AI search list
+- **AND** a second delete is 404
+
+### Requirement: Saving a C1 turn
+
+C1 SHALL save the turn only when the body has `persist: true`. A new `threadId` SHALL create an agent thread; an own thread (an old AI search thread too) SHALL get the turn appended with one atomic `$push`, and `memberUid` set. Before the stream, C1 SHALL load the thread memory into the cache when it is not there: the saved `chats_summary`, else a short seed from the last three turns. The stream SHALL write the turn before it closes, waiting at most 3 seconds, and the summary also to MongoDB. A stopped, failed or cancelled turn SHALL NOT be saved. A new thread SHALL get the first question as its title, then the AI search title from the model when it gives one. A failed save SHALL be logged with a fixed text and SHALL NOT stop the turn.
+
+#### Scenario: Continue an old thread
+
+- **GIVEN** an old AI search thread of the member whose cached summary expired
+- **WHEN** they send C1 with that `threadId` and `persist: true`
+- **THEN** the agent gets the saved summary as the chat history
+- **AND** the turn is appended to the same thread, with `kind: 'agent'`
+
+#### Scenario: Not saved without persist
+
+- **WHEN** a C1 turn has no `persist`
+- **THEN** no thread document is written, as before LAB-3457
+
+### Requirement: Final card states in the history
+
+A saved proposal SHALL have a `status`: `open` when saved, then `done`, `cancelled` or `failed` from C2 (with the C2 `summary`). C2 SHALL write the state into the saved thread (best effort; the C2 result and the cache record stay the truth). The thread read SHALL report an `open` proposal past `expiresAt` as `expired`, and an `open` proposal that the C2 cache record shows as closed with that state. A saved intro draft SHALL have `status` `open`, `sent` or `cancelled`.
+
+#### Scenario: Reopened chat with a confirmed card
+
+- **GIVEN** a saved turn whose proposal the member confirmed
+- **WHEN** they open the thread again
+- **THEN** the proposal has `status: 'done'` and the C2 summary
+
+#### Scenario: Expired card
+
+- **GIVEN** a saved open proposal past `expiresAt`
+- **WHEN** the thread is read
+- **THEN** the proposal has `status: 'expired'`
+
+### Requirement: Send a saved intro draft once (C5)
+
+`POST /v1/labos-agent/drafts/confirm` with `{ threadId, draftId, decision, text? }` (strict) SHALL send or cancel one saved intro draft. `send` SHALL need `text` of 20 to 3500 characters after trim. The target SHALL come from the saved draft, never from the body. The route SHALL move the draft from `open` to `sent` or `cancelled` with one atomic update before it calls the intro request service (C3 rules), so a draft is sent at most once. A failed send SHALL put the draft back to `open` with its saved text and SHALL pass the C3 error. A sent draft SHALL keep the sent `text`, `sentAt` and `introRequestUid`. Errors: 404 `DRAFT_NOT_FOUND`, 409 `DRAFT_CLOSED` with `status`.
+
+#### Scenario: Two clicks on Send
+
+- **GIVEN** an open saved draft
+- **WHEN** two C5 `send` requests arrive at once
+- **THEN** one intro request is created
+- **AND** the other request gets 409 `DRAFT_CLOSED` with `status: 'sent'`
+
+#### Scenario: Reopened card after a send
+
+- **GIVEN** a sent draft
+- **WHEN** the member reopens the chat and presses Send again
+- **THEN** the response is 409 `DRAFT_CLOSED` and nothing is sent
+

@@ -24,7 +24,12 @@ import {
 } from 'libs/contracts/src/schema/labos-agent';
 import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
-import { HuskyAiService, LATEST_REPLY_CACHE_TIMEOUT_MS } from '../husky/husky-ai.service';
+import {
+  ContextualTurnSummary,
+  HuskyAiService,
+  LATEST_REPLY_CACHE_TIMEOUT_MS,
+  PersistedTurn,
+} from '../husky/husky-ai.service';
 import { IntroRequestsService } from '../intro-requests/intro-requests.service';
 import { JobOpeningsQueryService } from '../job-openings/job-openings-query.service';
 import { McpToolCatalog } from '../mcp/mcp-tool-catalog';
@@ -95,6 +100,14 @@ import {
   StoredProposal,
 } from './labos-agent-proposals';
 import { webSources } from './labos-agent-sources';
+import {
+  firstQuestionTitle,
+  LabosAgentThreadStore,
+  ownsThread,
+  ThreadDoc,
+  threadNotFound,
+  ThreadTurnDoc,
+} from './labos-agent-threads.store';
 
 /** Read tools that run in chat, next to the AI search tools (contract section 3: S1 news, S2 profile). */
 const READ_TOOLS = ['list_news', 'get_news_item', 'get_my_profile', 'list_my_experiences'];
@@ -196,7 +209,8 @@ export class LabosAgentService {
     private scopes: McpScopesService,
     private introRequests: IntroRequestsService,
     private teams: TeamsService,
-    private jobs: JobOpeningsQueryService
+    private jobs: JobOpeningsQueryService,
+    private threads: LabosAgentThreadStore
   ) {}
 
   private readonly logger = new Logger(LabosAgentService.name);
@@ -218,6 +232,9 @@ export class LabosAgentService {
   /** Runs the checks that come before the stream (403, 404), then returns the stream. */
   async chat(email: string, body: LabosAgentChatRequest): Promise<ReadableStream> {
     const memberUid = await this.enabledMember(email);
+    // LAB-3457: the thread must be new or the member's own (also an old AI search thread), with or without `persist`,
+    // so a turn never reads or adds to another member's thread memory. An own thread gets its memory back.
+    const thread = await this.threadForTurn(body.threadId, memberUid, email);
     const page = await this.pageContext(body, memberUid, email);
     // S6 (contract 10.4): the mention lookups come after the context lookup, so a bad context gives its 404 first.
     const mentioned = await this.mentionContext(body, memberUid, email);
@@ -250,11 +267,14 @@ export class LabosAgentService {
     const allowed = await this.tools(ctx);
     const reads = allowed.filter((def) => READ_TOOLS.includes(def.name));
     const proposals: LabosAgentProposal[] = [];
+    const persist = body.persist === true;
     const deps = {
       prisma: this.prisma,
       reads: new Map(reads.map((def) => [def.name, def])),
       store: this.proposalStore,
       proposals,
+      // LAB-3457: C2 writes the card state into the saved thread.
+      ...(persist ? { threadId: body.threadId } : {}),
     };
     const proposeTools = Object.fromEntries(
       allowed.filter((def) => PROPOSE_TOOLS.includes(def.name)).map((def) => [def.name, proposeTool(def, ctx, deps)])
@@ -275,6 +295,15 @@ export class LabosAgentService {
     });
 
     const extraTools = { ...mcpToolsAsAgentTools(reads, ctx), ...proposeTools, draft_intro: draftIntro };
+    // LAB-3297 (V0-R4): `toolCount`, `usedWebSearch` and `sourceCount` at the end of the body. Counts only.
+    // LAB-3362 D1: news `sourceRefs` link to `/?news=<uid>`, also the refs of the AI search news tool. LAB-3362 D2:
+    // `sources` keeps only web pages outside LabOS that are not in `sourceRefs`. The counts use the same refs and
+    // `sources` as the body. LAB-3457: the saved turn uses the same fields.
+    const turnFields = (turn: ContextualTurnSummary) => {
+      const links = newsLinkFields(turn);
+      const sources = webSources(turn.sources, links.sourceRefs ?? turn.sourceRefs);
+      return { ...links, sources, ...answerCounts({ ...turn, ...links, sources }) };
+    };
 
     const stream = await this.huskyAiService.createContextualToolsResponse(
       { question: body.message, threadId: body.threadId, chatId: body.chatId },
@@ -287,16 +316,18 @@ export class LabosAgentService {
         extraTools,
         // The stream reads these arrays when it ends, so they hold the proposals and drafts the tools made in this turn.
         extraResponseFields: { proposals, drafts },
-        // LAB-3297 (V0-R4): `toolCount`, `usedWebSearch` and `sourceCount` at the end of the body. Counts only.
-        // LAB-3362 D1: news `sourceRefs` link to `/?news=<uid>`, also the refs of the AI search news tool. LAB-3362 D2:
-        // `sources` keeps only web pages outside LabOS that are not in `sourceRefs`. The counts use the same refs and
-        // `sources` as the body.
-        turnFields: (turn) => {
-          const links = newsLinkFields(turn);
-          const sources = webSources(turn.sources, links.sourceRefs ?? turn.sourceRefs);
-          return { ...links, sources, ...answerCounts({ ...turn, ...links, sources }) };
-        },
-        persistHistory: false,
+        turnFields,
+        // LAB-3457: `persist: true` saves the summary and the finished turn (with its cards) in the shared history.
+        persistHistory: persist,
+        ...(persist
+          ? {
+              persistTurn: (saved: PersistedTurn) =>
+                this.saveTurn(body, { memberUid, email, isNew: !thread }, saved, turnFields(saved.summary), {
+                  proposals,
+                  drafts,
+                }),
+            }
+          : {}),
         // LAB-3367 h3: the latest reply, scoped to the signed-in member and the thread. Never the raw thread ID.
         latestReplyKey: latestReplyCacheKey(memberUid, body.threadId),
         // LAB-3367 k2, k7: the rules for your last answer, in the system message of the answer calls only.
@@ -521,6 +552,71 @@ export class LabosAgentService {
   private threadCacheTimeoutMs = LATEST_REPLY_CACHE_TIMEOUT_MS;
 
   /**
+   * LAB-3457: the saved thread of `threadId`, or undefined for a new id. Another member's thread, a guest thread or a
+   * deleted thread is 404 THREAD_NOT_FOUND before the stream, so the turn never reads its memory. An own thread gets
+   * its memory into the cache (it expires after a day). A failed memory load does not stop the turn.
+   */
+  private async threadForTurn(threadId: string, memberUid: string, email: string): Promise<ThreadDoc | undefined> {
+    const doc = await this.threads.find(threadId);
+    if (!doc) return undefined;
+    if (doc.isDeleted || !ownsThread(doc, memberUid, email)) throw threadNotFound();
+    await this.threads.warmSummary(doc).catch(() => {
+      this.logger.error('Failed to load the memory of a saved LabOS agent thread');
+    });
+    return doc;
+  }
+
+  /**
+   * LAB-3457: saves the finished C1 turn with what the member saw: the answer, steps, sources, follow-ups and the cards
+   * as `open`. A new thread gets the first question as its title, then the AI search title from the model. A failure
+   * logs a fixed text (the error can hold the turn) and does not stop the turn.
+   */
+  private async saveTurn(
+    body: LabosAgentChatRequest,
+    target: { memberUid: string; email: string; isNew: boolean },
+    saved: PersistedTurn,
+    fields: { sources: string[]; sourceRefs?: ThreadTurnDoc['sourceRefs'] } & Record<string, unknown>,
+    cards: { proposals: LabosAgentProposal[]; drafts: LabosAgentDraft[] }
+  ): Promise<void> {
+    const sourceRefs = fields.sourceRefs ?? saved.tail.sourceRefs;
+    const turn: ThreadTurnDoc = {
+      questionId: body.chatId,
+      question: saved.question,
+      response: saved.content,
+      sources: fields.sources,
+      ...(sourceRefs?.length ? { sourceRefs } : {}),
+      actions: saved.tail.actions ?? [],
+      followUpQuestions: saved.tail.followUpQuestions ?? [],
+      createdAt: Date.now(),
+      kind: 'agent',
+      steps: saved.steps,
+      ...(body.context ? { context: body.context } : {}),
+      ...(body.mentions?.length ? { mentions: body.mentions } : {}),
+      proposals: cards.proposals.map((proposal) => ({ ...proposal, status: 'open' as const })),
+      drafts: cards.drafts.map((draft) => ({ ...draft, status: 'open' as const })),
+      ...answerCountFields(fields),
+    };
+    const title = firstQuestionTitle(saved.question);
+    try {
+      await this.threads.appendTurn(
+        { threadId: body.threadId, ...target },
+        { title, ...(body.context ? { context: body.context } : {}) },
+        turn
+      );
+    } catch {
+      this.logger.error('Failed to save a LabOS agent turn');
+      return;
+    }
+    if (!target.isNew) return;
+    this.huskyAiService
+      .generateThreadTitle(saved.question)
+      .then((generated) =>
+        generated.trim() ? this.threads.replaceTitle(body.threadId, title, generated.trim()) : undefined
+      )
+      .catch(() => this.logger.error('Failed to set the title of a LabOS agent thread'));
+  }
+
+  /**
    * C2: closes a proposal. Cancel writes nothing. Confirm checks the member's current permissions again, then runs
    * the real MCP tool once with the stored arguments.
    */
@@ -539,7 +635,8 @@ export class LabosAgentService {
     if (body.decision === 'cancel') {
       if (!(await this.proposalStore.claim(body.proposalId))) throw await this.lostClaim(body.proposalId);
       await this.proposalStore.close(stored, 'cancelled');
-      return { ...reply, status: 'cancelled', summary: 'Cancelled. Nothing changed.', result: {} };
+      await this.markSavedProposal(stored, 'cancelled', CANCELLED_SUMMARY);
+      return { ...reply, status: 'cancelled', summary: CANCELLED_SUMMARY, result: {} };
     }
 
     const ctx = await this.actor(memberUid, email);
@@ -556,6 +653,7 @@ export class LabosAgentService {
       result = await def.execute(ctx, stored.args);
     } catch (error) {
       await this.proposalStore.close(stored, 'failed');
+      await this.markSavedProposal(stored, 'failed');
       const status = error instanceof HttpException ? error.getStatus() : 500;
       if (status === 403) throw this.notAllowed(error.message);
       if (status >= 400 && status < 500) {
@@ -564,7 +662,21 @@ export class LabosAgentService {
       throw error;
     }
     await this.proposalStore.close(stored, 'done');
+    await this.markSavedProposal(stored, 'done', summary(stored));
     return { ...reply, status: 'done', summary: summary(stored), result };
+  }
+
+  /**
+   * LAB-3457: the card state in the saved thread, for a proposal of a saved turn. Best effort: the C2 result and the
+   * cache record stay the truth, and the thread read checks the cache for a card that is still open.
+   */
+  private async markSavedProposal(stored: StoredProposal, status: 'done' | 'cancelled' | 'failed', text?: string) {
+    if (!stored.threadId) return;
+    try {
+      await this.threads.markProposal(stored.threadId, stored.proposal.proposalId, status, text);
+    } catch {
+      this.logger.error('Failed to save the state of a LabOS agent proposal in its thread');
+    }
   }
 
   /**
@@ -599,7 +711,7 @@ export class LabosAgentService {
   }
 
   /** The live member behind the email, inside the pilot gate (403 AGENT_NOT_ENABLED otherwise). */
-  private async enabledMember(email: string): Promise<string> {
+  async enabledMember(email: string): Promise<string> {
     const memberUid = await resolveLiveMemberUidByEmail(this.prisma, email);
     if (!memberUid || !(await this.access.isEnabled(memberUid))) {
       throw agentError(
@@ -853,6 +965,20 @@ function introHint(type: 'member' | 'team', uid: string): string {
     // LAB-3367 G8: the same reason rule on each page, as on the intro page.
     `${INTRO_REASON_RULE} You never send the request.`
   );
+}
+
+/** The C2 cancel summary. */
+const CANCELLED_SUMMARY = 'Cancelled. Nothing changed.';
+
+/** LAB-3457: the answer counts of the body for the saved turn (only the fields that are set). */
+function answerCountFields(
+  fields: Record<string, unknown>
+): Pick<ThreadTurnDoc, 'toolCount' | 'usedWebSearch' | 'sourceCount'> {
+  return {
+    ...(typeof fields.toolCount === 'number' ? { toolCount: fields.toolCount } : {}),
+    ...(typeof fields.usedWebSearch === 'boolean' ? { usedWebSearch: fields.usedWebSearch } : {}),
+    ...(typeof fields.sourceCount === 'number' ? { sourceCount: fields.sourceCount } : {}),
+  };
 }
 
 /** LAB-3367 B3: at most this many kept targets. */

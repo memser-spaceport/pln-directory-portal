@@ -233,7 +233,9 @@ function setup(
     { adminCaps: jest.fn() } as any,
     { findAgentTargetName: jest.fn(), findEligibleRequester: jest.fn() } as any,
     {} as any,
-    {} as any
+    {} as any,
+    // LAB-3457: every thread id here is new (no saved thread).
+    { find: jest.fn().mockResolvedValue(null) } as any
   );
   const controller = new LabosAgentController(service);
   const req = { userEmail: `${SESSION}@example.com` };

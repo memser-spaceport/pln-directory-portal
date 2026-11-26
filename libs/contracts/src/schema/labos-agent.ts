@@ -353,15 +353,23 @@ export const LABOS_AGENT_THREAD_SOURCES = ['ai-search', 'agent'] as const;
 export type LabosAgentThreadSource = typeof LABOS_AGENT_THREAD_SOURCES[number];
 
 /** T1 paging limits. */
-export const LABOS_AGENT_THREADS_QUERY_LIMITS = { minLimit: 1, maxLimit: 50, defaultLimit: 20, maxPage: 10000 } as const;
+export const LABOS_AGENT_THREADS_QUERY_LIMITS = {
+  minLimit: 1,
+  maxLimit: 50,
+  defaultLimit: 20,
+  maxPage: 10000,
+} as const;
 
 const pageInt = (name: string, min: number, max: number, fallback: number) =>
   z
     .string()
     .optional()
-    .refine((value) => value === undefined || (/^\d{1,5}$/.test(value) && Number(value) >= min && Number(value) <= max), {
-      message: `${name} must be an integer from ${min} to ${max}`,
-    })
+    .refine(
+      (value) => value === undefined || (/^\d{1,5}$/.test(value) && Number(value) >= min && Number(value) <= max),
+      {
+        message: `${name} must be an integer from ${min} to ${max}`,
+      }
+    )
     .transform((value) => (value === undefined ? fallback : Number(value)));
 
 /** Query of T1. Query values are strings. `page` starts at 1. */

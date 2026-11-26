@@ -164,7 +164,30 @@ export interface ContextualToolsOptions {
    * replaces it in the body, for example the agent `sources` (LAB-3362 D2). AI search passes nothing.
    */
   turnFields?: (turn: ContextualTurnSummary) => Record<string, unknown>;
+  /**
+   * LAB-3457: with `persistHistory`, the caller saves the finished turn itself, instead of the AI search turn write
+   * (`persistContextualHistory`). The stream waits for it before it closes, at most `PERSIST_TURN_TIMEOUT_MS`, so a
+   * read right after the end finds the turn. A stopped, failed or cancelled turn is not given. The callback handles
+   * its own errors. AI search passes nothing.
+   */
+  persistTurn?: (turn: PersistedTurn) => Promise<void>;
 }
+
+/** LAB-3457: the finished turn for `ContextualToolsOptions.persistTurn`: what the member saw. */
+export interface PersistedTurn {
+  question: string;
+  /** The answer text, as streamed. */
+  content: string;
+  /** The step lines of the stream, in order. */
+  steps: string[];
+  /** The tail, before `turnFields`. */
+  tail: HuskyStoredContext;
+  /** The same input that `turnFields` gets. */
+  summary: ContextualTurnSummary;
+}
+
+/** LAB-3457: the longest wait for `ContextualToolsOptions.persistTurn` before the stream closes. */
+export const PERSIST_TURN_TIMEOUT_MS = 3000;
 
 /** What the finished turn did, for `ContextualToolsOptions.turnFields`. */
 export interface ContextualTurnSummary {
@@ -187,7 +210,7 @@ interface AnswerResult {
 }
 
 type HuskyResponseContext = z.infer<typeof HuskyResponseContextSchema>;
-type HuskyStoredContext = HuskyResponseContext & { sourceRefs?: HuskySourceRef[] };
+export type HuskyStoredContext = HuskyResponseContext & { sourceRefs?: HuskySourceRef[] };
 
 const EMPTY_RESPONSE_CONTEXT: HuskyResponseContext = { followUpQuestions: [], sources: [], actions: [] };
 
@@ -380,9 +403,12 @@ export class HuskyAiService {
           // answer character; a late tool finish must not write into that string.
           let stepsOpen = true;
           let stepCount = 0;
+          // LAB-3457: the step lines as streamed, for `persistTurn`.
+          const steps: string[] = [];
           const pushStep = (label: string) => {
             if (!stepsOpen) return;
             enqueue(`${stepCount ? ', ' : ''}${JSON.stringify(label)}`);
+            steps.push(label);
             stepCount += 1;
           };
           const emitText = (fragment: string) => {
@@ -529,6 +555,30 @@ export class HuskyAiService {
             }
           }
 
+          // LAB-3457: the caller saves the turn before the stream closes, so a thread read right after the end has it.
+          if (persistHistory && options.persistTurn && !cancelled) {
+            const saved = await this.withinTimeout(
+              options
+                .persistTurn({
+                  question,
+                  content,
+                  steps,
+                  tail: responseContext,
+                  summary: turnSummary(toolNames, responseContext),
+                })
+                .then(
+                  () => 'saved' as const,
+                  () => 'failed' as const
+                ),
+              this.persistTurnTimeoutMs
+            );
+            if (saved !== 'saved') {
+              this.logger.error(
+                `${saved ? 'Failed' : 'Timed out'} saving the turn of thread ${threadId}, chat ${chatId}`
+              );
+            }
+          }
+
           controller.close();
 
           // LAB-3367 K3: a fixed answer runs no summary model call and keeps the earlier summary.
@@ -538,7 +588,8 @@ export class HuskyAiService {
             .catch((error) =>
               this.logger.error(`Failed to update chat summary for thread ${threadId}: ${logSafeError(error)}`)
             );
-          if (!persistHistory) return;
+          // LAB-3457: a caller that saves its own turn (`persistTurn`) gets no AI search turn write.
+          if (!persistHistory || options.persistTurn) return;
           this.persistContextualHistory(
             threadId,
             chatId,
@@ -1061,6 +1112,23 @@ export class HuskyAiService {
     );
   }
 
+  /** LAB-3457: the wait for `persistTurn`. A field, so a test can make it short. */
+  private persistTurnTimeoutMs = PERSIST_TURN_TIMEOUT_MS;
+
+  /** LAB-3457: the result of `work`, or undefined after `ms`. The timer does not keep the process alive. */
+  private async withinTimeout<T>(work: Promise<T>, ms: number): Promise<T | undefined> {
+    let timer: NodeJS.Timeout | undefined;
+    const timeout = new Promise<undefined>((resolve) => {
+      timer = setTimeout(() => resolve(undefined), ms);
+      timer.unref?.();
+    });
+    try {
+      return await Promise.race([work, timeout]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
   /** The result of `work`, or undefined after `latestReplyTimeoutMs`. The timer does not keep the process alive. */
   private async withinLatestReplyTimeout<T>(work: Promise<T>): Promise<T | undefined> {
     let timer: NodeJS.Timeout | undefined;
@@ -1135,14 +1203,7 @@ export class HuskyAiService {
       throw new NotFoundException('Member not found');
     }
 
-    const prompt = Handlebars.compile(PROMPT_FOR_GENERATE_TITLE)({
-      question: question,
-    });
-    const { text } = await generateText({
-      model: this.getModel(),
-      prompt: prompt,
-    });
-    const createdTitle = text || '';
+    const createdTitle = await this.generateThreadTitle(question);
     await this.huskyPersistentDbService.updateByKeyValue(
       process.env.MONGO_THREADS_COLLECTION || 'threads',
       'threadId',
@@ -1154,6 +1215,18 @@ export class HuskyAiService {
     );
   }
 
+  /** The thread title from the first question: the AI search title prompt on `getModel()`. '' when the model gives none. */
+  async generateThreadTitle(question: string): Promise<string> {
+    const prompt = Handlebars.compile(PROMPT_FOR_GENERATE_TITLE)({
+      question: question,
+    });
+    const { text } = await generateText({
+      model: this.getModel(),
+      prompt: prompt,
+    });
+    return text || '';
+  }
+
   async getThreadsByEmail(email: string) {
     try {
       const threads = await this.huskyPersistentDbService.findByKeyValue(
@@ -1161,8 +1234,9 @@ export class HuskyAiService {
         'email',
         email
       );
+      // LAB-3457: agent threads are listed by `GET /v1/labos-agent/threads` only. A thread with no `source` stays.
       return threads
-        .filter((thread) => thread?.title?.length > 0)
+        .filter((thread) => thread?.title?.length > 0 && thread?.source !== 'agent')
         .sort((a, b) => b.updatedAt - a.updatedAt)
         .map((thread) => ({
           threadId: thread?.threadId,

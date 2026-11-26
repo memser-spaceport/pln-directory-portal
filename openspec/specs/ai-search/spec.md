@@ -138,3 +138,14 @@ The answer stream SHALL join the text before a tool call and the text after it w
 - **GIVEN** the model writes "Checking.", calls two tools, then writes "Done."
 - **WHEN** the answer finishes
 - **THEN** `content` is "Checking.\n\nDone."
+
+### Requirement: Agent threads stay out of the AI search list
+
+`GET /v1/husky/threads` SHALL leave out threads with `source: 'agent'` (LAB-3457); the LabOS agent lists them. A thread with no `source` SHALL stay in the list, also when the agent continued it. Thread delete SHALL stay a soft delete (`isDeleted: true`), and the AI search turn write SHALL not change for AI search callers.
+
+#### Scenario: A member with an agent thread
+
+- **GIVEN** a member with one AI search thread and one agent thread
+- **WHEN** they call `GET /v1/husky/threads`
+- **THEN** only the AI search thread is listed
+
