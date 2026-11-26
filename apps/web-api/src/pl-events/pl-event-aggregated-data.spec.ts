@@ -24,6 +24,10 @@ const payload = () => ({
 });
 
 describe('presentAggregatedData (LAB-3463)', () => {
+  it('passes through an unavailable result from the aggregation service', () => {
+    expect(presentAggregatedData(undefined, null)).toBeUndefined();
+  });
+
   it('gives a signed-out request the subscriber count and no member uid, name or photo', () => {
     const result = presentAggregatedData(payload(), null);
     const [lisbon, berlin] = result.locations;

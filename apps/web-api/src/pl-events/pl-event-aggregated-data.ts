@@ -11,7 +11,7 @@ export function withoutSubscriberMembers<T extends LocationWithSubscribers>(loca
   }));
 }
 
-export function presentAggregatedData<T extends { locations?: LocationWithSubscribers[] }>(
+export function presentAggregatedData<T extends { locations?: LocationWithSubscribers[] } | undefined>(
   data: T,
   loggedInMember: unknown
 ): T {
