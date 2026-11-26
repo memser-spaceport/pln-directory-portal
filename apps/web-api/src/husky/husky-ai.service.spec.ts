@@ -17,7 +17,11 @@ jest.mock('./tools/demo-day.tool', () => ({ DemoDayTool: jest.fn() }));
 jest.mock('../analytics/service/analytics.service', () => ({ AnalyticsService: jest.fn() }));
 // irl-events.tool imports PLEventGuestsService/MembersService -> axios, same ESM problem.
 jest.mock('./tools/irl-events.tool', () => ({ IrlEventsTool: jest.fn() }));
+// The real tools service pulls in undici through its tool modules, and undici needs the web streams globals at import.
+// This spec passes its own tools service mock to the constructor.
+jest.mock('./tools/husky-ai-tools.serivice', () => ({ HuskyAiToolsService: jest.fn() }));
 
+import { ForbiddenException } from '@nestjs/common';
 import { streamText, streamObject, generateText } from 'ai';
 import { HuskyResponseSchema } from 'libs/contracts/src/schema/husky-chat';
 import {
@@ -547,6 +551,168 @@ describe('HuskyAiService.createContextualToolsResponse', () => {
     );
     // The hand-over is summarised before the new question is sent to the model.
     expect(generateTextMock.mock.invocationCallOrder[0]).toBeLessThan(streamTextMock.mock.invocationCallOrder[0]);
+  });
+
+  describe('thread owner (LAB-3459)', () => {
+    const OWNER = 'owner@example.com';
+    const handedOver = {
+      user: 'Original blog question',
+      system: 'Original blog answer',
+      sources: [],
+      followUpQuestions: [],
+      actions: [],
+      threadId: 'thread-1',
+      chatId: 'chat-0',
+    };
+    const ownedThread = () => ({ threadId: 'thread-1', email: OWNER, contextual: [] as any[] });
+
+    const answer = () => {
+      streamTextMock.mockReturnValue(answerStream(['Answer']));
+      streamObjectMock.mockReturnValue(structuredStream(['{"followUpQuestions":[],"sources":[],"actions":[]}']));
+    };
+    /** Both turns (the hand-over and the new one) and the summary reached Redis and Mongo. */
+    const expectWritten = (thread: { contextual?: any[] } | null) => {
+      const docs = thread ? persistent.updateDocByKeyValue.mock.calls : persistent.create.mock.calls;
+      const turns = thread ? thread.contextual : docs.map((call) => call[1].contextual[0]);
+      expect(docs.length).toBeGreaterThan(0);
+      expect(turns?.map((turn) => turn.questionId)).toEqual(['chat-0', 'chat-1']);
+      expect(cache.set).toHaveBeenCalledWith('thread-1:summary', 'summary text');
+      expect(persistent.upsertByKeyValue).toHaveBeenCalledWith(
+        'chats_summary',
+        'threadId',
+        'thread-1',
+        expect.objectContaining({ summary: 'summary text' })
+      );
+    };
+
+    it.each([
+      ['another member', 'other@example.com', true],
+      ['a guest', undefined, false],
+    ])(
+      "refuses %s on a member's thread: no turn, no summary, no hand-over",
+      async (_who, email: string | undefined, isLoggedIn: boolean) => {
+        persistent.findOneByKeyValue.mockResolvedValue(ownedThread());
+        persistent.getDocByKeyValue.mockResolvedValue(ownedThread());
+        cache.get.mockResolvedValue("the owner's summary");
+        answer();
+
+        const call = service.createContextualToolsResponse({ ...chatInfo, chatSummary: handedOver }, isLoggedIn, email);
+
+        await expect(call).rejects.toThrow(ForbiddenException);
+        await expect(call).rejects.toThrow('Start a new thread or duplicate this one.');
+        await flushBackgroundWork();
+        expect(persistent.findOneByKeyValue).toHaveBeenCalledWith('threads', 'threadId', 'thread-1');
+        expect(persistent.create).not.toHaveBeenCalled();
+        expect(persistent.updateDocByKeyValue).not.toHaveBeenCalled();
+        expect(persistent.upsertByKeyValue).not.toHaveBeenCalled();
+        expect(persistent.updateByKeyValue).not.toHaveBeenCalled();
+        expect(cache.set).not.toHaveBeenCalled();
+        // The owner's summary does not reach the caller's answer either.
+        expect(cache.get).not.toHaveBeenCalled();
+        expect(generateTextMock).not.toHaveBeenCalled();
+        expect(streamTextMock).not.toHaveBeenCalled();
+      }
+    );
+
+    it('lets the owner continue their thread: the hand-over, the turn and the summary are written', async () => {
+      const thread = ownedThread();
+      persistent.findOneByKeyValue.mockResolvedValue(thread);
+      persistent.getDocByKeyValue.mockResolvedValue(thread);
+      answer();
+
+      await readAll(
+        await service.createContextualToolsResponse(
+          { ...chatInfo, chatId: 'chat-1', chatSummary: handedOver },
+          true,
+          OWNER
+        )
+      );
+      await flushBackgroundWork();
+
+      expectWritten(thread);
+      expect(persistent.updateDocByKeyValue).toHaveBeenCalledWith(
+        'threads',
+        'threadId',
+        'thread-1',
+        expect.objectContaining({ email: OWNER })
+      );
+    });
+
+    it.each([
+      ['a member on a guest thread', { threadId: 'thread-1', contextual: [] as any[] }, 'member@example.com', true],
+      ['a guest on a guest thread', { threadId: 'thread-1', contextual: [] as any[] }, undefined, false],
+      ['a member on a new thread', null, 'member@example.com', true],
+    ])(
+      'writes as before for %s',
+      async (_case, thread: { contextual: any[] } | null, email: string | undefined, isLoggedIn: boolean) => {
+        persistent.findOneByKeyValue.mockResolvedValue(thread && { ...thread });
+        persistent.getDocByKeyValue.mockResolvedValue(thread);
+        answer();
+
+        await readAll(
+          await service.createContextualToolsResponse(
+            { ...chatInfo, chatId: 'chat-1', chatSummary: handedOver },
+            isLoggedIn,
+            email
+          )
+        );
+        await flushBackgroundWork();
+
+        expectWritten(thread);
+      }
+    );
+
+    describe('duplicate', () => {
+      const summaryDoc = { threadId: 'thread-1', summary: 'the summary' };
+      const stored = (thread: unknown) =>
+        persistent.findOneByKeyValue.mockImplementation(async (collection: string) =>
+          collection === 'threads' ? thread : summaryDoc
+        );
+
+      it("still refuses to duplicate another member's thread", async () => {
+        stored(ownedThread());
+
+        await expect(service.duplicateThread('thread-1', 'other@example.com')).rejects.toThrow(ForbiddenException);
+        expect(persistent.create).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        ['a member', 'member@example.com', undefined, true],
+        ['a guest', '', 'guest-1', false],
+      ])(
+        'lets %s duplicate a guest thread and continue the copy',
+        async (_who, email: string, guestUserId: string | undefined, isLoggedIn: boolean) => {
+          stored({ threadId: 'thread-1', title: 'Storage', contextual: [{ questionId: 'chat-0' }] });
+          prisma.member.findUnique.mockResolvedValue({ name: 'Ada', image: null });
+
+          const { threadId: copyId } = await service.duplicateThread('thread-1', email, guestUserId);
+
+          const copy = persistent.create.mock.calls[0][1];
+          expect(copy).toEqual(
+            expect.objectContaining({ threadId: copyId, createdFrom: 'thread-1', ...(email && { email }) })
+          );
+          expect(copy.email).toBe(email || undefined);
+          expect(copy.guestUserId).toBe(guestUserId);
+          expect(cache.set).toHaveBeenCalledWith(`${copyId}:summary`, 'the summary');
+
+          persistent.create.mockClear();
+          stored(copy);
+          persistent.getDocByKeyValue.mockResolvedValue(copy);
+          answer();
+          await readAll(
+            await service.createContextualToolsResponse(
+              { ...chatInfo, threadId: copyId, chatId: 'chat-1' },
+              isLoggedIn,
+              email || undefined
+            )
+          );
+          await flushBackgroundWork();
+
+          expect(copy.contextual.map((turn) => turn.questionId)).toEqual(['chat-0', 'chat-1']);
+          expect(cache.set).toHaveBeenCalledWith(`${copyId}:summary`, 'summary text');
+        }
+      );
+    });
   });
 });
 
