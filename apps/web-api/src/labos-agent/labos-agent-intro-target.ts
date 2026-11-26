@@ -243,6 +243,26 @@ export function introAsk(
   return asks && (!page || toChip || chips.length > 1 || !isOwnTeam(message, chips[0])) ? 'unclear' : undefined;
 }
 
+/**
+ * True when the recipient of a request is not a chip and not the page: "Draft an intro to Dana. @Kyle knows her".
+ * Then the chip is only a mention, so it is not kept for the next turn.
+ */
+export function namesOtherRecipient(
+  message: string,
+  chips: readonly IntroTurnTarget[],
+  page: IntroTurnTarget | undefined
+): boolean {
+  return requests(message).some(({ text }) => {
+    if (namesKept(text, chips) || (page && (isPage(text, page, chips) || namesKept(text, [page])))) return false;
+    // "this member's team" can be a chip.
+    if (/^\S+(?:\s+\S+)?['’]s\b/.test(text)) return false;
+    const named = typeRecipient(text);
+    return named
+      ? !chips.some((chip) => chip.type === named.type)
+      : OTHER_RECIPIENT.test(text) || OTHER_WORDS.test(text);
+  });
+}
+
 /** True when the message has a request with a recipient. A message about the waiting card mostly has none. */
 export const hasIntroRequest = (message: string) => requests(message).length > 0;
 

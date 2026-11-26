@@ -53,7 +53,7 @@ import {
   PROFILE_READ_TOOLS,
   profileFacts,
 } from './labos-agent-drafts';
-import { hasIntroRequest, introAsk, keptTargetUse } from './labos-agent-intro-target';
+import { hasIntroRequest, introAsk, keptTargetUse, namesOtherRecipient } from './labos-agent-intro-target';
 import {
   asksAgainAfterFailure,
   asksForChange,
@@ -415,11 +415,14 @@ export class LabosAgentService {
     }
     // With a waiting card, "intro" mostly means the card, so only a request with a recipient is an ask.
     const unclear = ask === 'unclear' && (!cardTarget || hasIntroRequest(body.message));
+    // B7: an unclear chip is kept only next to the page, and not when the ask names another recipient ("to Dana").
+    // On Home the chip is then not kept, as with no rule: the reason turn must not draft for a chip it only mentions.
+    const keepsChip = unclear && !!page.introTarget && !namesOtherRecipient(body.message, others, page.introTarget);
     // D1: the next turn has the chip and the page. This turn has them too, with the hints of the page and the chips.
     const keepUnclear = async () => {
-      if (!unclear) return undefined;
-      await save({ ...keepFor(others), ...(page.introTarget ? { both: true } : {}), unclear: true });
-      return { targets: [...(page.introTarget ? [page.introTarget] : []), ...others], hints: [], keeps: true };
+      if (!keepsChip || !page.introTarget) return undefined;
+      await save({ ...keepFor(others), both: true, unclear: true });
+      return { targets: [page.introTarget, ...others], hints: [], keeps: true };
     };
     const stored = await this.threadCache(() => this.proposalStore.loadIntroTarget(key));
     if (!stored) return keepUnclear();
@@ -442,23 +445,26 @@ export class LabosAgentService {
       await drop();
       return undefined;
     }
-    // A new unclear ask adds its chips and the page: the kept targets stay possible.
+    // A new unclear ask adds its chips and the page to this turn: the kept targets stay possible. It keeps the chips for
+    // the next turns only when `keepsChip` (B7).
     const added = unclear ? others.filter((item) => !kept.some((target) => sameTarget(target, item))) : [];
+    const keptAdded = keepsChip ? added : [];
     const paused = use === 'pause' && !added.length;
     const pending: PendingIntroTarget = {
       ...stored,
-      targets: uniqueTargets([...added, ...kept])
+      targets: uniqueTargets([...keptAdded, ...kept])
         .slice(0, MAX_KEPT_TARGETS)
         .map(({ type, uid }) => ({ type, uid })),
       ...(use === 'both' || paused || moved || added.length ? { both: true } : {}),
-      ...(added.length ? { unclear: true } : {}),
+      ...(keptAdded.length ? { unclear: true } : {}),
     };
     if (JSON.stringify(pending) !== JSON.stringify(stored)) await save(pending);
     // D1: no target in the turn of a search or a cancel, but the next turn has the page and the kept targets.
     if (paused) return { targets: others, hints: pageHints, keeps: true };
     const both = !!page.introTarget && !!pending.both;
     const targets = uniqueTargets([...kept, ...(both && page.introTarget ? [page.introTarget] : []), ...others]);
-    return { targets, promptContext: keptPrompt(kept, pending, both), hints: both ? [] : pageHints, keeps: true };
+    const promptContext = keptPrompt(kept, added.length ? { ...pending, unclear: true } : pending, both);
+    return { targets, promptContext, hints: both ? [] : pageHints, keeps: true };
   }
 
   /** The kept targets with their names from the database. A deleted target has no name. */
