@@ -28,7 +28,9 @@ await this.prisma.pLEvent.findMany({ where: { ...VISIBLE_PL_EVENT_WHERE, locatio
 
 The global search index (`event` in OpenSearch, filled by `lambda/lambda-opensearch-sync`) holds approved, non-deleted
 events only. An event that stops being visible is removed from the index on the next run of the Lambda. Deploy the
-Lambda after the migration that adds `PLEvent.status`, because its query reads that column.
+Lambda after the migration that adds `PLEvent.status`, because its query reads that column. `GET /v1/global-search/all` matches events on name, description, short description, location and `additionalInfo` (tags,
+host, agenda), but shows only the first four as matches: `additionalInfo` is indexed as a JSON string. The frontend
+opens an event result on the LabOS All Events page (`/events/all?event=<uid>`), not on the index's `eventUrl`.
 
 ## Which gatherings are listed
 
