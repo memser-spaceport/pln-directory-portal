@@ -1,4 +1,5 @@
 // Stub the service modules: the real ones pull in a module graph that overflows jest's loader.
+jest.mock('@ssut/nestjs-sqs', () => ({ SqsMessageHandler: () => () => undefined }));
 jest.mock('../shared/log.service', () => ({ LogService: jest.fn() }));
 jest.mock('../shared/prisma.service', () => ({ PrismaService: jest.fn() }));
 jest.mock('../pl-events/pl-events.service', () => ({ PLEventsService: jest.fn() }));
@@ -90,5 +91,57 @@ describe('EventsConsumer reads the full details after a message (LAB-3403)', () 
 
     await expect(consumer.processEventOperation(message('UPSERT'))).rejects.toThrow('db');
     expect(sync.syncEventDetailsOnly).not.toHaveBeenCalled();
+  });
+});
+
+function setupFlag() {
+  const logger = { info: jest.fn(), error: jest.fn() };
+  const prisma = { $transaction: jest.fn() };
+  const plEventsService = { deleteEventByUid: jest.fn() };
+  const helper = {
+    mapEventData: jest.fn(async (event: { event_id: string }) => ({ externalId: event.event_id, type: 'IN_PERSON' })),
+    findEventByExternalId: jest.fn(async () => ({ uid: 'ev-1' })),
+  };
+  const consumer = new EventsConsumer(logger as any, prisma as any, plEventsService as any, helper as any, {} as any, {} as any);
+  return { consumer, logger, prisma, plEventsService, helper };
+}
+
+const flagMessage = (type: 'UPSERT' | 'DELETE') => ({
+  MessageId: 'msg-1',
+  Body: JSON.stringify({ body: { type, event: { event_id: 'evt-1', address_info: {} }, location: {} } }),
+});
+
+describe('EventsConsumer and EVENTS_LOCAL_SUBMIT_ENABLED (LAB-3327)', () => {
+  const flag = process.env.EVENTS_LOCAL_SUBMIT_ENABLED;
+  afterEach(() => {
+    process.env.EVENTS_LOCAL_SUBMIT_ENABLED = flag;
+  });
+
+  it('does nothing with a message once LabOS owns events', async () => {
+    process.env.EVENTS_LOCAL_SUBMIT_ENABLED = 'true';
+    const { consumer, prisma, plEventsService, helper, logger } = setupFlag();
+
+    await expect(consumer.processEventOperation(flagMessage('UPSERT'))).resolves.toBeUndefined();
+    await expect(consumer.processEventOperation(flagMessage('DELETE'))).resolves.toBeUndefined();
+
+    expect(helper.mapEventData).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(plEventsService.deleteEventByUid).not.toHaveBeenCalled();
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.stringContaining('Ignoring events-service message msg-1'),
+      'EventsConsumer'
+    );
+  });
+
+  it('still processes messages while the flag is off', async () => {
+    process.env.EVENTS_LOCAL_SUBMIT_ENABLED = 'false';
+    const { consumer, prisma, plEventsService, helper } = setupFlag();
+
+    await consumer.processEventOperation(flagMessage('UPSERT'));
+    expect(helper.mapEventData).toHaveBeenCalledTimes(1);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+
+    await consumer.processEventOperation(flagMessage('DELETE'));
+    expect(plEventsService.deleteEventByUid).toHaveBeenCalledWith('ev-1');
   });
 });

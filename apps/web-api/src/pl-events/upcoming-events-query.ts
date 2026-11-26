@@ -1,5 +1,6 @@
-import { hidesAttendance } from './pl-event-detail';
+import { hidesEventAttendance } from './pl-event-detail';
 import { BadRequestException } from '@nestjs/common';
+import { VISIBLE_PL_EVENT_WHERE } from './pl-event-visibility';
 
 /**
  * Optional narrowing of `GET /v1/irl/events/upcoming` (LAB-3071, for Home's events rail). With none of these the
@@ -55,7 +56,7 @@ export function upcomingEventsFindArgs(options: UpcomingEventsOptions, now: Date
     ...(options.ongoing
       ? { endDate: { gt: now }, ...(options.days ? { startDate: within } : {}) }
       : { startDate: { gt: now, ...within } }),
-    isDeleted: false,
+    ...VISIBLE_PL_EVENT_WHERE,
   };
   return {
     where,
@@ -81,8 +82,10 @@ type UpcomingEventRow = {
  * The uids whose attendee count the list can show (LAB-3271). The list has no viewer, so it follows the signed-out
  * rule of the drawer: an invite-only event hides its attendance.
  */
-export function countableUpcomingEventUids(events: Array<{ uid: string; type?: string | null }>): string[] {
-  return events.filter((event) => !hidesAttendance(event.type, false)).map((event) => event.uid);
+export function countableUpcomingEventUids(
+  events: Array<{ uid: string; type?: string | null; accessOption?: string | null }>
+): string[] {
+  return events.filter((event) => !hidesEventAttendance(event, false)).map((event) => event.uid);
 }
 
 /** Distinct listed members per event, from `groupBy(['eventUid', 'memberUid'])` rows. */

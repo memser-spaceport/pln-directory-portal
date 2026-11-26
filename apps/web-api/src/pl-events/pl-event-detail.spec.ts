@@ -14,7 +14,7 @@ import { NotFoundException } from '@nestjs/common';
 import { ResponsePLEventDetailSchema } from 'libs/contracts/src/schema/pl-event-attendance';
 import { emptyPLEventDetails } from 'libs/contracts/src/schema/pl-event-details';
 import { EVENTS_SERVICE_EVENT } from './fixtures/events-service-event.fixture';
-import { cityOf, visibleResources } from './pl-event-detail';
+import { cityOf, hidesEventAttendance, isInviteOnlyEvent, visibleResources } from './pl-event-detail';
 import { mapEventDetails, withEventDetails } from './pl-event-details.mapper';
 import { PLEventsService } from './pl-events.service';
 
@@ -25,6 +25,8 @@ const person = (uid: string) => ({ member: { uid, name: `Name ${uid}`, image: { 
 function eventRow(overrides: Record<string, unknown> = {}) {
   return {
     uid: 'ev-1',
+    status: 'APPROVED',
+    submitterUid: null,
     name: 'Builders Day',
     slugURL: 'builders-day',
     type: 'IN_PERSON',
@@ -160,6 +162,21 @@ describe('PLEventsService.getPLEventDetail (LAB-3213)', () => {
     expect(prisma.pLEventGuest.groupBy).not.toHaveBeenCalled();
   });
 
+  it('signed out on an accessOption INVITE event with no type: count 0 and no faces (QA 3281-5)', async () => {
+    const { service, prisma } = makeService(eventRow({ type: null, accessOption: 'INVITE' }));
+    const detail = await service.getPLEventDetail('ev-1', null);
+    expect(detail.goingCount).toBe(0);
+    expect(detail.faces).toEqual([]);
+    expect(prisma.pLEventGuest.groupBy).not.toHaveBeenCalled();
+  });
+
+  it('signed in on an accessOption INVITE event with no type: the count and faces are shown', async () => {
+    const { service } = makeService(eventRow({ type: null, accessOption: 'INVITE' }));
+    const detail = await service.getPLEventDetail('ev-1', VIEWER);
+    expect(detail.goingCount).toBe(4);
+    expect(detail.faces).toHaveLength(3);
+  });
+
   it('signed in on an INVITE_ONLY event: the count and faces are shown', async () => {
     const { service } = makeService(eventRow({ type: 'INVITE_ONLY' }));
     const detail = await service.getPLEventDetail('ev-1', VIEWER);
@@ -211,6 +228,170 @@ describe('PLEventsService.getPLEventDetail (LAB-3213)', () => {
     }
   });
 
+  it('an in-person event returns its venue, time zone, links and all-day flag from the columns (LAB-3281)', async () => {
+    const { service } = makeService(
+      eventRow({
+        timezone: 'Europe/Lisbon',
+        isAllDay: true,
+        venueAddress: 'Avenida da Liberdade 10',
+        latitude: 38.7205,
+        longitude: -9.1453,
+        registrationUrl: 'https://example.org/register',
+        meetingUrl: 'https://meet.example.org/room',
+      })
+    );
+    const detail = await service.getPLEventDetail('ev-1', null);
+
+    expect(ResponsePLEventDetailSchema.safeParse(detail).success).toBe(true);
+    expect(detail).toMatchObject({
+      timezone: 'Europe/Lisbon',
+      allDay: true,
+      venue: { address: 'Avenida da Liberdade 10', latitude: 38.7205, longitude: -9.1453 },
+      registrationUrl: 'https://example.org/register',
+      meetingUrl: 'https://meet.example.org/room',
+    });
+  });
+
+  it('an event with none of the new columns reads null venue and links, and its gathering time zone', async () => {
+    const { service } = makeService(eventRow());
+    const detail = await service.getPLEventDetail('ev-1', null);
+
+    expect(detail).toMatchObject({
+      timezone: 'Europe/Lisbon',
+      allDay: false,
+      venue: null,
+      registrationUrl: null,
+      meetingUrl: null,
+    });
+  });
+
+  it('details come from the columns, with tag colours, host logo and the rest from the stored JSON', async () => {
+    const stored = mapEventDetails(EVENTS_SERVICE_EVENT);
+    const { service } = makeService(
+      eventRow({
+        additionalInfo: withEventDetails(null, {
+          ...stored,
+          tags: [{ name: 'DeSci', color: '#0af' }],
+          format: 'IN-PERSON',
+          accessOption: null,
+        }),
+        format: 'HYBRID',
+        accessOption: 'PAID',
+        tags: ['DeSci', 'Robotics'],
+        hostName: 'Protocol Labs R&D',
+      })
+    );
+    const { details } = await service.getPLEventDetail('ev-1', null);
+
+    expect(details.format).toBe('HYBRID');
+    expect(details.accessOption).toBe('PAID');
+    expect(details.tags).toEqual([
+      { name: 'DeSci', color: '#0af' },
+      { name: 'Robotics', color: null },
+    ]);
+    expect(details.host).toEqual({ name: 'Protocol Labs R&D', logo: stored.host?.logo });
+    expect(details.agenda).toEqual(stored.agenda);
+    expect(details.coHosts).toEqual(stored.coHosts);
+    expect(details.locationUrl).toBe(stored.locationUrl);
+  });
+
+  it('a pending event is a 404 for another member and for a signed-out viewer (LAB-3325)', async () => {
+    const pending = eventRow({ status: 'PENDING', submitterUid: 'm-submitter' });
+    await expect(makeService(pending).service.getPLEventDetail('ev-1', VIEWER)).rejects.toBeInstanceOf(
+      NotFoundException
+    );
+    await expect(makeService(pending).service.getPLEventDetail('ev-1', null)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      makeService(eventRow({ status: 'REJECTED', submitterUid: 'm-submitter' })).service.getPLEventDetail(
+        'ev-1',
+        VIEWER
+      )
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('the submitter reads their pending event with its status and the edit form fields', async () => {
+    const pending = eventRow({
+      status: 'PENDING',
+      submitterUid: 'm-submitter',
+      reviewNote: null,
+      updatedAt: new Date('2026-11-19T10:00:00.000Z'),
+      logoUid: 'img-1',
+      timezone: 'Europe/Lisbon',
+      isAllDay: true,
+      format: 'IN_PERSON',
+      accessOption: 'OPEN',
+      tags: ['AI'],
+      hostName: 'Protocol Labs',
+      venueAddress: 'Avenida da Liberdade 10',
+      latitude: 38.72,
+      longitude: -9.14,
+      registrationUrl: 'https://lu.ma/abc',
+      meetingUrl: null,
+      eventAssociations: [{ role: 'HOST', memberUid: 'm-1', teamUid: null }],
+      additionalInfo: { details: { locationUrl: 'https://maps.app.goo.gl/abc', locationInstructions: 'Door B' } },
+      privateDetails: {
+        hostEmail: 'host@pl.xyz',
+        coHosts: [{ name: 'Ann', email: 'ann@example.org' }],
+        address: { city: 'Lisbon', state: null, country: 'Portugal' },
+      },
+    });
+    const detail = await makeService(pending).service.getPLEventDetail('ev-1', { uid: 'm-submitter' } as any);
+
+    expect(ResponsePLEventDetailSchema.safeParse(detail).success).toBe(true);
+    expect(detail).toMatchObject({
+      status: 'PENDING',
+      timezone: 'Europe/Lisbon',
+      allDay: true,
+      logoUid: 'img-1',
+      format: 'IN_PERSON',
+      accessOption: 'OPEN',
+      tags: ['AI'],
+      hostName: 'Protocol Labs',
+      hostEmail: 'host@pl.xyz',
+      coHosts: [{ name: 'Ann', email: 'ann@example.org' }],
+      registrationUrl: 'https://lu.ma/abc',
+      meetingUrl: null,
+      updatedAt: '2026-11-19T10:00:00.000Z',
+      address: {
+        address: 'Avenida da Liberdade 10',
+        city: 'Lisbon',
+        state: null,
+        country: 'Portugal',
+        latitude: 38.72,
+        longitude: -9.14,
+        locationUrl: 'https://maps.app.goo.gl/abc',
+        locationInstructions: 'Door B',
+      },
+      associations: [{ role: 'HOST', memberUid: 'm-1', teamUid: null }],
+    });
+  });
+
+  it('a directory admin reads a pending event with its status, but not a draft', async () => {
+    const admin = { uid: 'm-admin', isDirectoryAdmin: true } as any;
+    const pending = eventRow({ status: 'PENDING', submitterUid: 'm-submitter' });
+    expect((await makeService(pending).service.getPLEventDetail('ev-1', admin)).status).toBe('PENDING');
+
+    const draft = eventRow({ status: 'DRAFT', submitterUid: 'm-submitter' });
+    await expect(makeService(draft).service.getPLEventDetail('ev-1', admin)).rejects.toBeInstanceOf(NotFoundException);
+    expect((await makeService(draft).service.getPLEventDetail('ev-1', { uid: 'm-submitter' } as any)).status).toBe(
+      'DRAFT'
+    );
+  });
+
+  it('another member reads an approved event with the host name and no host email or status', async () => {
+    const approved = eventRow({
+      submitterUid: 'm-submitter',
+      hostName: 'Protocol Labs',
+      privateDetails: { hostEmail: 'host@pl.xyz', coHosts: [{ name: 'Ann', email: 'ann@example.org' }] },
+    });
+    const detail = await makeService(approved).service.getPLEventDetail('ev-1', VIEWER);
+
+    expect(detail.details.host).toEqual({ name: 'Protocol Labs', logo: null });
+    expect(detail).not.toHaveProperty('status');
+    expect(detail).not.toHaveProperty('hostEmail');
+    expect(JSON.stringify(detail)).not.toContain('@');
+  });
+
   it('a guest whose member is REJECTED is not counted, not a face and not a host', async () => {
     const { service } = makeService(eventRow(), {
       going: ['m-bad', 'm-1', 'm-2', 'm-3'],
@@ -229,10 +410,11 @@ describe('PLEventsService.getPLEventDetail (LAB-3213)', () => {
     expect(detail.location).toBeNull();
   });
 
-  it("timezone is the event's own, then the gathering's, then null (LAB-3403)", async () => {
-    const own = { details: mapEventDetails(EVENTS_SERVICE_EVENT) };
+  it("timezone is the event's own (column, then stored details), then the gathering's, then null (LAB-3403)", async () => {
+    const own = { details: mapEventDetails({ ...EVENTS_SERVICE_EVENT, timezone: 'America/Chicago' }) };
     const none = { details: mapEventDetails({ ...EVENTS_SERVICE_EVENT, timezone: undefined }) };
     const cases: Array<[Record<string, unknown>, string | null]> = [
+      [{ timezone: 'Asia/Tokyo', additionalInfo: own }, 'Asia/Tokyo'],
       [{ additionalInfo: own }, 'America/Chicago'],
       [{ additionalInfo: own, location: null }, 'America/Chicago'],
       [{ additionalInfo: none }, 'Europe/Lisbon'],
@@ -261,5 +443,21 @@ describe('pl-event-detail helpers (LAB-3213)', () => {
     expect(visibleResources(list, true)).toEqual(list);
     expect(visibleResources(list, false)).toEqual([{ a: 1 }]);
     expect(visibleResources(null, false)).toEqual([]);
+  });
+});
+
+describe('isInviteOnlyEvent and hidesEventAttendance (LAB-3281, QA 3281-5)', () => {
+  it('treats type INVITE_ONLY or accessOption INVITE as invite-only', () => {
+    expect(isInviteOnlyEvent({ type: 'INVITE_ONLY', accessOption: null })).toBe(true);
+    expect(isInviteOnlyEvent({ type: null, accessOption: 'INVITE' })).toBe(true);
+    expect(isInviteOnlyEvent({ type: 'IN_PERSON', accessOption: 'INVITE' })).toBe(true);
+    expect(isInviteOnlyEvent({ type: 'IN_PERSON', accessOption: 'OPEN' })).toBe(false);
+    expect(isInviteOnlyEvent({ type: null, accessOption: null })).toBe(false);
+  });
+
+  it('hides attendance only from signed-out viewers', () => {
+    expect(hidesEventAttendance({ type: null, accessOption: 'INVITE' }, false)).toBe(true);
+    expect(hidesEventAttendance({ type: null, accessOption: 'INVITE' }, true)).toBe(false);
+    expect(hidesEventAttendance({ type: 'IN_PERSON', accessOption: 'PAID' }, false)).toBe(false);
   });
 });

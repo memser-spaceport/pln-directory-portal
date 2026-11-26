@@ -42,6 +42,12 @@ describe('/v1/irl/events routes (LAB-3213)', () => {
   const eventService = {
     listUpcomingPLEvents: jest.fn(async () => ({ items: [{ uid: 'up-1' }], total: 1 })),
     getPLEventDetail: jest.fn(async (uid: string) => ({ uid, from: 'detail' })),
+    listPLEvents: jest.fn(async ({ page, limit }: { page: number; limit: number }) => ({
+      page,
+      limit,
+      total: 0,
+      items: [],
+    })),
   };
   const teamService = { getAllPLEventContibutors: jest.fn(async () => [{ uid: 'team-1' }]) };
   const memberService = { findMemberByEmail: jest.fn(async () => null) };
@@ -82,6 +88,24 @@ describe('/v1/irl/events routes (LAB-3213)', () => {
     expect(res.body).toEqual([{ uid: 'team-1' }]);
     expect(teamService.getAllPLEventContibutors).toHaveBeenCalledTimes(1);
     expect(eventService.getPLEventDetail).not.toHaveBeenCalled();
+  });
+
+  it('/v1/irl/events reaches the list handler, not the event detail one (LAB-3281)', async () => {
+    const res = await request(app.getHttpServer()).get('/v1/irl/events?city=Lisbon&city=Denver&limit=20').expect(200);
+    expect(res.body).toEqual({ page: 1, limit: 20, total: 0, items: [] });
+    expect(eventService.listPLEvents).toHaveBeenCalledWith({ page: 1, limit: 20, cities: ['Lisbon', 'Denver'] }, null);
+    expect(eventService.getPLEventDetail).not.toHaveBeenCalled();
+  });
+
+  it('/v1/irl/events answers 400 for a limit over 100 and for an unknown filter value', async () => {
+    await request(app.getHttpServer()).get('/v1/irl/events?limit=500').expect(400);
+    await request(app.getHttpServer()).get('/v1/irl/events?format=ON_THE_MOON').expect(400);
+    expect(eventService.listPLEvents).not.toHaveBeenCalled();
+  });
+
+  it('/v1/irl/events?going=true answers 401 with no signed-in member', async () => {
+    await request(app.getHttpServer()).get('/v1/irl/events?going=true').expect(401);
+    expect(eventService.listPLEvents).not.toHaveBeenCalled();
   });
 
   it('/v1/irl/events/:uid reaches the event detail handler', async () => {

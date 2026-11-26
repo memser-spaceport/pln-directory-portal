@@ -15,7 +15,9 @@
  * (memser-spaceport/events-service, `src/schemas/event.schema.ts`) and is read as
  * `event.location_url` by the PL events app (`service/events.service.ts`).
  *
- * `timezone` (LAB-3403) is read as `event.timezone` by the PL events app (`service/events.service.ts`).
+ * `timezone`, `meeting_link` and `address_info` are the old submission form's payload keys
+ * (pl-events-submission, `add-event-form.tsx`); the typed columns read them (LAB-3281).
+ * The details also keep `timezone` (LAB-3403).
  *
  * The QUEUE does not send all of it: on prod, 2026-11-24, every event it had written kept `format` only (LAB-3403).
  *
@@ -35,7 +37,15 @@ export const EVENTS_SERVICE_EVENT = {
   updatedAt: '2026-11-01T00:00:00.000Z',
   event_logo: null,
   format: 'IN_PERSON',
-  timezone: 'America/Chicago',
+  timezone: 'Europe/Lisbon',
+  meeting_link: 'https://meet.example.org/summit',
+  address_info: {
+    address: 'Fixture Venue, Avenida da Liberdade 10',
+    city: 'Lisbon',
+    country: 'Portugal',
+    latitude: 38.7205,
+    longitude: -9.1453,
+  },
   location_url: 'https://maps.example.org/?q=Fixture+Venue',
   access_type: 'Free',
   access_option: 'Free w/ RSVP',

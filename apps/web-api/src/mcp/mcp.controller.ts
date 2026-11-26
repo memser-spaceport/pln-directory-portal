@@ -25,6 +25,7 @@ import { ProjectsService } from '../projects/projects.service';
 import { PLEventGuestsService } from '../pl-events/pl-event-guests.service';
 import { PLEventLocationsService } from '../pl-events/pl-event-locations.service';
 import { PLEventsService } from '../pl-events/pl-events.service';
+import { PLEventWriteService } from '../pl-events/pl-event-write.service';
 import { AiAppsService } from '../ai-apps/ai-apps.service';
 import { PlNetworkPortfolioService } from '../spv-spotlights/pl-network-portfolio.service';
 import { aiAppFeedbackTools, aiAppWriteTools } from './mcp-ai-app-feedback-tools';
@@ -188,7 +189,8 @@ export class McpController {
     private readonly pitchEngagement: TeamPitchEngagementService,
     private readonly memberProofs: McpMemberProofService,
     private readonly images: ImagesService,
-    private readonly labosDigest: LabosDigestService
+    private readonly labosDigest: LabosDigestService,
+    private readonly eventWrite: PLEventWriteService
   ) {}
 
   private readonly logger = new Logger(McpController.name);
@@ -272,6 +274,7 @@ export class McpController {
         }),
         ...actionCoverageTools({
           events: this.events,
+          eventWrite: this.eventWrite,
           guests: this.eventGuests,
           prisma: this.prisma,
           applications: this.jobApplications,

@@ -6,6 +6,7 @@ import { IrlGatheringPushRuleKind, PushNotificationCategory } from '@prisma/clie
 import { IrlGatheringPushConfigService } from './irl-gathering-push-config.service';
 import { IrlGatheringPushCandidatesService } from './irl-gathering-push-candidates.service';
 import { PLEventGuestsService } from '../pl-event-guests.service';
+import { VISIBLE_PL_EVENT_WHERE } from '../pl-event-visibility';
 
 /**
  * Response returned to back-office on manual trigger.
@@ -233,7 +234,7 @@ export class IrlGatheringPushNotificationsProcessor {
     // Load events at this location in the relevant window.
     const events = await this.prisma.pLEvent.findMany({
       where: {
-        isDeleted: false,
+        ...VISIBLE_PL_EVENT_WHERE,
         locationUid: params.locationUid,
         ...eventWindowWhere,
       },
@@ -378,7 +379,7 @@ export class IrlGatheringPushNotificationsProcessor {
 
       const totalEventsInWindow = await this.prisma.pLEvent.count({
         where: {
-          isDeleted: false,
+          ...VISIBLE_PL_EVENT_WHERE,
           locationUid: gatheringUid,
           endDate: { gte: now, lte: windowEndUpcoming },
         },
@@ -608,7 +609,7 @@ export class IrlGatheringPushNotificationsProcessor {
     // Events to DISPLAY in notification (candidate-driven)
     const events = displayEventUids.length
       ? await this.prisma.pLEvent.findMany({
-        where: { uid: { in: displayEventUids }, isDeleted: false },
+        where: { uid: { in: displayEventUids }, ...VISIBLE_PL_EVENT_WHERE },
         select: {
           uid: true,
           slugURL: true,
@@ -663,7 +664,7 @@ export class IrlGatheringPushNotificationsProcessor {
       ruleKind === IrlGatheringPushRuleKind.REMINDER
         ? await this.prisma.pLEvent.count({
           where: {
-            isDeleted: false,
+            ...VISIBLE_PL_EVENT_WHERE,
             locationUid: gatheringUid,
             startDate: { gte: now, lte: windowEndReminder },
             endDate: { gte: now },
@@ -671,7 +672,7 @@ export class IrlGatheringPushNotificationsProcessor {
         })
         : await this.prisma.pLEvent.count({
           where: {
-            isDeleted: false,
+            ...VISIBLE_PL_EVENT_WHERE,
             locationUid: gatheringUid,
             endDate: { gte: now, lte: windowEndUpcoming },
           },
@@ -768,7 +769,7 @@ export class IrlGatheringPushNotificationsProcessor {
 
       const totalEventsInWindow = await this.prisma.pLEvent.count({
         where: {
-          isDeleted: false,
+          ...VISIBLE_PL_EVENT_WHERE,
           locationUid: gatheringUid,
           endDate: { gte: now, lte: windowEndUpcoming },
         },

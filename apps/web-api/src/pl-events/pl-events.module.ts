@@ -25,9 +25,22 @@ import { RbacModule } from '../rbac/rbac.module';
 import { AccessControlV2Module } from '../access-control-v2/access-control-v2.module';
 import { ProfileEventsController } from './profile-events.controller';
 import { ProfileEventsService } from './profile-events.service';
+import { PLEventSubmissionsController } from './pl-event-submissions.controller';
+import { PLEventWriteService } from './pl-event-write.service';
+import { PLEventFormHelpersController } from './pl-event-form-helpers.controller';
+import { PLEventFormHelpersService } from './pl-event-form-helpers.service';
+import { PLEventCurationController } from './pl-event-curation.controller';
+import { PLEventCurationService } from './pl-event-curation.service';
+import { IntegrationKeysModule } from '../integration-keys/integration-keys.module';
+import { ImagesModule } from '../images/images.module';
 
 @Module({
   controllers: [
+    // Before PLEventsController: their static paths (/v1/irl/events/mine, /places) must be matched before
+    // /v1/irl/events/:uid.
+    PLEventSubmissionsController,
+    PLEventFormHelpersController,
+    PLEventCurationController,
     PLEventsController,
     ProfileEventsController,
     IrlGatheringPushConfigController,
@@ -46,6 +59,9 @@ import { ProfileEventsService } from './profile-events.service';
     IrlGatheringPushNotificationsProcessor,
     PLEventAssociationService,
     ProfileEventsService,
+    PLEventWriteService,
+    PLEventFormHelpersService,
+    PLEventCurationService,
   ],
   exports: [
     PLEventsService,
@@ -53,6 +69,7 @@ import { ProfileEventsService } from './profile-events.service';
     PLEventGuestsService,
     PLEventLocationAssociationService,
     PLEventAssociationService,
+    PLEventWriteService,
     PLEventSyncService,
   ],
   imports: [
@@ -66,6 +83,8 @@ import { ProfileEventsService } from './profile-events.service';
     forwardRef(() => PushNotificationsModule),
     RbacModule,
     AccessControlV2Module,
+    IntegrationKeysModule,
+    ImagesModule,
   ],
 })
 export class PLEventsModule {}
