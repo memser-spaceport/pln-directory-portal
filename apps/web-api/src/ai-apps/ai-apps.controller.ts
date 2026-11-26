@@ -28,7 +28,7 @@ import { ZodValidationPipe } from '@abitia/zod-dto';
 import { Request, Response } from 'express';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { SkipEmptyStringToNull } from '../decorators/skip-empty-string-to-null.decorator';
-import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { OptionalUserTokenCheckGuard, UserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { validateUserAccessToken } from '../guards/user-access-token-validate.guard';
 import { extractTokenFromRequest } from '../utils/auth';
 import { RequirePermissions } from '../rbac/rbac.decorator';
@@ -135,10 +135,13 @@ export class AiAppsController {
     return this.connectService.poll(body.pollToken);
   }
 
-  /** Connect-session display info for the LabOS connect page (member JWT). */
+  /**
+   * Connect-session display info for the LabOS connect page. Public: the page loads it before sign-in
+   * and returns no secrets. Approve below still needs a member JWT.
+   */
   @NoCache()
   @Get('connect/:uid')
-  @UseGuards(UserTokenCheckGuard)
+  @UseGuards(OptionalUserTokenCheckGuard)
   async getConnectSession(@Param('uid') uid: string) {
     return this.connectService.getSessionForDisplay(uid);
   }

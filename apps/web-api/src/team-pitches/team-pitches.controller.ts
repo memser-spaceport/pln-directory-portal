@@ -16,7 +16,7 @@ import {
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '@abitia/zod-dto';
-import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { OptionalUserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { TeamPitchesService } from './team-pitches.service';
@@ -39,14 +39,14 @@ export class TeamPitchesController {
   ) {}
 
   @Get(':slugOrUid/access')
-  @UseGuards(UserTokenCheckGuard)
+  @UseGuards(OptionalUserTokenCheckGuard)
   @NoCache()
   async getAccess(@Param('slugOrUid') slugOrUid: string, @Req() req) {
     return this.teamPitchesService.getAccess(req.userEmail || null, slugOrUid);
   }
 
   @Get(':slugOrUid')
-  @UseGuards(UserTokenCheckGuard)
+  @UseGuards(OptionalUserTokenCheckGuard)
   @NoCache()
   async getPitch(@Param('slugOrUid') slugOrUid: string, @Req() req) {
     return this.teamPitchProfilesService.getFullPitch(req.userEmail || null, slugOrUid);

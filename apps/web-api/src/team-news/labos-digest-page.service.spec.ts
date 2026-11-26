@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  GoneException,
   NotFoundException,
   ServiceUnavailableException,
   UnauthorizedException,
@@ -9,6 +10,9 @@ import { DigestLinkError, issueDigestLinkToken } from './labos-digest-link-token
 import { LabosDigestPageService } from './labos-digest-page.service';
 import { LabosDigestPublicController } from './labos-digest-public.controller';
 import { digestTopics } from './labos-digest-topics.util';
+
+// labos-digest.service pulls in the AI SDK, which ships ESM jest can't load; the page only needs this filter.
+jest.mock('./labos-digest.service', () => ({ excludedTeamsWhere: () => null }));
 
 /** LAB-3263: the public digest page read, and the guards in front of More / Less. */
 const item = (uid: string, extra: Record<string, unknown> = {}) => ({
@@ -38,6 +42,8 @@ function build(
     scores?: Record<string, number>;
     choosable?: { slug: string; title: string; children: { slug: string; title: string }[] }[];
     issues?: {
+      uid?: string;
+      memberUid?: string;
       frequency: string;
       sentAt: Date;
       newsItemUids: string[];
@@ -57,11 +63,22 @@ function build(
       findMany: jest.fn(async () => (opts.members ?? ['m1']).map((uid) => ({ uid }))),
     },
     labosDigestIssue: {
-      findMany: jest.fn(async () => opts.issues ?? []),
+      findMany: jest.fn(async ({ where }: any = {}) =>
+        (opts.issues ?? [])
+          .filter((i) => (i.memberUid ?? 'm1') === where?.memberUid)
+          .map((i) => ({ uid: i.uid ?? `issue-${i.sentAt.toISOString()}`, ...i }))
+      ),
       findFirst: jest.fn(async ({ where }: any) => {
-        const row = (opts.issues ?? []).find((i) => i.sentAt.getTime() === where.sentAt.getTime());
-        return row ? { forumTids: [], ...row } : null;
+        const row = (opts.issues ?? []).find(
+          (i) => i.sentAt.getTime() === where.sentAt.getTime() && (i.memberUid ?? 'm1') === where.memberUid
+        );
+        return row ? { uid: `issue-${row.sentAt.toISOString()}`, forumTids: [], ...row } : null;
       }),
+      findUnique: jest.fn(async ({ where }: any) => {
+        const row = (opts.issues ?? []).find((i) => (i.uid ?? `issue-${i.sentAt.toISOString()}`) === where.uid);
+        return row ? { uid: where.uid, memberUid: 'm1', forumTids: [], ...row } : null;
+      }),
+      upsert: jest.fn(async () => ({ uid: 'issue-upserted' })),
       createMany: jest.fn(async ({ data }: any) => ({ count: data.length })),
     },
     teamNewsItem: {
@@ -109,7 +126,9 @@ function build(
         ]
     ),
   };
-  const forum = { read: jest.fn(async () => ({ posts: [], unavailable: false })) };
+  const forum = {
+    read: jest.fn(async (): Promise<{ posts: any[]; unavailable: boolean }> => ({ posts: [], unavailable: false })),
+  };
   const cache = { reset: jest.fn() };
   const service = new LabosDigestPageService(
     prisma as any,
@@ -118,7 +137,7 @@ function build(
     cache as any,
     newsQuery as any
   );
-  return { service, prisma, forum, vocabulary };
+  return { service, prisma, forum, vocabulary, cache };
 }
 
 const token = (extra: Record<string, unknown> = {}) =>
@@ -345,10 +364,23 @@ describe('LabosDigestPageService', () => {
           issues: [weekly('2026-11-23T11:00:00.000Z', ['x', 'y'], 'y'), weekly('2026-11-09T11:00:00.000Z', ['x'])],
         });
         const { issues } = await service.read(token());
+        // LAB-3356: each with its id; the link issue was never recorded, so it has none.
         expect(issues).toEqual([
-          { sentAt: '2026-11-23T11:00:00.000Z', frequency: 'weekly', title: 'Title y', isLinkIssue: false },
-          { sentAt: '2026-11-16T09:00:00.000Z', frequency: 'weekly', title: 'Title b', isLinkIssue: true },
-          { sentAt: '2026-11-09T11:00:00.000Z', frequency: 'weekly', title: 'Title x', isLinkIssue: false },
+          {
+            uid: 'issue-2026-11-23T11:00:00.000Z',
+            sentAt: '2026-11-23T11:00:00.000Z',
+            frequency: 'weekly',
+            title: 'Title y',
+            isLinkIssue: false,
+          },
+          { uid: null, sentAt: '2026-11-16T09:00:00.000Z', frequency: 'weekly', title: 'Title b', isLinkIssue: true },
+          {
+            uid: 'issue-2026-11-09T11:00:00.000Z',
+            sentAt: '2026-11-09T11:00:00.000Z',
+            frequency: 'weekly',
+            title: 'Title x',
+            isLinkIssue: false,
+          },
         ]);
       });
 
@@ -385,13 +417,6 @@ describe('LabosDigestPageService', () => {
         const page = await service.read(token(), '2026-11-16T09:00:00Z');
         expect(prisma.labosDigestIssue.findFirst).not.toHaveBeenCalled();
         expect(page.stories.map((s) => s.uid)).toEqual(['b', 'a']);
-      });
-
-      it('takes More on a story of the past issue, not on one only in the link', async () => {
-        const { service } = build({ issues: [weekly('2026-11-09T11:00:00.000Z', ['y'])] });
-        await expect(service.choose(token(), 'b', 'more', '2026-11-09T11:00:00.000Z')).rejects.toBeInstanceOf(
-          BadRequestException
-        );
       });
 
       it('records sent issues once, for members that exist, dropping a top story not in the stories', async () => {
@@ -436,17 +461,247 @@ describe('LabosDigestPageService', () => {
     });
   });
 
-  describe('choose', () => {
-    it('refuses a story that is not in the link', async () => {
-      const { service, prisma } = build();
-      await expect(service.choose(token(), 'other', 'more')).rejects.toBeInstanceOf(BadRequestException);
-      expect(prisma.$transaction).not.toHaveBeenCalled();
+  describe('exchange (LAB-3356)', () => {
+    const weekly = (sentAt: string, n: string[], memberUid = 'm1') => ({
+      memberUid,
+      frequency: 'WEEKLY',
+      sentAt: new Date(sentAt),
+      newsItemUids: n,
+      leadUid: null,
     });
 
-    it('refuses a bad token before touching the database', async () => {
+    it('records the link issue on its unique key, never changing a recorded one, and returns its id', async () => {
       const { service, prisma } = build();
-      await expect(service.choose(`${token()}x`, 'a', 'more')).rejects.toBeInstanceOf(DigestLinkError);
-      expect(prisma.teamNewsItem.findUnique).not.toHaveBeenCalled();
+      await expect(service.exchange(token())).resolves.toEqual({ issueUid: 'issue-upserted' });
+      expect(prisma.labosDigestIssue.upsert).toHaveBeenCalledWith({
+        where: {
+          memberUid_frequency_sentAt: {
+            memberUid: 'm1',
+            frequency: 'WEEKLY',
+            sentAt: new Date('2026-11-16T09:00:00.000Z'),
+          },
+        },
+        create: {
+          memberUid: 'm1',
+          frequency: 'WEEKLY',
+          sentAt: new Date('2026-11-16T09:00:00.000Z'),
+          newsItemUids: ['b', 'a', 'gone'],
+          leadUid: 'b',
+          forumTids: [101],
+        },
+        update: {},
+        select: { uid: true },
+      });
+    });
+
+    it('swaps an older Past issues send time for that issue of the link member, and 404s anyone else’s', async () => {
+      const { service, prisma } = build({
+        issues: [weekly('2026-11-09T11:00:00.000Z', ['x']), weekly('2026-11-02T11:00:00.000Z', ['x'], 'other')],
+      });
+      await expect(service.exchange(token(), '2026-11-09T11:00:00.000Z')).resolves.toEqual({
+        issueUid: 'issue-2026-11-09T11:00:00.000Z',
+      });
+      await expect(service.exchange(token(), '2026-11-02T11:00:00.000Z')).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.labosDigestIssue.upsert).not.toHaveBeenCalled();
+    });
+
+    it('is not found for a member who no longer exists, and refuses a bad or expired link first', async () => {
+      const { service, prisma } = build({ member: null });
+      await expect(service.exchange(token())).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.exchange(`${token()}x`)).rejects.toBeInstanceOf(DigestLinkError);
+      const old = issueDigestLinkToken(
+        { m: 'm1', f: 'daily', s: '2026-01-01T00:00:00.000Z', n: ['a'], l: 'a', p: [] },
+        Date.now() - 91 * 24 * 3600 * 1000
+      );
+      const error = await service.exchange(old).catch((e) => e);
+      expect(error).toMatchObject({ reason: 'expired' });
+      expect(prisma.labosDigestIssue.upsert).not.toHaveBeenCalled();
+    });
+
+    it('saves no choice and changes no setting', async () => {
+      const { service, prisma } = build();
+      await service.exchange(token());
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.member).not.toHaveProperty('update');
+    });
+  });
+
+  describe('readIssueByUid (LAB-3356)', () => {
+    const issueRow = {
+      uid: 'iss-1',
+      memberUid: 'm1',
+      frequency: 'WEEKLY',
+      sentAt: new Date('2026-11-16T09:00:00.000Z'),
+      newsItemUids: ['b', 'a'],
+      leadUid: 'b',
+      forumTids: [101],
+    };
+    const post = {
+      tid: 101,
+      title: 'Busy thread',
+      locked: false,
+      authorName: 'Sam',
+      authorRole: 'Engineer',
+      authorTeam: 'Lattice',
+      authorAvatarUrl: 'https://img/sam.png',
+      contentHtml: '<p>secret body</p>',
+      url: 'https://web/forum/topics/1/101',
+      replyCount: 3,
+    };
+    const signedOut = () => {
+      const built = build({
+        items: [item('a'), item('b')],
+        choices: [{ newsItemUid: 'a', choice: 'LESS' }],
+        follows: ['team-b'],
+        activeRoles: 2,
+        issues: [issueRow],
+      });
+      built.forum.read.mockResolvedValue({ posts: [post], unavailable: false });
+      return built;
+    };
+
+    it('reads the issue signed out with no member data and no forum posts', async () => {
+      const { service, prisma, forum } = signedOut();
+      const page = await service.readIssueByUid('iss-1', null);
+      expect(page.stories.map((s) => [s.uid, s.isTopStory, s.choice, s.followsTeam])).toEqual([
+        ['b', true, null, false],
+        ['a', false, null, false],
+      ]);
+      expect(page).toMatchObject({ firstName: null, isTeamMember: false, issues: [] });
+      // LAB-3355: no forum section for a signed-out reader, so not even the titles reach them.
+      expect(page).toMatchObject({ forumPosts: [], forumUnavailable: false });
+      expect(JSON.stringify(page)).not.toContain('Busy thread');
+      expect(forum.read).not.toHaveBeenCalled();
+      // No member query at all: not the issue's member, not anyone's.
+      expect(prisma.member.findUnique).not.toHaveBeenCalled();
+      expect(prisma.labosDigestChoice.findMany).not.toHaveBeenCalled();
+      expect(prisma.follow.findMany).not.toHaveBeenCalled();
+      expect(prisma.teamMemberRole.count).not.toHaveBeenCalled();
+      expect(prisma.memberInterestProfileEntry.findMany).not.toHaveBeenCalled();
+      expect(prisma.labosDigestIssue.findMany).not.toHaveBeenCalled();
+    });
+
+    it('suggests every offered topic by title signed out, and follows none', async () => {
+      const { service } = signedOut();
+      const { topics } = await service.readIssueByUid('iss-1', null);
+      expect(topics.followed).toEqual([]);
+      expect(topics.suggested.map((t) => t.slug)).toEqual(['ai', 'defi', 'desci', 'llms']);
+    });
+
+    it('reads another member’s issue with the signed-in reader’s own data', async () => {
+      const { service, prisma } = signedOut();
+      prisma.member.findUnique.mockResolvedValue({ name: 'Grace Hopper', preferences: { newsTags: ['defi'] } });
+      const page = await service.readIssueByUid('iss-1', { uid: 'reader', canReadForum: false });
+      expect(page.firstName).toBe('Grace');
+      expect(prisma.member.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { uid: 'reader' } }));
+      for (const query of [prisma.labosDigestChoice.findMany, prisma.follow.findMany, prisma.teamMemberRole.count]) {
+        expect(query).toHaveBeenCalledWith(
+          expect.objectContaining({ where: expect.objectContaining({ memberUid: 'reader' }) })
+        );
+      }
+      expect(page.topics.followed.map((t) => t.slug)).toEqual(['defi']);
+      // The reader's own Past issues: the issue on the page is someone else's, so it isn't added to them.
+      expect(prisma.labosDigestIssue.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { memberUid: 'reader' } })
+      );
+      expect(page.issues).toEqual([]);
+    });
+
+    it('sends no forum posts to a member without forum access (LAB-3355)', async () => {
+      const { service, forum } = signedOut();
+      const page = await service.readIssueByUid('iss-1', { uid: 'reader', canReadForum: false });
+      expect(page).toMatchObject({ forumPosts: [], forumUnavailable: false });
+      expect(JSON.stringify(page)).not.toContain('Busy thread');
+      expect(forum.read).not.toHaveBeenCalled();
+    });
+
+    it('sends the forum posts in full to a reader who may read the forum', async () => {
+      const { service } = signedOut();
+      const page = await service.readIssueByUid('iss-1', { uid: 'm1', canReadForum: true });
+      expect(page.forumPosts).toEqual([post]);
+    });
+
+    it('marks the issue on the page in the member’s own Past issues, by id', async () => {
+      const { service } = build({
+        items: [item('a'), item('b')],
+        issues: [
+          issueRow,
+          {
+            ...issueRow,
+            uid: 'iss-0',
+            sentAt: new Date('2026-11-09T09:00:00.000Z'),
+            newsItemUids: ['a'],
+            leadUid: null,
+          },
+        ],
+      });
+      const { issues } = await service.readIssueByUid('iss-1', { uid: 'm1', canReadForum: false });
+      expect(issues.map((i) => [i.uid, i.isLinkIssue])).toEqual([
+        ['iss-1', true],
+        ['iss-0', false],
+      ]);
+    });
+
+    it('is not found for an unknown issue', async () => {
+      const { service } = build();
+      await expect(service.readIssueByUid('nope', null)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('keeps the token read as it was: the link member’s data and the forum unlocked', async () => {
+      const { service, forum, prisma } = build({ items: [item('a')] });
+      forum.read.mockResolvedValue({ posts: [post], unavailable: false });
+      const page = await service.read(token());
+      expect(page.firstName).toBe('Ada');
+      expect(page.forumPosts).toEqual([post]);
+      expect(prisma.labosDigestChoice.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ memberUid: 'm1' }) })
+      );
+    });
+  });
+
+  describe('chooseByIssue (LAB-3356)', () => {
+    const issueRow = {
+      uid: 'iss-1',
+      frequency: 'WEEKLY',
+      sentAt: new Date('2026-11-16T09:00:00.000Z'),
+      newsItemUids: ['b', 'a'],
+      leadUid: 'b',
+    };
+    const withTx = (built: ReturnType<typeof build>) => {
+      const tx = {
+        $queryRaw: jest.fn(async () => [{ uid: 'reader' }]),
+        labosDigestChoice: { findFirst: jest.fn(async () => null), create: jest.fn(), update: jest.fn() },
+        memberInterestProfileEntry: { findMany: jest.fn(async () => []), upsert: jest.fn(), deleteMany: jest.fn() },
+      };
+      built.prisma.$transaction.mockImplementation(async (run: any) => run(tx));
+      return tx;
+    };
+
+    it('saves More for the signed-in member, whoever the issue was sent to', async () => {
+      const built = build({ issues: [issueRow] });
+      const tx = withTx(built);
+      await expect(built.service.chooseByIssue('iss-1', 'reader', 'a', 'more')).resolves.toMatchObject({
+        newsItemUid: 'a',
+        choice: 'more',
+      });
+      expect(tx.labosDigestChoice.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ memberUid: 'reader', newsItemUid: 'a', choice: 'MORE' }),
+      });
+      expect(tx.memberInterestProfileEntry.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ create: expect.objectContaining({ memberUid: 'reader', key: 'ai' }) })
+      );
+      expect(tx.labosDigestChoice.create.mock.calls[0][0].data.memberUid).not.toBe('m1');
+    });
+
+    it('refuses a story that is not in the issue, and an unknown issue, before any write', async () => {
+      const built = build({ issues: [issueRow] });
+      await expect(built.service.chooseByIssue('iss-1', 'reader', 'other', 'more')).rejects.toBeInstanceOf(
+        BadRequestException
+      );
+      await expect(built.service.chooseByIssue('nope', 'reader', 'a', 'more')).rejects.toBeInstanceOf(
+        NotFoundException
+      );
+      expect(built.prisma.$transaction).not.toHaveBeenCalled();
     });
   });
 });
@@ -457,15 +712,30 @@ describe('LabosDigestPublicController', () => {
 
   it('has no auth guard: the link names the member, never the session', () => {
     expect(Reflect.getMetadata('__guards__', LabosDigestPublicController)).toBeUndefined();
-    for (const method of ['read', 'choose']) {
+    for (const method of ['read', 'exchange', 'choose']) {
       expect(Reflect.getMetadata('__guards__', LabosDigestPublicController.prototype[method])).toBeUndefined();
-      expect(LabosDigestPublicController.prototype[method].length).toBe(1);
     }
+  });
+
+  it('answers the token choice route with 410 whatever the body, and saves nothing (LAB-3356)', () => {
+    const { service, prisma } = build();
+    const controller = new LabosDigestPublicController(service, {} as any);
+    expect(() => controller.choose()).toThrow(GoneException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('exchanges a link for its issue id, with 401 and its reason for a broken one (LAB-3356)', async () => {
+    process.env.DIGEST_LINK_SECRET = 'page-test-secret';
+    const controller = new LabosDigestPublicController(build().service, {} as any);
+    await expect(controller.exchange({ token: token() })).resolves.toEqual({ issueUid: 'issue-upserted' });
+    const error = await controller.exchange({ token: 'v1.nope.nope' }).catch((e) => e);
+    expect(error).toBeInstanceOf(UnauthorizedException);
+    expect(error.getResponse()).toMatchObject({ reason: 'signature' });
   });
 
   it('answers a broken link with 401 and its reason', async () => {
     process.env.DIGEST_LINK_SECRET = 's';
-    const controller = new LabosDigestPublicController(build().service);
+    const controller = new LabosDigestPublicController(build().service, {} as any);
     const error = await controller.read({ token: 'v1.nope.nope' }).catch((e) => e);
     expect(error).toBeInstanceOf(UnauthorizedException);
     expect(error.getResponse()).toMatchObject({ reason: 'signature' });
@@ -477,22 +747,24 @@ describe('LabosDigestPublicController', () => {
       { m: 'm1', f: 'daily', s: '2026-01-01T00:00:00.000Z', n: ['a'], l: 'a', p: [] },
       Date.now() - 91 * 24 * 3600 * 1000
     );
-    const error = await new LabosDigestPublicController(build().service).read({ token: old }).catch((e) => e);
+    const error = await new LabosDigestPublicController(build().service, {} as any)
+      .read({ token: old })
+      .catch((e) => e);
     expect(error.getResponse()).toMatchObject({ reason: 'expired' });
   });
 
   it('answers 503 when the environment has no link secret', async () => {
     delete process.env.DIGEST_LINK_SECRET;
-    const error = await new LabosDigestPublicController(build().service).read({ token: 'v1.a.b' }).catch((e) => e);
+    const error = await new LabosDigestPublicController(build().service, {} as any)
+      .read({ token: 'v1.a.b' })
+      .catch((e) => e);
     expect(error).toBeInstanceOf(ServiceUnavailableException);
   });
 
   it('rejects a body without a token or with an unknown choice', async () => {
-    const controller = new LabosDigestPublicController(build().service);
+    const controller = new LabosDigestPublicController(build().service, {} as any);
     await expect(controller.read({})).rejects.toBeInstanceOf(BadRequestException);
-    await expect(controller.choose({ token: 't', newsItemUid: 'a', choice: 'love' })).rejects.toBeInstanceOf(
-      BadRequestException
-    );
+    await expect(controller.exchange({ token: 't', issue: 'not a date' })).rejects.toBeInstanceOf(BadRequestException);
   });
 });
 

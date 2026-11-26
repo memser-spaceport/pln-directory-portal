@@ -21,8 +21,15 @@ describe('parseUpcomingEventsQuery (LAB-3071)', () => {
     });
   });
 
+  it('reads ongoing=true (LAB-3403); empty is off', () => {
+    expect(parseUpcomingEventsQuery({ ongoing: 'true' })).toEqual({ ongoing: true });
+    expect(parseUpcomingEventsQuery({ ongoing: '' })).toEqual({});
+  });
+
   it('refuses values it cannot honour', () => {
     for (const bad of [
+      { ongoing: 'yes' },
+      { ongoing: 'false' },
       { days: '0' },
       { days: '1.5' },
       { days: '400' },
@@ -50,6 +57,18 @@ describe('upcomingEventsFindArgs and toUpcomingEvent (LAB-3071)', () => {
       where: { startDate: { gt: NOW, lte: new Date('2026-12-04T10:00:00.000Z') }, isDeleted: false },
       orderBy: { startDate: 'asc' },
       take: 3,
+    });
+  });
+
+  it('ongoing: every event that has not ended, started or not (LAB-3403)', () => {
+    expect(upcomingEventsFindArgs({ ongoing: true }, NOW)).toEqual({
+      where: { endDate: { gt: NOW }, isDeleted: false },
+      orderBy: { startDate: 'desc' },
+    });
+    expect(upcomingEventsFindArgs({ ongoing: true, days: 30 }, NOW).where).toEqual({
+      endDate: { gt: NOW },
+      startDate: { lte: new Date('2026-12-04T10:00:00.000Z') },
+      isDeleted: false,
     });
   });
 

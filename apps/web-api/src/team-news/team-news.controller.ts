@@ -29,7 +29,7 @@ import {
 } from 'libs/contracts/src/schema/team-news';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
-import { OptionalUserTokenCheckGuard, UserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { OptionalUserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { ServiceAuthGuard } from '../guards/service-auth.guard';
 import { MembersService } from '../members/members.service';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
@@ -62,7 +62,7 @@ export class TeamNewsController {
 
   @Api(server.route.getTeamNews)
   @NoCache()
-  @UseGuards(UserTokenCheckGuard)
+  @UseGuards(OptionalUserTokenCheckGuard)
   async getTeamNews(@Req() request: Request & { userEmail?: string }) {
     const params = TeamNewsListQueryParams.parse(request.query);
     const { followed, memberUid } = await this.resolveViewerContext(request.userEmail);
@@ -71,7 +71,7 @@ export class TeamNewsController {
 
   @Api(server.route.getTeamNewsGrouped)
   @NoCache()
-  @UseGuards(UserTokenCheckGuard)
+  @UseGuards(OptionalUserTokenCheckGuard)
   async getTeamNewsGrouped(@Req() request: Request & { userEmail?: string }) {
     const params = TeamNewsListQueryParams.parse(request.query);
     const { followed, memberUid } = await this.resolveViewerContext(request.userEmail);
@@ -182,7 +182,7 @@ export class TeamNewsController {
 
   @Api(server.route.getTeamNewsPopular)
   @NoCache()
-  @UseGuards(UserTokenCheckGuard)
+  @UseGuards(OptionalUserTokenCheckGuard)
   async getTeamNewsPopular(@Req() request: Request) {
     const params = TeamNewsPopularQueryParams.parse(request.query);
     return this.teamNewsQueryService.getPopular(params);
@@ -190,7 +190,7 @@ export class TeamNewsController {
 
   @Api(server.route.getTeamNewsByTeam)
   @NoCache()
-  @UseGuards(UserTokenCheckGuard)
+  @UseGuards(OptionalUserTokenCheckGuard)
   async getTeamNewsByTeam(@Param('teamUid') teamUid: string, @Req() request: Request & { userEmail?: string }) {
     const params = TeamNewsByTeamQueryParams.parse(request.query);
     const { followed, memberUid } = await this.resolveViewerContext(request.userEmail);

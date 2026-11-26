@@ -18,7 +18,7 @@ import {
   FeedCommentsQueryParams,
 } from 'libs/contracts/src/schema/feed';
 import { NoCache } from '../decorators/no-cache.decorator';
-import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { OptionalUserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { MembersService } from '../members/members.service';
 import { FeedCommentsService } from './feed-comments.service';
@@ -45,7 +45,7 @@ export class FeedController {
 
   @Api(server.route.getFeedComments)
   @NoCache()
-  @UseGuards(UserTokenCheckGuard)
+  @UseGuards(OptionalUserTokenCheckGuard)
   async getFeedComments(@Req() req: Request & { userEmail?: string }) {
     const { newsItemUid } = this.parse(FeedCommentsQueryParams, req.query);
     const member = req.userEmail ? await this.membersService.findMemberByEmail(req.userEmail) : null;

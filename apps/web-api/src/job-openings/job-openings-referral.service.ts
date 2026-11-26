@@ -3,7 +3,7 @@ import type { CreateJobReferralInput } from 'libs/contracts/src/schema/job-refer
 import { PrismaService } from '../shared/prisma.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { noteToHtml } from './job-openings-email-html';
-import { normalizeExternalLinkedinUrl } from './job-openings-linkedin-url';
+import { normalizeExternalLinkedinUrl } from '../utils/linkedin-profile-url';
 import { parseJobReferCcEmails, resolveVisibleJobOpening } from './job-openings-resolve';
 import { deriveReferralBlurb } from './job-openings-referral-blurb';
 import {

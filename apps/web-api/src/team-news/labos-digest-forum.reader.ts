@@ -38,6 +38,7 @@ export function toDigestForumPost(payload: Row, webUiBase: string): LabosDigestP
   return {
     tid,
     title: text(payload.titleRaw) || text(payload.title),
+    locked: false,
     authorName: text(user.fullname) || text(user.displayname) || text(user.username) || 'anonymous',
     authorRole: text(user.teamRole) || null,
     authorTeam: text(user.teamName) || null,

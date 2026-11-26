@@ -89,7 +89,7 @@ function makeStore(initial: Partial<Row>[] = []) {
       return row ? pick(row, select) : null;
     }),
     findMany: jest.fn(async ({ where, select }: any = {}) =>
-      rows.filter((r) => matches(r, where)).map((r) => pick(r, select))
+      rows.filter((r) => matches(r, where)).map((r) => pick(r, select)),
     ),
     createMany: jest.fn(async ({ data }: any) => {
       data.forEach(add);
@@ -100,7 +100,7 @@ function makeStore(initial: Partial<Row>[] = []) {
       hit.forEach((r) =>
         Object.entries(data).forEach(([k, v]) => {
           if (v !== undefined) (r as any)[k] = v;
-        })
+        }),
       );
       return { count: hit.length };
     }),
@@ -159,7 +159,7 @@ function makeService(prisma: any, overrides: { isAdmin?: boolean; locationEvents
     {} as any,
     {} as any,
     {} as any,
-    push
+    push,
   );
   return { service, memberService, eventLocationsService, push, cache };
 }
@@ -180,7 +180,7 @@ describe('Guest create (LAB-3213)', () => {
       ME,
       LOC,
       ME.email,
-      { location: 'Lisbon' }
+      { location: 'Lisbon' },
     );
 
     expect(rows.map((r) => r.eventUid).sort()).toEqual(['A', 'B']);
@@ -198,7 +198,7 @@ describe('Guest create (LAB-3213)', () => {
       ME,
       LOC,
       ME.email,
-      { location: 'Lisbon' }
+      { location: 'Lisbon' },
     );
     expect(rows[0].showOnProfile).toBe(true);
     expect(rows[0].teamUid).toBe('t1');
@@ -213,8 +213,8 @@ describe('Guest create (LAB-3213)', () => {
         ME,
         LOC,
         ME.email,
-        { location: 'Lisbon' }
-      )
+        { location: 'Lisbon' },
+      ),
     ).rejects.toMatchObject({ status: 409 });
     expect(rows).toHaveLength(1);
   });
@@ -239,7 +239,7 @@ describe('PATCH /v1/irl/events/:uid/me (LAB-3213)', () => {
     const { service, memberService } = makeService(prisma);
     const controller = makeController(service, memberService);
     await expect(controller.updateMyEventVisibility('A', { showOnProfile: false }, request)).rejects.toBeInstanceOf(
-      NotFoundException
+      NotFoundException,
     );
   });
 
@@ -248,7 +248,7 @@ describe('PATCH /v1/irl/events/:uid/me (LAB-3213)', () => {
     const { service, memberService } = makeService(prisma);
     const controller = makeController(service, memberService);
     await expect(controller.updateMyEventVisibility('A', { showOnProfile: 'no' }, request)).rejects.toBeInstanceOf(
-      BadRequestException
+      BadRequestException,
     );
     expect(rows[0].showOnProfile).toBe(true);
   });
@@ -270,7 +270,7 @@ describe('PATCH /v1/irl/locations/:uid/guests/me (LAB-3213)', () => {
         additionalInfo: { checkInDate: '2026-12-01', checkOutDate: '2026-12-03' },
         events: [{ uid: 'A', isSpeaker: true }],
       },
-      request
+      request,
     );
 
     const a = rows.find((r) => r.eventUid === 'A') as Row;
@@ -291,7 +291,7 @@ describe('PATCH /v1/irl/locations/:uid/guests/me (LAB-3213)', () => {
     const { service, memberService } = makeService(prisma);
     const controller = makeController(service, memberService);
     await expect(
-      controller.updateMyGuestPlansByLocation(LOC, { events: [{ uid: 'B', isHost: true }] }, request)
+      controller.updateMyGuestPlansByLocation(LOC, { events: [{ uid: 'B', isHost: true }] }, request),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(rows).toHaveLength(1);
     expect(rows[0].isHost).toBe(false);
@@ -302,7 +302,7 @@ describe('PATCH /v1/irl/locations/:uid/guests/me (LAB-3213)', () => {
     const { service, memberService } = makeService(prisma);
     const controller = makeController(service, memberService);
     await expect(controller.updateMyGuestPlansByLocation(LOC, { topics: ['AI'] }, request)).rejects.toBeInstanceOf(
-      NotFoundException
+      NotFoundException,
     );
   });
 
@@ -327,8 +327,8 @@ describe('Not going (POST /v1/irl/locations/:uid/events/guests, LAB-3213)', () =
       controller.deletePLEventGuestsByLocation(
         LOC,
         { membersAndEvents: [{ memberUid: ME.uid, eventUid: 'A' }] } as any,
-        request
-      )
+        request,
+      ),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(rows).toHaveLength(3);
   });
@@ -338,7 +338,7 @@ describe('Not going (POST /v1/irl/locations/:uid/events/guests, LAB-3213)', () =
     const { service, memberService } = makeService(prisma);
     const controller = makeController(service, memberService);
     await expect(
-      controller.deletePLEventGuestsByLocation(LOC, { membersAndEvents: [] } as any, request)
+      controller.deletePLEventGuestsByLocation(LOC, { membersAndEvents: [] } as any, request),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(rows).toHaveLength(3);
   });
@@ -350,7 +350,7 @@ describe('Not going (POST /v1/irl/locations/:uid/events/guests, LAB-3213)', () =
     await controller.deletePLEventGuestsByLocation(
       LOC,
       { membersAndEvents: [{ memberUid: ME.uid, events: ['A'] }] },
-      request
+      request,
     );
     expect(rows.map((r) => r.eventUid)).toEqual(['B', null]);
   });
@@ -362,7 +362,7 @@ describe('Not going (POST /v1/irl/locations/:uid/events/guests, LAB-3213)', () =
     await controller.deletePLEventGuestsByLocation(
       LOC,
       { membersAndEvents: [{ memberUid: ME.uid, events: [] }] },
-      request
+      request,
     );
     expect(rows.map((r) => r.memberUid)).toEqual([OTHER]);
   });
@@ -375,8 +375,8 @@ describe('Not going (POST /v1/irl/locations/:uid/events/guests, LAB-3213)', () =
       controller.deletePLEventGuestsByLocation(
         LOC,
         { membersAndEvents: [{ memberUid: OTHER, events: ['A'] }] },
-        request
-      )
+        request,
+      ),
     ).rejects.toMatchObject({ status: 403 });
     expect(rows).toHaveLength(3);
   });
@@ -398,7 +398,7 @@ describe('Strict attendee list (GET /v1/irl/locations/:uid/guests?eventUid=, LAB
     await service.getPLEventGuestsByLocationAndType(
       LOC,
       { type: 'upcoming', eventUid: 'A', eventUids: ['A', 'B'], includeLocationOnlyGuests: 'true' },
-      ME
+      ME,
     );
 
     expect(fetchAttendees).toHaveBeenCalledTimes(1);
@@ -414,7 +414,7 @@ describe('Strict attendee list (GET /v1/irl/locations/:uid/guests?eventUid=, LAB
     const { service } = makeService(prisma, { locationEvents: EVENTS });
     const fetchAttendees = jest.spyOn(service, 'fetchAttendees').mockResolvedValue([{ memberUid: 'x' }] as any);
     await expect(
-      service.getPLEventGuestsByLocationAndType(LOC, { type: 'upcoming', eventUid: 'X' }, null)
+      service.getPLEventGuestsByLocationAndType(LOC, { type: 'upcoming', eventUid: 'X' }, null),
     ).resolves.toEqual([]);
     expect(fetchAttendees).not.toHaveBeenCalled();
   });
@@ -424,7 +424,7 @@ describe('Strict attendee list (GET /v1/irl/locations/:uid/guests?eventUid=, LAB
     const { service } = makeService(prisma, { locationEvents: EVENTS });
     const fetchAttendees = jest.spyOn(service, 'fetchAttendees').mockResolvedValue([] as any);
     await expect(
-      service.getPLEventGuestsByLocationAndType(LOC, { type: 'upcoming', eventUid: 'nope' }, ME)
+      service.getPLEventGuestsByLocationAndType(LOC, { type: 'upcoming', eventUid: 'nope' }, ME),
     ).resolves.toEqual([]);
     expect(fetchAttendees).not.toHaveBeenCalled();
   });
@@ -437,5 +437,129 @@ describe('Strict attendee list (GET /v1/irl/locations/:uid/guests?eventUid=, LAB
     const args = fetchAttendees.mock.calls[0][0];
     expect(args.includeLocationOnlyGuests).toBe(true);
     expect(args.eventUids).toEqual(['A', 'B']);
+  });
+});
+
+describe('getPLEventGuestsByLocationAndType query allow-list', () => {
+  const EVENTS = [
+    { uid: 'A', type: 'IN_PERSON', startDate: '2026-12-01', endDate: '2026-12-02' },
+    { uid: 'B', type: 'IN_PERSON', startDate: '2026-12-03', endDate: '2026-12-04' },
+    { uid: 'X', type: 'INVITE_ONLY', startDate: '2026-12-05', endDate: '2026-12-06' },
+  ];
+
+  function listService() {
+    const { prisma } = makeStore();
+    const { service } = makeService(prisma, { locationEvents: EVENTS });
+    const fetchAttendees = jest.spyOn(service, 'fetchAttendees').mockResolvedValue([] as any);
+    return { service, fetchAttendees };
+  }
+
+  it('ignores eventUids from the query and uses the location events', async () => {
+    const { service, fetchAttendees } = listService();
+    await service.getPLEventGuestsByLocationAndType(
+      LOC,
+      { type: 'upcoming', eventUids: ['evil-event', 'A'], includeLocationOnlyGuests: false, locationUid: 'other' },
+      null,
+    );
+    const args = fetchAttendees.mock.calls[0][0];
+    expect(args.eventUids).toEqual(['A', 'B']);
+    expect(args.locationUid).toBe(LOC);
+    expect(args.includeLocationOnlyGuests).toBe(true);
+  });
+
+  it('ignores an unknown query key', async () => {
+    const { service, fetchAttendees } = listService();
+    await service.getPLEventGuestsByLocationAndType(
+      LOC,
+      { type: 'upcoming', notARealFilter: 'secret', loggedInMemberUid: 'attacker' },
+      null,
+    );
+    const args = fetchAttendees.mock.calls[0][0];
+    expect(args).not.toHaveProperty('notARealFilter');
+    expect(args.loggedInMemberUid).toBeNull();
+    expect(args.eventUids).toEqual(['A', 'B']);
+  });
+
+  it('caps limit=100000 to the max', async () => {
+    const { service, fetchAttendees } = listService();
+    await service.getPLEventGuestsByLocationAndType(LOC, { type: 'upcoming', limit: '100000' }, null);
+    expect(fetchAttendees.mock.calls[0][0].limit).toBe(100);
+    await service.getPLEventGuestsByLocationAndType(LOC, { type: 'upcoming', limit: 100000 }, null);
+    expect(fetchAttendees.mock.calls[1][0].limit).toBe(100);
+  });
+
+  it('uses the default limit when limit is missing or invalid', async () => {
+    const { service, fetchAttendees } = listService();
+    await service.getPLEventGuestsByLocationAndType(LOC, { type: 'upcoming' }, null);
+    expect(fetchAttendees.mock.calls[0][0].limit).toBe(10);
+    expect(fetchAttendees.mock.calls[0][0].page).toBe(1);
+    await service.getPLEventGuestsByLocationAndType(LOC, { type: 'upcoming', limit: 'nope', page: '0' }, null);
+    expect(fetchAttendees.mock.calls[1][0].limit).toBe(10);
+    expect(fetchAttendees.mock.calls[1][0].page).toBe(1);
+  });
+
+  it('filteredEvents only keeps events from this location', async () => {
+    const { service, fetchAttendees } = listService();
+    await service.getPLEventGuestsByLocationAndType(
+      LOC,
+      { type: 'upcoming', filteredEvents: ['A', 'other-location'] },
+      null,
+    );
+    expect(fetchAttendees.mock.calls[0][0].eventUids).toEqual(['A']);
+
+    await service.getPLEventGuestsByLocationAndType(LOC, { type: 'upcoming', filteredEvents: ['other-location'] }, ME);
+    expect(fetchAttendees.mock.calls[1][0].eventUids).toEqual([]);
+    expect(fetchAttendees.mock.calls[1][0].eventUids).not.toContain('other-location');
+  });
+
+  it('returns the same result for a valid request', async () => {
+    const { prisma } = makeStore();
+    const { service } = makeService(prisma, { locationEvents: EVENTS });
+    const rows = [
+      {
+        memberUid: 'other',
+        member: { preferences: { showTelegram: true }, officeHours: 'mon', telegramHandler: '@a' },
+        officeHours: 'mon',
+        telegramId: '1',
+      },
+    ];
+    const fetchAttendees = jest.spyOn(service, 'fetchAttendees').mockResolvedValue(rows as any);
+    const result = await service.getPLEventGuestsByLocationAndType(
+      LOC,
+      {
+        type: 'upcoming',
+        search: 'ada',
+        sortBy: 'memberName',
+        sortDirection: 'desc',
+        page: '2',
+        limit: '20',
+        isHost: 'true',
+        isSpeaker: 'false',
+        isSponsor: 'false',
+        topics: ['ai'],
+        filteredEvents: ['A'],
+      },
+      ME,
+    );
+    expect(result).toBe(rows);
+    expect(fetchAttendees.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        locationUid: LOC,
+        eventUids: ['A'],
+        search: 'ada',
+        sortBy: 'memberName',
+        sortDirection: 'desc',
+        page: 2,
+        limit: 20,
+        isHost: 'true',
+        isSpeaker: 'false',
+        isSponsor: 'false',
+        topics: ['ai'],
+        filteredEvents: ['A'],
+        type: 'upcoming',
+        includeLocationOnlyGuests: true,
+        loggedInMemberUid: ME.uid,
+      }),
+    );
   });
 });

@@ -5,9 +5,10 @@ import { PrismaService } from '../shared/prisma.service';
 import { MembersModule } from '../members/members.module';
 import { SharedModule } from '../shared/shared.module';
 import {AdminModule} from "../admin/admin.module";
+import { MemberSignUpNotificationsModule } from '../member-sign-up-notifications/member-sign-up-notifications.module';
 
 @Module({
-  imports: [SharedModule, MembersModule, AdminModule],
+  imports: [SharedModule, MembersModule, AdminModule, MemberSignUpNotificationsModule],
   controllers: [LinkedInVerificationController],
   providers: [LinkedInVerificationService, PrismaService],
   exports: [LinkedInVerificationService],

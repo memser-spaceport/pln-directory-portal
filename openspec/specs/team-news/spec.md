@@ -104,7 +104,7 @@ A member's chosen news tags SHALL be stored as a list of focus-area slugs. Savin
 
 ### Requirement: Member news category tags
 
-A member's chosen news category tags SHALL be stored as `newsCategoryTags`. The only values SHALL be FUNDING, LAUNCH and ANNOUNCEMENT. Saving the list SHALL replace the previous list and leave every other preference unchanged. A value outside those three SHALL be rejected with 400, and nothing SHALL be stored. An empty list SHALL be stored as a valid choice. Reading a missing key SHALL return an empty list. The list SHALL NOT be seeded from teams or from `newsCategories`.
+A member's chosen news category tags SHALL be stored as `newsCategoryTags`. The only values SHALL be FUNDING, LAUNCH and ANNOUNCEMENT. Saving the list SHALL replace the previous list and leave every other preference unchanged. A value outside those three SHALL be rejected with 400, and nothing SHALL be stored. An empty list SHALL be stored as a valid choice. For a member with saved news tags, reading a missing key or a stored empty list SHALL return an empty list. For a member with no saved news tags, a missing key or a stored empty list SHALL be read as the default category tags. The list SHALL NOT be seeded from teams or from `newsCategories`.
 
 #### Scenario: Save category tags
 
@@ -114,7 +114,8 @@ A member's chosen news category tags SHALL be stored as `newsCategoryTags`. The 
 
 #### Scenario: Empty list
 
-- **WHEN** a member saves `[]`
+- **GIVEN** a member who saved the news tags `["ai"]`
+- **WHEN** they save the category tags `[]`
 - **THEN** reading their preferences returns `newsCategoryTags` `[]`
 
 #### Scenario: Unknown category
@@ -124,9 +125,83 @@ A member's chosen news category tags SHALL be stored as `newsCategoryTags`. The 
 
 #### Scenario: Never saved
 
-- **GIVEN** a member who never saved category tags, including one who saved `newsCategories`
+- **GIVEN** a member who saved the news tags `["ai"]` and never saved category tags, including one who saved `newsCategories`
 - **WHEN** their preferences are read
 - **THEN** `newsCategoryTags` is `[]`
+
+### Requirement: Default news category tags
+
+When a member has no saved news tags (never saved, or saved an empty list) and no saved category tags (never saved, or saved an empty list), their effective category tags SHALL be FUNDING, LAUNCH and ANNOUNCEMENT. Reading their preferences SHALL return these in `newsCategoryTags`. Reading SHALL NOT store anything. A member with 1 or more saved category tags SHALL keep exactly those. The interest profile SHALL NOT be read for categories.
+
+#### Scenario: Never saved anything
+
+- **GIVEN** a member who never saved news tags and never saved category tags
+- **WHEN** their preferences are read
+- **THEN** `newsCategoryTags` is `["FUNDING", "LAUNCH", "ANNOUNCEMENT"]` and `newsTagsSeeded` is `true`
+
+#### Scenario: Removed every tag
+
+- **GIVEN** a member who saved an empty news tag list and an empty category tag list
+- **WHEN** their preferences are read
+- **THEN** `newsCategoryTags` is `["FUNDING", "LAUNCH", "ANNOUNCEMENT"]`, and both stored lists are still `[]`
+
+#### Scenario: No team and no profile
+
+- **GIVEN** a member on no team, with no interest profile and no AI tags, who never saved news tags or category tags
+- **WHEN** their preferences are read
+- **THEN** `newsTags` is `[]` and `newsCategoryTags` is `["FUNDING", "LAUNCH", "ANNOUNCEMENT"]`
+
+#### Scenario: Own categories with default tags
+
+- **GIVEN** a member with no saved news tags who saved the category tags `["FUNDING"]`
+- **WHEN** their preferences are read
+- **THEN** `newsCategoryTags` is `["FUNDING"]`
+
+#### Scenario: Saved tags, no categories
+
+- **GIVEN** a member who saved the news tags `["ai"]` and has no saved category tags
+- **WHEN** their preferences are read
+- **THEN** `newsCategoryTags` is `[]`
+
+#### Scenario: Reading does not store
+
+- **GIVEN** a member who never saved news tags or category tags
+- **WHEN** their preferences are read twice
+- **THEN** the member still has no saved category tags
+
+### Requirement: Default categories are kept on the first tag save
+
+When a member with no saved news tags and no saved category tags saves a news tag list with 1 or more tags, and the request carries no `newsCategoryTags`, the same save SHALL also store FUNDING, LAUNCH and ANNOUNCEMENT as their category tags. A request that carries `newsCategoryTags` SHALL store the value it carries. A save for a member who already has saved news tags or saved category tags SHALL NOT change their category tags.
+
+#### Scenario: First topic added
+
+- **GIVEN** a member who never saved news tags or category tags
+- **WHEN** they save `newsTags` `["ai", "desci"]`
+- **THEN** reading their preferences returns `newsTags` `["ai", "desci"]` and `newsCategoryTags` `["FUNDING", "LAUNCH", "ANNOUNCEMENT"]`, and the category tags are stored
+
+#### Scenario: Own categories are not replaced
+
+- **GIVEN** a member with no saved news tags who saved the category tags `["FUNDING"]`
+- **WHEN** they save `newsTags` `["ai"]`
+- **THEN** their stored category tags are still `["FUNDING"]`
+
+#### Scenario: Member who already has saved tags
+
+- **GIVEN** a member who saved the news tags `["ai"]` and has no saved category tags
+- **WHEN** they save `newsTags` `["ai", "desci"]`
+- **THEN** reading their preferences returns `newsCategoryTags` `[]`
+
+#### Scenario: Request carries its own category tags
+
+- **GIVEN** a member who never saved news tags or category tags
+- **WHEN** they save `newsTags` `["ai"]` and `newsCategoryTags` `[]` in one request
+- **THEN** their stored category tags are `[]`
+
+#### Scenario: Empty tag list
+
+- **GIVEN** a member who never saved news tags or category tags
+- **WHEN** they save `newsTags` `[]`
+- **THEN** no category tags are stored
 
 ### Requirement: Starting tags
 
@@ -218,7 +293,7 @@ When a member has no saved news tags (they never saved a list, or their saved li
 
 ### Requirement: For You tag fields
 
-The home feed's grouped news response SHALL include, for a signed-in viewer, the viewer's effective news tags (their saved tags, or their starting tags when they have no saved tags, with every parent focus area expanded to the focus areas under it) and the uids of the teams they belong to or follow. For a signed-out viewer both SHALL be empty. The existing For You team list SHALL be unchanged.
+The home feed's grouped news response SHALL include, for a signed-in viewer, the viewer's effective news tags (their saved tags, or their starting tags when they have no saved tags, with every parent focus area expanded to the focus areas under it), the uids of the teams they belong to or follow, and their effective category tags (their saved category tags, or the default category tags when they have no saved news tags and no saved category tags). For a signed-out viewer all three SHALL be empty. The existing For You team list SHALL be unchanged.
 
 #### Scenario: Signed-in viewer
 
@@ -242,6 +317,18 @@ The home feed's grouped news response SHALL include, for a signed-in viewer, the
 - **GIVEN** a signed-in member who saved category tags FUNDING and LAUNCH
 - **WHEN** they load the grouped home feed
 - **THEN** `forYouCategories` is `["FUNDING", "LAUNCH"]`
+
+#### Scenario: Default categories
+
+- **GIVEN** a signed-in member who never saved news tags or category tags
+- **WHEN** they load the grouped home feed
+- **THEN** `forYouCategories` is `["FUNDING", "LAUNCH", "ANNOUNCEMENT"]`
+
+#### Scenario: Saved tags, no categories
+
+- **GIVEN** a signed-in member who saved the tag `ai` and has no saved category tags
+- **WHEN** they load the grouped home feed
+- **THEN** `forYouCategories` is `[]`
 
 ### Requirement: Default news tags
 
@@ -396,7 +483,7 @@ The system SHALL record `team-news-default-tags-generated` when the job stores A
 
 ### Requirement: Digest picks by news tags
 
-When news tag picks are enabled, a member's digest picks SHALL be stories from teams they belong to or follow, plus stories sharing any of their effective tags, plus stories whose category is one of their `newsCategoryTags`, at most one per team (its newest story), ordered by the member's interest in them, up to the limit, falling back to the newest network stories when that set is empty. The member's interest in a story SHALL be the sum of their interest profile `TOPIC` weights for the story's tags, highest first, newest first on a tie; the order SHALL be set before the limit, so a weight change can bring a story in or push one out. Weights SHALL only order the picks: a topic weight alone SHALL NOT make a story eligible. An empty `newsCategoryTags` SHALL add no stories. The stored `newsCategories` list SHALL NOT narrow these picks. When disabled, picks SHALL be exactly as before. The top story SHALL be the same either way.
+When news tag picks are enabled, a member's digest picks SHALL be stories from teams they belong to or follow, plus stories sharing any of their effective tags, plus stories whose category is one of their effective category tags (their saved `newsCategoryTags`, or the default category tags when they have no saved news tags and no saved category tags), at most one per team (its newest story), ordered by the member's interest in them, up to the limit, falling back to the newest network stories when that set is empty. The member's interest in a story SHALL be the sum of their interest profile `TOPIC` weights for the story's tags, highest first, newest first on a tie; the order SHALL be set before the limit, so a weight change can bring a story in or push one out. Weights SHALL only order the picks: a topic weight alone SHALL NOT make a story eligible. Empty effective category tags SHALL add no stories. The stored `newsCategories` list SHALL NOT narrow these picks. When disabled, picks SHALL be exactly as before. The top story SHALL be the same either way.
 
 #### Scenario: Tag match from an unrelated team
 
@@ -412,9 +499,15 @@ When news tag picks are enabled, a member's digest picks SHALL be stories from t
 
 #### Scenario: No category tags
 
-- **GIVEN** news tag picks are enabled and a member with no category tags
+- **GIVEN** news tag picks are enabled and a member with the saved tag `ai` and no saved category tags
 - **WHEN** a Funding story from a team they neither belong to nor follow is in the window, and it shares none of their tags
 - **THEN** it is not picked because of its category
+
+#### Scenario: Default category tags
+
+- **GIVEN** news tag picks are enabled and a member who never saved news tags or category tags
+- **WHEN** a Funding story from a team they neither belong to nor follow is in the window, and it shares none of their tags
+- **THEN** it can be picked for them
 
 #### Scenario: Legacy verb tag
 
