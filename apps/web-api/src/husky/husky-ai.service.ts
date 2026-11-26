@@ -132,6 +132,12 @@ export interface ContextualToolsOptions {
    */
   summaryKey?: string;
   /**
+   * LAB-3457: the member uid of a caller that already checked the thread owner itself (the LabOS agent: memberUid
+   * first, then email). A thread whose `memberUid` is this uid passes the LAB-3459 writer check even when its stored
+   * `email` is an older email of that member. Any other thread gets the email rule as before. AI search passes nothing.
+   */
+  threadOwnerUid?: string;
+  /**
    * LAB-3367 k2, k7: extra text for the system message of the answer call and of the continuation, after the shared
    * prompt. The structured tail call does not get it. Give only fixed rules, never member or card text. The LabOS
    * agent uses it for the rules for "your last answer". AI search passes nothing.
@@ -349,7 +355,7 @@ export class HuskyAiService {
     const { turnFields } = options;
     const summaryKey = options.summaryKey ?? `${threadId}:summary`;
     const currentDate = new Date().toISOString().split('T')[0];
-    await this.assertThreadWriter(threadId, userEmail);
+    await this.assertThreadWriter(threadId, userEmail, options.threadOwnerUid);
     const auth = await this.resolveAuthContext(isLoggedIn, userEmail);
 
     // A conversation started elsewhere (e.g. a blog embed) is handed over with its
@@ -653,12 +659,13 @@ export class HuskyAiService {
    * `email` takes them only from that member. A guest thread (no `email`) and a new thread stay open, as before. It
    * runs before any read or write, so a refused call changes nothing and does not read the thread's summary.
    */
-  private async assertThreadWriter(threadId: string, email?: string) {
+  private async assertThreadWriter(threadId: string, email?: string, ownerUid?: string) {
     const thread = await this.huskyPersistentDbService.findOneByKeyValue(
       process.env.MONGO_THREADS_COLLECTION || 'threads',
       'threadId',
       threadId
     );
+    if (ownerUid && thread?.memberUid === ownerUid) return;
     if (thread?.email && thread.email !== email) {
       throw new ForbiddenException(
         'You are not authorized to add to this thread. Start a new thread or duplicate this one.'

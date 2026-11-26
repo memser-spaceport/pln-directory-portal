@@ -113,6 +113,7 @@ describe('C1 and the shared chat history (LAB-3457)', () => {
       await h.chat({ ...VALID, persist });
       expect(h.options().summaryKey).toBe(summaryCacheKey('member-1', 'thread-1'));
       expect(h.options().summaryKey).not.toBe('thread-1:summary');
+      expect(h.options().threadOwnerUid).toBe('member-1');
     }
   });
 

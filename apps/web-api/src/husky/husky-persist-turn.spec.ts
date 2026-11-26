@@ -288,6 +288,45 @@ describe('HuskyAiService persistTurn (LAB-3457)', () => {
     expect(failed).not.toHaveBeenCalled();
   });
 
+  describe('with the LAB-3459 writer check', () => {
+    // An agent thread created before the member changed their email: owned by memberUid, stored email is the old one.
+    const thread = { threadId: 'thread-1', email: 'old@example.com', memberUid: 'member-1' };
+    beforeEach(() => persistent.findOneByKeyValue.mockResolvedValue(thread));
+
+    it('the agent (threadOwnerUid) continues its own thread after an email change and saves the turn', async () => {
+      const persistTurn = jest.fn().mockResolvedValue(undefined);
+      const out = await readAll(
+        await service.createContextualToolsResponse(chatInfo, true, 'new@example.com', {
+          persistHistory: true,
+          persistTurn,
+          threadOwnerUid: 'member-1',
+        })
+      );
+      expect(JSON.parse(out).content).toBe('Hello world');
+      expect(persistTurn).toHaveBeenCalledTimes(1);
+    });
+
+    it('another member uid, or no threadOwnerUid (AI search), still gets the LAB-3459 403 before any write', async () => {
+      for (const threadOwnerUid of ['member-2', undefined]) {
+        const persistTurn = jest.fn();
+        await expect(
+          service.createContextualToolsResponse(chatInfo, true, 'new@example.com', {
+            persistHistory: true,
+            persistTurn,
+            ...(threadOwnerUid ? { threadOwnerUid } : {}),
+          })
+        ).rejects.toMatchObject({ status: 403 });
+        expect(persistTurn).not.toHaveBeenCalled();
+        expect(streamTextMock).not.toHaveBeenCalled();
+      }
+    });
+
+    it('the stored email still passes without threadOwnerUid', async () => {
+      const out = await readAll(await service.createContextualToolsResponse(chatInfo, true, 'old@example.com'));
+      expect(JSON.parse(out).content).toBe('Hello world');
+    });
+  });
+
   it('gives no turn when the answer fails', async () => {
     streamTextMock.mockImplementation(() => {
       throw new Error('provider down');

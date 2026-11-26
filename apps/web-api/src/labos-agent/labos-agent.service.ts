@@ -339,6 +339,9 @@ export class LabosAgentService {
         latestReplyKey: latestReplyCacheKey(memberUid, body.threadId),
         // LAB-3459 follow-up: the thread memory, scoped to the member and the thread too (not `<threadId>:summary`).
         summaryKey: summaryCacheKey(memberUid, body.threadId),
+        // LAB-3457 + LAB-3459: threadForTurn checked the owner (memberUid first), so an own thread with an older stored
+        // email is not refused by the AI search writer check.
+        threadOwnerUid: memberUid,
         // LAB-3367 k2, k7: the rules for your last answer, in the system message of the answer calls only.
         answerInstructions: LAST_ANSWER_RULES,
         // LAB-3367 F1, F3, K3: a code gate for the agreed phrases when a card waits (labos-agent-last-answer.ts).
