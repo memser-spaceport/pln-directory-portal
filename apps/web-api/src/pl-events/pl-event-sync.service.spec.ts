@@ -138,6 +138,7 @@ describe('PLEventSyncService.syncEventDetailsOnly (LAB-3214 backfill)', () => {
 
     expect(prisma.pLEvent.findMany.mock.calls[0][0].where).toEqual({
       externalId: { in: [EVENTS_SERVICE_EVENT.event_id, 'not-in-directory'] },
+      syncedAt: { not: null },
       isDeleted: false,
     });
     expect(prisma.pLEvent.update).toHaveBeenCalledTimes(1);
@@ -277,8 +278,8 @@ describe('waiting events and drafts move with the cutover (LAB-3327)', () => {
       ['d-1', 'DRAFT', null],
     ]);
     expect(result).toEqual({
-      pending: { fetched: 1, created: 1, updated: 0, skippedApproved: 0 },
-      draft: { fetched: 1, created: 1, updated: 0, skippedApproved: 0 },
+      pending: { fetched: 1, created: 1, updated: 0, skippedApproved: 0, skippedLabosEvent: 0 },
+      draft: { fetched: 1, created: 1, updated: 0, skippedApproved: 0, skippedLabosEvent: 0 },
       withoutSubmitter: 1,
     });
     // Rejected events are not asked for, and nothing is announced for events that are not approved.
@@ -293,8 +294,8 @@ describe('waiting events and drafts move with the cutover (LAB-3327)', () => {
   it('updates what it brought over before and leaves an event LabOS has as approved', async () => {
     serviceByStatus({ SUBMITTED: [waiting, { ...waiting, event_id: 'w-approved' }] });
     const { service, prisma } = setup([
-      { uid: 'ev-w1', externalId: 'w-1', status: 'DRAFT', additionalInfo: null },
-      { uid: 'ev-ok', externalId: 'w-approved', status: 'APPROVED', additionalInfo: null },
+      { uid: 'ev-w1', externalId: 'w-1', status: 'DRAFT', additionalInfo: null, syncedAt: new Date('2026-01-01') },
+      { uid: 'ev-ok', externalId: 'w-approved', status: 'APPROVED', additionalInfo: null, syncedAt: new Date() },
     ]);
 
     const result = await service.importNonApprovedEvents();
@@ -360,5 +361,92 @@ describe('waiting events and drafts move with the cutover (LAB-3327)', () => {
     expect(creatorEmailOf({ created_by: null, submitted_by: 'bo@example.org' })).toBe('bo@example.org');
     expect(creatorEmailOf({ created_by: 'not an email' })).toBeNull();
     expect(creatorEmailOf({})).toBeNull();
+  });
+});
+
+describe('the sync leaves events made in LabOS alone (LAB-3327, dev rehearsal 2026-11-26)', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  // An IRL gathering event made in LabOS before the events service: an externalId, never synced.
+  const labosEvent = { uid: 'ev-ethcc', name: 'EthCC', externalId: 'ethcc', syncedAt: null, status: 'APPROVED' };
+  const synced = (over = {}) => ({
+    uid: 'ev-1',
+    name: 'Synced',
+    externalId: EVENTS_SERVICE_EVENT.event_id,
+    syncedAt: new Date('2026-01-01T00:00:00.000Z'),
+    status: 'APPROVED',
+    locationUid: 'loc-old',
+    additionalInfo: null,
+    ...over,
+  });
+
+  it('never deletes a LabOS event that the events service does not list', async () => {
+    serviceReturns([EVENTS_SERVICE_EVENT]);
+    const { service, prisma } = setup([labosEvent, synced()]);
+
+    await service.syncEvents({});
+
+    const deleted = prisma.pLEvent.updateMany.mock.calls.flatMap(([arg]) => arg.where.uid.in);
+    expect(deleted).not.toContain('ev-ethcc');
+  });
+
+  it('skips a service event whose id a LabOS event already has, and writes nothing to it', async () => {
+    serviceReturns([{ ...EVENTS_SERVICE_EVENT, event_id: 'ethcc', event_name: 'test2' }]);
+    const { service, prisma } = setup([labosEvent]);
+
+    await service.syncEvents({});
+
+    expect(prisma.pLEvent.update).not.toHaveBeenCalled();
+    expect(prisma.pLEvent.create).not.toHaveBeenCalled();
+  });
+
+  it('keeps the gathering and the slug of an event it updates', async () => {
+    serviceReturns([{ ...EVENTS_SERVICE_EVENT, updatedAt: '2030-01-01T00:00:00.000Z' }]);
+    const { service, prisma, eventsService } = setup([synced()]);
+
+    await service.syncEvents({ selectedEventUids: [EVENTS_SERVICE_EVENT.event_id] });
+
+    const data = prisma.pLEvent.update.mock.calls[0][0].data;
+    expect(data.locationUid).toBe('loc-old');
+    expect(data).not.toHaveProperty('slugURL');
+    expect(eventsService.createEventLocation).not.toHaveBeenCalled();
+  });
+
+  it('gives a gathering to an updated event that has none', async () => {
+    serviceReturns([{ ...EVENTS_SERVICE_EVENT, updatedAt: '2030-01-01T00:00:00.000Z' }]);
+    const { service, prisma } = setup([synced({ locationUid: null })]);
+
+    await service.syncEvents({ selectedEventUids: [EVENTS_SERVICE_EVENT.event_id] });
+
+    expect(prisma.pLEvent.update.mock.calls[0][0].data.locationUid).toBe('loc-1');
+  });
+
+  it('the details backfill reads only synced events', async () => {
+    serviceReturns([EVENTS_SERVICE_EVENT]);
+    const { service, prisma } = setup([]);
+
+    await service.syncEventDetailsOnly({});
+
+    expect(prisma.pLEvent.findMany.mock.calls[0][0].where).toMatchObject({ syncedAt: { not: null } });
+  });
+
+  it('the import leaves a LabOS event with the same id alone', async () => {
+    mockedAxios.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          events:
+            new URL(url, 'http://x').searchParams.get('status') === 'SUBMITTED'
+              ? [{ ...EVENTS_SERVICE_EVENT, event_id: 'ethcc', status: 'SUBMITTED' }]
+              : [],
+        },
+      })
+    );
+    const { service, prisma } = setup([labosEvent]);
+
+    const result = await service.importNonApprovedEvents();
+
+    expect(prisma.pLEvent.update).not.toHaveBeenCalled();
+    expect(prisma.pLEvent.create).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ pending: { skippedLabosEvent: 1 } });
   });
 });

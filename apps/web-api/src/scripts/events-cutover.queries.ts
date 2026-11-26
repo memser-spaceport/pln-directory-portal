@@ -129,7 +129,23 @@ GROUP BY l.uid, l.location, l.country
 ORDER BY upcoming_events DESC`,
     preMigration: 'same',
   },
+  {
+    number: 9,
+    title: 'Every event, for the per-event compare: state, name, dates, slug, gathering, guests and links',
+    kind: 'rows',
+    sql: `SELECT e.uid, e."externalId" AS external_id, e."isDeleted" AS deleted, e.name,
+       e."startDate"::text AS start_date, e."endDate"::text AS end_date, e."slugURL" AS slug,
+       e."locationUid" AS gathering_uid, e."syncedAt" IS NULL AS made_in_labos,
+       (SELECT count(*) FROM "PLEventGuest" g WHERE g."eventUid" = e.uid) AS guests,
+       (SELECT count(*) FROM "PLEventAssociation" a WHERE a."eventUid" = e.uid) AS links
+FROM "PLEvent" e
+ORDER BY e.uid`,
+    preMigration: 'same',
+  },
 ];
+
+/** The per-event query: its rows are compared one by one, not printed. */
+export const EVENT_FINGERPRINT_QUERY = 9;
 
 /** The SQL to run for this database state, or null when the query is skipped there. */
 export function queryFor(query: CutoverQuery, preMigration: boolean): string | null {

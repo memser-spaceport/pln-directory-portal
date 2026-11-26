@@ -193,6 +193,17 @@ gatherings with upcoming events and no priority: set one to move a city up the l
 | 6. Events by status and by who created them                                                        | After the switch: members' and partner apps' events by status                                     |
 | 7. City mappings that point to a gathering in another country (review each row before the cutover) | Rows to review (see "How an event finds its gathering")                                           |
 | 8. Gatherings with upcoming events and no priority (listed last on IRL Gatherings)                 | Gatherings to give a `priority` to move them up                                                   |
+| 9. Every event, for the per-event compare: state, name, dates, slug, gathering, guests and links   | `compare` checks it event by event (below), it is not printed                                     |
+
+`compare` reads query 9 of both snapshots event by event. It fails on: an event that was live and is now deleted or
+gone while it had guests or was made in LabOS; an event moved to another gathering; fewer guests on an event; any
+change to an event made in LabOS (an event with no `syncedAt`, such as the 2024 IRL gathering events). It shows,
+without failing: a synced event with no guests deleted, new events, name, date and slug changes, and a gathering
+given to an event that had none. The counts can stay the same while events change, so read this part at every
+step.
+
+The pull sync never updates or deletes an event made in LabOS, and skips a service event that has the same id. When
+it updates a synced event, the event keeps its gathering and its slug.
 
 Queries 1, 3, 4 and 6 read columns the migrations add (`sourceTeamUid`, `status`, `submitterUid`). On a database
 without them, `snapshot` runs 1, 3 and 4 without those conditions and leaves 6 out.

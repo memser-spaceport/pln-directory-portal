@@ -11,6 +11,7 @@ import {
   GUARDED_COUNTS,
   MAX_IDS,
   parseArgs,
+  compareEvents,
   SERVICE_STATUS_GROUPS,
   syncBody,
   toCounts,
@@ -186,8 +187,8 @@ describe('describeSyncAnswer', () => {
 describe('cutover queries', () => {
   const runbook = readFileSync(path.join(__dirname, '../../../../docs/EVENTS_CUTOVER.md'), 'utf8');
 
-  it('are numbered 1 to 8, and the runbook names each by its number and title', () => {
-    expect(CUTOVER_QUERIES.map((q) => q.number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+  it('are numbered 1 to 9, and the runbook names each by its number and title', () => {
+    expect(CUTOVER_QUERIES.map((q) => q.number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
     for (const query of CUTOVER_QUERIES) expect(runbook).toContain(`${query.number}. ${query.title}`);
   });
 
@@ -233,5 +234,66 @@ describe('waiting events and drafts in the cutover tool (LAB-3327)', () => {
     const report = analyseServiceEvents([{ event_id: 'a' }], ['a']);
     const lines = describeServiceReport('dev', report, 'draft', 'live synced DRAFT', false);
     expect(lines).toEqual(['dev: events service 1 draft events, LabOS 1 live synced DRAFT events: match']);
+  });
+});
+
+describe('per-event compare (query 9, LAB-3327)', () => {
+  const row = (over: Record<string, unknown> = {}) => ({
+    uid: 'e1',
+    external_id: 'x1',
+    deleted: false,
+    name: 'Event',
+    start_date: '2026-01-01 10:00:00',
+    end_date: '2026-01-01 12:00:00',
+    slug: 'x1',
+    gathering_uid: 'loc-a',
+    made_in_labos: false,
+    guests: '3',
+    links: '0',
+    ...over,
+  });
+
+  it('passes when nothing changed, and counts new events', () => {
+    const result = compareEvents([row()], [row(), row({ uid: 'e2' })]);
+    expect(result.ok).toBe(true);
+    expect(result.lines).toContain('Per-event compare: no event lost or moved');
+    expect(result.lines).toContain('For information: 1 new events');
+  });
+
+  it('fails on an event with guests deleted, an event made in LabOS deleted, and an event that is gone', () => {
+    const result = compareEvents(
+      [row(), row({ uid: 'e2', guests: '0', made_in_labos: true }), row({ uid: 'e3' })],
+      [row({ deleted: true }), row({ uid: 'e2', guests: '0', made_in_labos: true, deleted: 't' })]
+    );
+    expect(result.ok).toBe(false);
+    expect(result.lines.join('\n')).toMatch(/\(e1\): deleted \(3 guests\)/);
+    expect(result.lines.join('\n')).toMatch(/\(e2\): deleted \(0 guests, made in LabOS\)/);
+    expect(result.lines.join('\n')).toMatch(/\(e3\): gone/);
+  });
+
+  it('fails on a move to another gathering, fewer guests, or any change to an event made in LabOS', () => {
+    const moved = compareEvents([row()], [row({ gathering_uid: 'loc-b' })]);
+    expect(moved.ok).toBe(false);
+    expect(compareEvents([row()], [row({ guests: '2' })]).ok).toBe(false);
+    expect(compareEvents([row({ made_in_labos: true })], [row({ made_in_labos: true, name: 'test2' })]).ok).toBe(false);
+  });
+
+  it('only shows a synced event with no guests deleted, a rename, and a gathering given', () => {
+    const result = compareEvents(
+      [row({ guests: '0' }), row({ uid: 'e2', name: 'Old' }), row({ uid: 'e3', gathering_uid: null })],
+      [row({ guests: '0', deleted: true }), row({ uid: 'e2', name: 'New' }), row({ uid: 'e3' })]
+    );
+    expect(result.ok).toBe(true);
+    const text = result.lines.join('\n');
+    expect(text).toMatch(/synced event with no guests deleted: 1/);
+    expect(text).toMatch(/name, dates or slug changed: 1/);
+    expect(text).toMatch(/gathering given: 1/);
+  });
+
+  it('is skipped when a snapshot has no query 9 (taken by an older tool)', () => {
+    expect(compareEvents(undefined, [row()])).toEqual({
+      ok: true,
+      lines: ['Per-event compare: skipped (a snapshot has no query 9)'],
+    });
   });
 });
