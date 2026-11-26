@@ -1025,7 +1025,7 @@ export class HuskyAiService {
     if (email && guestUserId) {
       throw new BadRequestException('You cannot duplicate a thread with both email and guestUserId');
     }
-    const threadPromise = this.huskyPersistentDbService.findOneByKeyValue(
+    const threadPromise = this.huskyPersistentDbService.findOneLiveByKeyValue(
       process.env.MONGO_THREADS_COLLECTION || 'threads',
       'threadId',
       threadId
@@ -1094,7 +1094,7 @@ export class HuskyAiService {
   }
 
   async deleteThreadEmail(threadId: string, email: string) {
-    const thread = await this.huskyPersistentDbService.findOneByKeyValue(
+    const thread = await this.huskyPersistentDbService.findOneLiveByKeyValue(
       process.env.MONGO_THREADS_COLLECTION || 'threads',
       'threadId',
       threadId
@@ -1229,7 +1229,7 @@ export class HuskyAiService {
   }
 
   async createThreadBasicInfo(threadId: string, question: string, email = '') {
-    const thread = await this.huskyPersistentDbService.findOneByKeyValue(
+    const thread = await this.huskyPersistentDbService.findOneLiveByKeyValue(
       process.env.MONGO_THREADS_COLLECTION || 'threads',
       'threadId',
       threadId
@@ -1303,8 +1303,10 @@ export class HuskyAiService {
     }
   }
 
+  // LAB-3457: the thread reads by id (read, duplicate, delete, title) leave soft-deleted threads out, so a deleted chat
+  // never comes back. The LAB-3459 writer check still sees them, so a deleted thread is never taken as a new one.
   async getThreadById(threadId: string, email = '') {
-    const threadPromise = this.huskyPersistentDbService.findOneByKeyValue(
+    const threadPromise = this.huskyPersistentDbService.findOneLiveByKeyValue(
       process.env.MONGO_THREADS_COLLECTION || 'threads',
       'threadId',
       threadId

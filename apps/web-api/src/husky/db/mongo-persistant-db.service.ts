@@ -106,6 +106,12 @@ export class MongoPersistantDbService implements OnModuleInit, OnModuleDestroy, 
     return await col.findOne({ [key]: value });
   }
 
+  /** LAB-3457: one doc that is not soft deleted (`isDeleted`), as `findByKeyValue` does for lists. */
+  async findOneLiveByKeyValue(collection: string, key: string, value: string) {
+    const col = await this.getCollection(collection);
+    return await col.findOne({ [key]: value, isDeleted: { $ne: true } });
+  }
+
   async findOneById(collection: string, key: string, value: string, type?: string) {
     const col = await this.getCollection(collection);
     const query: any = { [key]: value };

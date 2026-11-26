@@ -141,7 +141,7 @@ The answer stream SHALL join the text before a tool call and the text after it w
 
 ### Requirement: Agent threads stay out of the AI search list
 
-`GET /v1/husky/threads` SHALL leave out threads with `source: 'agent'` (LAB-3457); the LabOS agent lists them. A thread with no `source` SHALL stay in the list, also when the agent continued it. Thread delete SHALL stay a soft delete (`isDeleted: true`), and the AI search turn write SHALL not change for AI search callers.
+`GET /v1/husky/threads` SHALL leave out threads with `source: 'agent'` (LAB-3457); the LabOS agent lists them. A thread with no `source` SHALL stay in the list, also when the agent continued it. Thread delete SHALL stay a soft delete (`isDeleted: true`), and the AI search turn write SHALL not change for AI search callers. The thread reads by id (`GET /v1/husky/threads/:id`, duplicate, delete, the title update) SHALL leave a soft-deleted thread out and answer 404 "Thread not found", for members and guests, so a deleted chat never comes back. The LAB-3459 writer check SHALL still see a deleted thread, so another member's deleted thread is refused and never taken as a new one.
 
 #### Scenario: A member with an agent thread
 
