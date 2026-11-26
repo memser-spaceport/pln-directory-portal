@@ -20,9 +20,10 @@ import { PLEventFormHelpersService } from './pl-event-form-helpers.service';
 const generateObjectMock = generateObject as jest.MockedFunction<typeof generateObject>;
 const axiosGet = axios.get as jest.MockedFunction<typeof axios.get>;
 
+const logger = { info: jest.fn(), error: jest.fn() };
+
 function helpers() {
-  const aiProvider = { getResponsesModel: jest.fn(() => 'model') };
-  const logger = { info: jest.fn(), error: jest.fn() };
+  const aiProvider = { getResponsesModel: jest.fn(() => 'model'), getModelName: jest.fn(() => 'gpt-4o') };
   return new PLEventFormHelpersService(aiProvider as any, logger as any);
 }
 
@@ -224,6 +225,33 @@ describe('agenda parsing (model mocked)', () => {
   it('answers 503 when the model cannot be reached', async () => {
     generateObjectMock.mockRejectedValue(new Error('provider down'));
     await expect(helpers().parseAgenda(INPUT)).rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
+
+  it('logs the provider error type and code, and no agenda text (LAB-3443)', async () => {
+    // The shape of an AI SDK APICallError; its message and request body must not reach the log.
+    const providerError = Object.assign(new Error(`Invalid schema for ${INPUT.text}`), {
+      name: 'AI_APICallError',
+      statusCode: 400,
+      isRetryable: false,
+      requestBodyValues: { input: INPUT.text },
+      responseBody: JSON.stringify({
+        error: {
+          message: 'Invalid schema',
+          type: 'invalid_request_error',
+          code: 'invalid_json_schema',
+          param: 'text.format.schema',
+        },
+      }),
+    });
+    generateObjectMock.mockRejectedValue(providerError);
+    await expect(helpers().parseAgenda(INPUT)).rejects.toBeInstanceOf(ServiceUnavailableException);
+    const line = logger.error.mock.calls[0][0] as string;
+    expect(line).toContain('"status":400');
+    expect(line).toContain('"type":"invalid_request_error"');
+    expect(line).toContain('"code":"invalid_json_schema"');
+    expect(line).toContain('"model":"gpt-4o"');
+    expect(line).not.toContain(INPUT.text);
+    expect(logger.error.mock.calls[0][1]).toBeUndefined();
   });
 });
 

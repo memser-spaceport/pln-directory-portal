@@ -226,4 +226,5 @@ For the submit form. Each route needs a signed-in member (401 without a session)
 | `POST /v1/irl/events/agenda/parse`                          | Body `{ text, startDate, endDate, timezone }`. Answer `{ sessions: [{ name, description, start_date, end_date, timezone }], message }`. A session with no end lasts one hour. With no sessions, `message` says what is missing. Model not reachable: 503 |
 
 The venue routes use `GOOGLE_PLACES_API_KEY` (Places, Geocoding and Time Zone APIs). Agenda parsing uses the API's
-AI provider (`EVENT_AGENDA_PARSE_AI_PROVIDER` overrides it).
+AI provider (`EVENT_AGENDA_PARSE_AI_PROVIDER` overrides it). A failed model call logs the model, the error class, the HTTP status and the
+provider's error type and code, never the agenda text (LAB-3443).

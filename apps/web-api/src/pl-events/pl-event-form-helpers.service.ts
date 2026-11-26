@@ -34,6 +34,7 @@ export class PLEventFormHelpersService {
       timezone: input.timezone,
     };
     let output;
+    const modelName = this.aiProvider.getModelName(EVENT_AGENDA_PARSE_AI_PROVIDER_ENV);
     try {
       const result = await generateObject({
         model: this.aiProvider.getResponsesModel(EVENT_AGENDA_PARSE_AI_PROVIDER_ENV, { useSearchGrounding: false }),
@@ -44,9 +45,46 @@ export class PLEventFormHelpersService {
       });
       output = result.object;
     } catch (error) {
-      this.logger.error(`Agenda parse failed: ${error?.message}`, error?.stack, LOG_CONTEXT);
+      this.logger.error(
+        `Agenda parse failed: ${JSON.stringify(agendaErrorFacts(error, modelName))}`,
+        undefined,
+        LOG_CONTEXT
+      );
       throw new ServiceUnavailableException('The agenda could not be read right now. Please try again.');
     }
     return toAgendaSessions(output, event);
   }
+}
+
+type ProviderCallError = { statusCode: number; responseBody?: string; isRetryable?: boolean };
+
+const SAFE_TOKEN = /^[A-Za-z0-9_.:-]{1,80}$/;
+const safe = (value: unknown) => (typeof value === 'string' && SAFE_TOKEN.test(value) ? value : undefined);
+
+/**
+ * What the log keeps of a failed model call (LAB-3443): the model, the error class, the HTTP status and the
+ * provider's error type, code and param. Never the agenda text, the model output or the request body.
+ */
+export function agendaErrorFacts(error: unknown, model: string) {
+  const outer = error as { name?: string; cause?: unknown } | undefined;
+  // An AI SDK APICallError (checked by shape: `ai` loads ESM-only code in Jest).
+  const call = [error, outer?.cause].find(
+    (item): item is ProviderCallError => typeof (item as ProviderCallError | undefined)?.statusCode === 'number'
+  );
+  let body: { error?: { type?: unknown; code?: unknown; param?: unknown } } | undefined;
+  try {
+    body = call?.responseBody ? JSON.parse(call.responseBody) : undefined;
+  } catch {
+    body = undefined;
+  }
+  return {
+    model: safe(model),
+    error: safe(outer?.name) ?? 'unknown',
+    cause: safe((outer?.cause as { name?: string } | undefined)?.name),
+    status: call?.statusCode,
+    type: safe(body?.error?.type),
+    code: safe(body?.error?.code),
+    param: safe(body?.error?.param),
+    retryable: call?.isRetryable,
+  };
 }
