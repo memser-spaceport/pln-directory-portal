@@ -25,6 +25,9 @@ import { NotificationServiceClient } from '../notifications/notification-service
 import { applyDemoDayParticipantPolicyAssignments } from '../demo-days/demo-day-investor-policy.util';
 import { LOGIN_TOKEN_TTL_SECONDS } from './auth.constants';
 
+/** A hung auth node must fail the call. It must not hold the request open. */
+const AUTH_HTTP_TIMEOUT_MS = 3000;
+
 @Injectable()
 export class AuthService implements OnModuleInit {
   private membersService: MembersService;
@@ -67,10 +70,14 @@ export class AuthService implements OnModuleInit {
 
   async createAuthRequest(authRequest) {
     const output = await this.authCall('create_auth_request', () =>
-      axios.post(`${process.env.AUTH_API_URL}/auth`, {
-        state: authRequest.state,
-        client_id: process.env.AUTH_APP_CLIENT_ID,
-      })
+      axios.post(
+        `${process.env.AUTH_API_URL}/auth`,
+        {
+          state: authRequest.state,
+          client_id: process.env.AUTH_APP_CLIENT_ID,
+        },
+        { timeout: AUTH_HTTP_TIMEOUT_MS }
+      )
     );
     return output.data.uid;
   }
@@ -87,6 +94,7 @@ export class AuthService implements OnModuleInit {
       axios.delete(`${process.env.AUTH_API_URL}/accounts/external/${externalAuthId}`, {
         headers: { Authorization: `Bearer ${clientToken}` },
         data: { token: externalAuthToken },
+        timeout: AUTH_HTTP_TIMEOUT_MS,
       })
     );
     return true;
@@ -114,7 +122,7 @@ export class AuthService implements OnModuleInit {
         axios.post(
           `${process.env.AUTH_API_URL}/auth/login-token`,
           { email: normalizedEmail, expiresIn },
-          { headers: { Authorization: `Bearer ${clientToken}` } }
+          { headers: { Authorization: `Bearer ${clientToken}` }, timeout: AUTH_HTTP_TIMEOUT_MS }
         )
       );
       if (!resp.data?.token) {
@@ -137,7 +145,7 @@ export class AuthService implements OnModuleInit {
     let authTokens;
     try {
       const resp = await this.authCall('redeem_login_token', () =>
-        axios.post(`${process.env.AUTH_API_URL}/auth/login-token/redeem`, { token })
+        axios.post(`${process.env.AUTH_API_URL}/auth/login-token/redeem`, { token }, { timeout: AUTH_HTTP_TIMEOUT_MS })
       );
       authTokens = resp.data;
     } catch (error) {
@@ -160,7 +168,11 @@ export class AuthService implements OnModuleInit {
     let authTokens;
     try {
       const resp = await this.authCall('redeem_login_token', () =>
-        axios.post(`${process.env.AUTH_API_URL}/auth/login-token/redeem`, { token: loginToken })
+        axios.post(
+          `${process.env.AUTH_API_URL}/auth/login-token/redeem`,
+          { token: loginToken },
+          { timeout: AUTH_HTTP_TIMEOUT_MS }
+        )
       );
       authTokens = resp.data;
     } catch (error) {
@@ -405,7 +417,7 @@ export class AuthService implements OnModuleInit {
 
   validateToken = async (request, token) => {
     const validationResult: any = await this.authCall('introspect', () =>
-      axios.post(`${process.env.AUTH_API_URL}/auth/introspect`, { token: token })
+      axios.post(`${process.env.AUTH_API_URL}/auth/introspect`, { token: token }, { timeout: AUTH_HTTP_TIMEOUT_MS })
     );
     if (validationResult?.data?.active && validationResult?.data?.email) {
       request['userEmail'] = validationResult.data.email;
@@ -436,12 +448,16 @@ export class AuthService implements OnModuleInit {
 
   private async getClientToken() {
     const response = await this.authCall('client_token', () =>
-      axios.post(`${process.env.AUTH_API_URL}/auth/token`, {
-        client_id: process.env.AUTH_APP_CLIENT_ID,
-        client_secret: process.env.AUTH_APP_CLIENT_SECRET,
-        grant_type: 'client_credentials',
-        grantTypes: ['client_credentials', 'authorization_code', 'refresh_token'],
-      })
+      axios.post(
+        `${process.env.AUTH_API_URL}/auth/token`,
+        {
+          client_id: process.env.AUTH_APP_CLIENT_ID,
+          client_secret: process.env.AUTH_APP_CLIENT_SECRET,
+          grant_type: 'client_credentials',
+          grantTypes: ['client_credentials', 'authorization_code', 'refresh_token'],
+        },
+        { timeout: AUTH_HTTP_TIMEOUT_MS }
+      )
     );
     return response.data.access_token;
   }
@@ -487,7 +503,7 @@ export class AuthService implements OnModuleInit {
 
     try {
       result = await this.authCall(`get_tokens.${grantType}`, () =>
-        axios.post(`${process.env.AUTH_API_URL}/auth/token`, payload)
+        axios.post(`${process.env.AUTH_API_URL}/auth/token`, payload, { timeout: AUTH_HTTP_TIMEOUT_MS })
       );
       return result.data;
     } catch (error) {
@@ -520,6 +536,7 @@ export class AuthService implements OnModuleInit {
   private getAuthApi() {
     const authOtpService = axios.create({
       baseURL: `${process.env.AUTH_API_URL}`,
+      timeout: AUTH_HTTP_TIMEOUT_MS,
     });
     authOtpService.interceptors.response.use(
       (response) => response,
@@ -555,6 +572,8 @@ export class AuthService implements OnModuleInit {
       throw new ForbiddenException('MAX_RESEND_ATTEMPTS_REACHED');
     } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EOTP004') {
       throw new BadRequestException('CODE_EXPIRED');
+    } else if (error?.response?.status === 400 && error?.response?.data?.errorCode === 'EATH004') {
+      throw new UnauthorizedException('Invalid or expired refresh token');
     } else {
       throw new InternalServerErrorException('Unexpected error. Please try again', { cause: error });
     }
