@@ -2,7 +2,11 @@ import { Logger } from '@nestjs/common';
 import { CoreTool, tool } from 'ai';
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
-import { LABOS_AGENT_INTRO_DRAFT_LIMITS, LabosAgentDraft } from 'libs/contracts/src/schema/labos-agent';
+import {
+  LABOS_AGENT_INTRO_DRAFT_LIMITS,
+  LabosAgentDraft,
+  LabosAgentSurface,
+} from 'libs/contracts/src/schema/labos-agent';
 import { IntroRequestsService } from '../intro-requests/intro-requests.service';
 import { McpActorContext } from '../mcp/mcp-tools';
 import { stripHtmlToPlainText } from '../team-news/team-news-body-html.util';
@@ -222,7 +226,31 @@ export type DraftDeps = {
   card?: { type: string; uid: string; text: string };
   message?: string;
   ownFacts?: () => Promise<string[]>;
+  /** LAB-3457 QA1: the C1 `surface`. Absent is the panel. */
+  surface?: LabosAgentSurface;
 };
+
+/**
+ * LAB-3457 QA1: what the agent asks when an intro has no target. On the full page (`surface: 'page'`) there is no
+ * member or team context, so the member types @ and picks one; the page never sends them to a profile. The panel keeps
+ * its text: an @mention, or "Ask the agent" on the profile.
+ */
+export const PAGE_NO_TARGET_ASK =
+  'Ask the member in one short line to type @ in the message and pick the member or team. ' +
+  'Do not send them to a profile page.';
+const PANEL_NO_TARGET_ASK =
+  'Ask the member to @mention the member or team in the message, ' +
+  'or to open "Ask the agent" from the profile of the member or team.';
+
+export function noTargetAsk(surface?: LabosAgentSurface): string {
+  return surface === 'page' ? PAGE_NO_TARGET_ASK : PANEL_NO_TARGET_ASK;
+}
+
+function noTargetLine(surface?: LabosAgentSurface): string {
+  return surface === 'page'
+    ? `When there is no target: ${PAGE_NO_TARGET_ASK}`
+    : 'When there is no target, ask the member to open "Ask the agent" from the member or team profile.';
+}
 
 /**
  * `draft_intro` (LAB-3300, contract section 8.3). An agent tool only, not an MCP tool. Propose only: it reads the
@@ -242,8 +270,8 @@ export function draftIntroTool(ctx: McpActorContext, deps: DraftDeps): CoreTool 
       profileToolsLine(deps.readTools ?? []) +
       'The tool only makes a draft card. The member edits it and presses Send. Nothing is sent. ' +
       'Call it before you write the answer. Do not write the draft text in the answer: the card shows it. ' +
-      'Use it only for an intro target of this turn. Make one draft for one target. When there is no target, ask the member to open ' +
-      '"Ask the agent" from the member or team profile.',
+      'Use it only for an intro target of this turn. Make one draft for one target. ' +
+      noTargetLine(deps.surface),
     parameters: z.object({
       type: z.enum(['member', 'team']),
       targetUid: z.string(),
@@ -255,11 +283,9 @@ export function draftIntroTool(ctx: McpActorContext, deps: DraftDeps): CoreTool 
       // 1. Only a target of this turn. A turn still has at most 1 draft (S3-R8).
       const target = deps.targets.find((item) => item.type === args.type && item.uid === args.targetUid);
       if (!target) {
-        return (
-          'The draft was refused: the target is not the intro target of this turn. Make no draft. ' +
-          'Ask the member to @mention the member or team in the message, ' +
-          'or to open "Ask the agent" from the profile of the member or team.'
-        );
+        return `The draft was refused: the target is not the intro target of this turn. Make no draft. ${noTargetAsk(
+          deps.surface
+        )}`;
       }
       try {
         // 2. The C3 sender rule, the same code as C3.

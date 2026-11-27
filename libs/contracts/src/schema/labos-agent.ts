@@ -90,6 +90,10 @@ export function labosAgentMentionKey(mention: LabosAgentMention): string {
   return mention.type === 'page' ? `page:${mention.page}` : `${mention.type}:${mention.uid}`;
 }
 
+/** The C1 `surface` values (LAB-3457 QA1). */
+export const LABOS_AGENT_SURFACES = ['page', 'panel'] as const;
+export type LabosAgentSurface = typeof LABOS_AGENT_SURFACES[number];
+
 /** Body of `POST /v1/labos-agent/chat`. */
 export const LabosAgentChatRequestSchema = z.object({
   threadId: z.string().min(1).max(64),
@@ -117,6 +121,12 @@ export const LabosAgentChatRequestSchema = z.object({
    * THREAD_NOT_FOUND before the stream.
    */
   persist: z.boolean().optional(),
+  /**
+   * LAB-3457 QA1: where the chat is. `page` is the full agent page (`/ai-search`), `panel` the agent panel on any other
+   * page. Absent is `panel`, as before. It changes only what the agent tells a member who asks for an intro with no
+   * target: on the page, to type @ and pick the member or team, never to open a profile.
+   */
+  surface: z.enum(LABOS_AGENT_SURFACES).optional(),
 });
 
 export type LabosAgentContext = z.infer<typeof LabosAgentContextSchema>;

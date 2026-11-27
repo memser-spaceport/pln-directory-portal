@@ -890,3 +890,20 @@ A saved proposal SHALL have a `status`: `open` when saved, then `done`, `cancell
 - **WHEN** the member sends C3 to T
 - **THEN** one intro request is created and the draft is `sent`
 - **AND** a later C5 send of that draft is 409 `DRAFT_CLOSED`
+
+### Requirement: An intro with no target on the full agent page
+
+C1 SHALL take an optional `surface`: `page` (the full agent page, `/ai-search`) or `panel` (the agent panel on any other page). Any other value SHALL give 400 before the stream. An absent `surface` SHALL work as `panel`. With `surface: 'page'`, when an intro has no target in the turn (for example, the member gives only a name), the agent SHALL ask in one short line to type @ and pick the member or team, and SHALL NOT tell the member to open a profile page or "Ask the agent". The `draft_intro` description and its "not the intro target of this turn" refusal SHALL say this. With `panel` or no `surface`, these texts SHALL stay as before (an @mention, or "Ask the agent" from the profile). `surface` SHALL NOT add a target: a page turn still drafts only for a target of the turn, such as an @mention chip.
+
+#### Scenario: A name alone on the full page
+
+- **GIVEN** a C1 turn with `surface: 'page'`, no `context` and no mentions
+- **WHEN** the member asks for an intro to a member by name and the model calls `draft_intro` for that member
+- **THEN** the call is refused with no draft, and the refusal asks to type @ and pick the member or team
+- **AND** neither the tool description nor the refusal tells the member to open a profile page
+
+#### Scenario: The panel on a profile page
+
+- **GIVEN** a C1 turn with `surface: 'panel'` or no `surface`
+- **WHEN** a `draft_intro` call is for a target outside the turn
+- **THEN** the refusal and the tool description are the same as before this change
