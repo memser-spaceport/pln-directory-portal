@@ -41,12 +41,12 @@ export class HuskyChatsController {
   @UseGuards(UserAccessTokenValidateGuard)
   @Post('v1/husky/chat/feedback')
   async huskyChatFeedback(@Body() body: HuskyFeedbackDto, @Req() req) {
-    await this.huskyService.addHuskyFeedback({ ...body, email: req.userEmail ?? body.email });
+    await this.huskyService.addHuskyFeedback({ ...body, email: req.userEmail ?? body.email }, req.userEmail);
   }
 
   @UseGuards(UserAccessTokenValidateGuard)
   @Delete('v1/husky/chat/feedback/:questionId')
-  async removeHuskyChatFeedback(@Param('questionId') questionId: string) {
-    await this.huskyService.removeHuskyFeedback(questionId);
+  async removeHuskyChatFeedback(@Param('questionId') questionId: string, @Req() req) {
+    await this.huskyService.removeHuskyFeedback(questionId, req.userEmail);
   }
 }
