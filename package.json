@@ -103,7 +103,7 @@
     "ai": "^4.0.19",
     "aws-sdk": "^2.1692.0",
     "axios": "^1.20.0",
-    "body-parser": "1.20.2",
+    "body-parser": "1.20.9",
     "bull": "^4.9.0",
     "cache-manager": "^4.1.0",
     "cache-manager-redis-store": "^2.0.0",
