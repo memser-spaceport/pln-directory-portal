@@ -68,6 +68,10 @@ export const PLEventDetailsSchema = z.object({
    * LAB-3332 do not have it; reads always return it (null when absent).
    */
   locationUrl: z.string().refine(isHttpUrl, 'expected an http or https URL').nullable().optional(),
+  /** Addresses by platform, for example `{ twitter: ['https://x.com/pl'] }`. Null when the event has none. */
+  contactInfos: z.record(z.array(z.string())).nullable().optional(),
+  /** How to find the venue. Null when the event has none. */
+  locationInstructions: z.string().nullable().optional(),
   /**
    * LAB-3403: the event's own time zone (IANA name), or null. Optional because details stored before LAB-3403 do not
    * have it; reads always return it (null when absent).
@@ -92,6 +96,8 @@ export function emptyPLEventDetails(): PLEventDetails {
     sponsors: [],
     agenda: null,
     locationUrl: null,
+    contactInfos: null,
+    locationInstructions: null,
     timezone: null,
   };
 }
@@ -100,6 +106,8 @@ export function emptyPLEventDetails(): PLEventDetails {
 export const SyncPLEventsBodySchema = z.object({
   selectedEventUids: z.array(z.string()).optional(),
   detailsOnly: z.boolean().optional(),
+  /** Cutover only: bring the events service's waiting events and drafts over (`importNonApprovedEvents`). */
+  nonApproved: z.boolean().optional(),
 });
 
 export type SyncPLEventsBody = z.infer<typeof SyncPLEventsBodySchema>;

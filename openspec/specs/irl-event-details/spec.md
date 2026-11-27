@@ -106,7 +106,7 @@ The event read SHALL include:
 - `faces`: up to three of those members (uid, name, image).
 - `viewerGoing`: true only when the signed-in viewer has a guest row for this event.
 
-For a signed-out viewer of an `INVITE_ONLY` event, `goingCount` SHALL be 0 and `faces` empty. REJECTED members SHALL be left out, as in the attendee list; `showOnProfile` SHALL NOT matter.
+An event is invite-only when its `type` is `INVITE_ONLY` or its `accessOption` is `INVITE` (LAB-3281). For a signed-out viewer of an invite-only event, `goingCount` SHALL be 0 and `faces` empty. REJECTED members SHALL be left out, as in the attendee list; `showOnProfile` SHALL NOT matter.
 
 #### Scenario: The viewer is going
 
@@ -121,6 +121,12 @@ For a signed-out viewer of an `INVITE_ONLY` event, `goingCount` SHALL be 0 and `
 - **WHEN** A is read
 - **THEN** `goingCount` is 2
 - **AND** the rejected member is not in `faces` or `hosts`
+
+#### Scenario: A signed-out viewer and an INVITE access event with no type
+
+- **GIVEN** event A with `accessOption` `INVITE`, `type` null and going members
+- **WHEN** a signed-out viewer reads A
+- **THEN** `goingCount` is 0 and `faces` is empty
 
 #### Scenario: A signed-out viewer
 

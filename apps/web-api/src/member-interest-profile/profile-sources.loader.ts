@@ -5,6 +5,7 @@ import { readStoredNewsTags } from '../team-news/utils/news-tags';
 import { NewsTagVocabulary } from '../team-news/news-tag-vocabulary.service';
 import { slugify } from '../utils/helper/helper';
 import type { ProfileLookups, ProfileSources } from './build-profile';
+import { VISIBLE_PL_EVENT_WHERE } from '../pl-events/pl-event-visibility';
 
 type LoaderPrisma = Pick<
   PrismaClient,
@@ -123,7 +124,7 @@ export async function loadProfileBatch(
         entityType: 'TEAM',
         teamUid: { not: null },
         role: { in: [...EVENT_LINK_ROLES] },
-        event: { isDeleted: false },
+        event: { ...VISIBLE_PL_EVENT_WHERE },
       },
       select: { eventUid: true, teamUid: true },
     }),

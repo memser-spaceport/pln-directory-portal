@@ -45,5 +45,6 @@ export const ResponsePLEventLocationAssociationWithRelationsSchema = ResponsePLE
 
 export class createLocationAssociationSchemaDto extends createZodDto(CreateLocationAssociationSchema) {}
 export class UpdatePLEventLocationAssociationSchemaDto extends createZodDto(UpdatePLEventLocationAssociationSchema) {}
-export class ResponsePLEventLocationAssociationSchemaDto extends createZodDto(ResponsePLEventLocationAssociationWithRelationsSchema) {}
-
+export class ResponsePLEventLocationAssociationSchemaDto extends createZodDto(
+  ResponsePLEventLocationAssociationWithRelationsSchema
+) {}

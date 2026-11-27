@@ -9,6 +9,7 @@ import { tool, CoreTool } from 'ai';
 import { z } from 'zod';
 import { HuskyAuthContext } from './husky-auth-context';
 import { fuzzyMatches, longestWord, textMentions } from './fuzzy-match.util';
+import { VISIBLE_PL_EVENT_WHERE } from '../../pl-events/pl-event-visibility';
 
 const MAX_EVENTS = 10;
 /** Page size for the public guest list. That route caps `limit` at this value. */
@@ -252,6 +253,7 @@ export class IrlEventsTool {
     const seen = new Set<string>();
     const events: EventRow[] = [];
     for (const query of queries) {
+      // pl-event-visibility: every query's `where` comes from buildWhere, which starts from VISIBLE_PL_EVENT_WHERE.
       const rows = await this.prisma.pLEvent.findMany({
         where: query.where,
         include: { location: true },
@@ -275,7 +277,7 @@ export class IrlEventsTool {
     args: IrlEventsToolArgs,
     viewer: ViewerMember | null
   ): { where: Prisma.PLEventWhereInput; endDate: Prisma.DateTimeFilter } {
-    const where: Prisma.PLEventWhereInput = { isDeleted: false };
+    const where: Prisma.PLEventWhereInput = { ...VISIBLE_PL_EVENT_WHERE };
     // Kept apart from `where` so the caller can add the timeframe bound to it.
     const endDate: Prisma.DateTimeFilter = {};
     const and: Prisma.PLEventWhereInput[] = [];

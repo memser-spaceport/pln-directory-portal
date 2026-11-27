@@ -22,6 +22,7 @@ import { PLEventsService } from './pl-events.service';
 import { TeamsService } from '../teams/teams.service';
 import path from 'path';
 import { IrlGatheringPushCandidatesService } from './push/irl-gathering-push-candidates.service';
+import { VISIBLE_PL_EVENT_WHERE, withoutPrivateEventFields } from './pl-event-visibility';
 
 const GUEST_LIST_DEFAULT_LIMIT = 10;
 const GUEST_LIST_MAX_LIMIT = 100;
@@ -179,9 +180,10 @@ export class PLEventGuestsService {
    */
   async getPLEventsByMemberAndLocation(member: Member, locationUid: string): Promise<any> {
     try {
-      return this.prisma.pLEvent.findMany({
+      const events = await this.prisma.pLEvent.findMany({
         where: {
           locationUid,
+          ...VISIBLE_PL_EVENT_WHERE,
           eventGuests: {
             some: {
               memberUid: member?.uid,
@@ -189,6 +191,7 @@ export class PLEventGuestsService {
           },
         },
       });
+      return withoutPrivateEventFields(events);
     } catch (err) {
       return this.handleErrors(err);
     }
@@ -821,6 +824,7 @@ export class PLEventGuestsService {
     const userAttendedEvents = await this.prisma.pLEvent.findMany({
       where: {
         type: 'INVITE_ONLY',
+        ...VISIBLE_PL_EVENT_WHERE,
         eventGuests: {
           some: {
             memberUid: member.uid,

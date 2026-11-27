@@ -32,6 +32,8 @@ const ProfileEventFieldsSchema = z.object({
   uid: z.string(),
   name: z.string(),
   type: z.string().nullable(),
+  /** `OPEN`, `INVITE` or `PAID`. An event with `INVITE` hides its attendance from signed-out viewers. */
+  accessOption: z.string().nullable().optional(),
   startDate: z.string(),
   endDate: z.string(),
   logo: z.string().nullable(),

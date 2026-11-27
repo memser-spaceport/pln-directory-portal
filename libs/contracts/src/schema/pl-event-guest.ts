@@ -1,8 +1,8 @@
-import { z } from "zod";
+import { z } from 'zod';
 import { createZodDto } from '@abitia/zod-dto';
 import { QueryParams } from './query-params';
 import { ResponseMemberSchema } from './member';
-import { ResponseTeamSchema  } from "./team";
+import { ResponseTeamSchema } from './team';
 import { DeletePLEventGuestsSchema } from './pl-event-attendance';
 
 export const CreatePLEventGuestSchema = z.object({
@@ -16,30 +16,40 @@ export const CreatePLEventGuestSchema = z.object({
   officeHours: z.string(),
   // Shown on the member's profile; defaults to true (LAB-3213).
   showOnProfile: z.boolean().optional(),
-  events: z.array(z.object({
-    uid: z.string(),
-    isHost: z.boolean().optional(),
-    isSpeaker: z.boolean().optional(),
-    isSponsor: z.boolean().optional(),
-    hostSubEvents: z.array(
+  events: z
+    .array(
       z.object({
-        name: z.string(),
-        link: z.string().url(),
+        uid: z.string(),
+        isHost: z.boolean().optional(),
+        isSpeaker: z.boolean().optional(),
+        isSponsor: z.boolean().optional(),
+        hostSubEvents: z
+          .array(
+            z.object({
+              name: z.string(),
+              link: z.string().url(),
+            })
+          )
+          .optional(),
+        speakerSubEvents: z
+          .array(
+            z.object({
+              name: z.string(),
+              link: z.string().url(),
+            })
+          )
+          .optional(),
+        sponsorSubEvents: z
+          .array(
+            z.object({
+              name: z.string(),
+              link: z.string().url(),
+            })
+          )
+          .optional(),
       })
-    ).optional(),
-    speakerSubEvents: z.array(
-      z.object({
-        name: z.string(),
-        link: z.string().url(),
-    })
-    ).optional(),
-    sponsorSubEvents: z.array(
-      z.object({
-        name: z.string(),
-        link: z.string().url(),
-      })
-    ).optional()
-  })).optional()
+    )
+    .optional(),
 });
 
 export const PLEventGuestSchema = z.object({
@@ -60,9 +70,8 @@ export const PLEventGuestSchema = z.object({
   isSpeaker: z.boolean().nullish(),
   isSponsor: z.boolean().nullish(),
   showOnProfile: z.boolean().nullish(),
-  priority: z.number().int().nullish()
+  priority: z.number().int().nullish(),
 });
-
 
 export const PLEventGuestQuerySchema = z.object({
   id: z.string(),
@@ -82,9 +91,8 @@ export const PLEventGuestQuerySchema = z.object({
   isHost: z.boolean().nullish(),
   isSpeaker: z.boolean().nullish(),
   isSponsor: z.boolean().nullish(),
-  searchBy: z.string()
+  searchBy: z.string(),
 });
-
 
 export const ResponsePLEventGuestSchema = PLEventGuestSchema.omit({ id: true }).strict();
 
@@ -96,7 +104,7 @@ export const ResponsePLEventGuestSchemaWithRelationsSchema = ResponsePLEventGues
 export const PLEventGuestRelationalFields = ResponsePLEventGuestSchemaWithRelationsSchema.pick({
   member: true,
   team: true,
-  priority: true
+  priority: true,
 }).strip();
 
 export const PLEventGuestQueryableFields = PLEventGuestRelationalFields.keyof();

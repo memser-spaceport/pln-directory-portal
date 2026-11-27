@@ -41,6 +41,7 @@ import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.const
 import { assignJobSearchStatusFromInput, omitJobSearchStatus } from './job-search-status';
 import { directoryListedMemberWhere } from './member-visibility';
 import { memberCrawlIndexWhere, toMemberCrawlIndex } from './member-crawl-index';
+import { VISIBLE_PL_EVENT_WHERE } from '../pl-events/pl-event-visibility';
 
 /**
  * Interface for member search match result (used by entity association)
@@ -547,7 +548,7 @@ export class MembersService {
           eventGuests: {
             where: {
               event: {
-                isDeleted: false,
+                ...VISIBLE_PL_EVENT_WHERE,
               },
             },
             orderBy: {

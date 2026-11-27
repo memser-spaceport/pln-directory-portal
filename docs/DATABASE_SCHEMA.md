@@ -128,9 +128,25 @@
     - resources: Array of JSON resources
     - additionalInfo: Optional JSON for extra event details
   - Status:
-    - type: PLEventType (e.g., INVITE_ONLY)
+    - type: PLEventType (INVITE_ONLY, VIRTUAL, IN_PERSON); the invite-only rules of attendance read it
     - isFeatured: Whether the event is featured
     - isAggregated: Whether the event is an aggregate
+  - Approval:
+    - status: PLEventStatus, default APPROVED. Only APPROVED events are returned by reads (see `docs/EVENTS.md`)
+    - submitterUid: Member who submitted the event (optional)
+    - sourceTeamUid: Team whose integration key published the event (optional); unique together with externalId
+    - reviewedAt, reviewNote: The last approve or reject decision
+  - Typed event fields (also filter fields of `GET /v1/irl/events`):
+    - timezone: IANA time zone name
+    - format: PLEventFormat
+    - accessOption: PLEventAccess
+    - tags: Array of tag names (GIN index)
+    - hostName: Host name; the host logo stays in additionalInfo.details
+    - venueAddress, latitude, longitude: Venue line and position
+    - isAllDay: True when the dates carry no time of day
+    - registrationUrl, meetingUrl: Links
+    - privateDetails: JSON read only by the submitter, a directory admin and a curator (host and co-host emails, the address parts the gathering was resolved from)
+  - Indexes: (status, isDeleted, startDate); GIN on tags; unique (sourceTeamUid, externalId)
   - Metrics:
     - eventsCount: Number of related events
     - priority: Integer for sorting/ordering
@@ -139,6 +155,7 @@
   - Has many PLEventGuests (one-to-many)
   - Has many DiscoveryQuestions (many-to-many)
   - Has two Image relations (logo and banner)
+  - Belongs to one Member as submitter (optional) and one Team as source team (optional)
 
 #### PLEventGuest
 - Purpose: Manages event participation and roles
@@ -466,8 +483,17 @@
 - ApprovalStatus: PENDING, APPROVED, REJECTED, AUTOAPPROVED
   - Purpose: Manages approval workflows
 
-- PLEventType: INVITE_ONLY
+- PLEventType: INVITE_ONLY, VIRTUAL, IN_PERSON
   - Purpose: Defines event access types
+
+- PLEventStatus: DRAFT, PENDING, APPROVED, REJECTED
+  - Purpose: Approval state of an event; only APPROVED events are visible. PENDING is shown to people as "Submitted"
+
+- PLEventFormat: IN_PERSON, VIRTUAL, HYBRID
+  - Purpose: How an event is held
+
+- PLEventAccess: OPEN, INVITE, PAID
+  - Purpose: Who can attend an event
 
 - MemberFollowUpStatus: PENDING, COMPLETED, CLOSED
   - Purpose: Tracks follow-up task status
