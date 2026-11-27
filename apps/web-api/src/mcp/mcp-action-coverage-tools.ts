@@ -612,7 +612,8 @@ export function actionCoverageTools(deps: {
             role: typeof args.role === 'string' ? args.role : undefined,
             isAccreditedInvestor: args.isAccreditedInvestor === true,
           } as never,
-          requiredUid(args, 'demoDay')
+          requiredUid(args, 'demoDay'),
+          emailOf(ctx)
         );
         return { demoDay: args.demoDay, applied: true };
       },
