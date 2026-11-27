@@ -96,6 +96,7 @@ import { AiAppsModule } from './ai-apps/ai-apps.module';
 import { IntegrationKeysModule } from './integration-keys/integration-keys.module';
 import { AgentSessionsModule } from './agent-sessions/agent-sessions.module';
 import { McpModule } from './mcp/mcp.module';
+import { MemberInvitesModule } from './member-invites/member-invites.module';
 
 @Module({
   controllers: [AppController, MetricsController],
@@ -211,6 +212,7 @@ import { McpModule } from './mcp/mcp.module';
     IntegrationKeysModule,
     AgentSessionsModule,
     McpModule,
+    MemberInvitesModule,
   ],
   providers: [
     {

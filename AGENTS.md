@@ -19,6 +19,7 @@
 - `apps/web-api/src`: domain modules (`members`, `teams`, `projects`, `deals`, etc.), controllers, services, guards, interceptors
 - `apps/web-api/src/app.module.ts`: central Nest module composition and global middleware/interceptor/filter wiring
 - `apps/web-api/prisma`: Prisma schema (`schema.prisma`), migrations, seeds, fixtures
+- `apps/web-api/src/member-invites`: the signed-in member's reusable invite link. The `MemberInviteCode` table stores the public code, not a session or a URL.
 - `apps/web-api/src/scripts`: one-off `ts-node` scripts run through the `api:*` scripts in `package.json` (imports, seeds, backfills, exports)
 - `apps/web-api/src/cli.ts`: `nest-commander` CLI entry (commands in `src/commands`; built by the `web-api:build-cli` target)
 - `apps/web-api/docs`: API docs (data model, deployment guide, testing guidelines)

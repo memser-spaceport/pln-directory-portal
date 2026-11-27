@@ -201,6 +201,7 @@ model Member {
   teamMemberRoles                    TeamMemberRole[]
   memberRoles                        MemberRole[]
   following                          Follow[]                          @relation("MemberFollowing")
+  inviteCode                         MemberInviteCode?
   preferences                        Json?
   /// One-time UI callout dismissals, as a flat map of key -> true.
   /// Deliberately NOT nested in `preferences`: that column is replaced
@@ -4850,6 +4851,16 @@ model Follow {
   @@unique([memberUid, entityType, entityUid])
   @@index([entityType, entityUid])
   @@index([memberUid, entityType])
+}
+
+/// LAB-3396: one reusable, public invite code per member. It opens standard sign-up and has no expiry.
+model MemberInviteCode {
+  id        Int      @id @default(autoincrement())
+  uid       String   @unique @default(cuid())
+  member    Member   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  memberUid String   @unique
+  code      String   @unique
+  createdAt DateTime @default(now())
 }
 
 /// MCP OAuth dynamic client registration (RFC 7591). Public clients only.
