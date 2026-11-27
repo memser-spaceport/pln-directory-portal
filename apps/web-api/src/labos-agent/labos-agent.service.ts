@@ -294,6 +294,8 @@ export class LabosAgentService {
         : undefined,
       message: body.message,
       ownFacts: () => this.ownFacts(claimsKey, reads, ctx),
+      // LAB-3457 QA1: the full page asks for an @mention, never for a profile.
+      surface: body.surface,
     });
 
     const extraTools = { ...mcpToolsAsAgentTools(reads, ctx), ...proposeTools, draft_intro: draftIntro };

@@ -35,6 +35,7 @@ import {
   DRAFT_LIMITS_RULE,
   INTRO_REASON_RULE,
   ownClaims,
+  PAGE_NO_TARGET_ASK,
   IntroTurnTarget,
 } from './labos-agent-drafts';
 import { introTargetKey, LabosAgentProposalStore, ownClaimsKey } from './labos-agent-proposals';
@@ -2505,5 +2506,80 @@ describe('LAB-3367 B2, B3, B4 (Oleg live QA on 8fcac6ca)', () => {
     expect(addedClaims(CLAIM, CARD, 'mention my hands-on experience in grants')).toEqual([]);
     expect(addedClaims(CLAIM, undefined, 'make it more convincing')).toEqual([]);
     expect(addedClaims(CLAIM, CARD, 'make it more convincing')).toEqual(['hands-on', 'experience']);
+  });
+});
+
+describe('LAB-3457 QA1: an intro ask with no target on the full page asks for an @mention, never a profile', () => {
+  // The texts the panel had before LAB-3457 QA1. The panel keeps them word for word.
+  const PANEL_LINE = 'When there is no target, ask the member to open "Ask the agent" from the member or team profile.';
+  const PANEL_REFUSAL =
+    'The draft was refused: the target is not the intro target of this turn. Make no draft. ' +
+    'Ask the member to @mention the member or team in the message, ' +
+    'or to open "Ask the agent" from the profile of the member or team.';
+  const NAME_ONLY = 'Draft an intro to Grace Hopper. I want her feedback on our identity product roadmap.';
+  afterEach(() => jest.restoreAllMocks());
+
+  /** One C1 turn through the controller. The scripted model calls draft_intro with each args object, in order. */
+  async function turn(body: Record<string, unknown>, ...calls: Array<Record<string, unknown>>) {
+    // A member chip needs search access (S6), as in the other mention tests.
+    const h = setup(undefined, [MEMBER_PERMISSIONS.SEARCH_READ]);
+    await h.controller.chat({ ...VALID, message: NAME_ONLY, ...body }, h.req, h.res as any);
+    const options = h.husky.createContextualToolsResponse.mock.calls.at(-1)[3];
+    const texts: string[] = [];
+    for (const args of calls) texts.push(await options.extraTools.draft_intro.execute(args));
+    return {
+      description: options.extraTools.draft_intro.description as string,
+      texts,
+      drafts: options.extraResponseFields.drafts as Array<Record<string, any>>,
+    };
+  }
+  const grace = { type: 'member', targetUid: 'm-grace', text: TEXT };
+
+  it('C1 surface: page, panel or absent; any other value is 400 before the stream', async () => {
+    for (const surface of ['page', 'panel', undefined]) {
+      expect(LabosAgentChatRequestSchema.safeParse({ ...VALID, surface }).success).toBe(true);
+    }
+    const h = setup();
+    await expect(h.controller.chat({ ...VALID, surface: 'profile' }, h.req, h.res as any)).rejects.toMatchObject({
+      status: 400,
+    });
+    expect(h.husky.createContextualToolsResponse).not.toHaveBeenCalled();
+  });
+
+  it('page, name alone: the tool says to type @ and pick the member, and never names a profile', async () => {
+    const { description } = await turn({ surface: 'page' });
+    expect(description).toContain(`When there is no target: ${PAGE_NO_TARGET_ASK}`);
+    expect(description).toContain('type @ in the message and pick the member or team');
+    expect(description).not.toContain('Ask the agent');
+    expect(description).not.toMatch(/open[^.]*profile/i);
+    expect(description).toContain('Do not send them to a profile page.');
+  });
+
+  it('page, name alone: a draft for a member who is not a target is refused with the @ line only', async () => {
+    const { texts, drafts } = await turn({ surface: 'page' }, grace);
+    expect(drafts).toEqual([]);
+    expect(texts[0]).toBe(
+      `The draft was refused: the target is not the intro target of this turn. Make no draft. ${PAGE_NO_TARGET_ASK}`
+    );
+    expect(texts[0]).not.toContain('Ask the agent');
+  });
+
+  it('page with an @mention chip: the draft is made at once, as before', async () => {
+    const { texts, drafts } = await turn({ surface: 'page', mentions: [{ type: 'member', uid: 'm-grace' }] }, grace);
+    expect(texts[0]).toContain('Nothing is sent');
+    expect(drafts).toEqual([
+      expect.objectContaining({ target: { type: 'member', uid: 'm-grace', name: 'Grace Hopper' } }),
+    ]);
+  });
+
+  it.each([
+    ['surface panel', { surface: 'panel' }],
+    ['no surface (an older client)', {}],
+    ['the panel on a profile page', { surface: 'panel', context: { page: 'member', memberUid: 'm-grace' } }],
+  ])('%s: the texts are unchanged', async (_name, body) => {
+    const { description, texts } = await turn(body, { ...grace, targetUid: 'm-other' });
+    expect(description).toContain(`Make one draft for one target. ${PANEL_LINE}`);
+    expect(description).not.toContain(PAGE_NO_TARGET_ASK);
+    expect(texts[0]).toBe(PANEL_REFUSAL);
   });
 });
